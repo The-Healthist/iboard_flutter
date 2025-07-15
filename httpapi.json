@@ -1,0 +1,107 @@
+[
+    {
+        "v": "11",
+        "auth": {
+            "token": "<<token>>",
+            "authType": "bearer",
+            "authActive": true
+        },
+        "body": {
+            "body": "{ \"deviceId\": \"DEVICE_25E970A5\" }",
+            "contentType": "application/json"
+        },
+        "name": "login",
+        "method": "POST",
+        "params": [],
+        "headers": [],
+        "endpoint": "<<baseUrl>>/api/device/login",
+        "responses": {},
+        "testScript": "",
+        "preRequestScript": "",
+        "requestVariables": []
+    },
+    {
+        "v": "10",
+        "auth": {
+            "token": "<<electron_token>>",
+            "authType": "bearer",
+            "authActive": true
+        },
+        "body": {
+            "body": "",
+            "contentType": "application/json"
+        },
+        "name": "get_advertisements_building",
+        "method": "GET",
+        "params": [],
+        "headers": [],
+        "endpoint": "<<baseUrl>>/api/device/client/advertisements",
+        "responses": {},
+        "testScript": "",
+        "preRequestScript": "",
+        "requestVariables": []
+    },
+    {
+        "v": "10",
+        "auth": {
+            "token": "<<electron_token>>",
+            "authType": "bearer",
+            "authActive": true
+        },
+        "body": {
+            "body": "",
+            "contentType": "application/json"
+        },
+        "name": "get_notices_building",
+        "method": "GET",
+        "params": [],
+        "headers": [],
+        "endpoint": "<<baseUrl>>/api/device/client/notices",
+        "responses": {},
+        "testScript": "",
+        "preRequestScript": "",
+        "requestVariables": []
+    },
+    {
+        "v": "10",
+        "auth": {
+            "token": "<<electron_token>>",
+            "authType": "bearer",
+            "authActive": true
+        },
+        "body": {
+            "body": "",
+            "contentType": "application/json"
+        },
+        "name": "healthtest",
+        "method": "POST",
+        "params": [],
+        "headers": [],
+        "endpoint": "<<baseUrl>>/api/device/client/health_test",
+        "responses": {},
+        "testScript": "",
+        "preRequestScript": "",
+        "requestVariables": []
+    },
+    {
+        "v": "10",
+        "auth": {
+            "token": "<<common_token>>",
+            "authType": "bearer",
+            "authActive": true
+        },
+        "body": {
+            "body": "{\"blg_id\":\"0314100\"}",
+            "contentType": "application/json"
+        },
+        "name": "notice get",
+        "method": "POST",
+        "params": [],
+        "headers": [],
+        "endpoint": "https://uqf0jqfm77.execute-api.ap-east-1.amazonaws.com/prod/v1/building_board/building-notices",
+        "responses": {},
+        "testScript": "",
+        "preRequestScript": "",
+        "requestVariables": []
+    }
+]

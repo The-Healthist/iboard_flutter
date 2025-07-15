@@ -1,0 +1,372 @@
+import 'dart:async'; // Added for Completer
+import 'dart:convert';
+import 'package:http/http.dart' as http;
+import 'package:logger/logger.dart';
+
+// Custom exception class for API-related errors
+class ApiException implements Exception {
+  final int? statusCode;
+  final String message;
+  final dynamic errorData;
+
+  ApiException({this.statusCode, required this.message, this.errorData});
+
+  @override
+  String toString() {
+    return 'ApiException: $message (Status Code: $statusCode)'
+        '${errorData != null ? "\\nError Data: $errorData" : ""}';
+  }
+}
+
+class ApiClient {
+  final String _baseUrl;
+  String? _token;
+  final Logger _logger = Logger();
+
+  // For managing token refresh
+  bool _isRefreshingToken = false; // True if a refresh operation is active
+  Future<String?>?
+      _tokenRefreshFuture; // Future for the active refresh operation
+
+  Future<String?> Function()? onNeedsTokenRefresh;
+
+  ApiClient({required String baseUrl, this.onNeedsTokenRefresh})
+      : _baseUrl = baseUrl.endsWith('/')
+            ? baseUrl.substring(0, baseUrl.length - 1)
+            : baseUrl;
+
+  void setAuthToken(String? token) {
+    _token = token;
+    if (token != null && token.isNotEmpty) {
+      _logger.i('Auth token set in ApiClient.');
+    } else {
+      _logger.i('Auth token cleared in ApiClient.');
+    }
+  }
+
+  Uri _buildUri(String pathOrFullUrl, Map<String, String>? queryParameters) {
+    String fullUrl;
+    if (pathOrFullUrl.startsWith('http://') ||
+        pathOrFullUrl.startsWith('https://')) {
+      fullUrl = pathOrFullUrl;
+    } else {
+      final path =
+          pathOrFullUrl.startsWith('/') ? pathOrFullUrl : '/$pathOrFullUrl';
+      fullUrl = '$_baseUrl$path';
+    }
+
+    if (queryParameters != null && queryParameters.isNotEmpty) {
+      return Uri.parse(fullUrl).replace(queryParameters: queryParameters);
+    }
+    return Uri.parse(fullUrl);
+  }
+
+  Map<String, String> _getHeaders(
+      {bool requiresAuth = false, String? contentType}) {
+    final headers = <String, String>{};
+    if (contentType != null) {
+      headers['Content-Type'] = contentType;
+    }
+    // Use the internal _token for authorization
+    if (requiresAuth && _token != null && _token!.isNotEmpty) {
+      headers['Authorization'] = 'Bearer $_token';
+    }
+    return headers;
+  }
+
+  Future<Map<String, dynamic>> _handleResponse(
+      http.Response response, String apiName) async {
+    final String decodedBody = utf8.decode(response.bodyBytes);
+
+    if (response.statusCode >= 200 && response.statusCode < 300) {
+      _logger.i('$apiName successful (Status: ${response.statusCode})');
+      if (decodedBody.isEmpty) {
+        return {}; // Return empty map for empty successful response
+      }
+      try {
+        return json.decode(decodedBody) as Map<String, dynamic>;
+      } catch (e, stackTrace) {
+        _logger.e('Failed to decode JSON for $apiName. Body: $decodedBody',
+            error: e, stackTrace: stackTrace);
+        throw ApiException(
+          statusCode: response.statusCode,
+          message:
+              'Successfully received response for $apiName, but failed to decode JSON.',
+          errorData: decodedBody,
+        );
+      }
+    } else {
+      _logger.w(
+          '$apiName failed (Status: ${response.statusCode}), Body: $decodedBody');
+      dynamic errorData;
+      try {
+        errorData = decodedBody.isNotEmpty ? json.decode(decodedBody) : null;
+      } catch (_) {
+        errorData =
+            decodedBody; // If error response is not JSON, use the raw body
+      }
+      // Do not throw ApiException for 401 here if it's handled by _sendRequest retry logic.
+      // The _sendRequest will throw if retry fails or is not applicable.
+      // However, _handleResponse is also called by the login method directly after _sendRequest.
+      // So, if it's a 401 and it wasn't retried (e.g. login call itself, or refresh failed), it should be thrown.
+      // The current _sendRequest logic re-throws or throws original if refresh fails.
+      // This means _handleResponse will receive the final response (either success, or failure after retry attempt).
+      throw ApiException(
+        statusCode: response.statusCode,
+        message:
+            'API request $apiName failed with status code ${response.statusCode}',
+        errorData: errorData,
+      );
+    }
+  }
+
+  // Helper to initiate or get existing refresh future
+  Future<String?> _initiateAndGetTokenRefreshFuture() {
+    if (!_isRefreshingToken) {
+      // If no refresh is active, start one
+      _isRefreshingToken = true;
+      final completer = Completer<String?>();
+      _tokenRefreshFuture = completer.future;
+
+      _logger.i('Starting new token refresh process via onNeedsTokenRefresh.');
+      onNeedsTokenRefresh!().then((newToken) {
+        if (newToken != null && newToken.isNotEmpty) {
+          _logger.i(
+              'Token refresh process completed successfully with a new token.');
+          completer.complete(newToken);
+        } else {
+          _logger.w(
+              'Token refresh process completed but no new token was returned.');
+          completer.complete(null); // Resolve with null if no token
+        }
+      }).catchError((e, stackTrace) {
+        _logger.e('Token refresh process failed execution.',
+            error: e, stackTrace: stackTrace);
+        completer.completeError(e); // Propagate error
+      }).whenComplete(() {
+        _isRefreshingToken =
+            false; // Allow new refresh attempts after this one completes or fails
+      });
+    } else {
+      _logger
+          .i('Token refresh already in progress, returning existing future.');
+    }
+    return _tokenRefreshFuture!;
+  }
+
+  Future<http.Response> _sendRequest(
+    Future<http.Response> Function() requestFunction, {
+    required String apiNameForLog,
+    bool isLoginRequest = false,
+    bool isHealthTestRequest = false, // New flag for healthTest itself
+  }) async {
+    // Section 1: Pre-flight health check (if applicable)
+    if (!isLoginRequest &&
+        !isHealthTestRequest &&
+        _token != null &&
+        _token!.isNotEmpty) {
+      _logger.i('Performing pre-request health check for $apiNameForLog.');
+      try {
+        // healthTest() itself calls _sendRequest with isHealthTestRequest = true
+        await healthTest();
+        _logger.i('Pre-request health check successful for $apiNameForLog.');
+      } on ApiException catch (e) {
+        if (e.statusCode == 401) {
+          _logger.w(
+              'Pre-request health check for $apiNameForLog failed with 401. Attempting token refresh.');
+          if (onNeedsTokenRefresh == null) {
+            _logger.w(
+                'onNeedsTokenRefresh is null, cannot refresh token. Rethrowing 401 from health check.');
+            throw e;
+          }
+
+          try {
+            final newToken = await _initiateAndGetTokenRefreshFuture();
+            if (newToken != null && newToken.isNotEmpty) {
+              _logger.i(
+                  'Token refreshed successfully via health check for $apiNameForLog. Main request will proceed.');
+              // Optionally, re-run healthTest to confirm, but adds latency.
+              // await healthTest();
+            } else {
+              _logger.w(
+                  'Token refresh after health check 401 for $apiNameForLog did not yield a new token. Rethrowing original 401 from health check.');
+              throw ApiException(
+                  statusCode: e.statusCode,
+                  message:
+                      'Failed to refresh token after health check 401 (no new token).',
+                  errorData: e.errorData);
+            }
+          } catch (refreshError) {
+            _logger.e(
+                'Error awaiting token refresh after health check 401 for $apiNameForLog.',
+                error: refreshError);
+            throw ApiException(
+                statusCode: e.statusCode,
+                message:
+                    'Token refresh process failed after health check 401: $refreshError',
+                errorData: e.errorData);
+          }
+        } else {
+          // Non-401 ApiException from health check
+          _logger.w(
+              'Pre-request health check for $apiNameForLog failed with non-401 ApiException: ${e.message}. Rethrowing.');
+          throw e;
+        }
+      } catch (otherError) {
+        // Catch other non-ApiException errors from healthTest()
+        _logger.e(
+            'Pre-request health check for $apiNameForLog failed with an unexpected error.',
+            error: otherError);
+        throw Exception(
+            'Pre-request health check failed unexpectedly: $otherError');
+      }
+    }
+
+    // Section 2: Execute the main request
+    http.Response response;
+    try {
+      response = await requestFunction();
+    } catch (e, stackTrace) {
+      _logger.e(
+          'Original request function for $apiNameForLog failed before HTTP call.',
+          error: e,
+          stackTrace: stackTrace);
+      rethrow; // Rethrow if requestFunction itself fails (e.g. building headers/body)
+    }
+
+    // Section 3: Handle 401 for the main request (retry logic)
+    if (response.statusCode == 401 && !isLoginRequest) {
+      _logger.w(
+          'Received 401 for actual request $apiNameForLog. Attempting token refresh.');
+      if (onNeedsTokenRefresh == null) {
+        _logger.w(
+            'onNeedsTokenRefresh is null, cannot refresh token for $apiNameForLog. Original 401 will be processed by _handleResponse.');
+        return response; // Let _handleResponse deal with the 401
+      }
+
+      try {
+        final newToken = await _initiateAndGetTokenRefreshFuture();
+        if (newToken != null && newToken.isNotEmpty) {
+          _logger.i(
+              'Token refreshed successfully for $apiNameForLog. Retrying original request.');
+          response =
+              await requestFunction(); // Retry the original request function
+        } else {
+          _logger.w(
+              'Token refresh for $apiNameForLog did not yield a new token. Original 401 response will be processed.');
+          // Let the original 401 response be returned to _handleResponse
+        }
+      } catch (refreshError) {
+        _logger.e(
+            'Error awaiting token refresh for $apiNameForLog during main request 401 handling.',
+            error: refreshError);
+        // Let the original 401 response be returned to _handleResponse
+      }
+    }
+    return response;
+  }
+
+  // --- API Methods based on httpapi.json ---
+
+  // 1. Login
+  // Endpoint: POST <<baseUrl>>/api/device/login
+  // Body: { "deviceId": "string" }
+  Future<Map<String, dynamic>> login({required String deviceId}) async {
+    const String endpointPath = '/api/device/login';
+    final Uri url = _buildUri(endpointPath, null);
+    final String requestBody = json.encode({'deviceId': deviceId});
+    final Map<String, String> headers =
+        _getHeaders(requiresAuth: false, contentType: 'application/json');
+
+    _logger.i('Attempting login for deviceId: $deviceId');
+
+    final http.Response response = await _sendRequest(
+        () => http.post(url, headers: headers, body: requestBody),
+        isLoginRequest: true, // Mark as login request
+        apiNameForLog: 'login');
+
+    final Map<String, dynamic> responseData =
+        await _handleResponse(response, 'login');
+
+    if (responseData.containsKey('token') &&
+        responseData['token'] is String &&
+        (responseData['token'] as String).isNotEmpty) {
+      setAuthToken(responseData['token'] as String);
+      _logger.i('Login successful, token stored in ApiClient.');
+    } else {
+      _logger.w(
+          'Login response did not contain a valid token. Clearing any existing token in ApiClient.');
+      setAuthToken(null);
+    }
+    return responseData;
+  }
+
+  // 2. Get Advertisements for Building
+  // Endpoint: GET <<baseUrl>>/api/device/client/advertisements
+  Future<Map<String, dynamic>> getAdvertisementsBuilding() async {
+    const String endpointPath = '/api/device/client/advertisements';
+    final Uri url = _buildUri(endpointPath, null);
+    final Map<String, String> headers =
+        _getHeaders(requiresAuth: true, contentType: 'application/json');
+
+    _logger.i('Fetching advertisements for building.');
+    final http.Response response = await _sendRequest(
+        () => http.get(url, headers: headers),
+        apiNameForLog: 'getAdvertisementsBuilding');
+    return _handleResponse(response, 'getAdvertisementsBuilding');
+  }
+
+  // 3. Get Notices for Building
+  // Endpoint: GET <<baseUrl>>/api/device/client/notices
+  Future<Map<String, dynamic>> getNoticesBuilding() async {
+    const String endpointPath = '/api/device/client/notices';
+    final Uri url = _buildUri(endpointPath, null);
+    final Map<String, String> headers =
+        _getHeaders(requiresAuth: true, contentType: 'application/json');
+
+    _logger.i('Fetching notices for building.');
+    final http.Response response = await _sendRequest(
+        () => http.get(url, headers: headers),
+        apiNameForLog: 'getNoticesBuilding');
+    return _handleResponse(response, 'getNoticesBuilding');
+  }
+
+  // 4. Health Test
+  // Endpoint: POST <<baseUrl>>/api/device/client/health_test
+  // Body: "" (empty string), ContentType: "application/json"
+  Future<Map<String, dynamic>> healthTest() async {
+    const String endpointPath = '/api/device/client/health_test';
+    final Uri url = _buildUri(endpointPath, null);
+    // Health test requires auth to check the token itself.
+    final Map<String, String> headers =
+        _getHeaders(requiresAuth: true, contentType: 'application/json');
+
+    _logger.i('Performing health test.');
+    final http.Response response = await _sendRequest(
+        () => http.post(url, headers: headers, body: ""),
+        apiNameForLog: 'healthTest',
+        isHealthTestRequest:
+            true // Mark as health test request to prevent pre-flight check on itself
+        );
+    return _handleResponse(response, 'healthTest');
+  }
+
+  // 5. Get Building Notices by ID (named "notice get" in JSON)
+  // Endpoint: POST https://uqf0jqfm77.execute-api.ap-east-1.amazonaws.com/prod/v1/building_board/building-notices
+  // Body: {"blg_id":"string"}
+  Future<Map<String, dynamic>> getBuildingNotices(
+      {required String blgId}) async {
+    const String fullUrl =
+        'https://uqf0jqfm77.execute-api.ap-east-1.amazonaws.com/prod/v1/building_board/building-notices';
+    final Uri url = _buildUri(fullUrl, null);
+    final String requestBody = json.encode({'blg_id': blgId});
+    final Map<String, String> headers =
+        _getHeaders(requiresAuth: true, contentType: 'application/json');
+
+    _logger.i('Fetching building notices for blgId: $blgId');
+    final http.Response response = await _sendRequest(
+        () => http.post(url, headers: headers, body: requestBody),
+        apiNameForLog: 'getBuildingNotices');
+    return _handleResponse(response, 'getBuildingNotices');
+  }
+}
