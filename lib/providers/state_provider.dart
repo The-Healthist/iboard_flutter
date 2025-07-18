@@ -178,8 +178,10 @@ class CarouselStateProvider extends ChangeNotifier {
   VoidCallback? _onShowFullscreenAd; // 顯示全屏廣告的回調
   VoidCallback? _onCloseFullscreenAd; // 關閉全屏廣告的回調
 
-  // 媒體控制狀態
-  bool _isMediaPaused = false; // 全局媒體暫停狀態
+  // 媒體控制狀態 - 按區域分別控制
+  bool _isTopMediaPaused = false; // 頂部廣告媒體暫停狀態
+  bool _isMiddleMediaPaused = false; // 中部通告媒體暫停狀態
+  bool _isBottomMediaPaused = false; // 底部區域媒體暫停狀態
 
   // 時間配置（從服務器獲取，帶默認值）
   Settings? _settings;
@@ -247,28 +249,66 @@ class CarouselStateProvider extends ChangeNotifier {
     return _currentState.getAreaState(area);
   }
 
-  /// 獲取媒體暫停狀態
-  bool get isMediaPaused => _isMediaPaused;
-
-  /// 暫停所有媒體
-  void pauseAllMedia() {
-    if (!_isMediaPaused) {
-      _isMediaPaused = true;
-      notifyListeners();
-      if (kDebugMode) {
-        print('🎵 暫停所有視頻播放');
-      }
+  /// 獲取媒體暫停狀態 - 按區域
+  bool isMediaPausedForArea(AreaType area) {
+    switch (area) {
+      case AreaType.topAd:
+        return _isTopMediaPaused;
+      case AreaType.middleNotice:
+        return _isMiddleMediaPaused;
+      case AreaType.bottomArea:
+        return _isBottomMediaPaused;
+      case AreaType.fullscreenAd:
+        return false; // 全屏廣告自己控制
     }
   }
 
-  /// 恢復所有媒體
+  /// 更新媒體狀態基於當前應用狀態
+  void _updateMediaStateBasedOnCurrentState() {
+    switch (_currentState.currentAppState) {
+      case AppState.defaultState:
+        // 默認狀態：所有區域媒體都播放
+        _isTopMediaPaused = false;
+        _isMiddleMediaPaused = false;
+        _isBottomMediaPaused = false;
+        break;
+      case AppState.fullscreenAd:
+        // 全屏廣告狀態：所有區域媒體都暫停
+        _isTopMediaPaused = true;
+        _isMiddleMediaPaused = true;
+        _isBottomMediaPaused = true;
+        break;
+      case AppState.manualOperation:
+        // 手動操作狀態：頂部廣告和底部繼續播放，只暫停中部通告
+        _isTopMediaPaused = false; // 顶部广告继续播放
+        _isMiddleMediaPaused = true; // 中部通告暂停
+        _isBottomMediaPaused = false; // 底部继续播放
+        break;
+    }
+
+    if (kDebugMode) {
+      print(
+          '🎵 媒體狀態更新[${_currentState.currentAppState.name}]: Top=${!_isTopMediaPaused ? "播放" : "暫停"}, Middle=${!_isMiddleMediaPaused ? "播放" : "暫停"}, Bottom=${!_isBottomMediaPaused ? "播放" : "暫停"}');
+    }
+  }
+
+  /// 暫停所有媒體 (向後兼容)
+  void pauseAllMedia() {
+    _isTopMediaPaused = true;
+    _isMiddleMediaPaused = true;
+    _isBottomMediaPaused = true;
+    notifyListeners();
+    if (kDebugMode) {
+      print('🎵 暫停所有視頻播放');
+    }
+  }
+
+  /// 恢復所有媒體 (向後兼容)
   void resumeAllMedia() {
-    if (_isMediaPaused) {
-      _isMediaPaused = false;
-      notifyListeners();
-      if (kDebugMode) {
-        print('▶️ 恢復所有視頻播放');
-      }
+    _updateMediaStateBasedOnCurrentState();
+    notifyListeners();
+    if (kDebugMode) {
+      print('▶️ 根據當前狀態更新視頻播放');
     }
   }
 
@@ -277,10 +317,10 @@ class CarouselStateProvider extends ChangeNotifier {
     if (_currentState.canTransitionTo(AppState.fullscreenAd)) {
       _clearAllTimers();
       _currentState = _currentState.toFullscreenAd();
-      
-      // 暫停所有媒體播放
-      pauseAllMedia();
-      
+
+      // 更新媒體狀態
+      _updateMediaStateBasedOnCurrentState();
+
       _startFullscreenAdTimer();
       notifyListeners();
 
@@ -299,6 +339,10 @@ class CarouselStateProvider extends ChangeNotifier {
       _clearAllTimers();
       _currentState = _currentState.toManualOperation();
       _lastUserInteractionTime = DateTime.now();
+
+      // 更新媒體狀態
+      _updateMediaStateBasedOnCurrentState();
+
       _startManualOperationTimer();
       notifyListeners();
       if (kDebugMode) {
@@ -313,10 +357,10 @@ class CarouselStateProvider extends ChangeNotifier {
       _clearAllTimers();
       _currentState = _currentState.toDefaultState();
       _lastFullscreenAdEndTime = DateTime.now();
-      
-      // 恢復所有媒體播放
-      resumeAllMedia();
-      
+
+      // 更新媒體狀態
+      _updateMediaStateBasedOnCurrentState();
+
       _startDefaultStateTimer();
       notifyListeners();
 

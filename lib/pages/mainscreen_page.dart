@@ -37,9 +37,38 @@ class _AnnouncementPageState extends State<AnnouncementPage> {
       _previousAnnouncementsForBuild; // Added state variable
   List<AdModel>? _previousAdvertisementsForBuild; // Added for ad tracking
 
-  // 轮播暂停状态管理
-  bool _isCarouselPaused = false;
+  // 轮播暂停状态管理 - 按区域分别控制
+  bool _isTopCarouselPaused = false;
+  bool _isMidCarouselPaused = false;
+  bool _isBottomCarouselPaused = false;
   AppState? _previousAppState;
+
+  /// 根据当前应用状态更新轮播暂停状态
+  void _updateCarouselStateBasedOnAppState(AppState appState) {
+    switch (appState) {
+      case AppState.defaultState:
+        // 默认状态：所有轮播都正常播放
+        _isTopCarouselPaused = false;
+        _isMidCarouselPaused = false;
+        _isBottomCarouselPaused = false;
+        break;
+      case AppState.fullscreenAd:
+        // 全屏广告状态：所有轮播都暂停
+        _isTopCarouselPaused = true;
+        _isMidCarouselPaused = true;
+        _isBottomCarouselPaused = true;
+        break;
+      case AppState.manualOperation:
+        // 手动操作状态：顶部和底部继续，中部暂停
+        _isTopCarouselPaused = false;
+        _isMidCarouselPaused = true;
+        _isBottomCarouselPaused = false;
+        break;
+    }
+
+    _logger.i(
+        '🎛️ 轮播状态更新[${appState.name}]: Top=${!_isTopCarouselPaused ? "运行" : "暂停"}, Mid=${!_isMidCarouselPaused ? "运行" : "暂停"}, Bottom=${!_isBottomCarouselPaused ? "运行" : "暂停"}');
+  }
 
   @override
   void initState() {
@@ -70,12 +99,14 @@ class _AnnouncementPageState extends State<AnnouncementPage> {
 
   /// 暂停所有轮播
   void _pauseAllCarousels() {
-    if (_isCarouselPaused) return;
-
     _logger.i('🛑 暂停所有轮播 - 进入全屏广告状态');
-    _isCarouselPaused = true;
 
-    // 暂停并保存当前状态
+    // 设置所有轮播为暂停状态
+    _isTopCarouselPaused = true;
+    _isMidCarouselPaused = true;
+    _isBottomCarouselPaused = true;
+
+    // 暂停所有定时器
     _topTimer?.cancel();
     _midTimer?.cancel();
     _bottomTimer?.cancel();
@@ -84,17 +115,16 @@ class _AnnouncementPageState extends State<AnnouncementPage> {
     _topCarouselController.pauseAllMedia();
     _midCarouselController.pauseAllMedia();
     _bottomCarouselController.pauseAllMedia();
-
-    // 保存当前播放索引 (如果需要精确恢复位置)
-    // 这里可以根据需要实现更精确的状态保存
   }
 
   /// 恢复所有轮播
   void _resumeAllCarousels() {
-    if (!_isCarouselPaused) return;
-
     _logger.i('▶️ 恢复所有轮播 - 退出全屏广告状态');
-    _isCarouselPaused = false;
+
+    // 设置所有轮播为运行状态
+    _isTopCarouselPaused = false;
+    _isMidCarouselPaused = false;
+    _isBottomCarouselPaused = false;
 
     // 恢复所有轮播中的媒体内容
     _topCarouselController.resumeAllMedia();
@@ -107,18 +137,60 @@ class _AnnouncementPageState extends State<AnnouncementPage> {
     }
 
     // 恢复中部通告轮播
-    if (_midCarouselController.widgetCount > 1 && !_isCarouselPaused) {
+    if (_midCarouselController.widgetCount > 1 && !_isMidCarouselPaused) {
       _midTimer = Timer.periodic(const Duration(seconds: 15), (timer) {
-        if (mounted && _midCarouselController.widgetCount > 1 && !_isCarouselPaused) {
+        if (mounted &&
+            _midCarouselController.widgetCount > 1 &&
+            !_isMidCarouselPaused) {
           _midCarouselController.playNext();
         }
       });
     }
 
     // 恢复底部轮播（如果有）
-    if (_bottomCarouselController.widgetCount > 1 && !_isCarouselPaused) {
+    if (_bottomCarouselController.widgetCount > 1 && !_isBottomCarouselPaused) {
       _bottomTimer = Timer.periodic(const Duration(seconds: 10), (timer) {
-        if (mounted && _bottomCarouselController.widgetCount > 1 && !_isCarouselPaused) {
+        if (mounted &&
+            _bottomCarouselController.widgetCount > 1 &&
+            !_isBottomCarouselPaused) {
+          _bottomCarouselController.playNext();
+        }
+      });
+    }
+  }
+
+  /// 处理手动操作模式
+  void _handleManualOperationMode() {
+    _logger.i('🖱️ 进入手动操作模式 - 暂停通告轮播，恢复顶部和底部轮播');
+
+    // 暂停中部通告轮播，但保持顶部和底部轮播
+    _midTimer?.cancel();
+
+    // 恢复顶部广告轮播（如果被暂停了）
+    _logger.d(
+        '🔍 检查顶部广告恢复条件: ads=${_topAds.length}, paused=$_isTopCarouselPaused');
+    if (_topAds.isNotEmpty && !_isTopCarouselPaused) {
+      _logger.d('✅ 满足条件，恢复顶部广告轮播');
+      // 获取当前显示的广告索引
+      int currentIndex = _topCarouselController.currentIndex;
+      _logger.d('📍 当前顶部广告索引: $currentIndex');
+
+      // 强制恢复顶部轮播的媒体播放（防止状态不同步）
+      _topCarouselController.resumeAllMedia();
+
+      _startTopAdTimer(currentIndex);
+    } else {
+      _logger
+          .w('❌ 不满足恢复条件: ads=${_topAds.length}, paused=$_isTopCarouselPaused');
+    }
+
+    // 恢复底部轮播（如果被暂停了）
+    if (_bottomCarouselController.widgetCount > 1 && !_isBottomCarouselPaused) {
+      _bottomTimer?.cancel();
+      _bottomTimer = Timer.periodic(const Duration(seconds: 10), (timer) {
+        if (mounted &&
+            _bottomCarouselController.widgetCount > 1 &&
+            !_isBottomCarouselPaused) {
           _bottomCarouselController.playNext();
         }
       });
@@ -167,9 +239,11 @@ class _AnnouncementPageState extends State<AnnouncementPage> {
     _midCarouselController.setCarouselArray(midWidgets);
 
     _midTimer?.cancel();
-    if (announcementWidgets.length > 1 && !_isCarouselPaused) {
+    if (announcementWidgets.length > 1 && !_isMidCarouselPaused) {
       _midTimer = Timer.periodic(const Duration(seconds: 15), (timer) {
-        if (mounted && _midCarouselController.widgetCount > 1 && !_isCarouselPaused) {
+        if (mounted &&
+            _midCarouselController.widgetCount > 1 &&
+            !_isMidCarouselPaused) {
           _midCarouselController.playNext();
         }
       });
@@ -177,17 +251,25 @@ class _AnnouncementPageState extends State<AnnouncementPage> {
   }
 
   void _startTopAdTimer(int currentIndex) {
+    _logger.d(
+        '🎬 开始顶部广告计时器: index=$currentIndex, ads=${_topAds.length}, paused=$_isTopCarouselPaused');
     _topTimer?.cancel();
     if (_topAds.length <= 1 ||
         currentIndex < 0 ||
         currentIndex >= _topAds.length ||
-        _isCarouselPaused) {
+        _isTopCarouselPaused) {
+      _logger.w(
+          '⚠️ 顶部广告计时器条件不满足: ads=${_topAds.length}, index=$currentIndex, paused=$_isTopCarouselPaused');
       return;
     }
 
     final ad = _topAds[currentIndex];
+    _logger.d('▶️ 启动顶部广告计时器: ${ad.title}, duration=${ad.durationObject}');
     _topTimer = Timer(ad.durationObject, () {
-      if (mounted && _topCarouselController.widgetCount > 1 && !_isCarouselPaused) {
+      if (mounted &&
+          _topCarouselController.widgetCount > 1 &&
+          !_isTopCarouselPaused) {
+        _logger.d('⏭️ 顶部广告计时器到期，切换到下一个');
         _topCarouselController.playNext();
         // onPageChanged will then call _startTopAdTimer for the new page
       }
@@ -229,9 +311,11 @@ class _AnnouncementPageState extends State<AnnouncementPage> {
     _bottomCarouselController.setCarouselArray(sampleWidgets);
 
     _bottomTimer?.cancel();
-    if (sampleWidgets.length > 1 && !_isCarouselPaused) {
+    if (sampleWidgets.length > 1 && !_isBottomCarouselPaused) {
       _bottomTimer = Timer.periodic(const Duration(seconds: 10), (timer) {
-        if (mounted && _bottomCarouselController.widgetCount > 1 && !_isCarouselPaused) {
+        if (mounted &&
+            _bottomCarouselController.widgetCount > 1 &&
+            !_isBottomCarouselPaused) {
           _bottomCarouselController.playNext();
         }
       });
@@ -252,11 +336,16 @@ class _AnnouncementPageState extends State<AnnouncementPage> {
     final carouselStateProvider = context.watch<CarouselStateProvider>();
     final currentAppState = carouselStateProvider.currentAppState;
 
-    // Handle fullscreen ad state changes
+    // Handle state changes for carousel and media control
     if (_previousAppState != currentAppState) {
+      // 更新轮播状态基于当前应用状态
+      _updateCarouselStateBasedOnAppState(currentAppState);
+
       if (currentAppState == AppState.fullscreenAd) {
         _pauseAllCarousels();
-      } else if (_previousAppState == AppState.fullscreenAd) {
+      } else if (currentAppState == AppState.manualOperation) {
+        _handleManualOperationMode();
+      } else if (currentAppState == AppState.defaultState) {
         _resumeAllCarousels();
       }
       _previousAppState = currentAppState;

@@ -157,9 +157,10 @@ class AnnouncementReaderWidgetState extends State<AnnouncementReaderWidget> {
 
   @override
   Widget build(BuildContext context) {
-    // 监听媒体暂停状态
+    // 监听媒体暂停状态 - 仅监听中部通告区域
     final carouselStateProvider = context.watch<CarouselStateProvider>();
-    final isMediaPaused = carouselStateProvider.isMediaPaused;
+    final isMediaPaused =
+        carouselStateProvider.isMediaPausedForArea(AreaType.middleNotice);
 
     // 根据媒体状态控制视频播放
     if (_videoController != null && _videoController!.value.isInitialized) {

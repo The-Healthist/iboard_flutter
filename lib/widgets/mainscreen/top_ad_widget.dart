@@ -112,9 +112,10 @@ class _TopAdWidgetState extends State<TopAdWidget> {
 
   @override
   Widget build(BuildContext context) {
-    // 监听媒体暂停状态
+    // 监听媒体暂停状态 - 仅监听顶部广告区域
     final carouselStateProvider = context.watch<CarouselStateProvider>();
-    final isMediaPaused = carouselStateProvider.isMediaPaused;
+    final isMediaPaused =
+        carouselStateProvider.isMediaPausedForArea(AreaType.topAd);
 
     // 根据媒体状态控制视频播放
     if (_videoController != null && _videoController!.value.isInitialized) {
