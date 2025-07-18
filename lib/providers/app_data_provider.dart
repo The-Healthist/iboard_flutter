@@ -24,6 +24,7 @@ class AppDataProvider extends ChangeNotifier {
   String? get error => _error;
   ApiClient get apiClient => _apiClient;
   String? get deviceId => _deviceId;
+  bool get isLoggedIn => _settingsModel != null && token != null;
 
   static const String _deviceIdKey = 'deviceId';
 

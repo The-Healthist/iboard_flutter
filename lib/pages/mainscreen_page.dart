@@ -2,13 +2,14 @@ import 'dart:async'; // Added import for Timer
 
 import 'package:flutter/foundation.dart'
     show listEquals; // Added import for listEquals
-import 'package:flutter/material.dart';
+import 'package:flutter/material.dart' hide CarouselController;
 import 'package:iboard_app/managers/managers.dart';
 import 'package:iboard_app/models/ad_model.dart';
 import 'package:iboard_app/models/announcement_model.dart';
 import 'package:iboard_app/models/file_model.dart';
 import 'package:iboard_app/providers/announcement_provider.dart';
-import 'package:iboard_app/widgets/carousel_widget.dart';
+import 'package:iboard_app/providers/app_data_provider.dart';
+import 'package:iboard_app/widgets/carousel_widget.dart' as custom_carousel;
 import 'package:iboard_app/widgets/mainscreen/bottom_display/weather_widget.dart';
 import 'package:iboard_app/widgets/mainscreen/main_display/announcement_reader_widget.dart';
 import 'package:iboard_app/widgets/mainscreen/main_display/mainscreen_widget.dart';
@@ -21,9 +22,9 @@ class AnnouncementPage extends StatefulWidget {
 }
 
 class _AnnouncementPageState extends State<AnnouncementPage> {
-  late CarouselController _topCarouselController;
-  late CarouselController _midCarouselController;
-  late CarouselController _bottomCarouselController;
+  late custom_carousel.CarouselController _topCarouselController;
+  late custom_carousel.CarouselController _midCarouselController;
+  late custom_carousel.CarouselController _bottomCarouselController;
 
   Timer? _topTimer;
   Timer? _midTimer;
@@ -35,9 +36,9 @@ class _AnnouncementPageState extends State<AnnouncementPage> {
   @override
   void initState() {
     super.initState();
-    _topCarouselController = CarouselController();
-    _midCarouselController = CarouselController();
-    _bottomCarouselController = CarouselController();
+    _topCarouselController = custom_carousel.CarouselController();
+    _midCarouselController = custom_carousel.CarouselController();
+    _bottomCarouselController = custom_carousel.CarouselController();
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _initializeMidWidgets();
@@ -228,7 +229,7 @@ class _AnnouncementPageState extends State<AnnouncementPage> {
               flex: 6,
               child: Container(
                   width: double.infinity,
-                  child: CarouselWidget(
+                  child: custom_carousel.CarouselWidget(
                     controller: _topCarouselController,
                     // autoPlayDuration is effectively managed by _startTopAdTimer
                     showIndicators: false,
@@ -250,19 +251,19 @@ class _AnnouncementPageState extends State<AnnouncementPage> {
                   width: double.infinity,
                   color:
                       Colors.grey.shade50, // Background for the carousel area
-                  child: CarouselWidget(
+                  child: custom_carousel.CarouselWidget(
                     controller: _midCarouselController,
                     showIndicators: false,
                     allowManualSwipe: false,
                     onPageChanged: (index) {},
                   )),
             ),
-            // 底部區域 - 4/24 比例
+            // 底部區域 - 4/24 比例 (减少到3/24，为设备码预留空间)
             Expanded(
-              flex: 4,
+              flex: 3,
               child: Container(
                 width: double.infinity,
-                child: CarouselWidget(
+                child: custom_carousel.CarouselWidget(
                   controller: _bottomCarouselController,
                   autoPlayDuration: const Duration(seconds: 10),
                   showIndicators: false,
@@ -274,7 +275,29 @@ class _AnnouncementPageState extends State<AnnouncementPage> {
                   },
                 ),
               ),
-            )
+            ),
+            // 设备码显示区域 - 1/24 比例
+            Container(
+              width: double.infinity,
+              height: 30,
+              color: Colors.grey.shade100,
+              child: Consumer<AppDataProvider>(
+                builder: (context, appDataProvider, child) {
+                  return Center(
+                    child: Text(
+                      appDataProvider.deviceId != null 
+                          ? '設備碼: ${appDataProvider.deviceId}' 
+                          : '設備碼: 未設定',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: Colors.grey.shade600,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  );
+                },
+              ),
+            ),
           ],
         ),
       ),

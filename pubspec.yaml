@@ -46,6 +46,9 @@ dependencies:
 
   # 設備信息
   device_info_plus: ^9.1.1
+  
+  # 加密
+  crypto: ^3.0.3
 
   # 文件處理
   path_provider: ^2.1.2
