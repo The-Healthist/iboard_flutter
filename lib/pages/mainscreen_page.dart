@@ -8,7 +8,6 @@ import 'package:iboard_app/models/ad_model.dart';
 import 'package:iboard_app/models/announcement_model.dart';
 import 'package:iboard_app/providers/advertisement_provider.dart';
 import 'package:iboard_app/providers/announcement_provider.dart';
-import 'package:iboard_app/providers/app_data_provider.dart';
 import 'package:iboard_app/providers/state_provider.dart';
 import 'package:iboard_app/widgets/carousel_widget.dart' as custom_carousel;
 import 'package:iboard_app/widgets/mainscreen/bottom_display/weather_widget.dart';
@@ -424,9 +423,9 @@ class _AnnouncementPageState extends State<AnnouncementPage> {
                     onPageChanged: (index) {},
                   )),
             ),
-            // 底部區域 - 4/24 比例 (减少到3/24，为设备码预留空间)
+            // 底部區域 - 4/24 比例
             Expanded(
-              flex: 3,
+              flex: 4,
               child: Container(
                 width: double.infinity,
                 child: custom_carousel.CarouselWidget(
@@ -440,28 +439,6 @@ class _AnnouncementPageState extends State<AnnouncementPage> {
                     // });
                   },
                 ),
-              ),
-            ),
-            // 设备码显示区域 - 1/24 比例
-            Container(
-              width: double.infinity,
-              height: 30,
-              color: Colors.grey.shade100,
-              child: Consumer<AppDataProvider>(
-                builder: (context, appDataProvider, child) {
-                  return Center(
-                    child: Text(
-                      appDataProvider.deviceId != null
-                          ? '設備碼: ${appDataProvider.deviceId}'
-                          : '設備碼: 未設定',
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: Colors.grey.shade600,
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                  );
-                },
               ),
             ),
           ],
