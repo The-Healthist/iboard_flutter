@@ -92,13 +92,13 @@ class Building {
 }
 
 class Settings {
-  final int arrearageUpdateDuration;
-  final int noticeUpdateDuration;
-  final int advertisementUpdateDuration;
-  final int advertisementPlayDuration;
-  final int noticePlayDuration;
-  final int spareDuration;
-  final int noticeStayDuration;
+  final int arrearageUpdateDuration; // 欠費更新時間(先不管)
+  final int noticeUpdateDuration; // 通知更新時間(先不管)
+  final int advertisementUpdateDuration; // 廣告更新時間(先不管)
+  final int advertisementPlayDuration; // 廣告播放時間
+  final int noticePlayDuration; // 通知播放時間
+  final int spareDuration; // 手動操作超時時間/無操作進入全屏廣告時間
+  final int noticeStayDuration; // 通知停留時間
 
   Settings({
     required this.arrearageUpdateDuration,

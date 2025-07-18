@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:iboard_app/providers/app_data_provider.dart';
+import 'package:iboard_app/providers/state_provider.dart';
 import 'package:provider/provider.dart';
 
 class TimeSettingsPage extends StatelessWidget {
@@ -110,7 +111,8 @@ class TimeSettingsPage extends StatelessWidget {
                                     SizedBox(width: 16),
                                     Expanded(
                                       child: Column(
-                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
                                         children: [
                                           Text(
                                             '設備基本資訊',
@@ -148,11 +150,14 @@ class TimeSettingsPage extends StatelessWidget {
                                   ),
                                   if (isLoggedIn && settingsModel != null) ...[
                                     SizedBox(height: 16),
-                                    _buildInfoRow('建築名稱', settingsModel.building.name),
+                                    _buildInfoRow(
+                                        '建築名稱', settingsModel.building.name),
                                     SizedBox(height: 16),
-                                    _buildInfoRow('建築ID', settingsModel.building.ismartId),
+                                    _buildInfoRow('建築ID',
+                                        settingsModel.building.ismartId),
                                     SizedBox(height: 16),
-                                    _buildInfoRow('位置', settingsModel.building.location),
+                                    _buildInfoRow(
+                                        '位置', settingsModel.building.location),
                                   ],
                                 ] else ...[
                                   Text(
@@ -163,7 +168,7 @@ class TimeSettingsPage extends StatelessWidget {
                                     ),
                                   ),
                                 ],
-                                
+
                                 // 错误信息显示（如果有）
                                 if (error != null) ...[
                                   SizedBox(height: 20),
@@ -172,7 +177,8 @@ class TimeSettingsPage extends StatelessWidget {
                                     decoration: BoxDecoration(
                                       color: Colors.red.shade50,
                                       borderRadius: BorderRadius.circular(8),
-                                      border: Border.all(color: Colors.red.shade200),
+                                      border: Border.all(
+                                          color: Colors.red.shade200),
                                     ),
                                     child: Row(
                                       children: [
@@ -227,7 +233,8 @@ class TimeSettingsPage extends StatelessWidget {
                                         padding: EdgeInsets.all(10),
                                         decoration: BoxDecoration(
                                           color: Colors.blue.shade50,
-                                          borderRadius: BorderRadius.circular(12),
+                                          borderRadius:
+                                              BorderRadius.circular(12),
                                         ),
                                         child: Icon(
                                           Icons.schedule,
@@ -249,7 +256,8 @@ class TimeSettingsPage extends StatelessWidget {
                                     ],
                                   ),
                                   SizedBox(height: 20),
-                                  Divider(height: 1, color: Colors.grey.shade200),
+                                  Divider(
+                                      height: 1, color: Colors.grey.shade200),
                                   SizedBox(height: 20),
 
                                   // 参数说明
@@ -297,11 +305,48 @@ class TimeSettingsPage extends StatelessWidget {
                                   _buildTimeSettingRow('通知播放時間',
                                       '${deviceSettings.noticePlayDuration} 秒'),
                                   SizedBox(height: 16),
-                                  _buildTimeSettingRow(
-                                      '備用時間', '${deviceSettings.spareDuration} 秒'),
+                                  _buildTimeSettingRow('備用時間（手動操作超時）',
+                                      '${deviceSettings.spareDuration} 秒'),
                                   SizedBox(height: 16),
-                                  _buildTimeSettingRow('通知停留時間',
+                                  _buildTimeSettingRow('通知停留時間（無操作超時）',
                                       '${deviceSettings.noticeStayDuration} 秒'),
+
+                                  // 显示实际应用的计时器配置
+                                  SizedBox(height: 20),
+                                  Divider(
+                                      height: 1, color: Colors.grey.shade200),
+                                  SizedBox(height: 20),
+                                  Consumer<CarouselStateProvider>(
+                                    builder:
+                                        (context, carouselProvider, child) {
+                                      return Column(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
+                                        children: [
+                                          Text(
+                                            '實際應用的計時器配置',
+                                            style: TextStyle(
+                                              fontSize: 16,
+                                              fontWeight: FontWeight.bold,
+                                              color: Colors.blue.shade700,
+                                            ),
+                                          ),
+                                          SizedBox(height: 12),
+                                          _buildTimeSettingRow('全屏廣告播放時間',
+                                              '${carouselProvider.fullscreenAdDuration} 秒'),
+                                          SizedBox(height: 12),
+                                          _buildTimeSettingRow('手動操作超時時間',
+                                              '${carouselProvider.manualOperationTimeout} 秒'),
+                                          SizedBox(height: 12),
+                                          _buildTimeSettingRow('無操作進入廣告時間',
+                                              '${carouselProvider.noActivityTimeout} 秒'),
+                                          SizedBox(height: 12),
+                                          _buildTimeSettingRow('公告播放時間',
+                                              '${carouselProvider.noticePlayDuration} 秒'),
+                                        ],
+                                      );
+                                    },
+                                  ),
                                 ],
                               ),
                             )

@@ -285,8 +285,8 @@ class _AnnouncementPageState extends State<AnnouncementPage> {
                 builder: (context, appDataProvider, child) {
                   return Center(
                     child: Text(
-                      appDataProvider.deviceId != null 
-                          ? '設備碼: ${appDataProvider.deviceId}' 
+                      appDataProvider.deviceId != null
+                          ? '設備碼: ${appDataProvider.deviceId}'
                           : '設備碼: 未設定',
                       style: TextStyle(
                         fontSize: 12,

@@ -83,12 +83,20 @@ class _HomePageState extends State<HomePage> {
       setState(() {
         _deviceId = deviceId;
       });
-      
+
       // 自动使用生成的设备ID登录
       if (mounted) {
         try {
-          await Provider.of<AppDataProvider>(context, listen: false)
-              .initializeAndLogin(deviceIdToSet: deviceId);
+          final appDataProvider =
+              Provider.of<AppDataProvider>(context, listen: false);
+          final carouselStateProvider =
+              Provider.of<CarouselStateProvider>(context, listen: false);
+
+          // 设置Provider间的关联
+          appDataProvider.setCarouselStateProvider(carouselStateProvider);
+
+          // 执行登录
+          await appDataProvider.initializeAndLogin(deviceIdToSet: deviceId);
         } catch (e) {
           print('Auto login failed: $e');
           // 不显示错误，用户可以手动点击Main按钮重试
@@ -141,13 +149,13 @@ class _HomePageState extends State<HomePage> {
                           padding: EdgeInsets.all(16),
                           margin: EdgeInsets.all(16),
                           decoration: BoxDecoration(
-                            color: appDataProvider.isLoggedIn 
-                                ? Colors.green.shade50 
+                            color: appDataProvider.isLoggedIn
+                                ? Colors.green.shade50
                                 : Colors.orange.shade50,
                             borderRadius: BorderRadius.circular(8),
                             border: Border.all(
-                              color: appDataProvider.isLoggedIn 
-                                  ? Colors.green.shade200 
+                              color: appDataProvider.isLoggedIn
+                                  ? Colors.green.shade200
                                   : Colors.orange.shade200,
                             ),
                           ),
@@ -155,21 +163,19 @@ class _HomePageState extends State<HomePage> {
                             mainAxisSize: MainAxisSize.min,
                             children: [
                               Icon(
-                                appDataProvider.isLoggedIn 
-                                    ? Icons.check_circle 
+                                appDataProvider.isLoggedIn
+                                    ? Icons.check_circle
                                     : Icons.warning,
-                                color: appDataProvider.isLoggedIn 
-                                    ? Colors.green.shade700 
+                                color: appDataProvider.isLoggedIn
+                                    ? Colors.green.shade700
                                     : Colors.orange.shade700,
                               ),
                               SizedBox(width: 8),
                               Text(
-                                appDataProvider.isLoggedIn 
-                                    ? '設備已登錄' 
-                                    : '設備未登錄',
+                                appDataProvider.isLoggedIn ? '設備已登錄' : '設備未登錄',
                                 style: TextStyle(
-                                  color: appDataProvider.isLoggedIn 
-                                      ? Colors.green.shade700 
+                                  color: appDataProvider.isLoggedIn
+                                      ? Colors.green.shade700
                                       : Colors.orange.shade700,
                                   fontWeight: FontWeight.w600,
                                 ),
@@ -186,10 +192,22 @@ class _HomePageState extends State<HomePage> {
                               );
                               return;
                             }
-                            
+
                             try {
+                              final appDataProvider =
+                                  Provider.of<AppDataProvider>(context,
+                                      listen: false);
+                              final carouselStateProvider =
+                                  Provider.of<CarouselStateProvider>(context,
+                                      listen: false);
+
+                              // 确保Provider间的关联已设置
+                              appDataProvider.setCarouselStateProvider(
+                                  carouselStateProvider);
+
                               if (!appDataProvider.isLoggedIn) {
-                                await appDataProvider.initializeAndLogin(deviceIdToSet: _deviceId);
+                                await appDataProvider.initializeAndLogin(
+                                    deviceIdToSet: _deviceId);
                               }
                               if (context.mounted) {
                                 Navigator.pushNamed(context, '/main');
@@ -212,7 +230,7 @@ class _HomePageState extends State<HomePage> {
                           },
                           child: Text('設置頁面'),
                         ),
-                        
+
                         // 显示错误信息（如果有）
                         if (appDataProvider.error != null) ...[
                           SizedBox(height: 20),
