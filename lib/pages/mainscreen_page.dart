@@ -6,7 +6,7 @@ import 'package:flutter/material.dart' hide CarouselController;
 import 'package:iboard_app/managers/managers.dart';
 import 'package:iboard_app/models/ad_model.dart';
 import 'package:iboard_app/models/announcement_model.dart';
-import 'package:iboard_app/models/file_model.dart';
+import 'package:iboard_app/providers/advertisement_provider.dart';
 import 'package:iboard_app/providers/announcement_provider.dart';
 import 'package:iboard_app/providers/app_data_provider.dart';
 import 'package:iboard_app/widgets/carousel_widget.dart' as custom_carousel;
@@ -14,6 +14,7 @@ import 'package:iboard_app/widgets/mainscreen/bottom_display/weather_widget.dart
 import 'package:iboard_app/widgets/mainscreen/main_display/announcement_reader_widget.dart';
 import 'package:iboard_app/widgets/mainscreen/main_display/mainscreen_widget.dart';
 import 'package:iboard_app/widgets/mainscreen/top_ad_widget.dart';
+import 'package:logger/logger.dart';
 import 'package:provider/provider.dart';
 
 class AnnouncementPage extends StatefulWidget {
@@ -22,6 +23,7 @@ class AnnouncementPage extends StatefulWidget {
 }
 
 class _AnnouncementPageState extends State<AnnouncementPage> {
+  final Logger _logger = Logger();
   late custom_carousel.CarouselController _topCarouselController;
   late custom_carousel.CarouselController _midCarouselController;
   late custom_carousel.CarouselController _bottomCarouselController;
@@ -32,6 +34,7 @@ class _AnnouncementPageState extends State<AnnouncementPage> {
   List<AdModel> _topAds = [];
   List<AnnouncementModel>?
       _previousAnnouncementsForBuild; // Added state variable
+  List<AdModel>? _previousAdvertisementsForBuild; // Added for ad tracking
 
   @override
   void initState() {
@@ -44,6 +47,11 @@ class _AnnouncementPageState extends State<AnnouncementPage> {
       _initializeMidWidgets();
       _initializeTopWidgets();
       _initializeBottomWidgets();
+
+      // Trigger data fetching
+      final advertisementProvider =
+          Provider.of<AdvertisementProvider>(context, listen: false);
+      advertisementProvider.fetchAdvertisements();
     });
   }
 
@@ -115,7 +123,7 @@ class _AnnouncementPageState extends State<AnnouncementPage> {
     }
 
     final ad = _topAds[currentIndex];
-    _topTimer = Timer(ad.duration, () {
+    _topTimer = Timer(ad.durationObject, () {
       if (mounted && _topCarouselController.widgetCount > 1) {
         _topCarouselController.playNext();
         // onPageChanged will then call _startTopAdTimer for the new page
@@ -124,54 +132,18 @@ class _AnnouncementPageState extends State<AnnouncementPage> {
   }
 
   void _initializeTopWidgets() {
-    // Assuming you have an AdModel instance ready
-    List<AdModel> adsData = [
-      AdModel(
-        title: 'Ad 1',
-        description: 'This is the first ad',
-        duration: Duration(seconds: 5),
-        display: AdDisplayType.top,
-        file: FileModel(
-          id: 1, // Added dummy ID
-          mimeType: 'image/png',
-          url:
-              'http://idreamsky.oss-cn-beijing.aliyuncs.com/2025-01-03/eec63ad5-a85e-47ef-b7d9-7a3ac0a77ea0.png',
-          md5: 'dummy_md5_1', // Added dummy md5
-          fileSize: 1024, // Added dummy fileSize
-        ),
-      ),
-      AdModel(
-        title: 'Ad 2',
-        description: 'This is the second ad',
-        duration: Duration(seconds: 5),
-        display: AdDisplayType.top,
-        file: FileModel(
-          id: 2, // Added dummy ID
-          mimeType: 'image/gif',
-          url:
-              'http://idreamsky.oss-cn-beijing.aliyuncs.com/2025-04-14/6c9f92ed-7290-462e-96dc-37615880d830.gif',
-          md5: 'dummy_md5_2', // Added dummy md5
-          fileSize: 2048, // Added dummy fileSize
-        ),
-      ),
-      AdModel(
-        title: 'Ad 3',
-        description: 'This is the third ad',
-        duration: Duration(seconds: 30), // Changed duration for testing
-        display: AdDisplayType.top,
-        file: FileModel(
-          id: 3, // Added dummy ID
-          mimeType: 'video/mp4',
-          url:
-              'http://idreamsky.oss-cn-beijing.aliyuncs.com/2025-04-23/57a1301f-0e5f-45f8-aa6d-77049487939d.mp4',
-          md5: 'dummy_md5_3', // Added dummy md5
-          fileSize: 30720, // Added dummy fileSize
-        ),
-      ),
-    ];
-    _topAds = adsData; // Store ads for timer logic
+    final advertisementProvider =
+        Provider.of<AdvertisementProvider>(context, listen: false);
+    List<AdModel> topAds = advertisementProvider.topAdvertisements;
 
-    // Create ad widgets from the AdModel instances
+    if (topAds.isEmpty) {
+      _logger.w('No top advertisements available');
+      return;
+    }
+
+    _topAds = topAds; // Store ads for timer logic
+
+    // Create ad widgets from the API AdModel instances
     List<Widget> adWidgets = _topAds.map((ad) {
       FileManager fileManager = FileManager();
       fileManager.getFile(ad.file);
@@ -209,6 +181,10 @@ class _AnnouncementPageState extends State<AnnouncementPage> {
     final announcementProvider = context.watch<AnnouncementProvider>();
     final currentAnnouncements = announcementProvider.announcements;
 
+    // Listen to AdvertisementProvider for changes
+    final advertisementProvider = context.watch<AdvertisementProvider>();
+    final currentAdvertisements = advertisementProvider.topAdvertisements;
+
     // If announcements have changed, re-initialize the mid widgets
     if (_previousAnnouncementsForBuild == null ||
         !listEquals(_previousAnnouncementsForBuild, currentAnnouncements)) {
@@ -217,6 +193,16 @@ class _AnnouncementPageState extends State<AnnouncementPage> {
         _initializeMidWidgets();
         _previousAnnouncementsForBuild =
             List.from(currentAnnouncements); // Update the stored list
+      }
+    }
+
+    // If advertisements have changed, re-initialize the top widgets
+    if (_previousAdvertisementsForBuild == null ||
+        !listEquals(_previousAdvertisementsForBuild, currentAdvertisements)) {
+      if (mounted) {
+        _initializeTopWidgets();
+        _previousAdvertisementsForBuild =
+            List.from(currentAdvertisements); // Update the stored list
       }
     }
 

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:iboard_app/pages/main_page.dart';
+import 'package:iboard_app/providers/advertisement_provider.dart';
 import 'package:iboard_app/providers/announcement_provider.dart';
 import 'package:iboard_app/providers/app_data_provider.dart';
 import 'package:iboard_app/providers/state_provider.dart'; // Added CarouselStateProvider import
@@ -24,6 +25,17 @@ void main() {
           ),
           update: (context, appDataProvider, previousAnnouncementProvider) =>
               AnnouncementProvider(
+            appDataProvider.apiClient,
+            appDataProvider,
+          ),
+        ),
+        ChangeNotifierProxyProvider<AppDataProvider, AdvertisementProvider>(
+          create: (context) => AdvertisementProvider(
+            Provider.of<AppDataProvider>(context, listen: false).apiClient,
+            Provider.of<AppDataProvider>(context, listen: false),
+          ),
+          update: (context, appDataProvider, previousAdvertisementProvider) =>
+              AdvertisementProvider(
             appDataProvider.apiClient,
             appDataProvider,
           ),
