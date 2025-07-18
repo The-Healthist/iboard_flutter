@@ -2,9 +2,11 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:iboard_app/models/announcement_model.dart'; // Changed import
 import 'package:iboard_app/managers/managers.dart';
+import 'package:iboard_app/providers/state_provider.dart';
 import 'package:flutter_pdfview/flutter_pdfview.dart';
 import 'package:video_player/video_player.dart';
 import 'package:logger/logger.dart';
+import 'package:provider/provider.dart';
 
 class AnnouncementReaderWidget extends StatefulWidget {
   final AnnouncementModel announcement;
@@ -155,6 +157,21 @@ class AnnouncementReaderWidgetState extends State<AnnouncementReaderWidget> {
 
   @override
   Widget build(BuildContext context) {
+    // 监听媒体暂停状态
+    final carouselStateProvider = context.watch<CarouselStateProvider>();
+    final isMediaPaused = carouselStateProvider.isMediaPaused;
+
+    // 根据媒体状态控制视频播放
+    if (_videoController != null && _videoController!.value.isInitialized) {
+      if (isMediaPaused && _videoController!.value.isPlaying) {
+        _videoController!.pause();
+        _logger.d('暂停通告视频播放');
+      } else if (!isMediaPaused && !_videoController!.value.isPlaying) {
+        _videoController!.play();
+        _logger.d('恢复通告视频播放');
+      }
+    }
+
     if (_isLoading) {
       return const Center(child: CircularProgressIndicator());
     }

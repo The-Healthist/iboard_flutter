@@ -48,6 +48,16 @@ class CarouselController {
     _state?.jumpToIndex(index);
   }
 
+  /// Pause all video content in the carousel
+  void pauseAllMedia() {
+    _state?.pauseAllMedia();
+  }
+
+  /// Resume all video content in the carousel
+  void resumeAllMedia() {
+    _state?.resumeAllMedia();
+  }
+
   /// Get current index
   int get currentIndex => _state?.currentIndex ?? 0;
 
@@ -353,6 +363,18 @@ class _CarouselWidgetState extends State<CarouselWidget>
   /// Get current widget
   Widget? get currentWidget =>
       _widgets.isEmpty ? null : _widgets[_currentIndex];
+
+  /// Pause all video content in the carousel
+  void pauseAllMedia() {
+    // Use a global notification to pause all media
+    // We'll implement this through the state provider
+  }
+
+  /// Resume all video content in the carousel
+  void resumeAllMedia() {
+    // Use a global notification to resume all media
+    // We'll implement this through the state provider
+  }
 
   @override
   Widget build(BuildContext context) {

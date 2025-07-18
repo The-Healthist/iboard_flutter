@@ -178,6 +178,9 @@ class CarouselStateProvider extends ChangeNotifier {
   VoidCallback? _onShowFullscreenAd; // 顯示全屏廣告的回調
   VoidCallback? _onCloseFullscreenAd; // 關閉全屏廣告的回調
 
+  // 媒體控制狀態
+  bool _isMediaPaused = false; // 全局媒體暫停狀態
+
   // 時間配置（從服務器獲取，帶默認值）
   Settings? _settings;
 
@@ -244,11 +247,40 @@ class CarouselStateProvider extends ChangeNotifier {
     return _currentState.getAreaState(area);
   }
 
+  /// 獲取媒體暫停狀態
+  bool get isMediaPaused => _isMediaPaused;
+
+  /// 暫停所有媒體
+  void pauseAllMedia() {
+    if (!_isMediaPaused) {
+      _isMediaPaused = true;
+      notifyListeners();
+      if (kDebugMode) {
+        print('🎵 暫停所有視頻播放');
+      }
+    }
+  }
+
+  /// 恢復所有媒體
+  void resumeAllMedia() {
+    if (_isMediaPaused) {
+      _isMediaPaused = false;
+      notifyListeners();
+      if (kDebugMode) {
+        print('▶️ 恢復所有視頻播放');
+      }
+    }
+  }
+
   /// 切換到全屏廣告狀態
   void enterFullscreenAd() {
     if (_currentState.canTransitionTo(AppState.fullscreenAd)) {
       _clearAllTimers();
       _currentState = _currentState.toFullscreenAd();
+      
+      // 暫停所有媒體播放
+      pauseAllMedia();
+      
       _startFullscreenAdTimer();
       notifyListeners();
 
@@ -281,6 +313,10 @@ class CarouselStateProvider extends ChangeNotifier {
       _clearAllTimers();
       _currentState = _currentState.toDefaultState();
       _lastFullscreenAdEndTime = DateTime.now();
+      
+      // 恢復所有媒體播放
+      resumeAllMedia();
+      
       _startDefaultStateTimer();
       notifyListeners();
 
