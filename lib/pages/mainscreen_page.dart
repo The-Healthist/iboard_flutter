@@ -200,25 +200,33 @@ class _AnnouncementPageState extends State<AnnouncementPage> {
   void _initializeMidWidgets() {
     final announcementProvider =
         Provider.of<AnnouncementProvider>(context, listen: false);
-    List<AnnouncementModel> announcements = announcementProvider.announcements;
+    // 使用轮播专用通告数组 - 只包含緊急和一般通告
+    List<AnnouncementModel> carouselAnnouncements =
+        announcementProvider.getCarouselAnnouncements();
 
     // 创建带回调的主屏幕部件
     Widget mainScreenWidget = MainScreenWidget(
       onAnnouncementTap: (AnnouncementModel announcement) {
-        // 查找announcement在列表中的索引
-        int announcementIndex = announcements.indexOf(announcement);
+        // 查找announcement在轮播通告列表中的索引
+        int announcementIndex = carouselAnnouncements.indexOf(announcement);
         if (announcementIndex != -1) {
           // 计算在carousel中的实际索引（主屏幕是索引0，所以announcement从索引1开始）
           int carouselIndex = announcementIndex + 1;
           // 跳转到对应的公告页面
           _midCarouselController.jumpToIndex(carouselIndex);
-          print(
-              'Jumping to announcement at index: $carouselIndex (${announcement.title})');
+          _logger.i(
+              '跳转到轮播通告: $carouselIndex (${announcement.title}) - 类型: ${announcement.uiType}');
+        } else {
+          // 如果点击的通告不在轮播列表中（不是緊急或一般通告），提示用户
+          _logger.w(
+              '点击的通告不在轮播列表中: ${announcement.title} - 类型: ${announcement.uiType}');
         }
       },
     );
 
-    List<Widget> announcementWidgets = announcements.map((announcement) {
+    // 只为轮播通告（緊急和一般）创建widget
+    List<Widget> announcementWidgets =
+        carouselAnnouncements.map((announcement) {
       FileManager fileManager = FileManager();
       fileManager.getFile(announcement.file);
       return Center(
@@ -237,6 +245,9 @@ class _AnnouncementPageState extends State<AnnouncementPage> {
       ...announcementWidgets,
     ];
     _midCarouselController.setCarouselArray(midWidgets);
+
+    _logger
+        .i('初始化中部轮播: 主屏幕 + ${carouselAnnouncements.length} 个轮播通告 (只包含緊急和一般通告)');
 
     _midTimer?.cancel();
     if (announcementWidgets.length > 1 && !_isMidCarouselPaused) {
@@ -326,7 +337,8 @@ class _AnnouncementPageState extends State<AnnouncementPage> {
   Widget build(BuildContext context) {
     // Listen to AnnouncementProvider for changes
     final announcementProvider = context.watch<AnnouncementProvider>();
-    final currentAnnouncements = announcementProvider.announcements;
+    final currentCarouselAnnouncements =
+        announcementProvider.carouselAnnouncements; // 监听轮播专用通告数组
 
     // Listen to AdvertisementProvider for changes
     final advertisementProvider = context.watch<AdvertisementProvider>();
@@ -351,14 +363,16 @@ class _AnnouncementPageState extends State<AnnouncementPage> {
       _previousAppState = currentAppState;
     }
 
-    // If announcements have changed, re-initialize the mid widgets
+    // If carousel announcements have changed, re-initialize the mid widgets
+    // 现在监听轮播通告数组的变化而不是所有通告的变化
     if (_previousAnnouncementsForBuild == null ||
-        !listEquals(_previousAnnouncementsForBuild, currentAnnouncements)) {
+        !listEquals(
+            _previousAnnouncementsForBuild, currentCarouselAnnouncements)) {
       if (mounted) {
         // Ensure widget is still in the tree
         _initializeMidWidgets();
         _previousAnnouncementsForBuild =
-            List.from(currentAnnouncements); // Update the stored list
+            List.from(currentCarouselAnnouncements); // 更新存储的轮播通告列表
       }
     }
 

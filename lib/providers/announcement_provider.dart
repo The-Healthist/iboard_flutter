@@ -3,7 +3,6 @@ import 'package:iboard_app/http/api_client.dart';
 import 'package:iboard_app/models/announcement_model.dart';
 import 'package:iboard_app/providers/app_data_provider.dart'; // Assuming AppDataProvider is here
 import 'package:logger/logger.dart';
-import 'package:provider/provider.dart';
 
 class AnnouncementProvider extends ChangeNotifier {
   final Logger _logger = Logger();
@@ -12,11 +11,14 @@ class AnnouncementProvider extends ChangeNotifier {
       _appDataProvider; // To access token and deviceId if needed
 
   List<AnnouncementModel> _announcements = [];
+  List<AnnouncementModel> _carouselAnnouncements = []; // 轮播专用通告数组
   bool _isLoading = false;
   String? _error;
 
   // Getters
   List<AnnouncementModel> get announcements => _announcements;
+  List<AnnouncementModel> get carouselAnnouncements =>
+      _carouselAnnouncements; // 轮播通告获取器
   bool get isLoading => _isLoading;
   String? get error => _error;
 
@@ -52,10 +54,14 @@ class AnnouncementProvider extends ChangeNotifier {
             .toList();
         _logger.i(
             'Successfully fetched and parsed ${_announcements.length} notices.');
+
+        // 更新轮播通告数组
+        _updateCarouselAnnouncements();
       } else {
         _logger.w(
             'Fetched notices data is not in the expected format: $responseData');
         _announcements = []; // Clear if format is wrong
+        _carouselAnnouncements = []; // 同时清除轮播通告数组
         _error = "Failed to parse notices data.";
       }
     } on ApiException catch (e) {
@@ -63,15 +69,33 @@ class AnnouncementProvider extends ChangeNotifier {
           error: e, stackTrace: e.errorData is StackTrace ? e.errorData : null);
       _error = 'Failed to fetch notices: ${e.message}';
       _announcements = []; // Clear on error
+      _carouselAnnouncements = []; // 同时清除轮播通告数组
     } catch (e, stackTrace) {
       _logger.e('An unexpected error occurred while fetching notices',
           error: e, stackTrace: stackTrace);
       _error = 'An unexpected error occurred: $e';
       _announcements = []; // Clear on error
+      _carouselAnnouncements = []; // 同时清除轮播通告数组
     } finally {
       _isLoading = false;
       notifyListeners();
     }
+  }
+
+  // 更新轮播通告数组 - 只包含緊急和一般通告
+  void _updateCarouselAnnouncements() {
+    _carouselAnnouncements = _announcements
+        .where((announcement) =>
+            announcement.uiType == AnnouncementTypeUi.emergency ||
+            announcement.uiType == AnnouncementTypeUi.general)
+        .toList();
+    _logger.i(
+        'Updated carousel announcements: ${_carouselAnnouncements.length} announcements (emergency + general only)');
+  }
+
+  // 获取轮播专用通告 - 返回緊急和一般通告
+  List<AnnouncementModel> getCarouselAnnouncements() {
+    return _carouselAnnouncements;
   }
 
   // Interface to get a specific announcement by ID (if needed)
