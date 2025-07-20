@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:iboard_app/pages/time_settings_page.dart';
 
 class SettingsPage extends StatelessWidget {
   @override
@@ -107,6 +108,20 @@ class SettingsPage extends StatelessWidget {
                       SizedBox(height: 30),
                       // 示例設置選項
                       _buildSettingsItem(
+                        icon: Icons.schedule,
+                        title: '時間設定',
+                        subtitle: '查看設備資訊和系統時間參數設置',
+                        onTap: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => TimeSettingsPage(),
+                            ),
+                          );
+                        },
+                      ),
+                      SizedBox(height: 16),
+                      _buildSettingsItem(
                         icon: Icons.display_settings,
                         title: '顯示設置',
                         subtitle: '調整螢幕顯示參數',
@@ -117,13 +132,6 @@ class SettingsPage extends StatelessWidget {
                         icon: Icons.network_wifi,
                         title: '網絡設置',
                         subtitle: '配置網絡連接',
-                        onTap: () {},
-                      ),
-                      SizedBox(height: 16),
-                      _buildSettingsItem(
-                        icon: Icons.schedule,
-                        title: '時間設置',
-                        subtitle: '設定時間和日期',
                         onTap: () {},
                       ),
                     ],

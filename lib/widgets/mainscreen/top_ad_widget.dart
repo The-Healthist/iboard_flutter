@@ -2,8 +2,10 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:iboard_app/models/ad_model.dart'; // Assuming AdModel exists
 import 'package:iboard_app/managers/file_manager.dart'; // Assuming FileManager exists
+import 'package:iboard_app/providers/state_provider.dart';
 import 'package:video_player/video_player.dart';
 import 'package:logger/logger.dart';
+import 'package:provider/provider.dart';
 
 class TopAdWidget extends StatefulWidget {
   final AdModel ad;
@@ -110,6 +112,22 @@ class _TopAdWidgetState extends State<TopAdWidget> {
 
   @override
   Widget build(BuildContext context) {
+    // 监听媒体暂停状态 - 仅监听顶部广告区域
+    final carouselStateProvider = context.watch<CarouselStateProvider>();
+    final isMediaPaused =
+        carouselStateProvider.isMediaPausedForArea(AreaType.topAd);
+
+    // 根据媒体状态控制视频播放
+    if (_videoController != null && _videoController!.value.isInitialized) {
+      if (isMediaPaused && _videoController!.value.isPlaying) {
+        _videoController!.pause();
+        _logger.d('暂停顶部广告视频播放');
+      } else if (!isMediaPaused && !_videoController!.value.isPlaying) {
+        _videoController!.play();
+        _logger.d('恢复顶部广告视频播放');
+      }
+    }
+
     if (_isLoading) {
       return const Center(child: CircularProgressIndicator());
     }

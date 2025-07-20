@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:iboard_app/http/api_client.dart';
 import 'package:iboard_app/models/settings_model.dart';
+import 'package:iboard_app/providers/state_provider.dart';
 import 'package:logger/logger.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -11,6 +12,7 @@ class AppDataProvider extends ChangeNotifier {
   SettingsModel? _settingsModel;
   String? _deviceId;
   String _baseUrl; // Should be initialized, e.g., from a config
+  CarouselStateProvider? _carouselStateProvider; // 添加对CarouselStateProvider的引用
 
   bool _isLoading = false;
   String? _error;
@@ -24,6 +26,7 @@ class AppDataProvider extends ChangeNotifier {
   String? get error => _error;
   ApiClient get apiClient => _apiClient;
   String? get deviceId => _deviceId;
+  bool get isLoggedIn => _settingsModel != null && token != null;
 
   static const String _deviceIdKey = 'deviceId';
 
@@ -34,6 +37,15 @@ class AppDataProvider extends ChangeNotifier {
     );
     _logger.i(
         'AppDataProvider initialized. ApiClient configured for token refresh.');
+  }
+
+  /// 设置CarouselStateProvider的引用，用于更新时间配置
+  void setCarouselStateProvider(CarouselStateProvider? provider) {
+    _carouselStateProvider = provider;
+    // 如果已有设置数据，立即更新
+    if (_settingsModel?.settings != null) {
+      _carouselStateProvider?.updateSettings(_settingsModel!.settings);
+    }
   }
 
   Future<void> _loadDeviceId() async {
@@ -85,6 +97,13 @@ class AppDataProvider extends ChangeNotifier {
       // ApiClient's internal token is already set by its login method.
       // We also update the AppDataProvider's token via settingsModel.
       _logger.i('Initial login successful. SettingsModel updated.');
+
+      // 更新CarouselStateProvider的时间配置
+      if (_carouselStateProvider != null && _settingsModel?.settings != null) {
+        _carouselStateProvider!.updateSettings(_settingsModel!.settings);
+        _logger.i('CarouselStateProvider settings updated successfully.');
+      }
+
       _error = null;
     } on ApiException catch (e) {
       _logger.e('Initial login failed',
@@ -129,6 +148,14 @@ class AppDataProvider extends ChangeNotifier {
       // and also set within the ApiClient instance.
       _logger.i(
           'Token refresh successful. SettingsModel updated. New token: ${_settingsModel?.token}');
+
+      // 更新CarouselStateProvider的时间配置
+      if (_carouselStateProvider != null && _settingsModel?.settings != null) {
+        _carouselStateProvider!.updateSettings(_settingsModel!.settings);
+        _logger
+            .i('CarouselStateProvider settings updated after token refresh.');
+      }
+
       _error = null; // Clear previous errors
       notifyListeners(); // Notify listeners about the updated settings model (and token)
       return _settingsModel?.token; // Return the new token to ApiClient
