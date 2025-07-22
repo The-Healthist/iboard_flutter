@@ -18,7 +18,7 @@ class _MainPageState extends State<MainPage> {
   Timer? _mainTimer;
   List<AnnouncementModel>?
       _previousAnnouncementsForBuild; // Added state variable
-  bool _isAdsDialogOpen = false; // Track dialog state
+  bool _isAdsDialogOpen = false; // 是否已打開全屏廣告對話框
 
   @override
   void initState() {
@@ -35,6 +35,7 @@ class _MainPageState extends State<MainPage> {
     super.dispose();
   }
 
+  //1，初始化頂部广告
   void _initializeTopWidgets() {
     // 初始化為默認播放狀態並啟動計時器
     final carouselProvider = context.read<CarouselStateProvider>();
@@ -49,10 +50,18 @@ class _MainPageState extends State<MainPage> {
       closeAdsDialog();
     });
 
+    // 設置通告轮播下一个回调 - 這個功能現在由mainscreen_page.dart處理
+    // carouselProvider.setNoticeCarouselNextCallback(() {
+    //   // 通告轮播下一个的逻辑会由mainscreen_page.dart处理
+    // });
+
+    // 啟動通告輪播系統（可選，如果需要集成state_provider的輪播）
+    // carouselProvider.startNoticeCarousel();
+
     carouselProvider.resetToDefault(); // 使用resetToDefault確保計時器正確啟動
   }
 
-  // Method to show FullscreenAdsPage in a dialog
+  //2， Method to show FullscreenAdsPage in a dialog
   void showAdsDialog() {
     if (_isAdsDialogOpen) return; // Prevent multiple dialogs
 
@@ -93,7 +102,7 @@ class _MainPageState extends State<MainPage> {
     });
   }
 
-  // Method to close the ads dialog
+  //3， Method to close the ads dialog
   void closeAdsDialog() {
     if (_isAdsDialogOpen && Navigator.canPop(context)) {
       Navigator.of(context).pop();

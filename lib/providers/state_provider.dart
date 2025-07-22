@@ -56,7 +56,7 @@ abstract class CarouselState {
   }
 }
 
-/// 默認播放狀態
+///1， 默認播放狀態
 class DefaultCarouselState extends CarouselState {
   @override
   PlaybackState get topAdState => PlaybackState.auto;
@@ -90,7 +90,7 @@ class DefaultCarouselState extends CarouselState {
   }
 }
 
-/// 全屏廣告狀態
+///2， 全屏廣告狀態
 class FullscreenAdCarouselState extends CarouselState {
   @override
   PlaybackState get topAdState => PlaybackState.paused;
@@ -124,7 +124,7 @@ class FullscreenAdCarouselState extends CarouselState {
   }
 }
 
-/// 手動操作狀態
+///3， 手動操作狀態
 class ManualOperationCarouselState extends CarouselState {
   @override
   PlaybackState get topAdState => PlaybackState.auto;
@@ -170,6 +170,15 @@ class CarouselStateProvider extends ChangeNotifier {
   Timer? _manualOperationTimer; // 手動操作計時器
   Timer? _defaultStateTimer; // 默認狀態計時器(spareDuration)
 
+  // 通告轮播定时器相关
+  Timer? _noticeCarouselTimer; // 通告轮播定时器
+  Timer? _noticeLogTimer; // 通告log输出定时器
+  bool _isNoticeCarouselActive = false; // 通告轮播是否激活
+  bool _isNoticeCarouselPaused = false; // 通告轮播是否暂停
+  DateTime? _noticeTimerStartTime; // 通告定时器开始时间
+  Duration _noticeElapsedTime = Duration.zero; // 通告已经过时间
+  VoidCallback? _onNoticeCarouselNext; // 通告轮播下一个回调
+
   // 時間記錄
   DateTime? _lastUserInteractionTime; // 最後用戶操作時間
   DateTime? _lastFullscreenAdEndTime; // 最後全屏廣告結束時間
@@ -199,7 +208,6 @@ class CarouselStateProvider extends ChangeNotifier {
       if (settings != null) {
         print('✅ 動態時間設置成功！');
         print('- 全屏廣告播放時間: ${settings.advertisementPlayDuration}秒');
-        print('- 公告輪播總時間: ${settings.noticePlayDuration}秒');
         print('- 每個公告停留時間: ${settings.noticeStayDuration}秒');
         print('- 無操作/手動操作超時時間: ${settings.spareDuration}秒');
         print('- 廣告更新間隔: ${settings.advertisementUpdateDuration}秒');
@@ -222,11 +230,15 @@ class CarouselStateProvider extends ChangeNotifier {
   int get noActivityTimeout =>
       _settings?.spareDuration ?? _defaultNoActivityTimeout;
 
-  /// 獲取公告輪播總時間（秒） - 公告開啟輪播模式的時間總和
-  int get noticePlayDuration => _settings?.noticePlayDuration ?? 20;
-
   /// 獲取每個公告停留時間（秒） - 每一個公告在輪播模式停留的時間
-  int get noticeStayDuration => _settings?.noticeStayDuration ?? 5;
+  int get noticeStayDuration {
+    final duration = _settings?.noticeStayDuration ?? 5;
+    if (kDebugMode) {
+      print(
+          '🔍 [DEBUG] noticeStayDuration: API=${_settings?.noticeStayDuration}, 返回值=$duration');
+    }
+    return duration;
+  }
 
   /// 設置全屏廣告顯示回調
   void setFullscreenAdCallback(VoidCallback? callback) {
@@ -236,6 +248,11 @@ class CarouselStateProvider extends ChangeNotifier {
   /// 設置全屏廣告關閉回調
   void setCloseFullscreenAdCallback(VoidCallback? callback) {
     _onCloseFullscreenAd = callback;
+  }
+
+  /// 設置通告轮播下一个回调
+  void setNoticeCarouselNextCallback(VoidCallback? callback) {
+    _onNoticeCarouselNext = callback;
   }
 
   /// 獲取當前狀態
@@ -248,6 +265,12 @@ class CarouselStateProvider extends ChangeNotifier {
   PlaybackState getAreaState(AreaType area) {
     return _currentState.getAreaState(area);
   }
+
+  /// 獲取通告轮播是否激活
+  bool get isNoticeCarouselActive => _isNoticeCarouselActive;
+
+  /// 獲取通告轮播是否暂停
+  bool get isNoticeCarouselPaused => _isNoticeCarouselPaused;
 
   /// 獲取媒體暫停狀態 - 按區域
   bool isMediaPausedForArea(AreaType area) {
@@ -263,7 +286,7 @@ class CarouselStateProvider extends ChangeNotifier {
     }
   }
 
-  /// 更新媒體狀態基於當前應用狀態
+  ///1， 更新媒體狀態基於當前應用狀態
   void _updateMediaStateBasedOnCurrentState() {
     switch (_currentState.currentAppState) {
       case AppState.defaultState:
@@ -292,7 +315,7 @@ class CarouselStateProvider extends ChangeNotifier {
     }
   }
 
-  /// 暫停所有媒體 (向後兼容)
+  ///2， 暫停所有媒體 (向後兼容)
   void pauseAllMedia() {
     _isTopMediaPaused = true;
     _isMiddleMediaPaused = true;
@@ -303,7 +326,7 @@ class CarouselStateProvider extends ChangeNotifier {
     }
   }
 
-  /// 恢復所有媒體 (向後兼容)
+  ///3， 恢復所有媒體 (向後兼容)
   void resumeAllMedia() {
     _updateMediaStateBasedOnCurrentState();
     notifyListeners();
@@ -312,10 +335,16 @@ class CarouselStateProvider extends ChangeNotifier {
     }
   }
 
-  /// 切換到全屏廣告狀態
+  ///4， 切換到全屏廣告狀態
   void enterFullscreenAd() {
     if (_currentState.canTransitionTo(AppState.fullscreenAd)) {
       _clearAllTimers();
+
+      // 暂停通告轮播定时器
+      if (_isNoticeCarouselActive) {
+        _pauseNoticeCarousel();
+      }
+
       _currentState = _currentState.toFullscreenAd();
 
       // 更新媒體狀態
@@ -333,7 +362,7 @@ class CarouselStateProvider extends ChangeNotifier {
     }
   }
 
-  /// 切換到手動操作狀態
+  ///5， 切換到手動操作狀態
   void enterManualOperation() {
     if (_currentState.canTransitionTo(AppState.manualOperation)) {
       _clearAllTimers();
@@ -351,7 +380,7 @@ class CarouselStateProvider extends ChangeNotifier {
     }
   }
 
-  /// 切換到默認狀態
+  ///6， 切換到默認狀態
   void enterDefaultState() {
     if (_currentState.canTransitionTo(AppState.defaultState)) {
       _clearAllTimers();
@@ -362,6 +391,16 @@ class CarouselStateProvider extends ChangeNotifier {
       _updateMediaStateBasedOnCurrentState();
 
       _startDefaultStateTimer();
+
+      // 如果通告轮播之前是激活状态，恢复通告轮播
+      // 注意：通告轮播现在由 mainscreen_page.dart 管理，避免双重管理冲突
+      if (_isNoticeCarouselActive) {
+        if (kDebugMode) {
+          print('🔄 [STATE] 檢測到通告輪播激活狀態，但交由 mainscreen_page 管理');
+        }
+        // _resumeNoticeCarousel(); // 暫時注釋以避免與 mainscreen_page 衝突
+      }
+
       notifyListeners();
 
       // 調用關閉全屏廣告的回調
@@ -373,7 +412,7 @@ class CarouselStateProvider extends ChangeNotifier {
     }
   }
 
-  /// 用戶交互更新（重置手動操作計時器）
+  ///7， 用戶交互更新（重置手動操作計時器）
   void onUserInteraction() {
     if (_currentState.currentAppState == AppState.manualOperation) {
       _lastUserInteractionTime = DateTime.now();
@@ -387,7 +426,7 @@ class CarouselStateProvider extends ChangeNotifier {
     }
   }
 
-  /// 啟動全屏廣告計時器（使用配置的廣告播放時間）
+  ///8， 啟動全屏廣告計時器（使用配置的廣告播放時間）
   void _startFullscreenAdTimer() {
     _fullscreenAdTimer?.cancel();
     final duration = Duration(seconds: fullscreenAdDuration);
@@ -401,7 +440,7 @@ class CarouselStateProvider extends ChangeNotifier {
     });
   }
 
-  /// 啟動手動操作計時器（使用配置的手動操作超時時間）
+  ///9， 啟動手動操作計時器（使用配置的手動操作超時時間）
   void _startManualOperationTimer() {
     _manualOperationTimer?.cancel();
     final duration = Duration(seconds: manualOperationTimeout);
@@ -415,14 +454,14 @@ class CarouselStateProvider extends ChangeNotifier {
     });
   }
 
-  /// 重置手動操作計時器
+  ///10， 重置手動操作計時器
   void _resetManualOperationTimer() {
     if (_currentState.currentAppState == AppState.manualOperation) {
       _startManualOperationTimer();
     }
   }
 
-  /// 啟動默認狀態計時器（使用配置的無操作超時時間）
+  ///11， 啟動默認狀態計時器（使用配置的無操作超時時間）
   void _startDefaultStateTimer() {
     _defaultStateTimer?.cancel();
     final duration = Duration(seconds: noActivityTimeout);
@@ -436,19 +475,20 @@ class CarouselStateProvider extends ChangeNotifier {
     });
   }
 
-  /// 清除所有計時器
+  ///12， 清除所有計時器
   void _clearAllTimers() {
     _fullscreenAdTimer?.cancel();
     _manualOperationTimer?.cancel();
     _defaultStateTimer?.cancel();
+    // 注意：这里不清除通告轮播定时器，因为它们有独立的生命周期
   }
 
-  /// 檢查是否可以轉換到指定狀態
+  ///13， 檢查是否可以轉換到指定狀態
   bool canTransitionTo(AppState targetState) {
     return _currentState.canTransitionTo(targetState);
   }
 
-  /// 嘗試狀態轉換，返回是否成功
+  ///14， 嘗試狀態轉換，返回是否成功
   bool tryTransitionTo(AppState targetState) {
     try {
       switch (targetState) {
@@ -470,7 +510,7 @@ class CarouselStateProvider extends ChangeNotifier {
     }
   }
 
-  /// 重置到默認狀態（強制重置，忽略轉換規則）
+  ///15， 重置到默認狀態（強制重置，忽略轉換規則）
   void resetToDefault() {
     _clearAllTimers();
     _currentState = DefaultCarouselState();
@@ -482,7 +522,7 @@ class CarouselStateProvider extends ChangeNotifier {
     }
   }
 
-  /// 獲取狀態描述（用於調試）
+  ///16， 獲取狀態描述（用於調試）
   String getStateDescription() {
     final now = DateTime.now();
     String timerInfo = '';
@@ -520,10 +560,143 @@ Timer Info: $timerInfo
 ''';
   }
 
-  /// 釋放資源
+  ///17， 釋放資源
   @override
   void dispose() {
     _clearAllTimers();
+    _clearNoticeCarouselTimers();
     super.dispose();
+  }
+
+  ///18， 清除通告轮播定时器
+  void _clearNoticeCarouselTimers() {
+    _noticeCarouselTimer?.cancel();
+    _noticeLogTimer?.cancel();
+  }
+
+  ///19， 启动通告轮播
+  void startNoticeCarousel() {
+    if (_isNoticeCarouselActive) {
+      if (kDebugMode) {
+        print('⚠️ 通告轮播已经在运行中');
+      }
+      return;
+    }
+
+    _isNoticeCarouselActive = true;
+    _isNoticeCarouselPaused = false;
+    _noticeTimerStartTime = DateTime.now();
+    _noticeElapsedTime = Duration.zero;
+
+    _startNoticeCarouselTimer();
+    _startNoticeLogTimer();
+
+    if (kDebugMode) {
+      print('✅ 启动通告轮播 - 停留时间: ${noticeStayDuration}秒');
+    }
+    notifyListeners();
+  }
+
+  ///20， 停止通告轮播
+  void stopNoticeCarousel() {
+    if (!_isNoticeCarouselActive) return;
+
+    _isNoticeCarouselActive = false;
+    _isNoticeCarouselPaused = false;
+    _clearNoticeCarouselTimers();
+
+    if (kDebugMode) {
+      print('🛑 停止通告轮播');
+    }
+    notifyListeners();
+  }
+
+  ///21， 暂停通告轮播
+  void _pauseNoticeCarousel() {
+    if (!_isNoticeCarouselActive || _isNoticeCarouselPaused) return;
+
+    _isNoticeCarouselPaused = true;
+
+    // 计算已过时间
+    if (_noticeTimerStartTime != null) {
+      _noticeElapsedTime = DateTime.now().difference(_noticeTimerStartTime!);
+    }
+
+    _clearNoticeCarouselTimers();
+
+    if (kDebugMode) {
+      print('⏸️ 暂停通告轮播 - 已播放: ${_noticeElapsedTime.inSeconds}秒');
+    }
+  }
+
+  ///22， 恢复通告轮播
+  void _resumeNoticeCarousel() {
+    if (!_isNoticeCarouselActive || !_isNoticeCarouselPaused) return;
+
+    _isNoticeCarouselPaused = false;
+
+    // 计算剩余时间
+    final remainingTime =
+        Duration(seconds: noticeStayDuration) - _noticeElapsedTime;
+
+    if (remainingTime.isNegative || remainingTime.inSeconds <= 0) {
+      // 如果已经超时，立即切换到下一个
+      _onNoticeCarouselNext?.call();
+      _resetNoticeTimer();
+    } else {
+      // 重新设置定时器
+      _noticeTimerStartTime = DateTime.now();
+      _startNoticeCarouselTimer(remainingTime);
+    }
+
+    _startNoticeLogTimer();
+
+    if (kDebugMode) {
+      print('▶️ 恢复通告轮播 - 剩余时间: ${remainingTime.inSeconds}秒');
+    }
+  }
+
+  ///23， 启动通告轮播定时器
+  void _startNoticeCarouselTimer([Duration? customDuration]) {
+    _noticeCarouselTimer?.cancel();
+
+    final duration = customDuration ?? Duration(seconds: noticeStayDuration);
+
+    _noticeCarouselTimer = Timer(duration, () {
+      if (_isNoticeCarouselActive && !_isNoticeCarouselPaused) {
+        _onNoticeCarouselNext?.call();
+        _resetNoticeTimer();
+      }
+    });
+  }
+
+  ///24， 启动通告Log输出定时器
+  void _startNoticeLogTimer() {
+    _noticeLogTimer?.cancel();
+
+    _noticeLogTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
+      if (!_isNoticeCarouselActive || _isNoticeCarouselPaused) {
+        timer.cancel();
+        return;
+      }
+
+      if (_noticeTimerStartTime != null) {
+        final elapsed = DateTime.now().difference(_noticeTimerStartTime!) +
+            _noticeElapsedTime;
+        final remaining = Duration(seconds: noticeStayDuration) - elapsed;
+        final remainingSeconds = remaining.isNegative ? 0 : remaining.inSeconds;
+
+        if (kDebugMode) {
+          print('📢 通告: ${remainingSeconds}s/${noticeStayDuration}s');
+        }
+      }
+    });
+  }
+
+  ///25， 重置通告定时器状态
+  void _resetNoticeTimer() {
+    _noticeTimerStartTime = DateTime.now();
+    _noticeElapsedTime = Duration.zero;
+    _startNoticeCarouselTimer();
   }
 }

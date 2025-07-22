@@ -342,7 +342,7 @@ class TimeSettingsPage extends StatelessWidget {
                                               '${carouselProvider.noActivityTimeout} 秒'),
                                           SizedBox(height: 12),
                                           _buildTimeSettingRow('公告播放時間',
-                                              '${carouselProvider.noticePlayDuration} 秒'),
+                                              '${carouselProvider.noticeStayDuration} 秒'),
                                         ],
                                       );
                                     },

@@ -34,6 +34,7 @@ class _TopAdWidgetState extends State<TopAdWidget> {
     _loadFile();
   }
 
+  //1，加载广告文件
   Future<void> _loadFile() async {
     setState(() {
       _isLoading = true;
@@ -85,6 +86,7 @@ class _TopAdWidgetState extends State<TopAdWidget> {
     }
   }
 
+  //2，初始化视频播放器
   void _initializeVideoPlayer() {
     if (_localFilePath == null) return;
     _videoController = VideoPlayerController.file(File(_localFilePath!))
