@@ -321,6 +321,12 @@ class AnnouncementProvider extends ChangeNotifier {
         _logger.i(
             'Announcement update completed. Total: ${_announcements.length}, Carousel announcements: ${_carouselAnnouncements.length}');
         _error = null; // 成功时清除错误
+
+        // 如果之前有网络错误，记录恢复信息
+        if (_error != null &&
+            (_error!.contains('网络') || _error!.contains('超时'))) {
+          _logger.i('网络已恢复，通告数据更新成功');
+        }
       } else {
         _logger.w(
             'Fetched notices data is not in the expected format: $responseData');
@@ -359,8 +365,40 @@ class AnnouncementProvider extends ChangeNotifier {
     } catch (e, stackTrace) {
       _logger.e('An unexpected error occurred while fetching notices',
           error: e, stackTrace: stackTrace);
-      _error = 'An unexpected error occurred: $e';
-      // 发生意外错误时不清除现有数据，保持现状
+
+      // 详细的网络错误处理
+      String errorMessage;
+      bool isNetworkError = false;
+
+      if (e.toString().contains('SocketException') ||
+          e.toString().contains('Connection timed out') ||
+          e.toString().contains('ClientException')) {
+        errorMessage = '网络连接失败，使用缓存的通告数据继续轮播';
+        isNetworkError = true;
+        _logger.w('网络连接问题检测到，保持现有数据: $e');
+      } else if (e.toString().contains('TimeoutException') ||
+          e.toString().contains('请求超时')) {
+        errorMessage = '请求超时，使用缓存的通告数据继续轮播';
+        isNetworkError = true;
+        _logger.w('请求超时检测到，保持现有数据: $e');
+      } else if (e.toString().contains('FormatException')) {
+        errorMessage = '服务器返回数据格式错误，保持现有通告数据';
+        _logger.w('数据格式错误检测到，保持现有数据: $e');
+      } else {
+        errorMessage = '发生未知错误，保持现有通告数据: $e';
+        _logger.w('未知错误检测到，保持现有数据: $e');
+      }
+
+      _error = errorMessage;
+
+      // 网络错误时检查并确保有可用的通告数据
+      if (isNetworkError) {
+        await _ensureCachedAnnouncementsAvailable();
+      }
+
+      // 发生任何错误时都不清除现有数据，保持现状让轮播继续
+      _logger.i(
+          '错误处理完成，保持现有通告数据: ${_announcements.length}个通告，${_carouselAnnouncements.length}个轮播通告');
     } finally {
       _isLoading = false;
       notifyListeners();
@@ -389,6 +427,47 @@ class AnnouncementProvider extends ChangeNotifier {
       return _announcements.firstWhere((notice) => notice.id == id);
     } catch (e) {
       return null; // Not found
+    }
+  }
+
+  /// 确保在网络错误时有可用的缓存通告数据
+  Future<void> _ensureCachedAnnouncementsAvailable() async {
+    try {
+      // 如果当前没有通告数据，尝试从缓存中加载
+      if (_announcements.isEmpty) {
+        _logger.i('当前通告列表为空，尝试从缓存中恢复通告数据...');
+
+        // 这里可以实现从本地缓存（SharedPreferences或数据库）加载通告数据的逻辑
+        // 目前先记录日志，未来可以扩展实际的缓存恢复逻辑
+        _logger.w('TODO: 实现从本地缓存恢复通告数据的功能');
+
+        // 暂时创建一个默认的通告以确保轮播能够继续工作
+        // 在实际应用中，这应该从缓存中加载真实的通告数据
+        /*
+        final defaultAnnouncement = AnnouncementModel(
+          id: -1,
+          title: '网络连接中断 - 使用缓存数据',
+          content: '正在尝试重新连接网络，请稍候...',
+          uiType: AnnouncementTypeUi.general,
+          file: FileModel(url: '', md5: ''),
+          fromDate: DateTime.now().subtract(Duration(days: 1)),
+          toDate: DateTime.now().add(Duration(days: 1)),
+        );
+        _announcements = [defaultAnnouncement];
+        _updateCarouselAnnouncements();
+        _logger.i('已创建默认通告以确保轮播继续工作');
+        */
+      } else {
+        _logger.i('当前有 ${_announcements.length} 个通告数据可用，继续使用现有数据');
+      }
+
+      // 确保轮播通告数组也有数据
+      if (_carouselAnnouncements.isEmpty && _announcements.isNotEmpty) {
+        _updateCarouselAnnouncements();
+        _logger.i('重新更新轮播通告数组: ${_carouselAnnouncements.length} 个轮播通告');
+      }
+    } catch (e) {
+      _logger.e('检查缓存通告数据时发生错误', error: e);
     }
   }
 

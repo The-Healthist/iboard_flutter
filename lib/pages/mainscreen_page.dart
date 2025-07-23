@@ -842,9 +842,30 @@ class _AnnouncementPageState extends State<AnnouncementPage> {
             _previousAnnouncementsForBuild, currentCarouselAnnouncements)) {
       if (mounted) {
         // Ensure widget is still in the tree
-        _initializeMidWidgets();
-        _previousAnnouncementsForBuild =
-            List.from(currentCarouselAnnouncements); // 更新存储的轮播通告列表
+
+        // 检查新的通告数据是否有效
+        if (currentCarouselAnnouncements.isNotEmpty ||
+            _previousAnnouncementsForBuild == null) {
+          // 只有当新数据非空或首次初始化时才更新
+          try {
+            _initializeMidWidgets();
+            _previousAnnouncementsForBuild =
+                List.from(currentCarouselAnnouncements); // 更新存储的轮播通告列表
+            _logger.i('通告轮播更新成功: ${currentCarouselAnnouncements.length} 个通告');
+          } catch (e) {
+            _logger.e('初始化中部轮播失败，保持现有状态', error: e);
+            // 不更新 _previousAnnouncementsForBuild，保持现有状态
+          }
+        } else {
+          // 新数据为空但有旧数据，记录警告但不更新（保持现有轮播继续工作）
+          _logger.w('收到空的通告数据，保持现有轮播继续工作。'
+              '当前轮播: ${_previousAnnouncementsForBuild?.length ?? 0} 个通告');
+
+          // 检查是否有网络错误信息
+          if (announcementProvider.error != null) {
+            _logger.w('通告获取错误: ${announcementProvider.error}');
+          }
+        }
       }
     }
 
@@ -852,9 +873,29 @@ class _AnnouncementPageState extends State<AnnouncementPage> {
     if (_previousAdvertisementsForBuild == null ||
         !listEquals(_previousAdvertisementsForBuild, currentAdvertisements)) {
       if (mounted) {
-        _initializeTopWidgets();
-        _previousAdvertisementsForBuild =
-            List.from(currentAdvertisements); // Update the stored list
+        // 检查新的广告数据是否有效
+        if (currentAdvertisements.isNotEmpty ||
+            _previousAdvertisementsForBuild == null) {
+          // 只有当新数据非空或首次初始化时才更新
+          try {
+            _initializeTopWidgets();
+            _previousAdvertisementsForBuild =
+                List.from(currentAdvertisements); // Update the stored list
+            _logger.i('广告轮播更新成功: ${currentAdvertisements.length} 个广告');
+          } catch (e) {
+            _logger.e('初始化顶部轮播失败，保持现有状态', error: e);
+            // 不更新 _previousAdvertisementsForBuild，保持现有状态
+          }
+        } else {
+          // 新数据为空但有旧数据，记录警告但不更新
+          _logger.w('收到空的广告数据，保持现有轮播继续工作。'
+              '当前轮播: ${_previousAdvertisementsForBuild?.length ?? 0} 个广告');
+
+          // 检查是否有网络错误信息
+          if (advertisementProvider.error != null) {
+            _logger.w('广告获取错误: ${advertisementProvider.error}');
+          }
+        }
       }
     }
 

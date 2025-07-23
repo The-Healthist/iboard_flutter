@@ -130,7 +130,7 @@ class _HomePageState extends State<HomePage> {
           if (appDataProvider.isLoggedIn) {
             advertisementProvider.startPeriodicUpdate();
             announcementProvider.startPeriodicUpdate();
-            
+
             // 自动跳转到主页面
             if (mounted) {
               Navigator.pushReplacementNamed(context, '/main');

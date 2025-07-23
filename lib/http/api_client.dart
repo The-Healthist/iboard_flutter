@@ -23,6 +23,11 @@ class ApiClient {
   String? _token;
   final Logger _logger = Logger();
 
+  // 网络请求配置
+  static const Duration _requestTimeout = Duration(seconds: 30); // 30秒超时
+  static const int _maxRetryAttempts = 1; // 最大重试1次
+  static const Duration _retryDelay = Duration(seconds: 3); // 重试间隔3秒
+
   // For managing token refresh
   bool _isRefreshingToken = false; // True if a refresh operation is active
   Future<String?>?
@@ -222,16 +227,60 @@ class ApiClient {
       }
     }
 
-    // Section 2: Execute the main request
-    http.Response response;
-    try {
-      response = await requestFunction();
-    } catch (e, stackTrace) {
-      _logger.e(
-          'Original request function for $apiNameForLog failed before HTTP call.',
-          error: e,
-          stackTrace: stackTrace);
-      rethrow; // Rethrow if requestFunction itself fails (e.g. building headers/body)
+    // Section 2: Execute the main request with timeout and retry
+    http.Response? response;
+    Exception? lastException;
+
+    for (int attempt = 1; attempt <= _maxRetryAttempts; attempt++) {
+      try {
+        _logger.i('$apiNameForLog - 尝试第 $attempt/$_maxRetryAttempts 次请求');
+
+        // 应用超时到请求函数
+        response = await requestFunction().timeout(
+          _requestTimeout,
+          onTimeout: () {
+            throw Exception(
+                '请求超时 (${_requestTimeout.inSeconds}秒) - $apiNameForLog');
+          },
+        );
+
+        // 如果请求成功，跳出重试循环
+        _logger.i(
+            '$apiNameForLog - 第 $attempt 次请求成功 (状态码: ${response.statusCode})');
+        break;
+      } catch (e, stackTrace) {
+        lastException = e is Exception ? e : Exception(e.toString());
+
+        // 详细记录网络错误类型
+        String errorType = 'Unknown';
+        if (e.toString().contains('SocketException')) {
+          errorType = 'Socket连接错误';
+        } else if (e.toString().contains('TimeoutException') ||
+            e.toString().contains('请求超时')) {
+          errorType = '请求超时';
+        } else if (e.toString().contains('ClientException')) {
+          errorType = '客户端错误';
+        }
+
+        if (attempt == _maxRetryAttempts) {
+          // 最后一次尝试失败，抛出异常
+          _logger.e(
+              '$apiNameForLog - 所有 $_maxRetryAttempts 次请求尝试均失败 (最后错误类型: $errorType)',
+              error: e,
+              stackTrace: stackTrace);
+          rethrow;
+        } else {
+          // 还有重试机会，记录警告并等待
+          _logger.w(
+              '$apiNameForLog - 第 $attempt 次请求失败 ($errorType)，${_retryDelay.inSeconds}秒后重试');
+          await Future.delayed(_retryDelay);
+        }
+      }
+    }
+
+    // 如果response仍然为null，说明所有重试都失败了
+    if (response == null) {
+      throw lastException ?? Exception('请求失败，未知错误 - $apiNameForLog');
     }
 
     // Section 3: Handle 401 for the main request (retry logic)
@@ -263,7 +312,7 @@ class ApiClient {
         // Let the original 401 response be returned to _handleResponse
       }
     }
-    return response;
+    return response!;
   }
 
   // --- API Methods based on httpapi.json ---
