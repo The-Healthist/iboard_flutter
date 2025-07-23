@@ -141,10 +141,10 @@ class _AnnouncementPageState extends State<AnnouncementPage> {
         } else {
           // 运行状态：计算当前剩余时间
           final elapsed = DateTime.now().difference(_currentTopAdStartTime!);
-          
+
           // 如果有已播放时间记录（说明经历了暂停恢复），需要加上之前的播放时间
           final totalElapsed = elapsed + _topAdElapsedTime;
-              
+
           final remaining = _topAdDuration - totalElapsed;
           topAdRemaining = remaining.isNegative ? 0 : remaining.inSeconds;
         }

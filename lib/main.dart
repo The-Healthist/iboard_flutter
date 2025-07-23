@@ -4,6 +4,7 @@ import 'package:iboard_app/providers/advertisement_provider.dart';
 import 'package:iboard_app/providers/announcement_provider.dart';
 import 'package:iboard_app/providers/app_data_provider.dart';
 import 'package:iboard_app/providers/state_provider.dart'; // Added CarouselStateProvider import
+import 'package:iboard_app/managers/file_manager.dart';
 import 'package:iboard_app/utils/device_id_util.dart';
 import 'package:provider/provider.dart';
 import 'pages/mainscreen_page.dart';
@@ -18,26 +19,37 @@ void main() {
           create: (context) =>
               AppDataProvider(baseUrl: 'http://test.iboard.skylinedances.com'),
         ),
-        ChangeNotifierProxyProvider<AppDataProvider, AnnouncementProvider>(
+        Provider<FileManager>(
+          create: (context) => FileManager(),
+        ),
+        ChangeNotifierProxyProvider2<AppDataProvider, FileManager,
+            AnnouncementProvider>(
           create: (context) => AnnouncementProvider(
             Provider.of<AppDataProvider>(context, listen: false).apiClient,
             Provider.of<AppDataProvider>(context, listen: false),
+            Provider.of<FileManager>(context, listen: false),
           ),
-          update: (context, appDataProvider, previousAnnouncementProvider) =>
+          update: (context, appDataProvider, fileManager,
+                  previousAnnouncementProvider) =>
               AnnouncementProvider(
             appDataProvider.apiClient,
             appDataProvider,
+            fileManager,
           ),
         ),
-        ChangeNotifierProxyProvider<AppDataProvider, AdvertisementProvider>(
+        ChangeNotifierProxyProvider2<AppDataProvider, FileManager,
+            AdvertisementProvider>(
           create: (context) => AdvertisementProvider(
             Provider.of<AppDataProvider>(context, listen: false).apiClient,
             Provider.of<AppDataProvider>(context, listen: false),
+            Provider.of<FileManager>(context, listen: false),
           ),
-          update: (context, appDataProvider, previousAdvertisementProvider) =>
+          update: (context, appDataProvider, fileManager,
+                  previousAdvertisementProvider) =>
               AdvertisementProvider(
             appDataProvider.apiClient,
             appDataProvider,
+            fileManager,
           ),
         ),
         ChangeNotifierProvider(
@@ -103,12 +115,22 @@ class _HomePageState extends State<HomePage> {
               Provider.of<AppDataProvider>(context, listen: false);
           final carouselStateProvider =
               Provider.of<CarouselStateProvider>(context, listen: false);
+          final advertisementProvider =
+              Provider.of<AdvertisementProvider>(context, listen: false);
+          final announcementProvider =
+              Provider.of<AnnouncementProvider>(context, listen: false);
 
           // 设置Provider间的关联
           appDataProvider.setCarouselStateProvider(carouselStateProvider);
 
           // 执行登录
           await appDataProvider.initializeAndLogin(deviceIdToSet: deviceId);
+
+          // 登录成功后启动定时更新
+          if (appDataProvider.isLoggedIn) {
+            advertisementProvider.startPeriodicUpdate();
+            announcementProvider.startPeriodicUpdate();
+          }
         } catch (e) {
           print('Auto login failed: $e');
           // 不显示错误，用户可以手动点击Main按钮重试
@@ -212,6 +234,12 @@ class _HomePageState extends State<HomePage> {
                               final carouselStateProvider =
                                   Provider.of<CarouselStateProvider>(context,
                                       listen: false);
+                              final advertisementProvider =
+                                  Provider.of<AdvertisementProvider>(context,
+                                      listen: false);
+                              final announcementProvider =
+                                  Provider.of<AnnouncementProvider>(context,
+                                      listen: false);
 
                               // 确保Provider间的关联已设置
                               appDataProvider.setCarouselStateProvider(
@@ -221,6 +249,13 @@ class _HomePageState extends State<HomePage> {
                                 await appDataProvider.initializeAndLogin(
                                     deviceIdToSet: _deviceId);
                               }
+
+                              // 登录成功后启动定时更新
+                              if (appDataProvider.isLoggedIn) {
+                                advertisementProvider.startPeriodicUpdate();
+                                announcementProvider.startPeriodicUpdate();
+                              }
+
                               if (context.mounted) {
                                 Navigator.pushNamed(context, '/main');
                               }

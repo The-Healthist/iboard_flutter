@@ -210,8 +210,8 @@ class CarouselStateProvider extends ChangeNotifier {
         print('- 全屏廣告播放時間: ${settings.advertisementPlayDuration}秒');
         print('- 每個公告停留時間: ${settings.noticeStayDuration}秒');
         print('- 無操作/手動操作超時時間: ${settings.spareDuration}秒');
-        print('- 廣告更新間隔: ${settings.advertisementUpdateDuration}秒');
-        print('- 公告更新間隔: ${settings.noticeUpdateDuration}秒');
+        print('- 廣告更新間隔: ${settings.advertisementUpdateDuration}分鐘');
+        print('- 公告更新間隔: ${settings.noticeUpdateDuration}分鐘');
       } else {
         print('⚠️ 使用默認時間配置');
       }
