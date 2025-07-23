@@ -130,6 +130,11 @@ class _HomePageState extends State<HomePage> {
           if (appDataProvider.isLoggedIn) {
             advertisementProvider.startPeriodicUpdate();
             announcementProvider.startPeriodicUpdate();
+            
+            // 自动跳转到主页面
+            if (mounted) {
+              Navigator.pushReplacementNamed(context, '/main');
+            }
           }
         } catch (e) {
           print('Auto login failed: $e');
@@ -148,10 +153,10 @@ class _HomePageState extends State<HomePage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: Text('iBoard 主頁'),
-        backgroundColor: Theme.of(context).colorScheme.inversePrimary,
-      ),
+      // appBar: AppBar(
+      //   title: Text('iBoard 主頁'),
+      //   backgroundColor: Theme.of(context).colorScheme.inversePrimary,
+      // ),
       body: Column(
         children: [
           Expanded(
@@ -177,160 +182,161 @@ class _HomePageState extends State<HomePage> {
                             Text('正在登錄...'),
                           ],
                         )
-                      else ...[
-                        // 显示登录状态
-                        Container(
-                          padding: EdgeInsets.all(16),
-                          margin: EdgeInsets.all(16),
-                          decoration: BoxDecoration(
-                            color: appDataProvider.isLoggedIn
-                                ? Colors.green.shade50
-                                : Colors.orange.shade50,
-                            borderRadius: BorderRadius.circular(8),
-                            border: Border.all(
-                              color: appDataProvider.isLoggedIn
-                                  ? Colors.green.shade200
-                                  : Colors.orange.shade200,
-                            ),
-                          ),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Icon(
-                                appDataProvider.isLoggedIn
-                                    ? Icons.check_circle
-                                    : Icons.warning,
-                                color: appDataProvider.isLoggedIn
-                                    ? Colors.green.shade700
-                                    : Colors.orange.shade700,
-                              ),
-                              SizedBox(width: 8),
-                              Text(
-                                appDataProvider.isLoggedIn ? '設備已登錄' : '設備未登錄',
-                                style: TextStyle(
-                                  color: appDataProvider.isLoggedIn
-                                      ? Colors.green.shade700
-                                      : Colors.orange.shade700,
-                                  fontWeight: FontWeight.w600,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                        SizedBox(height: 20),
-                        ElevatedButton(
-                          onPressed: () async {
-                            if (_deviceId == null) {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(content: Text('設備碼尚未生成')),
-                              );
-                              return;
-                            }
+                      // 注释掉主要的UI内容，因为现在会自动跳转到主页面
+                      // else ...[
+                      //   // 显示登录状态
+                      //   Container(
+                      //     padding: EdgeInsets.all(16),
+                      //     margin: EdgeInsets.all(16),
+                      //     decoration: BoxDecoration(
+                      //       color: appDataProvider.isLoggedIn
+                      //           ? Colors.green.shade50
+                      //           : Colors.orange.shade50,
+                      //       borderRadius: BorderRadius.circular(8),
+                      //       border: Border.all(
+                      //         color: appDataProvider.isLoggedIn
+                      //             ? Colors.green.shade200
+                      //             : Colors.orange.shade200,
+                      //       ),
+                      //     ),
+                      //     child: Row(
+                      //       mainAxisSize: MainAxisSize.min,
+                      //       children: [
+                      //         Icon(
+                      //           appDataProvider.isLoggedIn
+                      //               ? Icons.check_circle
+                      //               : Icons.warning,
+                      //           color: appDataProvider.isLoggedIn
+                      //               ? Colors.green.shade700
+                      //               : Colors.orange.shade700,
+                      //         ),
+                      //         SizedBox(width: 8),
+                      //         Text(
+                      //           appDataProvider.isLoggedIn ? '設備已登錄' : '設備未登錄',
+                      //           style: TextStyle(
+                      //             color: appDataProvider.isLoggedIn
+                      //                 ? Colors.green.shade700
+                      //                 : Colors.orange.shade700,
+                      //             fontWeight: FontWeight.w600,
+                      //           ),
+                      //         ),
+                      //       ],
+                      //     ),
+                      //   ),
+                      //   SizedBox(height: 20),
+                      //   ElevatedButton(
+                      //     onPressed: () async {
+                      //       if (_deviceId == null) {
+                      //         ScaffoldMessenger.of(context).showSnackBar(
+                      //           SnackBar(content: Text('設備碼尚未生成')),
+                      //         );
+                      //         return;
+                      //       }
 
-                            try {
-                              final appDataProvider =
-                                  Provider.of<AppDataProvider>(context,
-                                      listen: false);
-                              final carouselStateProvider =
-                                  Provider.of<CarouselStateProvider>(context,
-                                      listen: false);
-                              final advertisementProvider =
-                                  Provider.of<AdvertisementProvider>(context,
-                                      listen: false);
-                              final announcementProvider =
-                                  Provider.of<AnnouncementProvider>(context,
-                                      listen: false);
+                      //       try {
+                      //         final appDataProvider =
+                      //             Provider.of<AppDataProvider>(context,
+                      //                 listen: false);
+                      //         final carouselStateProvider =
+                      //             Provider.of<CarouselStateProvider>(context,
+                      //                 listen: false);
+                      //         final advertisementProvider =
+                      //             Provider.of<AdvertisementProvider>(context,
+                      //                 listen: false);
+                      //         final announcementProvider =
+                      //             Provider.of<AnnouncementProvider>(context,
+                      //                 listen: false);
 
-                              // 确保Provider间的关联已设置
-                              appDataProvider.setCarouselStateProvider(
-                                  carouselStateProvider);
+                      //         // 确保Provider间的关联已设置
+                      //         appDataProvider.setCarouselStateProvider(
+                      //             carouselStateProvider);
 
-                              if (!appDataProvider.isLoggedIn) {
-                                await appDataProvider.initializeAndLogin(
-                                    deviceIdToSet: _deviceId);
-                              }
+                      //         if (!appDataProvider.isLoggedIn) {
+                      //           await appDataProvider.initializeAndLogin(
+                      //               deviceIdToSet: _deviceId);
+                      //         }
 
-                              // 登录成功后启动定时更新
-                              if (appDataProvider.isLoggedIn) {
-                                advertisementProvider.startPeriodicUpdate();
-                                announcementProvider.startPeriodicUpdate();
-                              }
+                      //         // 登录成功后启动定时更新
+                      //         if (appDataProvider.isLoggedIn) {
+                      //           advertisementProvider.startPeriodicUpdate();
+                      //           announcementProvider.startPeriodicUpdate();
+                      //         }
 
-                              if (context.mounted) {
-                                Navigator.pushNamed(context, '/main');
-                              }
-                            } catch (e) {
-                              if (context.mounted) {
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  SnackBar(content: Text('Login failed: $e')),
-                                );
-                              }
-                              print("Login failed: $e");
-                            }
-                          },
-                          child: Text('Main'),
-                        ),
-                        SizedBox(height: 20),
-                        ElevatedButton(
-                          onPressed: () {
-                            Navigator.pushNamed(context, '/settings');
-                          },
-                          child: Text('設置頁面'),
-                        ),
+                      //         if (context.mounted) {
+                      //           Navigator.pushNamed(context, '/main');
+                      //         }
+                      //       } catch (e) {
+                      //         if (context.mounted) {
+                      //           ScaffoldMessenger.of(context).showSnackBar(
+                      //             SnackBar(content: Text('Login failed: $e')),
+                      //           );
+                      //         }
+                      //         print("Login failed: $e");
+                      //       }
+                      //     },
+                      //     child: Text('Main'),
+                      //   ),
+                      //   SizedBox(height: 20),
+                      //   ElevatedButton(
+                      //     onPressed: () {
+                      //       Navigator.pushNamed(context, '/settings');
+                      //     },
+                      //     child: Text('設置頁面'),
+                      //   ),
 
-                        // 显示错误信息（如果有）
-                        if (appDataProvider.error != null) ...[
-                          SizedBox(height: 20),
-                          Container(
-                            padding: EdgeInsets.all(12),
-                            margin: EdgeInsets.all(16),
-                            decoration: BoxDecoration(
-                              color: Colors.red.shade50,
-                              borderRadius: BorderRadius.circular(8),
-                              border: Border.all(color: Colors.red.shade200),
-                            ),
-                            child: Row(
-                              children: [
-                                Icon(
-                                  Icons.error_outline,
-                                  color: Colors.red.shade700,
-                                  size: 20,
-                                ),
-                                SizedBox(width: 10),
-                                Expanded(
-                                  child: Text(
-                                    appDataProvider.error!,
-                                    style: TextStyle(
-                                      fontSize: 14,
-                                      color: Colors.red.shade700,
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ],
-                      ],
+                      //   // 显示错误信息（如果有）
+                      //   if (appDataProvider.error != null) ...[
+                      //     SizedBox(height: 20),
+                      //     Container(
+                      //       padding: EdgeInsets.all(12),
+                      //       margin: EdgeInsets.all(16),
+                      //       decoration: BoxDecoration(
+                      //         color: Colors.red.shade50,
+                      //         borderRadius: BorderRadius.circular(8),
+                      //         border: Border.all(color: Colors.red.shade200),
+                      //       ),
+                      //       child: Row(
+                      //         children: [
+                      //           Icon(
+                      //             Icons.error_outline,
+                      //             color: Colors.red.shade700,
+                      //             size: 20,
+                      //           ),
+                      //           SizedBox(width: 10),
+                      //           Expanded(
+                      //             child: Text(
+                      //               appDataProvider.error!,
+                      //               style: TextStyle(
+                      //                 fontSize: 14,
+                      //                 color: Colors.red.shade700,
+                      //               ),
+                      //             ),
+                      //           ),
+                      //         ],
+                      //       ),
+                      //     ),
+                      //   ],
+                      // ],
                     ],
                   );
                 },
               ),
             ),
           ),
-          // 底部显示设备码
-          Container(
-            width: double.infinity,
-            padding: EdgeInsets.all(16),
-            color: Colors.grey.shade100,
-            child: Text(
-              _deviceId != null ? '設備碼: $_deviceId' : '設備碼生成中...',
-              style: TextStyle(
-                fontSize: 12,
-                color: Colors.grey.shade600,
-              ),
-              textAlign: TextAlign.center,
-            ),
-          ),
+          // 底部显示设备码 - 也注释掉，因为主页面已经有设备ID显示
+          // Container(
+          //   width: double.infinity,
+          //   padding: EdgeInsets.all(16),
+          //   color: Colors.grey.shade100,
+          //   child: Text(
+          //     _deviceId != null ? '設備碼: $_deviceId' : '設備碼生成中...',
+          //     style: TextStyle(
+          //       fontSize: 12,
+          //       color: Colors.grey.shade600,
+          //     ),
+          //     textAlign: TextAlign.center,
+          //   ),
+          // ),
         ],
       ),
     );
