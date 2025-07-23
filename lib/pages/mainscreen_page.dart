@@ -8,6 +8,7 @@ import 'package:iboard_app/models/ad_model.dart';
 import 'package:iboard_app/models/announcement_model.dart';
 import 'package:iboard_app/providers/advertisement_provider.dart';
 import 'package:iboard_app/providers/announcement_provider.dart';
+import 'package:iboard_app/providers/app_data_provider.dart';
 import 'package:iboard_app/providers/state_provider.dart';
 import 'package:iboard_app/widgets/carousel_widget.dart' as custom_carousel;
 import 'package:iboard_app/widgets/mainscreen/bottom_display/weather_widget.dart';
@@ -686,6 +687,10 @@ class _AnnouncementPageState extends State<AnnouncementPage> {
     final advertisementProvider = context.watch<AdvertisementProvider>();
     final currentAdvertisements = advertisementProvider.topAdvertisements;
 
+    // Listen to AppDataProvider for device ID
+    final appDataProvider = context.watch<AppDataProvider>();
+    final deviceId = appDataProvider.deviceId;
+
     // Listen to CarouselStateProvider for fullscreen ad state changes
     final carouselStateProvider = context.watch<CarouselStateProvider>();
     final currentAppState = carouselStateProvider.currentAppState;
@@ -768,7 +773,7 @@ class _AnnouncementPageState extends State<AnnouncementPage> {
                     onPageChanged: (index) {},
                   )),
             ),
-            // 底部區域 - 4/24 比例
+            // 底部區域 - 4/24 比例 (缩小了天气显示区域)
             Expanded(
               flex: 4,
               child: Container(
@@ -783,6 +788,24 @@ class _AnnouncementPageState extends State<AnnouncementPage> {
                     //   _bottomCurrentIndex = index;
                     // });
                   },
+                ),
+              ),
+            ),
+            // 设备ID显示区域 - 1/24 比例
+            Container(
+              width: double.infinity,
+              height: 20,
+              padding: EdgeInsets.symmetric(horizontal: 8),
+              child: Center(
+                child: Text(
+                  deviceId != null ? '設備ID: $deviceId' : '設備ID: 未知',
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: Colors.grey.shade700,
+                    fontWeight: FontWeight.w500,
+                  ),
+                  overflow: TextOverflow.ellipsis,
+                  maxLines: 1,
                 ),
               ),
             ),
