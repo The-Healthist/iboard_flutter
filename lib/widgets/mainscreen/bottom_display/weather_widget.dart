@@ -464,7 +464,7 @@ class _WeatherWidgetState extends State<WeatherWidget> {
         children: [
           // 左侧部分：当前天气显示区域 - 使用Expanded使其与右侧预报区域高度一致
           Expanded(
-            flex: 3, // 左侧占用2份空间（约40%宽度）
+            flex: 2,
             child: FutureBuilder<CurrentWeatherDataModel?>(
               future: _currentWeatherDataFuture, // 异步获取当前天气数据的Future
               builder: (context, snapshot) {
@@ -613,7 +613,7 @@ class _WeatherWidgetState extends State<WeatherWidget> {
           ), // Expanded结束
           // 右侧部分：天气预报区域 - 使用Expanded占满Row的剩余空间
           Expanded(
-            flex: 7, // 右侧占用3份空间（约60%宽度）
+            flex: 6, // 右侧占用3份空间（约60%宽度）
             child: FutureBuilder<WeatherData?>(
               future: _forecastDataFuture, // 异步获取天气预报数据的Future
               builder: (context, snapshot) {
