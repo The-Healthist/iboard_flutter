@@ -1,4 +1,4 @@
-import 'dart:developer';
+import 'dart:async'; // Added for Timer
 
 import 'package:flutter/material.dart';
 import 'package:iboard_app/http/weather.dart';
@@ -23,13 +23,66 @@ class _WeatherWidgetState extends State<WeatherWidget> {
   final Logger _logger = Logger();
   final String _currentWeatherLocation =
       '香港天文台'; // Default location for current temp
+  Timer? _timeUpdateTimer; // Added timer for updating time
+  DateTime _currentTime = DateTime.now(); // Added to track current time
 
   @override
   void initState() {
     super.initState();
+    // Initialize current time immediately
+    _currentTime = DateTime.now();
+    _logger.i(
+        'WeatherWidget初始化时间: ${DateFormat('yyyy-MM-dd HH:mm:ss').format(_currentTime)}');
+
     initializeDateFormatting('zh_HK', null).then((_) {
       // Added initialization
       _fetchWeatherData();
+      _startTimeUpdateTimer(); // Start timer for updating time
+    });
+  }
+
+  @override
+  void dispose() {
+    _timeUpdateTimer?.cancel(); // Cancel timer
+    super.dispose();
+  }
+
+  void _startTimeUpdateTimer() {
+    // Update time immediately
+    setState(() {
+      _currentTime = DateTime.now();
+    });
+    _logger.i(
+        '启动时间更新定时器，当前时间: ${DateFormat('yyyy-MM-dd HH:mm:ss').format(_currentTime)}');
+
+    // Calculate delay to next minute
+    final now = DateTime.now();
+    final nextMinute =
+        DateTime(now.year, now.month, now.day, now.hour, now.minute + 1);
+    final delayToNextMinute = nextMinute.difference(now);
+
+    // First update at the next minute
+    Timer(delayToNextMinute, () {
+      if (mounted) {
+        setState(() {
+          _currentTime = DateTime.now();
+        });
+        _logger
+            .i('时间更新: ${DateFormat('yyyy-MM-dd HH:mm').format(_currentTime)}');
+
+        // Then update every minute
+        _timeUpdateTimer = Timer.periodic(const Duration(minutes: 1), (timer) {
+          if (mounted) {
+            setState(() {
+              _currentTime = DateTime.now();
+            });
+            _logger.i(
+                '定时时间更新: ${DateFormat('yyyy-MM-dd HH:mm').format(_currentTime)}');
+          } else {
+            timer.cancel();
+          }
+        });
+      }
     });
   }
 
@@ -73,11 +126,11 @@ class _WeatherWidgetState extends State<WeatherWidget> {
         ? currentWeatherData.icon!.first
         : null;
 
-    final now = DateTime.now();
-    final formattedDate = DateFormat('yyyy-MM-dd').format(now);
-    final formattedTime = DateFormat('HH:mm').format(now);
+    // Use the tracked current time instead of DateTime.now()
+    final formattedDate = DateFormat('yyyy-MM-dd').format(_currentTime);
+    final formattedTime = DateFormat('HH:mm').format(_currentTime);
     final formattedWeekday = DateFormat('EEEE', 'zh_HK')
-        .format(now); // Assuming Hong Kong locale for week day
+        .format(_currentTime); // Assuming Hong Kong locale for week day
 
     return Container(
       width: 220, // Adjusted width for the current weather section
