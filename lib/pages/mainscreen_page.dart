@@ -15,6 +15,7 @@ import 'package:iboard_app/widgets/mainscreen/bottom_display/weather_widget.dart
 import 'package:iboard_app/widgets/mainscreen/main_display/announcement_reader_widget.dart';
 import 'package:iboard_app/widgets/mainscreen/main_display/mainscreen_widget.dart';
 import 'package:iboard_app/widgets/mainscreen/top_ad_widget.dart';
+import 'package:iboard_app/pages/settings_page.dart';
 import 'package:logger/logger.dart';
 import 'package:provider/provider.dart';
 
@@ -57,6 +58,10 @@ class _AnnouncementPageState extends State<AnnouncementPage> {
   Duration _noticeDuration = const Duration(seconds: 5); // 通告总时长 - 使用API默认值
   int _currentTopAdIndex = 0; // 当前顶部广告索引
   int _currentNoticeIndex = 0; // 当前通告索引
+
+  // 设备ID点击计数相关
+  int _deviceIdClickCount = 0; // 设备ID点击次数
+  Timer? _clickResetTimer; // 点击重置定时器
 
   ///1， 根据当前应用状态更新轮播暂停状态
   void _updateCarouselStateBasedOnAppState(AppState appState) {
@@ -118,6 +123,7 @@ class _AnnouncementPageState extends State<AnnouncementPage> {
     _debugTimer?.cancel(); // 取消调试定时器
     _watchdogTimer?.cancel(); // 取消监控定时器
     _delayedNoticeTimer?.cancel(); // 取消延迟启动定时器
+    _clickResetTimer?.cancel(); // 取消点击重置定时器
     super.dispose();
   }
 
@@ -213,6 +219,91 @@ class _AnnouncementPageState extends State<AnnouncementPage> {
     _topCarouselController.pauseAllMedia();
     _midCarouselController.pauseAllMedia();
     _bottomCarouselController.pauseAllMedia();
+  }
+
+  ///5.1，进入设置页面前暂停所有轮播和计时器
+  void _pauseAllCarouselsForSettings() {
+    _logger.i('⚙️ 进入设置页面 - 暂停所有轮播和计时器');
+
+    // 暂停所有定时器
+    _topTimer?.cancel();
+    _midTimer?.cancel();
+    _bottomTimer?.cancel();
+    _debugTimer?.cancel();
+    _watchdogTimer?.cancel();
+    _delayedNoticeTimer?.cancel();
+
+    // 暂停所有轮播中的媒体内容
+    _topCarouselController.pauseAllMedia();
+    _midCarouselController.pauseAllMedia();
+    _bottomCarouselController.pauseAllMedia();
+
+    // 设置所有轮播为暂停状态
+    _isTopCarouselPaused = true;
+    _isMidCarouselPaused = true;
+    _isBottomCarouselPaused = true;
+
+    // 暂停全屏广告计时器（通过设置状态为手动操作模式）
+    final carouselStateProvider = context.read<CarouselStateProvider>();
+    carouselStateProvider.enterManualOperation();
+
+    _logger.i('⚙️ 设置页面模式 - 所有轮播已暂停');
+  }
+
+  ///5.2，从设置页面返回后恢复所有轮播和计时器
+  void _resumeAllCarouselsFromSettings() {
+    _logger.i('↩️ 从设置页面返回 - 恢复所有轮播和计时器');
+
+    // 恢复默认状态
+    final carouselStateProvider = context.read<CarouselStateProvider>();
+    carouselStateProvider.enterDefaultState();
+
+    // 设置所有轮播为运行状态
+    _isTopCarouselPaused = false;
+    _isMidCarouselPaused = false;
+    _isBottomCarouselPaused = false;
+
+    // 恢复所有轮播中的媒体内容
+    _topCarouselController.resumeAllMedia();
+    _midCarouselController.resumeAllMedia();
+    _bottomCarouselController.resumeAllMedia();
+
+    // 重新启动调试定时器和监控定时器
+    _startDebugTimer();
+    _startCarouselWatchdog();
+
+    // 恢复顶部广告轮播
+    if (_topAds.isNotEmpty) {
+      int currentIndex = _topCarouselController.currentIndex;
+      _startTopAdTimer(currentIndex);
+    }
+
+    // 恢复中部通告轮播
+    if (_midCarouselController.widgetCount > 1) {
+      final apiNoticeStayDuration = carouselStateProvider.noticeStayDuration;
+      _currentNoticeStartTime = DateTime.now();
+
+      // 确保当前索引在通告范围内
+      if (_currentNoticeIndex < 1) {
+        _currentNoticeIndex = 1;
+        _midCarouselController.jumpToIndex(_currentNoticeIndex);
+      }
+
+      _startContinuousNoticeCarousel(apiNoticeStayDuration);
+    }
+
+    // 恢复底部轮播
+    if (_bottomCarouselController.widgetCount > 1) {
+      _bottomTimer = Timer.periodic(const Duration(seconds: 10), (timer) {
+        if (mounted &&
+            _bottomCarouselController.widgetCount > 1 &&
+            !_isBottomCarouselPaused) {
+          _bottomCarouselController.playNext();
+        }
+      });
+    }
+
+    _logger.i('↩️ 设置页面返回 - 所有轮播已恢复');
   }
 
   ///5，正常退出全屏广告状态，恢复所有轮播
@@ -674,9 +765,41 @@ class _AnnouncementPageState extends State<AnnouncementPage> {
     }
   }
 
+  ///12，处理设备ID点击事件
+  void _handleDeviceIdClick() {
+    _deviceIdClickCount++;
+    _logger.i('📱 设备ID点击次数: $_deviceIdClickCount/8');
+
+    // 取消之前的重置定时器
+    _clickResetTimer?.cancel();
+
+    if (_deviceIdClickCount >= 8) {
+      // 达到8次点击，进入设置页面
+      _logger.i('🔧 连续点击8次，进入设置页面');
+      _deviceIdClickCount = 0; // 重置计数
+
+      // 进入设置页面前暂停所有轮播和计时器
+      _pauseAllCarouselsForSettings();
+
+      Navigator.push(
+        context,
+        MaterialPageRoute(builder: (context) => SettingsPage()),
+      ).then((_) {
+        // 从设置页面返回后恢复所有轮播
+        _resumeAllCarouselsFromSettings();
+      });
+    } else {
+      // 设置5秒后重置计数器
+      _clickResetTimer = Timer(const Duration(seconds: 5), () {
+        _deviceIdClickCount = 0;
+        _logger.i('⏰ 点击计数器已重置');
+      });
+    }
+  }
+
   @override
 
-  ///11，处理视频播放器的初始化和播放
+  ///13，处理视频播放器的初始化和播放
   Widget build(BuildContext context) {
     // Listen to AnnouncementProvider for changes
     final announcementProvider = context.watch<AnnouncementProvider>();
@@ -797,15 +920,18 @@ class _AnnouncementPageState extends State<AnnouncementPage> {
               height: 20,
               padding: EdgeInsets.symmetric(horizontal: 8),
               child: Center(
-                child: Text(
-                  deviceId != null ? '設備ID: $deviceId' : '設備ID: 未知',
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: Colors.grey.shade700,
-                    fontWeight: FontWeight.w500,
+                child: GestureDetector(
+                  onTap: _handleDeviceIdClick,
+                  child: Text(
+                    deviceId != null ? '設備ID: $deviceId' : '設備ID: 未知',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: Colors.grey.shade700,
+                      fontWeight: FontWeight.w500,
+                    ),
+                    overflow: TextOverflow.ellipsis,
+                    maxLines: 1,
                   ),
-                  overflow: TextOverflow.ellipsis,
-                  maxLines: 1,
                 ),
               ),
             ),
