@@ -108,8 +108,45 @@ class AppDataProvider extends ChangeNotifier {
     } on ApiException catch (e) {
       _logger.e('Initial login failed',
           error: e, stackTrace: e.errorData is StackTrace ? e.errorData : null);
-      _error = 'Login failed: ${e.message}';
-      _settingsModel = null; // Clear data on login failure
+
+      // 检查是否是设备ID无效错误（状态码400且消息包含Invalid device ID）
+      if (e.statusCode == 400 &&
+          e.errorData is Map &&
+          e.errorData['message'] != null &&
+          e.errorData['message'].toString().contains('Invalid device ID')) {
+        _logger.w(
+            'Device ID not found, attempting to register device: $_deviceId');
+
+        try {
+          // 尝试注册设备
+          await _registerNewDevice(_deviceId!);
+          _logger.i('Device registration successful, retrying login...');
+
+          // 重新尝试登录
+          final retryResponseData =
+              await _apiClient.login(deviceId: _deviceId!);
+          _settingsModel = SettingsModel.fromJson(retryResponseData);
+          _logger.i('Login successful after device registration.');
+
+          // 更新CarouselStateProvider的时间配置
+          if (_carouselStateProvider != null &&
+              _settingsModel?.settings != null) {
+            _carouselStateProvider!.updateSettings(_settingsModel!.settings);
+            _logger.i(
+                'CarouselStateProvider settings updated successfully after registration.');
+          }
+
+          _error = null;
+        } catch (registrationError) {
+          _logger.e('Device registration or retry login failed',
+              error: registrationError);
+          _error = 'Device registration failed: $registrationError';
+          _settingsModel = null;
+        }
+      } else {
+        _error = 'Login failed: ${e.message}';
+        _settingsModel = null; // Clear data on login failure
+      }
     } catch (e, stackTrace) {
       _logger.e('An unexpected error occurred during initial login',
           error: e, stackTrace: stackTrace);
@@ -179,6 +216,42 @@ class AppDataProvider extends ChangeNotifier {
     } finally {
       // _isLoading = false; // Reset global isLoading if it was set
       // notifyListeners();
+    }
+  }
+
+  // 注册新设备的私有方法
+  Future<void> _registerNewDevice(String deviceId) async {
+    _logger.i('Starting device registration process for deviceId: $deviceId');
+
+    try {
+      // 第一步：使用管理员账号登录获取 token
+      _logger.i('Step 1: Admin login to get admin token');
+      final adminLoginResponse = await _apiClient.adminLogin(
+        email: 'admin@example.com',
+        password: 'admin123',
+      );
+
+      if (!adminLoginResponse.containsKey('token')) {
+        throw Exception('Admin login failed: No token in response');
+      }
+
+      final adminToken = adminLoginResponse['token'] as String;
+      _logger.i('Admin login successful, received token');
+
+      // 第二步：使用管理员 token 创建设备
+      _logger.i('Step 2: Creating device with admin token');
+      await _apiClient.createDevice(
+        deviceId: deviceId,
+        adminToken: adminToken,
+        buildingId: 20, // 固定值
+      );
+
+      _logger.i(
+          'Device registration completed successfully for deviceId: $deviceId');
+    } catch (e, stackTrace) {
+      _logger.e('Device registration failed for deviceId: $deviceId',
+          error: e, stackTrace: stackTrace);
+      throw Exception('Failed to register device: $e');
     }
   }
 

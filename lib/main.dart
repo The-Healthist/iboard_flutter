@@ -10,55 +10,62 @@ import 'package:provider/provider.dart';
 import 'pages/mainscreen_page.dart';
 import 'pages/fullscreen_ads_page.dart';
 import 'pages/settings_page.dart';
+import 'dart:async';
 
 void main() {
-  runApp(
-    MultiProvider(
-      providers: [
-        ChangeNotifierProvider(
-          create: (context) =>
-              AppDataProvider(baseUrl: 'http://test.iboard.skylinedances.com'),
-        ),
-        Provider<FileManager>(
-          create: (context) => FileManager(),
-        ),
-        ChangeNotifierProxyProvider2<AppDataProvider, FileManager,
-            AnnouncementProvider>(
-          create: (context) => AnnouncementProvider(
-            Provider.of<AppDataProvider>(context, listen: false).apiClient,
-            Provider.of<AppDataProvider>(context, listen: false),
-            Provider.of<FileManager>(context, listen: false),
+  WidgetsFlutterBinding.ensureInitialized();
+  runZonedGuarded(() {
+    runApp(
+      MultiProvider(
+        providers: [
+          ChangeNotifierProvider(
+            create: (context) => AppDataProvider(
+                baseUrl: 'http://test.iboard.skylinedances.com'),
           ),
-          update: (context, appDataProvider, fileManager,
-                  previousAnnouncementProvider) =>
-              AnnouncementProvider(
-            appDataProvider.apiClient,
-            appDataProvider,
-            fileManager,
+          Provider<FileManager>(
+            create: (context) => FileManager(),
           ),
-        ),
-        ChangeNotifierProxyProvider2<AppDataProvider, FileManager,
-            AdvertisementProvider>(
-          create: (context) => AdvertisementProvider(
-            Provider.of<AppDataProvider>(context, listen: false).apiClient,
-            Provider.of<AppDataProvider>(context, listen: false),
-            Provider.of<FileManager>(context, listen: false),
+          ChangeNotifierProxyProvider2<AppDataProvider, FileManager,
+              AnnouncementProvider>(
+            create: (context) => AnnouncementProvider(
+              Provider.of<AppDataProvider>(context, listen: false).apiClient,
+              Provider.of<AppDataProvider>(context, listen: false),
+              Provider.of<FileManager>(context, listen: false),
+            ),
+            update: (context, appDataProvider, fileManager,
+                    previousAnnouncementProvider) =>
+                AnnouncementProvider(
+              appDataProvider.apiClient,
+              appDataProvider,
+              fileManager,
+            ),
           ),
-          update: (context, appDataProvider, fileManager,
-                  previousAdvertisementProvider) =>
-              AdvertisementProvider(
-            appDataProvider.apiClient,
-            appDataProvider,
-            fileManager,
+          ChangeNotifierProxyProvider2<AppDataProvider, FileManager,
+              AdvertisementProvider>(
+            create: (context) => AdvertisementProvider(
+              Provider.of<AppDataProvider>(context, listen: false).apiClient,
+              Provider.of<AppDataProvider>(context, listen: false),
+              Provider.of<FileManager>(context, listen: false),
+            ),
+            update: (context, appDataProvider, fileManager,
+                    previousAdvertisementProvider) =>
+                AdvertisementProvider(
+              appDataProvider.apiClient,
+              appDataProvider,
+              fileManager,
+            ),
           ),
-        ),
-        ChangeNotifierProvider(
-            create: (_) =>
-                CarouselStateProvider()), // Add CarouselStateProvider here
-      ],
-      child: MyApp(),
-    ),
-  );
+          ChangeNotifierProvider(
+              create: (_) =>
+                  CarouselStateProvider()), // Add CarouselStateProvider here
+        ],
+        child: MyApp(),
+      ),
+    );
+  }, (error, stack) {
+    print('Uncaught error: '
+        '\$error\nStack trace: \$stack');
+  });
 }
 
 class MyApp extends StatelessWidget {
@@ -87,7 +94,6 @@ class HomePage extends StatefulWidget {
 }
 
 class _HomePageState extends State<HomePage> {
-  String? _deviceId;
   bool _isInitializing = false;
 
   @override
@@ -104,9 +110,6 @@ class _HomePageState extends State<HomePage> {
     try {
       final deviceIdUtil = DeviceIdUtil();
       final deviceId = await deviceIdUtil.generateUniqueDeviceId();
-      setState(() {
-        _deviceId = deviceId;
-      });
 
       // 自动使用生成的设备ID登录
       if (mounted) {

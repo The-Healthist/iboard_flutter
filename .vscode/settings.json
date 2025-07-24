@@ -2,5 +2,6 @@
     "cSpell.words": [
         "iboard"
     ],
-    "cmake.sourceDirectory": "C:/Users/20216/Documents/GitHub/iboard_flutter/linux"
+    "cmake.sourceDirectory": "C:/Users/20216/Documents/GitHub/iboard_flutter/linux",
+    "java.configuration.updateBuildConfiguration": "interactive"
 }

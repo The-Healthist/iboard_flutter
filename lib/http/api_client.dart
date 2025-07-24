@@ -418,4 +418,82 @@ class ApiClient {
         apiNameForLog: 'getBuildingNotices');
     return _handleResponse(response, 'getBuildingNotices');
   }
+
+  // 6. Admin login (using email/password)
+  // Endpoint: POST <<baseUrl>>/api/admin/login
+  // Body: { "email": "string", "password": "string" }
+  Future<Map<String, dynamic>> adminLogin({
+    required String email,
+    required String password,
+  }) async {
+    const String endpointPath = '/api/admin/login';
+    final Uri url = _buildUri(endpointPath, null);
+    final String requestBody =
+        json.encode({'email': email, 'password': password});
+
+    // 使用固定的 Authorization header
+    final Map<String, String> headers = {
+      'Authorization':
+          'Basic OmV5SmhiR2NpT2lKSVV6STFOaUlzSW5SNWNDSTZJa3BYVkNKOS5leUpsYldGcGJDSTZJbUZrYldsdVFHVjRZVzF3YkdVdVkyOXRJaXdpWlhod0lqb3hOelExTnpZMU5UQTVMQ0pwWkNJNk1Td2lhWE5CWkcxcGJpSTZkSEoxWlgwLm9XcExTV1BLOTNSWlNKVFotbTE1bUt6R3BaMTJlZExKa0RTR3Q0cUVZS2M=',
+      'Content-Type': 'application/json',
+    };
+
+    _logger.i('Attempting admin login for email: $email');
+    final http.Response response = await _sendRequest(
+        () => http.post(url, headers: headers, body: requestBody),
+        isLoginRequest: true,
+        apiNameForLog: 'adminLogin');
+
+    final Map<String, dynamic> responseData =
+        await _handleResponse(response, 'adminLogin');
+
+    _logger.i('Admin login successful for email: $email');
+    return responseData;
+  }
+
+  // 7. Create device
+  // Endpoint: POST <<baseUrl>>/api/admin/device
+  // Body: { "deviceId": "string", "buildingId": number, "settings": {...} }
+  Future<Map<String, dynamic>> createDevice({
+    required String deviceId,
+    required String adminToken,
+    int buildingId = 20,
+    Map<String, dynamic>? settings,
+  }) async {
+    const String endpointPath = '/api/admin/device';
+    final Uri url = _buildUri(endpointPath, null);
+
+    // 默认设置
+    final defaultSettings = {
+      "arrearageUpdateDuration": 5,
+      "noticeUpdateDuration": 10,
+      "advertisementUpdateDuration": 15,
+      "advertisementPlayDuration": 30,
+      "noticePlayDuration": 30,
+      "spareDuration": 5,
+      "noticeStayDuration": 10
+    };
+
+    final String requestBody = json.encode({
+      'deviceId': deviceId,
+      'buildingId': buildingId,
+      'settings': settings ?? defaultSettings,
+    });
+
+    final Map<String, String> headers = {
+      'Authorization': 'Bearer $adminToken',
+      'Content-Type': 'application/json',
+    };
+
+    _logger.i('Creating device with deviceId: $deviceId');
+    final http.Response response = await _sendRequest(
+        () => http.post(url, headers: headers, body: requestBody),
+        apiNameForLog: 'createDevice');
+
+    final Map<String, dynamic> responseData =
+        await _handleResponse(response, 'createDevice');
+
+    _logger.i('Device created successfully: $deviceId');
+    return responseData;
+  }
 }
