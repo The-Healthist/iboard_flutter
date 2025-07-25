@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:iboard_app/pages/main_page.dart';
 import 'package:iboard_app/providers/advertisement_provider.dart';
 import 'package:iboard_app/providers/announcement_provider.dart';
+import 'package:iboard_app/providers/announcement_carousel_provider.dart';
 import 'package:iboard_app/providers/app_data_provider.dart';
 import 'package:iboard_app/providers/state_provider.dart'; // Added CarouselStateProvider import
 import 'package:iboard_app/providers/top_ad_carousel_provider.dart'; // Added TopAdCarouselProvider import
@@ -62,6 +63,9 @@ void main() {
           ChangeNotifierProvider(
               create: (_) =>
                   TopAdCarouselProvider()), // Add TopAdCarouselProvider here
+          ChangeNotifierProvider(
+              create: (_) =>
+                  AnnouncementCarouselProvider()), // Add AnnouncementCarouselProvider here
         ],
         child: MyApp(),
       ),
