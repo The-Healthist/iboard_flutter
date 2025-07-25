@@ -1,8 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:video_player/video_player.dart';
 import 'package:iboard_app/managers/file_manager.dart';
 import 'package:iboard_app/models/ad_model.dart';
+import 'package:logger/logger.dart';
+import 'dart:io';
 
-class FullAdWidget extends StatelessWidget {
+class FullAdWidget extends StatefulWidget {
   final AdModel ad;
   final FileManager fileManager;
 
@@ -11,6 +14,83 @@ class FullAdWidget extends StatelessWidget {
     required this.ad,
     required this.fileManager,
   }) : super(key: key);
+
+  @override
+  State<FullAdWidget> createState() => _FullAdWidgetState();
+}
+
+class _FullAdWidgetState extends State<FullAdWidget> {
+  static final Logger _logger = Logger();
+  VideoPlayerController? _videoController;
+  bool _isVideoInitialized = false;
+  bool _isLoadingVideo = false;
+  String? _errorMessage;
+
+  @override
+  void initState() {
+    super.initState();
+    _logger
+        .i('🎬 初始化全屏广告: "${widget.ad.title}" - 类型: ${widget.ad.file.mimeType}');
+    if (widget.ad.file.mimeType.startsWith('video/')) {
+      _initializeVideo();
+    }
+  }
+
+  @override
+  void dispose() {
+    _videoController?.dispose();
+    super.dispose();
+  }
+
+  Future<void> _initializeVideo() async {
+    if (_isLoadingVideo) return;
+
+    _logger.i('🎥 开始初始化视频: ${widget.ad.file.url}');
+
+    setState(() {
+      _isLoadingVideo = true;
+      _errorMessage = null;
+    });
+
+    try {
+      // 尝试从FileManager获取本地缓存的视频文件
+      final File? localFile = await widget.fileManager.getFile(widget.ad.file);
+
+      if (localFile != null && await localFile.exists()) {
+        // 使用本地文件
+        _logger.i('✅ 使用本地缓存视频文件: ${localFile.path}');
+        _videoController = VideoPlayerController.file(localFile);
+      } else {
+        // 使用网络URL
+        _logger.i('🌐 使用网络视频URL: ${widget.ad.file.url}');
+        _videoController = VideoPlayerController.networkUrl(
+          Uri.parse(widget.ad.file.url),
+        );
+      }
+
+      await _videoController!.initialize();
+
+      if (mounted) {
+        setState(() {
+          _isVideoInitialized = true;
+          _isLoadingVideo = false;
+        });
+
+        // 自动播放视频并循环
+        _videoController!.setLooping(true);
+        _videoController!.play();
+        _logger.i('🎬 视频初始化成功并开始播放');
+      }
+    } catch (e) {
+      _logger.e('❌ 视频初始化失败: $e');
+      if (mounted) {
+        setState(() {
+          _isLoadingVideo = false;
+          _errorMessage = '视频加载失败: $e';
+        });
+      }
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -38,9 +118,9 @@ class FullAdWidget extends StatelessWidget {
 
   Widget _buildAdContent() {
     // 根据文件类型显示不同的内容
-    if (ad.file.mimeType.startsWith('image/')) {
+    if (widget.ad.file.mimeType.startsWith('image/')) {
       return _buildImageAd();
-    } else if (ad.file.mimeType.startsWith('video/')) {
+    } else if (widget.ad.file.mimeType.startsWith('video/')) {
       return _buildVideoAd();
     } else {
       return _buildDefaultAd();
@@ -51,9 +131,9 @@ class FullAdWidget extends StatelessWidget {
     return Container(
       width: double.infinity,
       height: double.infinity,
-      child: ad.file.localFilePath != null
+      child: widget.ad.file.localFilePath != null
           ? Image.asset(
-              ad.file.localFilePath!,
+              widget.ad.file.localFilePath!,
               fit: BoxFit.cover,
               errorBuilder: (context, error, stackTrace) {
                 return _buildNetworkImage();
@@ -65,7 +145,7 @@ class FullAdWidget extends StatelessWidget {
 
   Widget _buildNetworkImage() {
     return Image.network(
-      ad.file.url,
+      widget.ad.file.url,
       fit: BoxFit.cover,
       width: double.infinity,
       height: double.infinity,
@@ -91,8 +171,88 @@ class FullAdWidget extends StatelessWidget {
   }
 
   Widget _buildVideoAd() {
-    // TODO: 实现视频播放组件
-    // 这里可以使用 video_player 包来播放视频
+    if (_isLoadingVideo) {
+      return Container(
+        width: double.infinity,
+        height: double.infinity,
+        color: Colors.black,
+        child: Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              CircularProgressIndicator(color: Colors.white),
+              SizedBox(height: 20),
+              Text(
+                '正在加载视频...',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 18,
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    if (_errorMessage != null) {
+      return Container(
+        width: double.infinity,
+        height: double.infinity,
+        color: Colors.black,
+        child: Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(
+                Icons.error_outline,
+                size: 80,
+                color: Colors.red,
+              ),
+              SizedBox(height: 20),
+              Text(
+                '视频加载失败',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 24,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              SizedBox(height: 10),
+              Text(
+                _errorMessage!,
+                style: TextStyle(
+                  color: Colors.white70,
+                  fontSize: 16,
+                ),
+                textAlign: TextAlign.center,
+              ),
+              SizedBox(height: 20),
+              ElevatedButton(
+                onPressed: _initializeVideo,
+                child: Text('重试'),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    if (_isVideoInitialized && _videoController != null) {
+      return Container(
+        width: double.infinity,
+        height: double.infinity,
+        color: Colors.black,
+        child: Center(
+          child: AspectRatio(
+            aspectRatio: _videoController!.value.aspectRatio,
+            child: VideoPlayer(_videoController!),
+          ),
+        ),
+      );
+    }
+
+    // 显示视频预览或占位符
     return Container(
       width: double.infinity,
       height: double.infinity,
@@ -117,19 +277,12 @@ class FullAdWidget extends StatelessWidget {
             ),
             SizedBox(height: 10),
             Text(
-              ad.title,
+              widget.ad.title,
               style: TextStyle(
                 color: Colors.white70,
                 fontSize: 16,
               ),
               textAlign: TextAlign.center,
-            ),
-            SizedBox(height: 20),
-            // 显示网络图片作为视频预览
-            Container(
-              width: 300,
-              height: 200,
-              child: _buildNetworkImage(),
             ),
           ],
         ),
@@ -163,7 +316,7 @@ class FullAdWidget extends StatelessWidget {
             ),
             SizedBox(height: 30),
             Text(
-              ad.title,
+              widget.ad.title,
               style: TextStyle(
                 fontSize: 36,
                 fontWeight: FontWeight.bold,
@@ -180,7 +333,7 @@ class FullAdWidget extends StatelessWidget {
             ),
             SizedBox(height: 20),
             Text(
-              ad.description,
+              widget.ad.description,
               style: TextStyle(
                 fontSize: 18,
                 color: Colors.white.withOpacity(0.9),

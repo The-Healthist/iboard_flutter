@@ -2,7 +2,7 @@ import 'dart:async'; // Added import for Timer
 
 import 'package:flutter/foundation.dart'
     show listEquals; // Added import for listEquals
-import 'package:flutter/material.dart' hide CarouselController;
+import 'package:flutter/material.dart';
 import 'package:iboard_app/managers/managers.dart';
 import 'package:iboard_app/models/ad_model.dart';
 import 'package:iboard_app/models/announcement_model.dart';
@@ -10,11 +10,11 @@ import 'package:iboard_app/providers/advertisement_provider.dart';
 import 'package:iboard_app/providers/announcement_provider.dart';
 import 'package:iboard_app/providers/app_data_provider.dart';
 import 'package:iboard_app/providers/state_provider.dart';
+import 'package:iboard_app/providers/top_ad_carousel_provider.dart';
 import 'package:iboard_app/widgets/carousel_widget.dart' as custom_carousel;
 import 'package:iboard_app/widgets/mainscreen/bottom_display/weather_widget.dart';
 import 'package:iboard_app/widgets/mainscreen/main_display/announcement_reader_widget.dart';
 import 'package:iboard_app/widgets/mainscreen/main_display/mainscreen_widget.dart';
-import 'package:iboard_app/widgets/mainscreen/top_ad_widget.dart';
 import 'package:iboard_app/pages/settings_page.dart';
 import 'package:logger/logger.dart';
 import 'package:provider/provider.dart';
@@ -26,37 +26,28 @@ class AnnouncementPage extends StatefulWidget {
 
 class _AnnouncementPageState extends State<AnnouncementPage> {
   final Logger _logger = Logger();
-  late custom_carousel.CarouselController _topCarouselController;
   late custom_carousel.CarouselController _midCarouselController;
   late custom_carousel.CarouselController _bottomCarouselController;
 
-  Timer? _topTimer;
   Timer? _midTimer;
   Timer? _bottomTimer;
   Timer? _debugTimer; // 添加调试定时器
   Timer? _watchdogTimer; // 添加监控定时器
   Timer? _delayedNoticeTimer; // 延迟启动通告轮播定时器
-  List<AdModel> _topAds = [];
   List<AnnouncementModel>?
       _previousAnnouncementsForBuild; // Added state variable
   List<AdModel>? _previousAdvertisementsForBuild; // Added for ad tracking
 
   // 轮播暂停状态管理 - 按区域分别控制
-  bool _isTopCarouselPaused = false;
   bool _isMidCarouselPaused = false;
   bool _isBottomCarouselPaused = false;
   AppState? _previousAppState;
 
   // 时间记录相关 - 用于全屏广告暂停恢复
-  DateTime? _currentTopAdStartTime; // 当前顶部广告开始时间
   DateTime? _currentNoticeStartTime; // 当前通告开始时间
-  DateTime? _currentTopAdPauseTime; // 当前顶部广告暂停时间
   DateTime? _currentNoticePauseTime; // 当前通告暂停时间
-  Duration _topAdElapsedTime = Duration.zero; // 顶部广告已播放时间
   Duration _noticeElapsedTime = Duration.zero; // 通告已播放时间
-  Duration _topAdDuration = const Duration(seconds: 15); // 顶部广告总时长
   Duration _noticeDuration = const Duration(seconds: 5); // 通告总时长 - 使用API默认值
-  int _currentTopAdIndex = 0; // 当前顶部广告索引
   int _currentNoticeIndex = 0; // 当前通告索引
 
   // 设备ID点击计数相关
@@ -65,29 +56,31 @@ class _AnnouncementPageState extends State<AnnouncementPage> {
 
   ///1， 根据当前应用状态更新轮播暂停状态
   void _updateCarouselStateBasedOnAppState(AppState appState) {
+    final topAdProvider = context.read<TopAdCarouselProvider>();
+    
     switch (appState) {
       case AppState.defaultState:
         // 默认状态：所有轮播都正常播放
-        _isTopCarouselPaused = false;
+        topAdProvider.updateCarouselPauseState(false);
         _isMidCarouselPaused = false;
         _isBottomCarouselPaused = false;
         break;
       case AppState.fullscreenAd:
         // 全屏广告状态：所有轮播都暂停
-        _isTopCarouselPaused = true;
+        topAdProvider.updateCarouselPauseState(true);
         _isMidCarouselPaused = true;
         _isBottomCarouselPaused = true;
         break;
       case AppState.manualOperation:
         // 手动操作状态：顶部和底部继续，中部暂停
-        _isTopCarouselPaused = false;
+        topAdProvider.updateCarouselPauseState(false);
         _isMidCarouselPaused = true;
         _isBottomCarouselPaused = false;
         break;
     }
 
     _logger.i(
-        '🎛️ 轮播状态更新[${appState.name}]: Top=${!_isTopCarouselPaused ? "运行" : "暂停"}, Mid=${!_isMidCarouselPaused ? "运行" : "暂停"}, Bottom=${!_isBottomCarouselPaused ? "运行" : "暂停"}');
+        '🎛️ 轮播状态更新[${appState.name}]: Top=${!topAdProvider.isTopCarouselPaused ? "运行" : "暂停"}, Mid=${!_isMidCarouselPaused ? "运行" : "暂停"}, Bottom=${!_isBottomCarouselPaused ? "运行" : "暂停"}');
   }
 
   @override
@@ -95,7 +88,6 @@ class _AnnouncementPageState extends State<AnnouncementPage> {
   ///2， 初始化状态
   void initState() {
     super.initState();
-    _topCarouselController = custom_carousel.CarouselController();
     _midCarouselController = custom_carousel.CarouselController();
     _bottomCarouselController = custom_carousel.CarouselController();
 
@@ -117,7 +109,6 @@ class _AnnouncementPageState extends State<AnnouncementPage> {
 
   ///3， 释放资源
   void dispose() {
-    _topTimer?.cancel();
     _midTimer?.cancel();
     _bottomTimer?.cancel();
     _debugTimer?.cancel(); // 取消调试定时器
@@ -127,7 +118,7 @@ class _AnnouncementPageState extends State<AnnouncementPage> {
     super.dispose();
   }
 
-  ///4，启动调试定时器 - 每秒输出各区域的实时状态
+  ///4，启动调试定时器 - 每秒输出通告轮播的实时状态
   void _startDebugTimer() {
     _debugTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
       if (!mounted) return;
@@ -138,25 +129,6 @@ class _AnnouncementPageState extends State<AnnouncementPage> {
       // 获取API配置的通告停留时间
       final apiNoticeStayDuration = carouselStateProvider.noticeStayDuration;
 
-      // 计算顶部广告剩余时间
-      int topAdRemaining = 0;
-      if (_currentTopAdStartTime != null) {
-        if (_isTopCarouselPaused) {
-          // 暂停状态：使用暂停时的剩余时间
-          final remaining = _topAdDuration - _topAdElapsedTime;
-          topAdRemaining = remaining.isNegative ? 0 : remaining.inSeconds;
-        } else {
-          // 运行状态：计算当前剩余时间
-          final elapsed = DateTime.now().difference(_currentTopAdStartTime!);
-
-          // 如果有已播放时间记录（说明经历了暂停恢复），需要加上之前的播放时间
-          final totalElapsed = elapsed + _topAdElapsedTime;
-
-          final remaining = _topAdDuration - totalElapsed;
-          topAdRemaining = remaining.isNegative ? 0 : remaining.inSeconds;
-        }
-      }
-
       // 计算通告剩余时间 - 使用实时API配置
       int noticeRemaining = 0;
       if (_currentNoticeStartTime != null && !_isMidCarouselPaused) {
@@ -165,14 +137,14 @@ class _AnnouncementPageState extends State<AnnouncementPage> {
         noticeRemaining = remaining.isNegative ? 0 : remaining.inSeconds;
       }
 
-      // 输出调试信息
+      // 输出通告调试信息
       String statusInfo = '';
-      if (_isTopCarouselPaused || _isMidCarouselPaused) {
+      if (_isMidCarouselPaused) {
         statusInfo = ' [暂停状态]';
       }
 
       _logger.i(
-          '🕐 [调试] 状态=${currentAppState.name} | 顶部广告: ${topAdRemaining}s/${_topAdDuration.inSeconds}s | 通告: ${noticeRemaining}s/${apiNoticeStayDuration}s (API配置)$statusInfo');
+          '🕐 [通告调试] 状态=${currentAppState.name} | 通告: ${noticeRemaining}s/${apiNoticeStayDuration}s (API配置)$statusInfo');
     });
   }
 
@@ -180,21 +152,15 @@ class _AnnouncementPageState extends State<AnnouncementPage> {
   void _pauseAllCarousels() {
     _logger.i('🛑 暂停所有轮播 - 进入全屏广告状态');
 
+    final topAdProvider = context.read<TopAdCarouselProvider>();
     final carouselStateProvider = context.read<CarouselStateProvider>();
     final apiNoticeStayDuration = carouselStateProvider.noticeStayDuration;
 
-    // 记录当前播放时间
-    _currentTopAdPauseTime = DateTime.now();
-    _currentNoticePauseTime = DateTime.now();
+    // 暂停顶部广告轮播
+    topAdProvider.pauseTopCarousel();
 
-    // 计算已播放时间
-    if (_currentTopAdStartTime != null) {
-      _topAdElapsedTime =
-          _currentTopAdPauseTime!.difference(_currentTopAdStartTime!);
-      final remainingTop = _topAdDuration - _topAdElapsedTime;
-      _logger.i(
-          '📊 [暂停] 顶部广告 - 已播放: ${_topAdElapsedTime.inSeconds}s/${_topAdDuration.inSeconds}s, 剩余: ${remainingTop.inSeconds}s');
-    }
+    // 记录当前播放时间
+    _currentNoticePauseTime = DateTime.now();
 
     if (_currentNoticeStartTime != null) {
       _noticeElapsedTime =
@@ -205,18 +171,15 @@ class _AnnouncementPageState extends State<AnnouncementPage> {
           '📊 [暂停] 通告 - 已播放: ${_noticeElapsedTime.inSeconds}s/${apiNoticeStayDuration}s, 剩余: ${remainingNotice.inSeconds}s');
     }
 
-    // 设置所有轮播为暂停状态
-    _isTopCarouselPaused = true;
+    // 设置其他轮播为暂停状态
     _isMidCarouselPaused = true;
     _isBottomCarouselPaused = true;
 
-    // 暂停所有定时器
-    _topTimer?.cancel();
+    // 暂停其他定时器
     _midTimer?.cancel();
     _bottomTimer?.cancel();
 
-    // 暂停所有轮播中的媒体内容
-    _topCarouselController.pauseAllMedia();
+    // 暂停其他轮播中的媒体内容
     _midCarouselController.pauseAllMedia();
     _bottomCarouselController.pauseAllMedia();
   }
@@ -225,21 +188,23 @@ class _AnnouncementPageState extends State<AnnouncementPage> {
   void _pauseAllCarouselsForSettings() {
     _logger.i('⚙️ 进入设置页面 - 暂停所有轮播和计时器');
 
-    // 暂停所有定时器
-    _topTimer?.cancel();
+    final topAdProvider = context.read<TopAdCarouselProvider>();
+
+    // 暂停顶部广告计时器
+    topAdProvider.pauseAllTimersForSettings();
+
+    // 暂停其他定时器
     _midTimer?.cancel();
     _bottomTimer?.cancel();
     _debugTimer?.cancel();
     _watchdogTimer?.cancel();
     _delayedNoticeTimer?.cancel();
 
-    // 暂停所有轮播中的媒体内容
-    _topCarouselController.pauseAllMedia();
+    // 暂停其他轮播中的媒体内容
     _midCarouselController.pauseAllMedia();
     _bottomCarouselController.pauseAllMedia();
 
-    // 设置所有轮播为暂停状态
-    _isTopCarouselPaused = true;
+    // 设置其他轮播为暂停状态
     _isMidCarouselPaused = true;
     _isBottomCarouselPaused = true;
 
@@ -254,29 +219,26 @@ class _AnnouncementPageState extends State<AnnouncementPage> {
   void _resumeAllCarouselsFromSettings() {
     _logger.i('↩️ 从设置页面返回 - 恢复所有轮播和计时器');
 
+    final topAdProvider = context.read<TopAdCarouselProvider>();
+
     // 恢复默认状态
     final carouselStateProvider = context.read<CarouselStateProvider>();
     carouselStateProvider.enterDefaultState();
 
-    // 设置所有轮播为运行状态
-    _isTopCarouselPaused = false;
+    // 恢复顶部广告轮播
+    topAdProvider.resumeAllTimersFromSettings();
+
+    // 设置其他轮播为运行状态
     _isMidCarouselPaused = false;
     _isBottomCarouselPaused = false;
 
-    // 恢复所有轮播中的媒体内容
-    _topCarouselController.resumeAllMedia();
+    // 恢复其他轮播中的媒体内容
     _midCarouselController.resumeAllMedia();
     _bottomCarouselController.resumeAllMedia();
 
     // 重新启动调试定时器和监控定时器
     _startDebugTimer();
     _startCarouselWatchdog();
-
-    // 恢复顶部广告轮播
-    if (_topAds.isNotEmpty) {
-      int currentIndex = _topCarouselController.currentIndex;
-      _startTopAdTimer(currentIndex);
-    }
 
     // 恢复中部通告轮播
     if (_midCarouselController.widgetCount > 1) {
@@ -310,43 +272,18 @@ class _AnnouncementPageState extends State<AnnouncementPage> {
   void _resumeAllCarousels() {
     _logger.i('▶️ 恢复所有轮播 - 退出全屏广告状态');
 
-    // 设置所有轮播为运行状态
-    _isTopCarouselPaused = false;
+    final topAdProvider = context.read<TopAdCarouselProvider>();
+
+    // 恢复顶部轮播
+    topAdProvider.resumeTopCarousel();
+
+    // 设置其他轮播为运行状态
     _isMidCarouselPaused = false;
     _isBottomCarouselPaused = false;
 
-    // 恢复所有轮播中的媒体内容
-    _topCarouselController.resumeAllMedia();
+    // 恢复其他轮播中的媒体内容
     _midCarouselController.resumeAllMedia();
     _bottomCarouselController.resumeAllMedia();
-
-    // 计算剩余播放时间并恢复定时器
-
-    // 恢复顶部广告轮播 - 继续播放剩余时间
-    if (_topAds.isNotEmpty) {
-      final remainingTopTime = _topAdDuration - _topAdElapsedTime;
-      _logger.i(
-          '🔄 [恢复] 顶部广告 - 继续播放剩余时间：${remainingTopTime.inSeconds}s (已播放: ${_topAdElapsedTime.inSeconds}s)');
-
-      if (remainingTopTime.inSeconds > 0) {
-        // 继续播放剩余时间
-        _topTimer = Timer(remainingTopTime, () {
-          if (mounted && !_isTopCarouselPaused) {
-            _logger.i('⏰ [定时] 顶部广告时间到，切换到下一个');
-            _topCarouselController.playNext();
-            _startTopAdTimer(15); // 下一个广告正常播放
-          }
-        });
-      } else {
-        // 时间已到，直接切换到下一个
-        _logger.i('⚡ [跳过] 顶部广告剩余时间为0，直接切换到下一个');
-        _topCarouselController.playNext();
-        _startTopAdTimer(15);
-      }
-
-      // 重置当前广告开始时间
-      _currentTopAdStartTime = DateTime.now();
-    }
 
     // 恢复中部通告轮播 - 考虑剩余时间后启动无限循环轮播
     if (_midCarouselController.widgetCount > 1 && !_isMidCarouselPaused) {
@@ -409,7 +346,6 @@ class _AnnouncementPageState extends State<AnnouncementPage> {
     }
 
     // 重置计时变量
-    _topAdElapsedTime = Duration.zero;
     _noticeElapsedTime = Duration.zero;
   }
 
@@ -555,22 +491,8 @@ class _AnnouncementPageState extends State<AnnouncementPage> {
     _isMidCarouselPaused = true;
 
     // 恢复顶部广告轮播（如果被暂停了）
-    _logger.d(
-        '🔍 检查顶部广告恢复条件: ads=${_topAds.length}, paused=$_isTopCarouselPaused');
-    if (_topAds.isNotEmpty && !_isTopCarouselPaused) {
-      _logger.d('✅ 满足条件，恢复顶部广告轮播');
-      // 获取当前显示的广告索引
-      int currentIndex = _topCarouselController.currentIndex;
-      _logger.d('📍 当前顶部广告索引: $currentIndex');
-
-      // 强制恢复顶部轮播的媒体播放（防止状态不同步）
-      _topCarouselController.resumeAllMedia();
-
-      _startTopAdTimer(currentIndex);
-    } else {
-      _logger
-          .w('❌ 不满足恢复条件: ads=${_topAds.length}, paused=$_isTopCarouselPaused');
-    }
+    final topAdProvider = context.read<TopAdCarouselProvider>();
+    topAdProvider.checkAndRestoreTopCarousel();
 
     // 恢复底部轮播（如果被暂停了）
     if (_bottomCarouselController.widgetCount > 1 && !_isBottomCarouselPaused) {
@@ -682,70 +604,17 @@ class _AnnouncementPageState extends State<AnnouncementPage> {
     }
   }
 
-  ///8，打开全屏广告对话框
-  void _startTopAdTimer(int currentIndex) {
-    _logger.d(
-        '🎬 开始顶部广告计时器: index=$currentIndex, ads=${_topAds.length}, paused=$_isTopCarouselPaused');
-    _topTimer?.cancel();
-    if (_topAds.length <= 1 ||
-        currentIndex < 0 ||
-        currentIndex >= _topAds.length ||
-        _isTopCarouselPaused) {
-      _logger.w(
-          '⚠️ 顶部广告计时器条件不满足: ads=${_topAds.length}, index=$currentIndex, paused=$_isTopCarouselPaused');
-      return;
-    }
-
-    final ad = _topAds[currentIndex];
-    // 记录当前广告开始时间和总时长
-    _currentTopAdStartTime = DateTime.now();
-    _topAdDuration = ad.durationObject;
-    _currentTopAdIndex = currentIndex;
-
-    _logger.d('▶️ 启动顶部广告计时器: ${ad.title}, duration=${ad.durationObject}');
-    _logger.i(
-        '📝 记录顶部广告开始时间: ${_currentTopAdStartTime}, 索引: $_currentTopAdIndex, 时长: ${_topAdDuration.inSeconds}秒');
-
-    _topTimer = Timer(ad.durationObject, () {
-      if (mounted &&
-          _topCarouselController.widgetCount > 1 &&
-          !_isTopCarouselPaused) {
-        _logger.d('⏭️ 顶部广告计时器到期，切换到下一个');
-        _topCarouselController.playNext();
-        // onPageChanged will then call _startTopAdTimer for the new page
-      }
-    });
-  }
-
   ///9，初始化顶部轮播
   void _initializeTopWidgets() {
     final advertisementProvider =
         Provider.of<AdvertisementProvider>(context, listen: false);
+    final topAdProvider = context.read<TopAdCarouselProvider>();
     List<AdModel> topAds = advertisementProvider.topAdvertisements;
 
-    if (topAds.isEmpty) {
-      _logger.w('No top advertisements available');
-      return;
-    }
-
-    _topAds = topAds; // Store ads for timer logic
-
-    // Create ad widgets from the API AdModel instances
-    List<Widget> adWidgets = _topAds.map((ad) {
-      FileManager fileManager = FileManager();
-      fileManager.getFile(ad.file);
-      return Center(
-        child: TopAdWidget(
-          ad: ad,
-          fileManager: fileManager,
-        ),
-      );
-    }).toList();
-    _topCarouselController.setCarouselArray(adWidgets);
-
-    if (_topAds.length > 1) {
-      _startTopAdTimer(0); // Start timer for the first ad
-    }
+    topAdProvider.initializeTopWidgets(topAds);
+    
+    // 启动顶部广告调试定时器
+    topAdProvider.startDebugTimer();
   }
 
   ///10，初始化底部轮播
@@ -908,19 +777,23 @@ class _AnnouncementPageState extends State<AnnouncementPage> {
               flex: 6,
               child: Container(
                   width: double.infinity,
-                  child: custom_carousel.CarouselWidget(
-                    controller: _topCarouselController,
-                    // autoPlayDuration is effectively managed by _startTopAdTimer
-                    showIndicators: false,
-                    allowManualSwipe: false,
-                    onPageChanged: (index) {
-                      if (_topAds.length > 1) {
-                        _startTopAdTimer(index);
-                      }
-                      // setState(() {
-                      //   _topCurrentIndex = index;
-                      // });
-                    },
+                  child: Consumer<TopAdCarouselProvider>(
+                    builder: (context, topAdProvider, child) {
+                      return custom_carousel.CarouselWidget(
+                        controller: topAdProvider.topCarouselController,
+                        // autoPlayDuration is effectively managed by _startTopAdTimer
+                        showIndicators: false,
+                        allowManualSwipe: false,
+                        onPageChanged: (index) {
+                          if (topAdProvider.topAds.length > 1) {
+                            topAdProvider.onPageChanged(index);
+                          }
+                          // setState(() {
+                          //   _topCurrentIndex = index;
+                          // });
+                        },
+                      );
+                    }
                   )),
             ),
             // 中部區域 - 14/24 比例
