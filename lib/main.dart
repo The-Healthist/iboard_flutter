@@ -6,6 +6,7 @@ import 'package:iboard_app/providers/announcement_carousel_provider.dart';
 import 'package:iboard_app/providers/app_data_provider.dart';
 import 'package:iboard_app/providers/state_provider.dart'; // Added CarouselStateProvider import
 import 'package:iboard_app/providers/top_ad_carousel_provider.dart'; // Added TopAdCarouselProvider import
+import 'package:iboard_app/providers/full_advertisement_carousel_provider.dart'; // Added FullAdvertisementCarouselProvider import
 import 'package:iboard_app/managers/file_manager.dart';
 import 'package:iboard_app/utils/device_id_util.dart';
 import 'package:provider/provider.dart';
@@ -66,6 +67,9 @@ void main() {
           ChangeNotifierProvider(
               create: (_) =>
                   AnnouncementCarouselProvider()), // Add AnnouncementCarouselProvider here
+          ChangeNotifierProvider(
+              create: (_) =>
+                  FullAdvertisementCarouselProvider()), // Add FullAdvertisementCarouselProvider here
         ],
         child: MyApp(),
       ),
@@ -126,6 +130,9 @@ class _HomePageState extends State<HomePage> {
               Provider.of<AppDataProvider>(context, listen: false);
           final carouselStateProvider =
               Provider.of<CarouselStateProvider>(context, listen: false);
+          final fullAdCarouselProvider =
+              Provider.of<FullAdvertisementCarouselProvider>(context,
+                  listen: false);
           final advertisementProvider =
               Provider.of<AdvertisementProvider>(context, listen: false);
           final announcementProvider =
@@ -133,6 +140,11 @@ class _HomePageState extends State<HomePage> {
 
           // 设置Provider间的关联
           appDataProvider.setCarouselStateProvider(carouselStateProvider);
+
+          // 设置预加载回调
+          carouselStateProvider.setPreloadFullscreenAdCallback(() {
+            fullAdCarouselProvider.preloadFullscreenAd();
+          });
 
           // 执行登录
           await appDataProvider.initializeAndLogin(deviceIdToSet: deviceId);

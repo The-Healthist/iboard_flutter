@@ -8,11 +8,18 @@ import 'dart:io';
 class FullAdWidget extends StatefulWidget {
   final AdModel ad;
   final FileManager fileManager;
+  final Duration? initialVideoPosition; // 初始视频播放位置
+  final Function(String adId, Duration position)?
+      onVideoProgressChanged; // 视频进度变化回调
+  final VoidCallback? onVideoDisposed; // 视频资源释放完成回调
 
   const FullAdWidget({
     Key? key,
     required this.ad,
     required this.fileManager,
+    this.initialVideoPosition,
+    this.onVideoProgressChanged,
+    this.onVideoDisposed,
   }) : super(key: key);
 
   @override
@@ -38,8 +45,52 @@ class _FullAdWidgetState extends State<FullAdWidget> {
 
   @override
   void dispose() {
-    _videoController?.dispose();
+    _logger.i('🔄 开始释放全屏广告Widget资源');
+
+    // 安全释放视频控制器
+    if (_videoController != null) {
+      try {
+        // 移除监听器
+        _videoController!.removeListener(_onVideoProgressChanged);
+
+        // 暂停播放
+        if (_videoController!.value.isInitialized &&
+            _videoController!.value.isPlaying) {
+          _videoController!.pause();
+        }
+
+        // 释放资源
+        _videoController!.dispose();
+        _logger.i('✅ 视频控制器已安全释放');
+      } catch (e) {
+        _logger.w('⚠️ 释放视频控制器时出错: $e');
+      } finally {
+        _videoController = null;
+        // 通知视频资源已释放
+        if (widget.onVideoDisposed != null) {
+          widget.onVideoDisposed!();
+        }
+      }
+    }
+
     super.dispose();
+    _logger.i('✅ 全屏广告Widget资源释放完成');
+  }
+
+  ///1，视频播放进度变化监听器
+  void _onVideoProgressChanged() {
+    try {
+      if (_videoController != null &&
+          _videoController!.value.isInitialized &&
+          widget.onVideoProgressChanged != null &&
+          mounted) {
+        final position = _videoController!.value.position;
+        // 每秒回调一次进度，避免过于频繁的回调
+        widget.onVideoProgressChanged!(widget.ad.id.toString(), position);
+      }
+    } catch (e) {
+      _logger.w('⚠️ 视频进度监听器出错: $e');
+    }
   }
 
   Future<void> _initializeVideo() async {
@@ -53,6 +104,17 @@ class _FullAdWidgetState extends State<FullAdWidget> {
     });
 
     try {
+      // 释放之前的视频控制器
+      if (_videoController != null) {
+        try {
+          _videoController!.removeListener(_onVideoProgressChanged);
+          _videoController!.dispose();
+        } catch (e) {
+          _logger.w('⚠️ 释放旧视频控制器时出错: $e');
+        }
+        _videoController = null;
+      }
+
       // 尝试从FileManager获取本地缓存的视频文件
       final File? localFile = await widget.fileManager.getFile(widget.ad.file);
 
@@ -68,25 +130,54 @@ class _FullAdWidgetState extends State<FullAdWidget> {
         );
       }
 
+      // 初始化视频控制器
       await _videoController!.initialize();
 
-      if (mounted) {
-        setState(() {
-          _isVideoInitialized = true;
-          _isLoadingVideo = false;
-        });
-
-        // 自动播放视频并循环
-        _videoController!.setLooping(true);
-        _videoController!.play();
-        _logger.i('🎬 视频初始化成功并开始播放');
+      // 检查widget是否仍然挂载
+      if (!mounted) {
+        _logger.w('⚠️ Widget已卸载，停止视频初始化');
+        _videoController?.dispose();
+        _videoController = null;
+        return;
       }
+
+      setState(() {
+        _isVideoInitialized = true;
+        _isLoadingVideo = false;
+      });
+
+      // 如果有初始播放位置，跳转到该位置
+      if (widget.initialVideoPosition != null &&
+          widget.initialVideoPosition!.inMilliseconds > 0) {
+        await _videoController!.seekTo(widget.initialVideoPosition!);
+        _logger.i('⏩ 视频跳转到指定位置: ${widget.initialVideoPosition!.inSeconds}秒');
+      }
+
+      // 添加进度监听器
+      _videoController!.addListener(_onVideoProgressChanged);
+
+      // 自动播放视频（不循环，让Provider控制播放）
+      _videoController!.setLooping(false);
+      await _videoController!.play();
+      _logger.i('🎬 视频初始化成功并开始播放');
     } catch (e) {
       _logger.e('❌ 视频初始化失败: $e');
+
+      // 清理资源
+      if (_videoController != null) {
+        try {
+          _videoController!.dispose();
+        } catch (disposeError) {
+          _logger.w('⚠️ 清理失败的视频控制器时出错: $disposeError');
+        }
+        _videoController = null;
+      }
+
       if (mounted) {
         setState(() {
           _isLoadingVideo = false;
           _errorMessage = '视频加载失败: $e';
+          _isVideoInitialized = false;
         });
       }
     }
@@ -243,9 +334,11 @@ class _FullAdWidgetState extends State<FullAdWidget> {
         width: double.infinity,
         height: double.infinity,
         color: Colors.black,
-        child: Center(
-          child: AspectRatio(
-            aspectRatio: _videoController!.value.aspectRatio,
+        child: FittedBox(
+          fit: BoxFit.contain, // 修改为 contain 以完整显示视频内容
+          child: SizedBox(
+            width: _videoController!.value.size.width,
+            height: _videoController!.value.size.height,
             child: VideoPlayer(_videoController!),
           ),
         ),

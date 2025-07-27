@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:iboard_app/managers/file_manager.dart';
 import 'package:iboard_app/providers/advertisement_provider.dart';
-import 'package:iboard_app/widgets/full_ad_widget.dart';
+import 'package:iboard_app/providers/full_advertisement_carousel_provider.dart';
+import 'package:iboard_app/providers/state_provider.dart';
 import 'package:provider/provider.dart';
 
 class FullscreenAdsPage extends StatefulWidget {
@@ -10,8 +10,6 @@ class FullscreenAdsPage extends StatefulWidget {
 }
 
 class _FullscreenAdsPageState extends State<FullscreenAdsPage> {
-  int _currentAdIndex = 0;
-
   @override
   void initState() {
     super.initState();
@@ -20,77 +18,114 @@ class _FullscreenAdsPageState extends State<FullscreenAdsPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: Consumer<AdvertisementProvider>(
-        builder: (context, advertisementProvider, child) {
+      body: Consumer3<AdvertisementProvider, FullAdvertisementCarouselProvider,
+          CarouselStateProvider>(
+        builder: (context, advertisementProvider, fullAdCarouselProvider,
+            stateProvider, child) {
           final fullAds = advertisementProvider.fullAdvertisements;
 
-          if (advertisementProvider.isLoading) {
-            return Container(
-              width: double.infinity,
-              height: double.infinity,
-              color: Colors.black,
-              child: Center(
-                child: CircularProgressIndicator(color: Colors.white),
-              ),
-            );
-          }
-
+          // 检查是否有错误
           if (advertisementProvider.error != null) {
-            return Container(
-              width: double.infinity,
-              height: double.infinity,
-              color: Colors.black,
-              child: Center(
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(
-                      Icons.error_outline,
-                      size: 80,
-                      color: Colors.red,
-                    ),
-                    SizedBox(height: 20),
-                    Text(
-                      '廣告載入失敗',
-                      style: TextStyle(
-                        fontSize: 24,
-                        color: Colors.white,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    SizedBox(height: 10),
-                    Text(
-                      advertisementProvider.error!,
-                      style: TextStyle(
-                        fontSize: 16,
-                        color: Colors.white70,
-                      ),
-                      textAlign: TextAlign.center,
-                    ),
-                  ],
-                ),
-              ),
-            );
+            return _buildErrorState(advertisementProvider.error!);
           }
 
+          // 检查是否正在加载
+          if (advertisementProvider.isLoading) {
+            return _buildLoadingState();
+          }
+
+          // 检查是否有广告数据
           if (fullAds.isEmpty) {
             return _buildDefaultFullscreenAd();
           }
 
-          // 显示全屏广告
-          final currentAd = fullAds[_currentAdIndex % fullAds.length];
-          FileManager fileManager = FileManager();
-          fileManager.getFile(currentAd.file);
+          // 确保Provider有最新的广告数据
+          fullAdCarouselProvider.updateFullscreenAds(fullAds);
 
-          return FullAdWidget(
-            ad: currentAd,
-            fileManager: fileManager,
-          );
+          // 如果Provider处于活跃状态并且有当前广告Widget，显示它
+          if (fullAdCarouselProvider.isActive) {
+            final currentAdWidget = fullAdCarouselProvider.getCurrentAdWidget();
+            if (currentAdWidget != null) {
+              return Container(
+                width: double.infinity,
+                height: double.infinity,
+                child: currentAdWidget,
+              );
+            }
+          }
+
+          // 默认显示第一个广告（用于初始化时）
+          if (fullAdCarouselProvider.adWidgets.isNotEmpty) {
+            return Container(
+              width: double.infinity,
+              height: double.infinity,
+              child: fullAdCarouselProvider.adWidgets.first,
+            );
+          }
+
+          return _buildDefaultFullscreenAd();
         },
       ),
     );
   }
 
+  ///1，构建错误状态界面
+  Widget _buildErrorState(String error) {
+    return Container(
+      width: double.infinity,
+      height: double.infinity,
+      color: Colors.black,
+      child: Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              Icons.error_outline,
+              size: 80,
+              color: Colors.red,
+            ),
+            SizedBox(height: 20),
+            SelectableText.rich(
+              TextSpan(
+                children: [
+                  TextSpan(
+                    text: '廣告載入失敗\n',
+                    style: TextStyle(
+                      fontSize: 24,
+                      color: Colors.white,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  TextSpan(
+                    text: error,
+                    style: TextStyle(
+                      fontSize: 16,
+                      color: Colors.red,
+                    ),
+                  ),
+                ],
+              ),
+              textAlign: TextAlign.center,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  ///2，构建加载状态界面
+  Widget _buildLoadingState() {
+    return Container(
+      width: double.infinity,
+      height: double.infinity,
+      color: Colors.black,
+      child: Center(
+        child: CircularProgressIndicator(color: Colors.white),
+      ),
+    );
+  }
+
+  ///3，构建默认全屏广告界面
   Widget _buildDefaultFullscreenAd() {
     return Container(
       width: double.infinity,

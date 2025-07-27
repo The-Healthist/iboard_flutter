@@ -331,9 +331,12 @@ class AnnouncementCarouselProvider extends ChangeNotifier {
   }
 
   ///7，启动调试定时器 - 每秒输出通告轮播的实时状态
-  void startDebugTimer(int apiNoticeStayDuration) {
+  void startDebugTimer(int apiNoticeStayDuration, {bool enableLogging = true}) {
     _debugTimer?.cancel();
     _debugTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
+      // 如果不启用日志，直接返回
+      if (!enableLogging) return;
+
       // 计算通告剩余时间 - 使用实时API配置
       int noticeRemaining = 0;
       String statusInfo = '';

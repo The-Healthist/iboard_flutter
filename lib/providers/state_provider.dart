@@ -186,6 +186,11 @@ class CarouselStateProvider extends ChangeNotifier {
   // 回調函數
   VoidCallback? _onShowFullscreenAd; // 顯示全屏廣告的回調
   VoidCallback? _onCloseFullscreenAd; // 關閉全屏廣告的回調
+  VoidCallback? _onPreloadFullscreenAd; // 预加载全屏广告的回调
+  VoidCallback? _onEnterFullscreenAdMode; // 进入全屏广告模式的回调（通知FullAdProvider）
+  VoidCallback? _onExitFullscreenAdMode; // 退出全屏广告模式的回调（通知FullAdProvider）
+  Function(bool isNeedCarousel, int carouselTime)?
+      _onSmartCarouselSwitch; // 智能轮播切换回调
 
   // 媒體控制狀態 - 按區域分別控制
   bool _isTopMediaPaused = false; // 頂部廣告媒體暫停狀態
@@ -248,6 +253,27 @@ class CarouselStateProvider extends ChangeNotifier {
   /// 設置全屏廣告關閉回調
   void setCloseFullscreenAdCallback(VoidCallback? callback) {
     _onCloseFullscreenAd = callback;
+  }
+
+  /// 设置全屏广告预加载回调
+  void setPreloadFullscreenAdCallback(VoidCallback? callback) {
+    _onPreloadFullscreenAd = callback;
+  }
+
+  /// 设置进入全屏广告模式回调
+  void setEnterFullscreenAdModeCallback(VoidCallback? callback) {
+    _onEnterFullscreenAdMode = callback;
+  }
+
+  /// 设置退出全屏广告模式回调
+  void setExitFullscreenAdModeCallback(VoidCallback? callback) {
+    _onExitFullscreenAdMode = callback;
+  }
+
+  /// 设置智能轮播切换回调
+  void setSmartCarouselSwitchCallback(
+      Function(bool isNeedCarousel, int carouselTime)? callback) {
+    _onSmartCarouselSwitch = callback;
   }
 
   /// 設置通告轮播下一个回调
@@ -338,6 +364,9 @@ class CarouselStateProvider extends ChangeNotifier {
   ///4， 切換到全屏廣告狀態
   void enterFullscreenAd() {
     if (_currentState.canTransitionTo(AppState.fullscreenAd)) {
+      // 预加载全屏广告
+      _onPreloadFullscreenAd?.call();
+
       _clearAllTimers();
 
       // 暂停通告轮播定时器
@@ -351,6 +380,10 @@ class CarouselStateProvider extends ChangeNotifier {
       _updateMediaStateBasedOnCurrentState();
 
       _startFullscreenAdTimer();
+
+      // 通知FullAdvertisementCarouselProvider进入全屏广告模式
+      _onEnterFullscreenAdMode?.call();
+
       notifyListeners();
 
       // 調用顯示全屏廣告的回調
@@ -386,6 +419,9 @@ class CarouselStateProvider extends ChangeNotifier {
       _clearAllTimers();
       _currentState = _currentState.toDefaultState();
       _lastFullscreenAdEndTime = DateTime.now();
+
+      // 通知FullAdvertisementCarouselProvider退出全屏广告模式
+      _onExitFullscreenAdMode?.call();
 
       // 更新媒體狀態
       _updateMediaStateBasedOnCurrentState();
@@ -426,17 +462,40 @@ class CarouselStateProvider extends ChangeNotifier {
     }
   }
 
-  ///8， 啟動全屏廣告計時器（使用配置的廣告播放時間）
+  ///8， 启动全屏广告定时器
   void _startFullscreenAdTimer() {
     _fullscreenAdTimer?.cancel();
+
     final duration = Duration(seconds: fullscreenAdDuration);
     _fullscreenAdTimer = Timer(duration, () {
       if (_currentState.currentAppState == AppState.fullscreenAd) {
         if (kDebugMode) {
-          print('⏰ 全屏廣告動態計時器到期 (${fullscreenAdDuration}秒)，切換到默認狀態');
+          print('⏰ 全屏廣告定時器到期 (${fullscreenAdDuration}秒)，切換到默認狀態');
         }
         enterDefaultState();
       }
+    });
+
+    // 启动一个周期性定时器来检查是否需要切换广告
+    _startAdSwitchCheckTimer();
+
+    if (kDebugMode) {
+      print('🎬 启动全屏广告定时器: ${fullscreenAdDuration}秒');
+    }
+  }
+
+  /// 启动广告切换检查定时器
+  void _startAdSwitchCheckTimer() {
+    // 每秒检查一次是否需要切换广告
+    Timer.periodic(const Duration(seconds: 1), (timer) {
+      if (_currentState.currentAppState != AppState.fullscreenAd) {
+        // 如果不在全屏广告状态，取消定时器
+        timer.cancel();
+        return;
+      }
+
+      // 调用智能轮播切换回调
+      _onSmartCarouselSwitch?.call(true, 0);
     });
   }
 
@@ -465,6 +524,7 @@ class CarouselStateProvider extends ChangeNotifier {
   void _startDefaultStateTimer() {
     _defaultStateTimer?.cancel();
     final duration = Duration(seconds: noActivityTimeout);
+
     _defaultStateTimer = Timer(duration, () {
       if (_currentState.currentAppState == AppState.defaultState) {
         if (kDebugMode) {
