@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:iboard_app/models/ad_model.dart'; // Assuming AdModel exists
 import 'package:iboard_app/managers/file_manager.dart'; // Assuming FileManager exists
 import 'package:iboard_app/providers/state_provider.dart';
+import 'package:iboard_app/widgets/carousel_widget.dart'; // 导入通知类
 import 'package:video_player/video_player.dart';
 import 'package:logger/logger.dart';
 import 'package:provider/provider.dart';
@@ -27,6 +28,7 @@ class _TopAdWidgetState extends State<TopAdWidget> {
   bool _isLoading = true;
   String? _localFilePath;
   String? _error;
+  bool _isManuallyPaused = false; // 添加手动暂停标记
 
   @override
   void initState() {
@@ -106,6 +108,34 @@ class _TopAdWidgetState extends State<TopAdWidget> {
       });
   }
 
+  //3，暂停视频播放
+  void _pauseVideo() {
+    if (_videoController != null &&
+        _videoController!.value.isInitialized &&
+        _videoController!.value.isPlaying) {
+      _videoController!.pause();
+      _isManuallyPaused = true;
+      _logger.i('📱 手动暂停顶部广告视频播放 - ${widget.ad.title}');
+    } else {
+      _logger.i('📱 视频不需要暂停或已经暂停 - 状态: ${_videoController?.value.isPlaying}');
+    }
+  }
+
+  //4，恢复视频播放
+  void _resumeVideo() {
+    if (_videoController != null &&
+        _videoController!.value.isInitialized &&
+        !_videoController!.value.isPlaying &&
+        _isManuallyPaused) {
+      _videoController!.play();
+      _isManuallyPaused = false;
+      _logger.i('📱 手动恢复顶部广告视频播放 - ${widget.ad.title}');
+    } else {
+      _logger.i(
+          '📱 视频不需要恢复或已经播放 - 状态: ${_videoController?.value.isPlaying}, 手动暂停: $_isManuallyPaused');
+    }
+  }
+
   @override
   void dispose() {
     _videoController?.dispose();
@@ -124,12 +154,34 @@ class _TopAdWidgetState extends State<TopAdWidget> {
       if (isMediaPaused && _videoController!.value.isPlaying) {
         _videoController!.pause();
         _logger.d('暂停顶部广告视频播放');
-      } else if (!isMediaPaused && !_videoController!.value.isPlaying) {
+      } else if (!isMediaPaused &&
+          !_videoController!.value.isPlaying &&
+          !_isManuallyPaused) {
         _videoController!.play();
         _logger.d('恢复顶部广告视频播放');
       }
     }
 
+    // 使用NotificationListener监听媒体暂停和恢复通知
+    return NotificationListener<Notification>(
+      onNotification: (notification) {
+        if (notification is MediaPauseNotification) {
+          _logger.i('📱 收到媒体暂停通知 - ${widget.ad.title}');
+          _pauseVideo();
+          return true; // 阻止通知继续传递
+        } else if (notification is MediaResumeNotification) {
+          _logger.i('📱 收到媒体恢复通知 - ${widget.ad.title}');
+          _resumeVideo();
+          return true; // 阻止通知继续传递
+        }
+        return false; // 其他通知继续传递
+      },
+      child: _buildContent(),
+    );
+  }
+
+  //5，构建内容部分
+  Widget _buildContent() {
     if (_isLoading) {
       return const Center(child: CircularProgressIndicator());
     }

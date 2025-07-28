@@ -355,6 +355,32 @@ class FullscreenAdProvider extends ChangeNotifier {
     _debugTimer?.cancel();
   }
 
+  /// 暂停所有计时器（用于设置页面）
+  void pauseAllTimersForSettings() {
+    _logger.i('⚙️ 全屏广告 - 暂停所有计时器（设置页面）');
+    _fullscreenTimer?.cancel();
+    _debugTimer?.cancel();
+    _isPaused = true;
+    notifyListeners();
+  }
+
+  /// 从设置页面恢复所有计时器
+  void resumeAllTimersFromSettings() {
+    _logger.i('↩️ 全屏广告 - 从设置页面恢复所有计时器');
+    _isPaused = false;
+
+    // 如果处于活跃状态，恢复轮播
+    if (_isActive) {
+      // 重新启动调试定时器
+      startDebugTimer();
+
+      // 恢复轮播
+      resumeCarousel();
+    }
+
+    notifyListeners();
+  }
+
   /// 记录视频播放进度
   void saveVideoProgress(String adId, Duration position) {
     _videoProgressMap[adId] = position;

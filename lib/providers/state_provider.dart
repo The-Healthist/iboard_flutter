@@ -628,6 +628,20 @@ Timer Info: $timerInfo
     super.dispose();
   }
 
+  ///26， 暂停所有状态定时器（用于设置页面等场景）
+  void pauseAllStateTimers() {
+    _clearAllTimers();
+    _clearNoticeCarouselTimers();
+
+    // 重置所有定时器相关的时间记录
+    _lastUserInteractionTime = null;
+    _lastFullscreenAdEndTime = null;
+
+    if (kDebugMode) {
+      print('⏸️ 已暂停所有状态定时器');
+    }
+  }
+
   ///18， 清除通告轮播定时器
   void _clearNoticeCarouselTimers() {
     _noticeCarouselTimer?.cancel();

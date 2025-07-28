@@ -1,6 +1,12 @@
 import 'package:flutter/material.dart';
 import 'dart:async';
 
+/// 媒体暂停通知类
+class MediaPauseNotification extends Notification {}
+
+/// 媒体恢复通知类
+class MediaResumeNotification extends Notification {}
+
 /// Controller for the CarouselWidget that provides programmatic access to carousel functions
 class CarouselController {
   _CarouselWidgetState? _state;
@@ -366,14 +372,22 @@ class _CarouselWidgetState extends State<CarouselWidget>
 
   /// Pause all video content in the carousel
   void pauseAllMedia() {
-    // Use a global notification to pause all media
-    // We'll implement this through the state provider
+    // 发送通知给所有子组件暂停媒体播放
+    if (context.mounted) {
+      // 使用通知机制通知所有子组件
+      MediaPauseNotification().dispatch(context);
+      debugPrint('CarouselWidget: Sent media pause notification');
+    }
   }
 
   /// Resume all video content in the carousel
   void resumeAllMedia() {
-    // Use a global notification to resume all media
-    // We'll implement this through the state provider
+    // 发送通知给所有子组件恢复媒体播放
+    if (context.mounted) {
+      // 使用通知机制通知所有子组件
+      MediaResumeNotification().dispatch(context);
+      debugPrint('CarouselWidget: Sent media resume notification');
+    }
   }
 
   @override
