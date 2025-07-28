@@ -213,17 +213,18 @@ class ApiClient {
           }
         } else {
           // Non-401 ApiException from health check
+          // For server-side issues like 500 errors, we'll allow the main request to proceed
+          // rather than failing completely. This prevents server issues from blocking all requests.
           _logger.w(
-              'Pre-request health check for $apiNameForLog failed with non-401 ApiException: ${e.message}. Rethrowing.');
-          throw e;
+              'Pre-request health check for $apiNameForLog failed with non-401 ApiException (Status: ${e.statusCode}). Allowing main request to proceed. Error: ${e.message}');
+          // Don't throw for non-401 errors, let the main request proceed
         }
       } catch (otherError) {
         // Catch other non-ApiException errors from healthTest()
-        _logger.e(
-            'Pre-request health check for $apiNameForLog failed with an unexpected error.',
-            error: otherError);
-        throw Exception(
-            'Pre-request health check failed unexpectedly: $otherError');
+        // For unexpected errors, we'll also allow the main request to proceed
+        _logger.w(
+            'Pre-request health check for $apiNameForLog failed with an unexpected error. Allowing main request to proceed. Error: $otherError');
+        // Don't throw for unexpected errors, let the main request proceed
       }
     }
 
@@ -495,5 +496,27 @@ class ApiClient {
 
     _logger.i('Device created successfully: $deviceId');
     return responseData;
+  }
+
+  /// 8. 获取欠费数据
+  /// Endpoint: POST https://uqf0jqfm77.execute-api.ap-east-1.amazonaws.com/prod/v1/building_board/building-mf-table
+  /// Body: {"blg_id": "string", "ptype": "mf"}
+  Future<Map<String, dynamic>> getArrearage({String? buildingId}) async {
+    const String fullUrl =
+        'https://uqf0jqfm77.execute-api.ap-east-1.amazonaws.com/prod/v1/building_board/building-mf-table';
+    final Uri url = _buildUri(fullUrl, null);
+    final Map<String, dynamic> requestBodyMap = {
+      'ptype': 'mf',
+      if (buildingId != null) 'blg_id': buildingId,
+    };
+    final String requestBody = json.encode(requestBodyMap);
+    final Map<String, String> headers =
+        _getHeaders(requiresAuth: true, contentType: 'application/json');
+
+    _logger.i('获取欠费数据，楼宇ID: $buildingId');
+    final http.Response response = await _sendRequest(
+        () => http.post(url, headers: headers, body: requestBody),
+        apiNameForLog: 'getArrearage');
+    return _handleResponse(response, 'getArrearage');
   }
 }

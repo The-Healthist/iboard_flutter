@@ -5,6 +5,8 @@ import 'package:iboard_app/models/ad_model.dart';
 import 'package:iboard_app/widgets/carousel_widget.dart' as custom_carousel;
 import 'package:iboard_app/widgets/mainscreen/top_ad_widget.dart';
 import 'package:logger/logger.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'dart:convert';
 
 /// 顶部广告轮播Provider
 /// 负责管理顶部广告的轮播逻辑、暂停恢复、定时器管理等
@@ -20,6 +22,7 @@ class TopAdCarouselProvider extends ChangeNotifier {
 
   // 广告数据
   List<AdModel> _topAds = [];
+  List<AdModel> _customOrderTopAds = []; // 自定义顺序的顶部广告
 
   // 状态管理
   bool _isTopCarouselPaused = false;
@@ -34,7 +37,8 @@ class TopAdCarouselProvider extends ChangeNotifier {
   // Getters
   custom_carousel.CarouselController get topCarouselController =>
       _topCarouselController;
-  List<AdModel> get topAds => _topAds;
+  List<AdModel> get topAds =>
+      _customOrderTopAds.isNotEmpty ? _customOrderTopAds : _topAds;
   bool get isTopCarouselPaused => _isTopCarouselPaused;
   Duration get topAdDuration => _topAdDuration;
   int get currentTopAdIndex => _currentTopAdIndex;
@@ -43,19 +47,106 @@ class TopAdCarouselProvider extends ChangeNotifier {
 
   TopAdCarouselProvider() {
     _topCarouselController = custom_carousel.CarouselController();
+    _loadCustomOrder(); // 加载自定义顺序
   }
 
-  /// 初始化顶部轮播
+  ///1，设置自定义轮播顶部广告顺序
+  Future<void> setCarouselList(List<AdModel> customOrderList) async {
+    _customOrderTopAds = List.from(customOrderList);
+    await _saveCustomOrder();
+    _logger.i('🔄 设置自定义顶部广告轮播顺序: ${_customOrderTopAds.length} 个广告');
+    notifyListeners();
+  }
+
+  ///2，保存自定义顺序到缓存
+  Future<void> _saveCustomOrder() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final orderData = _customOrderTopAds
+          .map((ad) => {
+                'id': ad.id,
+                'title': ad.title,
+                'order': _customOrderTopAds.indexOf(ad),
+              })
+          .toList();
+      await prefs.setString('top_ad_carousel_order', json.encode(orderData));
+      _logger.i('💾 顶部广告轮播自定义顺序已保存到缓存');
+    } catch (e) {
+      _logger.e('保存顶部广告轮播顺序失败', error: e);
+    }
+  }
+
+  ///3，从缓存加载自定义顺序
+  Future<void> _loadCustomOrder() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final orderString = prefs.getString('top_ad_carousel_order');
+      if (orderString != null) {
+        final orderData = json.decode(orderString) as List;
+        _logger.i('📂 从缓存加载顶部广告轮播自定义顺序: ${orderData.length} 个配置');
+      }
+    } catch (e) {
+      _logger.e('加载顶部广告轮播顺序失败', error: e);
+    }
+  }
+
+  ///4，根据API数据更新自定义顺序（保持用户自定义的顺序）
+  void updateTopAdsWithCustomOrder(List<AdModel> newTopAds) {
+    _topAds = newTopAds;
+
+    if (_customOrderTopAds.isEmpty) {
+      // 如果没有自定义顺序，使用默认顺序
+      _customOrderTopAds = List.from(newTopAds);
+    } else {
+      // 有自定义顺序，需要智能更新
+      _updateCustomOrderWithNewData(newTopAds);
+    }
+
+    _logger.i(
+        '🔄 更新顶部广告轮播数据: 原始${newTopAds.length}个，自定义顺序${_customOrderTopAds.length}个');
+  }
+
+  ///5，智能更新自定义顺序列表
+  void _updateCustomOrderWithNewData(List<AdModel> newTopAds) {
+    // 创建新数据的ID映射
+    final newAdsMap = {for (var item in newTopAds) item.id: item};
+
+    // 移除已删除的广告
+    _customOrderTopAds.removeWhere((item) => !newAdsMap.containsKey(item.id));
+
+    // 更新现有广告的数据
+    for (int i = 0; i < _customOrderTopAds.length; i++) {
+      final currentId = _customOrderTopAds[i].id;
+      if (newAdsMap.containsKey(currentId)) {
+        _customOrderTopAds[i] = newAdsMap[currentId]!;
+      }
+    }
+
+    // 添加新增的广告到末尾
+    final existingIds = _customOrderTopAds.map((item) => item.id).toSet();
+    final newItems =
+        newTopAds.where((item) => !existingIds.contains(item.id)).toList();
+    _customOrderTopAds.addAll(newItems);
+
+    // 保存更新后的顺序
+    _saveCustomOrder();
+
+    _logger.i(
+        '📝 智能更新自定义顺序: 移除${newTopAds.length - newAdsMap.length}个, 新增${newItems.length}个');
+  }
+
+  ///6，初始化顶部轮播
   void initializeTopWidgets(List<AdModel> topAds) {
     if (topAds.isEmpty) {
       _logger.w('No top advertisements available');
       return;
     }
 
-    _topAds = topAds; // Store ads for timer logic
+    // 使用自定义顺序更新方法
+    updateTopAdsWithCustomOrder(topAds);
 
     // Create ad widgets from the API AdModel instances
-    List<Widget> adWidgets = _topAds.map((ad) {
+    List<Widget> adWidgets = this.topAds.map((ad) {
       FileManager fileManager = FileManager();
       fileManager.getFile(ad.file);
       return Center(
@@ -67,33 +158,33 @@ class TopAdCarouselProvider extends ChangeNotifier {
     }).toList();
     _topCarouselController.setCarouselArray(adWidgets);
 
-    if (_topAds.length > 1) {
+    if (this.topAds.length > 1) {
       startTopAdTimer(0); // Start timer for the first ad
     }
 
-    _logger.i('🎬 [初始化] 顶部广告轮播初始化完成，广告数量: ${_topAds.length}');
+    _logger.i('🎬 [初始化] 顶部广告轮播初始化完成，广告数量: ${this.topAds.length}');
   }
 
-  /// 启动顶部广告计时器
+  ///7，启动顶部广告计时器
   void startTopAdTimer(int currentIndex) {
     _logger.d(
-        '🎬 开始顶部广告计时器: index=$currentIndex, ads=${_topAds.length}, paused=$_isTopCarouselPaused');
+        '🎬 开始顶部广告计时器: index=$currentIndex, ads=${this.topAds.length}, paused=$_isTopCarouselPaused');
     _topTimer?.cancel();
-    if (_topAds.length <= 1 ||
+    if (this.topAds.length <= 1 ||
         currentIndex < 0 ||
-        currentIndex >= _topAds.length ||
+        currentIndex >= this.topAds.length ||
         _isTopCarouselPaused) {
       _logger.w(
-          '⚠️ 顶部广告计时器条件不满足: ads=${_topAds.length}, index=$currentIndex, paused=$_isTopCarouselPaused');
+          '⚠️ 顶部广告计时器条件不满足: ads=${this.topAds.length}, index=$currentIndex, paused=$_isTopCarouselPaused');
       return;
     }
 
-    final ad = _topAds[currentIndex];
+    final ad = this.topAds[currentIndex];
     // 记录当前广告开始时间和总时长
     _currentTopAdStartTime = DateTime.now();
     _topAdDuration = ad.durationObject;
     _currentTopAdIndex = currentIndex;
-    
+
     // 只有当切换到新广告时才重置已播放时间
     _topAdElapsedTime = Duration.zero;
 
@@ -119,10 +210,11 @@ class TopAdCarouselProvider extends ChangeNotifier {
 
     // 计算已播放时间
     if (_currentTopAdStartTime != null) {
-      final rawElapsed = _currentTopAdPauseTime!.difference(_currentTopAdStartTime!);
+      final rawElapsed =
+          _currentTopAdPauseTime!.difference(_currentTopAdStartTime!);
       // 加上之前的已播放时间（如果有的话）
       final totalElapsed = rawElapsed + _topAdElapsedTime;
-      
+
       // 确保已播放时间不超过广告总时长
       if (totalElapsed >= _topAdDuration) {
         // 广告已经播放完成，应该准备切换到下一个
@@ -198,11 +290,11 @@ class TopAdCarouselProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// 检查并恢复轮播状态（监控定时器使用）
+  ///8，检查并恢复轮播状态（监控定时器使用）
   void checkAndRestoreTopCarousel() {
     _logger.i(
-        '🔍 检查顶部广告恢复条件: ads=${_topAds.length}, paused=$_isTopCarouselPaused');
-    if (_topAds.isNotEmpty && !_isTopCarouselPaused) {
+        '🔍 检查顶部广告恢复条件: ads=${this.topAds.length}, paused=$_isTopCarouselPaused');
+    if (this.topAds.isNotEmpty && !_isTopCarouselPaused) {
       // 检查当前定时器是否活跃
       if (_topTimer == null || !_topTimer!.isActive) {
         _logger.w('🔧 检测到顶部广告轮播中断，尝试恢复...');
@@ -212,8 +304,8 @@ class TopAdCarouselProvider extends ChangeNotifier {
         startTopAdTimer(currentIndex);
       }
     } else {
-      _logger
-          .w('❌ 不满足恢复条件: ads=${_topAds.length}, paused=$_isTopCarouselPaused');
+      _logger.w(
+          '❌ 不满足恢复条件: ads=${this.topAds.length}, paused=$_isTopCarouselPaused');
     }
   }
 
@@ -230,7 +322,8 @@ class TopAdCarouselProvider extends ChangeNotifier {
           topAdRemaining = remaining.isNegative ? 0 : remaining.inSeconds;
         } else {
           // 运行状态：计算当前剩余时间
-          final currentElapsed = DateTime.now().difference(_currentTopAdStartTime!);
+          final currentElapsed =
+              DateTime.now().difference(_currentTopAdStartTime!);
 
           // 如果有已播放时间记录（说明经历了暂停恢复），需要加上之前的播放时间
           final totalElapsed = currentElapsed + _topAdElapsedTime;
@@ -256,9 +349,9 @@ class TopAdCarouselProvider extends ChangeNotifier {
     _debugTimer?.cancel();
   }
 
-  /// 处理页面变化事件
+  ///9，处理页面变化事件
   void onPageChanged(int index) {
-    if (!_isTopCarouselPaused && _topAds.isNotEmpty) {
+    if (!_isTopCarouselPaused && this.topAds.isNotEmpty) {
       startTopAdTimer(index);
     }
   }
@@ -280,7 +373,7 @@ class TopAdCarouselProvider extends ChangeNotifier {
     _topCarouselController.resumeAllMedia();
 
     // 恢复顶部广告轮播
-    if (_topAds.isNotEmpty) {
+    if (this.topAds.isNotEmpty) {
       int currentIndex = _topCarouselController.currentIndex;
       startTopAdTimer(currentIndex);
     }

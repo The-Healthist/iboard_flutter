@@ -4,6 +4,7 @@ import 'package:iboard_app/models/settings_model.dart';
 import 'package:iboard_app/providers/state_provider.dart';
 import 'package:logger/logger.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:iboard_app/providers/arrear_provider.dart';
 
 class AppDataProvider extends ChangeNotifier {
   final Logger _logger = Logger();
@@ -13,12 +14,15 @@ class AppDataProvider extends ChangeNotifier {
   String? _deviceId;
   String _baseUrl; // Should be initialized, e.g., from a config
   CarouselStateProvider? _carouselStateProvider; // 添加对CarouselStateProvider的引用
+  ArrearProvider? _arrearProvider; // 添加对ArrearProvider的引用
 
   bool _isLoading = false;
   String? _error;
 
   // Getters
   SettingsModel? get settingsModel => _settingsModel;
+  ArrearProvider? get arrearProvider =>
+      _arrearProvider; // 添加对ArrearProvider的getter
   Building? get buildingInfo => _settingsModel?.building;
   Settings? get deviceSettings => _settingsModel?.settings;
   String? get token => _settingsModel?.token;
@@ -45,6 +49,27 @@ class AppDataProvider extends ChangeNotifier {
     // 如果已有设置数据，立即更新
     if (_settingsModel?.settings != null) {
       _carouselStateProvider?.updateSettings(_settingsModel!.settings);
+    }
+  }
+
+  /// 设置ArrearProvider的引用，用于设置楼宇ID
+  void setArrearProvider(ArrearProvider? provider) {
+    _arrearProvider = provider;
+    _logger.i('ArrearProvider引用已设置');
+  }
+
+  /// 设置楼宇ID到ArrearProvider
+  void setBuildingIdToArrearProvider(String? ismartId) {
+    if (_arrearProvider != null && ismartId != null && ismartId.isNotEmpty) {
+      // 检查Provider是否已被销毁
+      if (!_arrearProvider!.isDisposed) {
+        _logger.i('设置ArrearProvider楼宇ID: $ismartId');
+        _arrearProvider!.setSelectedBuildingId(ismartId);
+      } else {
+        _logger.w('ArrearProvider已被销毁，无法设置楼宇ID');
+      }
+    } else {
+      _logger.w('ArrearProvider未设置或楼宇ID无效，跳过设置');
     }
   }
 
@@ -104,6 +129,18 @@ class AppDataProvider extends ChangeNotifier {
         _logger.i('CarouselStateProvider settings updated successfully.');
       }
 
+      // 设置ArrearProvider的楼宇ID
+      if (_settingsModel != null) {
+        final buildingIsmartId = _settingsModel!.building.ismartId;
+        if (buildingIsmartId.isNotEmpty) {
+          setBuildingIdToArrearProvider(buildingIsmartId);
+        } else {
+          _logger.w('楼宇ID为空，无法设置楼宇ID');
+        }
+      } else {
+        _logger.w('设置信息不完整，无法设置楼宇ID');
+      }
+
       _error = null;
     } on ApiException catch (e) {
       _logger.e('Initial login failed',
@@ -134,6 +171,14 @@ class AppDataProvider extends ChangeNotifier {
             _carouselStateProvider!.updateSettings(_settingsModel!.settings);
             _logger.i(
                 'CarouselStateProvider settings updated successfully after registration.');
+          }
+
+          // 设置ArrearProvider的楼宇ID
+          final building = _settingsModel?.building;
+          if (building?.ismartId != null) {
+            setBuildingIdToArrearProvider(building!.ismartId);
+          } else {
+            _logger.w('楼宇信息不完整，无法设置楼宇ID');
           }
 
           _error = null;
@@ -296,6 +341,35 @@ class AppDataProvider extends ChangeNotifier {
       _isLoading = false;
       notifyListeners();
       return null;
+    }
+  }
+
+  /// 初始化获取欠费数据
+  Future<void> initGetArrearData() async {
+    _logger.i('AppDataProvider: 开始初始化获取欠费数据');
+    if (_arrearProvider != null && !(_arrearProvider!.isDisposed)) {
+      try {
+        // 确保我们有有效的楼宇ID
+        final buildingIsmartId = _settingsModel != null ? _settingsModel!.building.ismartId : null;
+        if (buildingIsmartId != null && buildingIsmartId.isNotEmpty) {
+          _logger.i('AppDataProvider: 使用楼宇ID $buildingIsmartId 初始化欠费数据');
+          // 设置楼宇ID到ArrearProvider
+          _arrearProvider!.setSelectedBuildingId(buildingIsmartId);
+          // 获取欠费数据
+          await _arrearProvider!.fetchArrears(reset: true, buildingId: buildingIsmartId);
+          _logger.i('AppDataProvider: 欠费数据初始化完成');
+        } else {
+          _logger.w('AppDataProvider: 楼宇ID无效，无法初始化欠费数据');
+        }
+      } catch (e, stackTrace) {
+        _logger.e('AppDataProvider: 欠费数据初始化失败: $e', error: e, stackTrace: stackTrace);
+      }
+    } else {
+      if (_arrearProvider == null) {
+        _logger.w('AppDataProvider: ArrearProvider未设置，无法初始化欠费数据');
+      } else {
+        _logger.w('AppDataProvider: ArrearProvider已被销毁，无法初始化欠费数据');
+      }
     }
   }
 }

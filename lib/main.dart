@@ -13,6 +13,8 @@ import 'package:provider/provider.dart';
 import 'pages/mainscreen_page.dart';
 import 'pages/fullscreen_ads_page.dart';
 import 'pages/settings_page.dart';
+import 'pages/carousel_settings_page.dart'; // 添加轮播设置页面导入
+import 'providers/arrear_provider.dart'; // 添加欠费provider导入
 import 'dart:async';
 
 void main() {
@@ -70,6 +72,16 @@ void main() {
           ChangeNotifierProvider(
               create: (_) =>
                   FullscreenAdProvider()), // Add FullscreenAdProvider here
+          ChangeNotifierProxyProvider<AppDataProvider, ArrearProvider>(
+            create: (context) => ArrearProvider(
+              apiClient: Provider.of<AppDataProvider>(context, listen: false)
+                  .apiClient,
+            ),
+            update: (context, appDataProvider, previousArrearProvider) =>
+                ArrearProvider(
+              apiClient: appDataProvider.apiClient,
+            ),
+          ),
         ],
         child: MyApp(),
       ),
@@ -95,6 +107,7 @@ class MyApp extends StatelessWidget {
         '/announcement': (context) => AnnouncementPage(),
         '/fullscreen-ads': (context) => FullscreenAdsPage(),
         '/settings': (context) => SettingsPage(),
+        '/carousel-settings': (context) => CarouselSettingsPage(),
       },
     );
   }
@@ -141,6 +154,11 @@ class _HomePageState extends State<HomePage> {
           appDataProvider.setCarouselStateProvider(carouselStateProvider);
           fullscreenAdProvider.setAppDataProvider(appDataProvider);
 
+          // 设置ArrearProvider引用
+          final arrearProvider =
+              Provider.of<ArrearProvider>(context, listen: false);
+          appDataProvider.setArrearProvider(arrearProvider);
+
           // 设置预加载回调
           carouselStateProvider.setPreloadFullscreenAdCallback(() {
             // 新的Provider没有预加载方法
@@ -149,10 +167,18 @@ class _HomePageState extends State<HomePage> {
           // 执行登录
           await appDataProvider.initializeAndLogin(deviceIdToSet: deviceId);
 
-          // 登录成功后启动定时更新
+          // 登录成功后启动定时更新和初始化欠费数据
           if (appDataProvider.isLoggedIn) {
             advertisementProvider.startPeriodicUpdate();
             announcementProvider.startPeriodicUpdate();
+
+            // 初始化欠费数据
+            try {
+              await appDataProvider.initGetArrearData();
+              print('欠费数据初始化完成');
+            } catch (e) {
+              print('欠费数据初始化失败: $e');
+            }
 
             // 自动跳转到主页面
             if (mounted) {

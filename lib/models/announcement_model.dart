@@ -52,7 +52,7 @@ class AnnouncementModel {
     switch (apiType.toLowerCase()) {
       case 'normal':
         return AnnouncementTypeUi.general;
-      case 'emergency': // Assuming API might send 'emergency'
+      case 'urgent': // Assuming API might send 'emergency'
         return AnnouncementTypeUi.emergency;
       case 'government': // Assuming API might send 'government'
         return AnnouncementTypeUi.government;

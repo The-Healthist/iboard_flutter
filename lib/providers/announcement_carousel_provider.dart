@@ -5,7 +5,10 @@ import 'package:iboard_app/models/announcement_model.dart';
 import 'package:iboard_app/widgets/carousel_widget.dart' as custom_carousel;
 import 'package:iboard_app/widgets/mainscreen/main_display/announcement_reader_widget.dart';
 import 'package:iboard_app/widgets/mainscreen/main_display/mainscreen_widget.dart';
+import 'package:iboard_app/widgets/mainscreen/main_display/arrear_display_widget.dart';
 import 'package:logger/logger.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'dart:convert';
 
 /// 通告轮播Provider
 /// 负责管理通告轮播的逻辑、暂停恢复、定时器管理等
@@ -22,6 +25,7 @@ class AnnouncementCarouselProvider extends ChangeNotifier {
 
   // 通告数据
   List<AnnouncementModel> _carouselAnnouncements = [];
+  List<AnnouncementModel> _customOrderCarouselAnnouncements = []; // 自定义顺序的轮播通告
 
   // 状态管理
   bool _isMidCarouselPaused = false;
@@ -36,7 +40,10 @@ class AnnouncementCarouselProvider extends ChangeNotifier {
   // Getters
   custom_carousel.CarouselController get midCarouselController =>
       _midCarouselController;
-  List<AnnouncementModel> get carouselAnnouncements => _carouselAnnouncements;
+  List<AnnouncementModel> get carouselAnnouncements =>
+      _customOrderCarouselAnnouncements.isNotEmpty
+          ? _customOrderCarouselAnnouncements
+          : _carouselAnnouncements;
   bool get isMidCarouselPaused => _isMidCarouselPaused;
   Duration get noticeDuration => _noticeDuration;
   int get currentNoticeIndex => _currentNoticeIndex;
@@ -45,42 +52,144 @@ class AnnouncementCarouselProvider extends ChangeNotifier {
 
   AnnouncementCarouselProvider() {
     _midCarouselController = custom_carousel.CarouselController();
+    _loadCustomOrder(); // 加载自定义顺序
   }
 
-  ///1，初始化中部轮播
+  ///1，设置自定义轮播通告顺序
+  Future<void> setCarouselList(List<AnnouncementModel> customOrderList) async {
+    _customOrderCarouselAnnouncements = List.from(customOrderList);
+    await _saveCustomOrder();
+    _logger
+        .i('🔄 设置自定义通告轮播顺序: ${_customOrderCarouselAnnouncements.length} 个通告');
+    notifyListeners();
+  }
+
+  ///2，保存自定义顺序到缓存
+  Future<void> _saveCustomOrder() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final orderData = _customOrderCarouselAnnouncements
+          .map((announcement) => {
+                'id': announcement.id,
+                'title': announcement.title,
+                'order':
+                    _customOrderCarouselAnnouncements.indexOf(announcement),
+              })
+          .toList();
+      await prefs.setString(
+          'announcement_carousel_order', json.encode(orderData));
+      _logger.i('💾 通告轮播自定义顺序已保存到缓存');
+    } catch (e) {
+      _logger.e('保存通告轮播顺序失败', error: e);
+    }
+  }
+
+  ///3，从缓存加载自定义顺序
+  Future<void> _loadCustomOrder() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final orderString = prefs.getString('announcement_carousel_order');
+      if (orderString != null) {
+        final orderData = json.decode(orderString) as List;
+        // 这里只加载顺序配置，实际的通告数据需要等待API数据后再应用
+        _logger.i('📂 从缓存加载通告轮播自定义顺序: ${orderData.length} 个配置');
+      }
+    } catch (e) {
+      _logger.e('加载通告轮播顺序失败', error: e);
+    }
+  }
+
+  ///4，根据API数据更新自定义顺序（保持用户自定义的顺序）
+  void updateCarouselAnnouncementsWithCustomOrder(
+      List<AnnouncementModel> newAnnouncements) {
+    _carouselAnnouncements = newAnnouncements;
+
+    if (_customOrderCarouselAnnouncements.isEmpty) {
+      // 如果没有自定义顺序，使用默认顺序
+      _customOrderCarouselAnnouncements = List.from(newAnnouncements);
+    } else {
+      // 有自定义顺序，需要智能更新
+      _updateCustomOrderWithNewData(newAnnouncements);
+    }
+
+    _logger.i(
+        '🔄 更新通告轮播数据: 原始${newAnnouncements.length}个，自定义顺序${_customOrderCarouselAnnouncements.length}个');
+  }
+
+  ///5，智能更新自定义顺序列表
+  void _updateCustomOrderWithNewData(List<AnnouncementModel> newAnnouncements) {
+    // 创建新数据的ID映射
+    final newAnnouncementsMap = {
+      for (var item in newAnnouncements) item.id: item
+    };
+
+    // 移除已删除的通告
+    _customOrderCarouselAnnouncements
+        .removeWhere((item) => !newAnnouncementsMap.containsKey(item.id));
+
+    // 更新现有通告的数据
+    for (int i = 0; i < _customOrderCarouselAnnouncements.length; i++) {
+      final currentId = _customOrderCarouselAnnouncements[i].id;
+      if (newAnnouncementsMap.containsKey(currentId)) {
+        _customOrderCarouselAnnouncements[i] = newAnnouncementsMap[currentId]!;
+      }
+    }
+
+    // 添加新增的通告到末尾
+    final existingIds =
+        _customOrderCarouselAnnouncements.map((item) => item.id).toSet();
+    final newItems = newAnnouncements
+        .where((item) => !existingIds.contains(item.id))
+        .toList();
+    _customOrderCarouselAnnouncements.addAll(newItems);
+
+    // 保存更新后的顺序
+    _saveCustomOrder();
+
+    _logger.i(
+        '📝 智能更新自定义顺序: 移除${newAnnouncements.length - newAnnouncementsMap.length}个, 新增${newItems.length}个');
+  }
+
+  ///6，初始化中部轮播
   void initializeMidWidgets({
     required List<AnnouncementModel> carouselAnnouncements,
     required int apiNoticeStayDuration,
     required int delayBeforeNotice,
-    required Function(AnnouncementModel) onAnnouncementTap,
+    required Function(AnnouncementModel?) onAnnouncementTap,
     required VoidCallback onHomeButtonPressed,
   }) {
-    _carouselAnnouncements = carouselAnnouncements;
+    // 使用自定义顺序更新方法
+    updateCarouselAnnouncementsWithCustomOrder(carouselAnnouncements);
     _noticeDuration = Duration(seconds: apiNoticeStayDuration);
 
     // 创建带回调的主屏幕部件
     Widget mainScreenWidget = MainScreenWidget(
-      onAnnouncementTap: (AnnouncementModel announcement) {
-        // 查找announcement在轮播通告列表中的索引
-        int announcementIndex = carouselAnnouncements.indexOf(announcement);
-        if (announcementIndex != -1) {
-          // 计算在carousel中的实际索引（主屏幕是索引0，所以announcement从索引1开始）
-          int carouselIndex = announcementIndex + 1;
-          // 跳转到对应的公告页面
-          _midCarouselController.jumpToIndex(carouselIndex);
-          _logger.i(
-              '跳转到轮播通告: $carouselIndex (${announcement.title}) - 类型: ${announcement.uiType}');
+      onAnnouncementTap: (AnnouncementModel? announcement) {
+        if (announcement == null) {
+          // 显示欠费查询界面
+          _showArrearQueryWidget(onHomeButtonPressed);
         } else {
-          // 如果点击的通告不在轮播列表中（不是緊急或一般通告），提示用户
-          _logger.w(
-              '点击的通告不在轮播列表中: ${announcement.title} - 类型: ${announcement.uiType}');
+          // 查找announcement在轮播通告列表中的索引
+          int announcementIndex = carouselAnnouncements.indexOf(announcement);
+          if (announcementIndex != -1) {
+            // 计算在carousel中的实际索引（主屏幕是索引0，所以announcement从索引1开始）
+            int carouselIndex = announcementIndex + 1;
+            // 跳转到对应的公告页面
+            _midCarouselController.jumpToIndex(carouselIndex);
+            _logger.i(
+                '跳转到轮播通告: $carouselIndex (${announcement.title}) - 类型: ${announcement.uiType}');
+          } else {
+            // 如果点击的通告不在轮播列表中（不是緊急或一般通告），提示用户
+            _logger.w(
+                '点击的通告不在轮播列表中: ${announcement.title} - 类型: ${announcement.uiType}');
+          }
         }
       },
     );
 
     // 只为轮播通告（緊急和一般）创建widget
     List<Widget> announcementWidgets =
-        carouselAnnouncements.map((announcement) {
+        this.carouselAnnouncements.map((announcement) {
       FileManager fileManager = FileManager();
       fileManager.getFile(announcement.file);
       return Center(
@@ -98,7 +207,7 @@ class AnnouncementCarouselProvider extends ChangeNotifier {
     _midCarouselController.setCarouselArray(midWidgets);
 
     _logger.i(
-        '🎬 [初始化] 中部轮播初始化完成: 主屏幕 + ${carouselAnnouncements.length} 个轮播通告 (只包含緊急和一般通告)');
+        '🎬 [初始化] 中部轮播初始化完成: 主屏幕 + ${this.carouselAnnouncements.length} 个轮播通告 (只包含緊急和一般通告)');
     _logger.i('📋 [配置] 使用API配置的通告停留时间: ${apiNoticeStayDuration}秒');
 
     _midTimer?.cancel();
@@ -354,9 +463,9 @@ class AnnouncementCarouselProvider extends ChangeNotifier {
       // 获取当前通告信息
       String currentNoticeInfo = '';
       if (_currentNoticeIndex > 0 &&
-          _currentNoticeIndex <= _carouselAnnouncements.length) {
+          _currentNoticeIndex <= this.carouselAnnouncements.length) {
         final currentAnnouncement =
-            _carouselAnnouncements[_currentNoticeIndex - 1];
+            this.carouselAnnouncements[_currentNoticeIndex - 1];
         currentNoticeInfo = ' - ${currentAnnouncement.title}';
       } else if (_currentNoticeIndex == 0) {
         currentNoticeInfo = ' - 主屏幕';
@@ -417,6 +526,50 @@ class AnnouncementCarouselProvider extends ChangeNotifier {
       _logger.i('🔄 跳转到通告索引: $index');
       notifyListeners();
     }
+  }
+
+  ///12，显示欠费查询界面
+  void _showArrearQueryWidget(VoidCallback onHomeButtonPressed) {
+    _logger.i('💰 显示欠费查询界面');
+
+    // 创建欠费查询组件
+    Widget arrearQueryWidget = ArrearDisplayWidget(
+      onHomeButtonPressed: onHomeButtonPressed,
+    );
+
+    // 将欠费查询组件添加到轮播数组中
+    // 注意：这里需要重新构建整个轮播数组，因为CarouselController没有getCarouselArray方法
+    List<Widget> currentWidgets = [
+      // 主屏幕
+      MainScreenWidget(
+        onAnnouncementTap: (announcement) {
+          // 这里可以处理从欠费查询界面返回的逻辑
+        },
+      ),
+      // 通告组件
+      ...this.carouselAnnouncements.map((announcement) {
+        FileManager fileManager = FileManager();
+        fileManager.getFile(announcement.file);
+        return Center(
+          child: AnnouncementReaderWidget(
+            announcement: announcement,
+            fileManager: fileManager,
+            onHomeButtonPressed: onHomeButtonPressed,
+          ),
+        );
+      }).toList(),
+      // 欠费查询组件
+      arrearQueryWidget,
+    ];
+
+    _midCarouselController.setCarouselArray(currentWidgets);
+
+    // 跳转到欠费查询界面
+    int arrearQueryIndex = currentWidgets.length - 1;
+    _midCarouselController.jumpToIndex(arrearQueryIndex);
+    _currentNoticeIndex = arrearQueryIndex;
+
+    _logger.i('💰 已跳转到欠费查询界面，索引: $arrearQueryIndex');
   }
 
   @override

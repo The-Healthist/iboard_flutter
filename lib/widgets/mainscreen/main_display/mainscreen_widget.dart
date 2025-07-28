@@ -4,7 +4,8 @@ import 'package:iboard_app/providers/announcement_provider.dart';
 import 'package:provider/provider.dart';
 
 class MainScreenWidget extends StatefulWidget {
-  final Function(AnnouncementModel announcement)? onAnnouncementTap; // 添加回调函数
+  final Function(AnnouncementModel? announcement)?
+      onAnnouncementTap; // 修改回调函数支持null
 
   const MainScreenWidget({Key? key, this.onAnnouncementTap}) : super(key: key);
 
@@ -39,8 +40,13 @@ class MainScreenWidgetState extends State<MainScreenWidget> {
           width: double.infinity,
           child: ElevatedButton(
             onPressed: () {
-              // TODO: Implement navigation or action for this function
-              print('$chineseTitle pressed');
+              // 处理功能按钮点击
+              if (chineseTitle == '欠費查詢') {
+                // 调用回调函数来显示欠费查询界面
+                widget.onAnnouncementTap?.call(null); // 传递null表示显示欠费查询
+              } else {
+                print('$chineseTitle pressed');
+              }
             },
             style: ElevatedButton.styleFrom(
               shape: RoundedRectangleBorder(

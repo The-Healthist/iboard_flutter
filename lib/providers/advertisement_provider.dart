@@ -260,6 +260,8 @@ class AdvertisementProvider extends ChangeNotifier {
       _advertisements = List<AdModel>.from(newAdvertisements); // 创建副本，避免引用问题
 
       _logger.i('Smart advertisement update completed successfully.');
+
+      // 通知listeners，这会触发mainscreen_page.dart中的监听器更新轮播
     } catch (e, stackTrace) {
       _logger.e('Error in smart advertisement update',
           error: e, stackTrace: stackTrace);

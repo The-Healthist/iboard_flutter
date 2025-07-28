@@ -236,8 +236,10 @@ class _SettingsPageState extends State<SettingsPage> {
                         _buildSettingsItem(
                           icon: Icons.display_settings,
                           title: '顯示設置',
-                          subtitle: '調整螢幕顯示參數',
-                          onTap: () {},
+                          subtitle: '調整螢幕顯示參數和輪播順序',
+                          onTap: () {
+                            Navigator.pushNamed(context, '/carousel-settings');
+                          },
                         ),
                         SizedBox(height: 16),
                         _buildSettingsItem(

@@ -382,20 +382,25 @@ class _AnnouncementPageState extends State<AnnouncementPage> {
       carouselAnnouncements: carouselAnnouncements,
       apiNoticeStayDuration: apiNoticeStayDuration,
       delayBeforeNotice: delayBeforeNotice,
-      onAnnouncementTap: (AnnouncementModel announcement) {
-        // 查找announcement在轮播通告列表中的索引
-        int announcementIndex = carouselAnnouncements.indexOf(announcement);
-        if (announcementIndex != -1) {
-          // 计算在carousel中的实际索引（主屏幕是索引0，所以announcement从索引1开始）
-          int carouselIndex = announcementIndex + 1;
-          // 跳转到对应的公告页面
-          announcementCarouselProvider.jumpToAnnouncementIndex(carouselIndex);
-          _logger.i(
-              '跳转到轮播通告: $carouselIndex (${announcement.title}) - 类型: ${announcement.uiType}');
+      onAnnouncementTap: (AnnouncementModel? announcement) {
+        if (announcement == null) {
+          // 显示欠费查询界面
+          _logger.i('💰 从主页面跳转到欠费查询界面');
         } else {
-          // 如果点击的通告不在轮播列表中（不是緊急或一般通告），提示用户
-          _logger.w(
-              '点击的通告不在轮播列表中: ${announcement.title} - 类型: ${announcement.uiType}');
+          // 查找announcement在轮播通告列表中的索引
+          int announcementIndex = carouselAnnouncements.indexOf(announcement);
+          if (announcementIndex != -1) {
+            // 计算在carousel中的实际索引（主屏幕是索引0，所以announcement从索引1开始）
+            int carouselIndex = announcementIndex + 1;
+            // 跳转到对应的公告页面
+            announcementCarouselProvider.jumpToAnnouncementIndex(carouselIndex);
+            _logger.i(
+                '跳转到轮播通告: $carouselIndex (${announcement.title}) - 类型: ${announcement.uiType}');
+          } else {
+            // 如果点击的通告不在轮播列表中（不是緊急或一般通告），提示用户
+            _logger.w(
+                '点击的通告不在轮播列表中: ${announcement.title} - 类型: ${announcement.uiType}');
+          }
         }
       },
       onHomeButtonPressed: () {

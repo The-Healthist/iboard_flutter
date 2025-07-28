@@ -6,6 +6,8 @@ import 'package:iboard_app/widgets/full_ad_widget.dart';
 import 'package:logger/logger.dart';
 import 'package:iboard_app/providers/app_data_provider.dart';
 import 'package:video_player/video_player.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'dart:convert';
 
 /// 简化版全屏广告Provider
 /// 参考顶部广告轮播逻辑实现
@@ -18,6 +20,7 @@ class FullscreenAdProvider extends ChangeNotifier {
 
   // 广告数据
   List<AdModel> _fullscreenAds = [];
+  List<AdModel> _customOrderFullscreenAds = []; // 自定义顺序的全屏广告
   List<Widget> _adWidgets = [];
 
   // 状态管理
@@ -44,13 +47,16 @@ class FullscreenAdProvider extends ChangeNotifier {
   void setAppDataProvider(AppDataProvider appDataProvider) {
     _appDataProvider = appDataProvider;
     _logger.i('AppDataProvider已设置');
+    _loadCustomOrder(); // 加载自定义顺序
   }
 
   // 视频播放进度记录
   Map<String, Duration> _videoProgressMap = {};
 
   // Getters
-  List<AdModel> get fullscreenAds => _fullscreenAds;
+  List<AdModel> get fullscreenAds => _customOrderFullscreenAds.isNotEmpty
+      ? _customOrderFullscreenAds
+      : _fullscreenAds;
   List<Widget> get adWidgets => _adWidgets;
   bool get isPaused => _isPaused;
   bool get isActive => _isActive;
@@ -68,22 +74,114 @@ class FullscreenAdProvider extends ChangeNotifier {
       _appDataProvider?.deviceSettings?.advertisementPlayDuration ??
       _defaultFullscreenAdDuration;
 
-  /// 更新全屏广告数据
-  void updateFullscreenAds(List<AdModel> newAds) {
+  ///1，设置自定义轮播全屏广告顺序
+  Future<void> setCarouselList(List<AdModel> customOrderList) async {
+    _customOrderFullscreenAds = List.from(customOrderList);
+    await _saveCustomOrder();
+    _logger.i('🔄 设置自定义全屏广告轮播顺序: ${_customOrderFullscreenAds.length} 个广告');
+
+    // 重新创建广告Widget
+    _createAdWidgets();
+    notifyListeners();
+  }
+
+  ///2，保存自定义顺序到缓存
+  Future<void> _saveCustomOrder() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final orderData = _customOrderFullscreenAds
+          .map((ad) => {
+                'id': ad.id,
+                'title': ad.title,
+                'order': _customOrderFullscreenAds.indexOf(ad),
+              })
+          .toList();
+      await prefs.setString(
+          'fullscreen_ad_carousel_order', json.encode(orderData));
+      _logger.i('💾 全屏广告轮播自定义顺序已保存到缓存');
+    } catch (e) {
+      _logger.e('保存全屏广告轮播顺序失败', error: e);
+    }
+  }
+
+  ///3，从缓存加载自定义顺序
+  Future<void> _loadCustomOrder() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final orderString = prefs.getString('fullscreen_ad_carousel_order');
+      if (orderString != null) {
+        final orderData = json.decode(orderString) as List;
+        _logger.i('📂 从缓存加载全屏广告轮播自定义顺序: ${orderData.length} 个配置');
+      }
+    } catch (e) {
+      _logger.e('加载全屏广告轮播顺序失败', error: e);
+    }
+  }
+
+  ///4，根据API数据更新自定义顺序（保持用户自定义的顺序）
+  void updateFullscreenAdsWithCustomOrder(List<AdModel> newAds) {
     _fullscreenAds = newAds;
+
+    if (_customOrderFullscreenAds.isEmpty) {
+      // 如果没有自定义顺序，使用默认顺序
+      _customOrderFullscreenAds = List.from(newAds);
+    } else {
+      // 有自定义顺序，需要智能更新
+      _updateCustomOrderWithNewData(newAds);
+    }
+
     _createAdWidgets();
 
-    if (_fullscreenAds.isNotEmpty && _currentAdIndex >= _fullscreenAds.length) {
+    if (this.fullscreenAds.isNotEmpty &&
+        _currentAdIndex >= this.fullscreenAds.length) {
       _currentAdIndex = 0;
     }
 
-    _logger.i('📺 全屏广告数据更新: ${_fullscreenAds.length} 条广告');
+    _logger.i(
+        '🔄 更新全屏广告轮播数据: 原始${newAds.length}个，自定义顺序${_customOrderFullscreenAds.length}个');
     notifyListeners();
+  }
+
+  ///5，智能更新自定义顺序列表
+  void _updateCustomOrderWithNewData(List<AdModel> newAds) {
+    // 创建新数据的ID映射
+    final newAdsMap = {for (var item in newAds) item.id: item};
+
+    // 移除已删除的广告
+    _customOrderFullscreenAds
+        .removeWhere((item) => !newAdsMap.containsKey(item.id));
+
+    // 更新现有广告的数据
+    for (int i = 0; i < _customOrderFullscreenAds.length; i++) {
+      final currentId = _customOrderFullscreenAds[i].id;
+      if (newAdsMap.containsKey(currentId)) {
+        _customOrderFullscreenAds[i] = newAdsMap[currentId]!;
+      }
+    }
+
+    // 添加新增的广告到末尾
+    final existingIds =
+        _customOrderFullscreenAds.map((item) => item.id).toSet();
+    final newItems =
+        newAds.where((item) => !existingIds.contains(item.id)).toList();
+    _customOrderFullscreenAds.addAll(newItems);
+
+    // 保存更新后的顺序
+    _saveCustomOrder();
+
+    _logger.i(
+        '📝 智能更新自定义顺序: 移除${newAds.length - newAdsMap.length}个, 新增${newItems.length}个');
+  }
+
+  /// 更新全屏广告数据
+  void updateFullscreenAds(List<AdModel> newAds) {
+    // 使用自定义顺序更新方法
+    updateFullscreenAdsWithCustomOrder(newAds);
   }
 
   /// 创建广告Widget组件列表
   void _createAdWidgets() {
-    _adWidgets = _fullscreenAds.asMap().entries.map((entry) {
+    _adWidgets = this.fullscreenAds.asMap().entries.map((entry) {
       return _createSingleAdWidget(entry.value, entry.key);
     }).toList();
     _logger.i('📺 创建了 ${_adWidgets.length} 个广告Widget');
@@ -105,8 +203,8 @@ class FullscreenAdProvider extends ChangeNotifier {
       onVideoProgressChanged: (adId, position) {
         // 对于全屏广告，不需要保存视频进度
         // 只在需要时保存图片广告的显示时间
-        if (_currentAdIndex < _fullscreenAds.length &&
-            _fullscreenAds[_currentAdIndex].id.toString() == adId) {
+        if (_currentAdIndex < this.fullscreenAds.length &&
+            this.fullscreenAds[_currentAdIndex].id.toString() == adId) {
           final currentAd = getCurrentAd();
           if (currentAd != null &&
               currentAd.file.mimeType.startsWith('image/')) {
@@ -126,7 +224,7 @@ class FullscreenAdProvider extends ChangeNotifier {
     _isPaused = false;
     _currentAdPauseTime = null;
 
-    if (_fullscreenAds.isNotEmpty) {
+    if (this.fullscreenAds.isNotEmpty) {
       _createAdWidgets();
       startFullscreenAdTimer(_currentAdIndex);
       startDebugTimer();
@@ -139,19 +237,19 @@ class FullscreenAdProvider extends ChangeNotifier {
   /// 启动全屏广告计时器
   void startFullscreenAdTimer(int currentIndex) {
     _logger.d(
-        '🎬 开始全屏广告计时器: index=$currentIndex, ads=${_fullscreenAds.length}, paused=$_isPaused');
+        '🎬 开始全屏广告计时器: index=$currentIndex, ads=${this.fullscreenAds.length}, paused=$_isPaused');
     _fullscreenTimer?.cancel();
 
-    if (_fullscreenAds.isEmpty ||
+    if (this.fullscreenAds.isEmpty ||
         currentIndex < 0 ||
-        currentIndex >= _fullscreenAds.length ||
+        currentIndex >= this.fullscreenAds.length ||
         _isPaused) {
       _logger.w(
-          '⚠️ 全屏广告计时器条件不满足: ads=${_fullscreenAds.length}, index=$currentIndex, paused=$_isPaused');
+          '⚠️ 全屏广告计时器条件不满足: ads=${this.fullscreenAds.length}, index=$currentIndex, paused=$_isPaused');
       return;
     }
 
-    final ad = _fullscreenAds[currentIndex];
+    final ad = this.fullscreenAds[currentIndex];
     _currentAdStartTime = DateTime.now();
     _adDuration = ad.durationObject;
     _currentAdIndex = currentIndex;
@@ -181,10 +279,10 @@ class FullscreenAdProvider extends ChangeNotifier {
 
   /// 切换到下一个广告
   void _nextAd() {
-    if (_fullscreenAds.isEmpty || _isPaused || !_isActive) return;
+    if (this.fullscreenAds.isEmpty || _isPaused || !_isActive) return;
 
     // 切换到下一个广告
-    _currentAdIndex = (_currentAdIndex + 1) % _fullscreenAds.length;
+    _currentAdIndex = (_currentAdIndex + 1) % this.fullscreenAds.length;
 
     // 重置时间记录
     _adElapsedTime = Duration.zero;
@@ -252,7 +350,7 @@ class FullscreenAdProvider extends ChangeNotifier {
     }
 
     // 计算剩余播放时间并恢复定时器
-    if (_fullscreenAds.isNotEmpty && _currentAdStartTime != null) {
+    if (this.fullscreenAds.isNotEmpty && _currentAdStartTime != null) {
       final currentAd = getCurrentAd();
       if (currentAd != null) {
         _adDuration = currentAd.durationObject;
@@ -319,7 +417,7 @@ class FullscreenAdProvider extends ChangeNotifier {
       String timeInfo = '';
 
       if (_currentAdStartTime != null &&
-          _currentAdIndex < _fullscreenAds.length) {
+          _currentAdIndex < this.fullscreenAds.length) {
         // 确保预计已播放时间不会超过广告总时长
         Duration safeExpectedElapsed = _expectedAdElapsedTime > _adDuration
             ? _adDuration
@@ -340,13 +438,14 @@ class FullscreenAdProvider extends ChangeNotifier {
         }
       }
 
-      final currentAd =
-          _fullscreenAds.isNotEmpty ? _fullscreenAds[_currentAdIndex] : null;
+      final currentAd = this.fullscreenAds.isNotEmpty
+          ? this.fullscreenAds[_currentAdIndex]
+          : null;
       final adTitle = currentAd?.title ?? '无广告';
       final timerActive = _fullscreenTimer?.isActive ?? false;
 
       _logger.i(
-          '🎬 [全屏广告] $statusText | [${_currentAdIndex + 1}/${_fullscreenAds.length}] $adTitle | $timeInfo | Timer活跃: $timerActive');
+          '🎬 [全屏广告] $statusText | [${_currentAdIndex + 1}/${this.fullscreenAds.length}] $adTitle | $timeInfo | Timer活跃: $timerActive');
     });
   }
 
@@ -398,8 +497,8 @@ class FullscreenAdProvider extends ChangeNotifier {
 
   /// 获取当前播放的广告模型
   AdModel? getCurrentAd() {
-    if (_currentAdIndex >= _fullscreenAds.length) return null;
-    return _fullscreenAds[_currentAdIndex];
+    if (_currentAdIndex >= this.fullscreenAds.length) return null;
+    return this.fullscreenAds[_currentAdIndex];
   }
 
   /// 获取当前播放的Widget
