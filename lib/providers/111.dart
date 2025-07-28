@@ -366,30 +366,42 @@ class FullAdvertisementCarouselProvider extends ChangeNotifier {
   void exitFullscreenMode() {
     if (!_isActive) return;
 
+    _logger.i('🚪 退出全屏广告模式 - 当前广告索引: $_currentAdIndex');
+
+    // 确保当前广告资源被正确释放
     _safelyDisposeCurrentWidget();
 
     final currentAd = getCurrentAd();
     if (currentAd != null) {
+      _logger.i('💾 保存当前广告播放进度 - 广告ID: ${currentAd.id}, 类型: ${currentAd.file.mimeType}');
+      
       if (isCurrentAdVideo()) {
         final videoProgress = getCurrentVideoProgress();
         if (videoProgress != null) {
           saveVideoProgress(currentAd.id.toString(), videoProgress);
+          _logger.i('📹 保存视频播放进度: ${videoProgress.inSeconds}秒');
         }
       } else if (currentAd.file.mimeType.startsWith('image/')) {
         // 保存图片广告的显示时间
         saveImageDisplayTime(currentAd.id.toString(), _adElapsedTime);
+        _logger.i('🖼️ 保存图片显示时间: ${_adElapsedTime.inSeconds}秒');
       }
     }
 
-    _isActive = false;
+    // 确保所有定时器被取消
     _carouselTimer?.cancel();
     _debugTimer?.cancel();
-
+    
+    // 重置所有状态
+    _isActive = false;
+    _isPaused = false; // 确保暂停状态也被重置
     _fullscreenStartTime = null;
     _currentAdStartTime = null;
     _currentAdPauseTime = null;
     _adElapsedTime = Duration.zero;
     _expectedAdElapsedTime = Duration.zero; // 重置预计已播放时间
+
+    _logger.i('⏹️ 全屏广告模式已完全退出');
 
     notifyListeners();
   }
@@ -499,16 +511,24 @@ class FullAdvertisementCarouselProvider extends ChangeNotifier {
           }
         }
 
+        // 确保预计已播放时间不超过广告总时长
+        Duration expectedElapsedTime = _expectedAdElapsedTime;
+        if (expectedElapsedTime > _adDuration) {
+          expectedElapsedTime = _adDuration;
+        }
+
         if (_isPaused) {
           timeInfo =
-              '剩余: ${remaining.inSeconds}s/${_adDuration.inSeconds}s | 实际已播放: ${actualElapsedTime.inSeconds}s | 预计已播放: ${_expectedAdElapsedTime.inSeconds}s';
+              '剩余: ${remaining.inSeconds}s/${_adDuration.inSeconds}s | 实际已播放: ${actualElapsedTime.inSeconds}s | 预计已播放: ${expectedElapsedTime.inSeconds}s';
+          _logger.d('⏸️ [调试] 广告状态 - 剩余: ${remaining.inSeconds}s/${_adDuration.inSeconds}s | 实际已播放: ${actualElapsedTime.inSeconds}s | 预计已播放: ${expectedElapsedTime.inSeconds}s');
         } else {
           final currentElapsed =
               DateTime.now().difference(_currentAdStartTime!);
           final totalElapsed = currentElapsed + _adElapsedTime;
           remaining = _adDuration - totalElapsed;
           timeInfo =
-              '剩余: ${remaining.inSeconds.clamp(0, _adDuration.inSeconds)}s/${_adDuration.inSeconds}s | 实际已播放: ${actualElapsedTime.inSeconds}s | 预计已播放: ${_expectedAdElapsedTime.inSeconds}s';
+              '剩余: ${remaining.inSeconds.clamp(0, _adDuration.inSeconds)}s/${_adDuration.inSeconds}s | 实际已播放: ${actualElapsedTime.inSeconds}s | 预计已播放: ${expectedElapsedTime.inSeconds}s';
+          _logger.d('▶️ [调试] 广告状态 - 剩余: ${remaining.inSeconds.clamp(0, _adDuration.inSeconds)}s/${_adDuration.inSeconds}s | 实际已播放: ${actualElapsedTime.inSeconds}s | 预计已播放: ${expectedElapsedTime.inSeconds}s');
         }
       }
 

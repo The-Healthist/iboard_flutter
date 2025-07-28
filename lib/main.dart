@@ -6,7 +6,7 @@ import 'package:iboard_app/providers/announcement_carousel_provider.dart';
 import 'package:iboard_app/providers/app_data_provider.dart';
 import 'package:iboard_app/providers/state_provider.dart'; // Added CarouselStateProvider import
 import 'package:iboard_app/providers/top_ad_carousel_provider.dart'; // Added TopAdCarouselProvider import
-import 'package:iboard_app/providers/full_advertisement_carousel_provider.dart'; // Added FullAdvertisementCarouselProvider import
+import 'package:iboard_app/providers/fullscreen_ad_provider.dart';
 import 'package:iboard_app/managers/file_manager.dart';
 import 'package:iboard_app/utils/device_id_util.dart';
 import 'package:provider/provider.dart';
@@ -69,7 +69,7 @@ void main() {
                   AnnouncementCarouselProvider()), // Add AnnouncementCarouselProvider here
           ChangeNotifierProvider(
               create: (_) =>
-                  FullAdvertisementCarouselProvider()), // Add FullAdvertisementCarouselProvider here
+                  FullscreenAdProvider()), // Add FullscreenAdProvider here
         ],
         child: MyApp(),
       ),
@@ -130,20 +130,20 @@ class _HomePageState extends State<HomePage> {
               Provider.of<AppDataProvider>(context, listen: false);
           final carouselStateProvider =
               Provider.of<CarouselStateProvider>(context, listen: false);
-          final fullAdCarouselProvider =
-              Provider.of<FullAdvertisementCarouselProvider>(context,
-                  listen: false);
           final advertisementProvider =
               Provider.of<AdvertisementProvider>(context, listen: false);
           final announcementProvider =
               Provider.of<AnnouncementProvider>(context, listen: false);
+          final fullscreenAdProvider =
+              Provider.of<FullscreenAdProvider>(context, listen: false);
 
           // 设置Provider间的关联
           appDataProvider.setCarouselStateProvider(carouselStateProvider);
+          fullscreenAdProvider.setAppDataProvider(appDataProvider);
 
           // 设置预加载回调
           carouselStateProvider.setPreloadFullscreenAdCallback(() {
-            fullAdCarouselProvider.preloadFullscreenAd();
+            // 新的Provider没有预加载方法
           });
 
           // 执行登录

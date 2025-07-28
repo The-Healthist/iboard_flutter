@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:iboard_app/providers/advertisement_provider.dart';
-import 'package:iboard_app/providers/full_advertisement_carousel_provider.dart';
-import 'package:iboard_app/providers/state_provider.dart';
+import 'package:iboard_app/providers/fullscreen_ad_provider.dart';
 import 'package:provider/provider.dart';
 
 class FullscreenAdsPage extends StatefulWidget {
@@ -18,10 +17,8 @@ class _FullscreenAdsPageState extends State<FullscreenAdsPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: Consumer3<AdvertisementProvider, FullAdvertisementCarouselProvider,
-          CarouselStateProvider>(
-        builder: (context, advertisementProvider, fullAdCarouselProvider,
-            stateProvider, child) {
+      body: Consumer2<AdvertisementProvider, FullscreenAdProvider>(
+        builder: (context, advertisementProvider, fullscreenAdProvider, child) {
           final fullAds = advertisementProvider.fullAdvertisements;
 
           // 检查是否有错误
@@ -40,11 +37,11 @@ class _FullscreenAdsPageState extends State<FullscreenAdsPage> {
           }
 
           // 确保Provider有最新的广告数据
-          fullAdCarouselProvider.updateFullscreenAds(fullAds);
+          fullscreenAdProvider.updateFullscreenAds(fullAds);
 
           // 如果Provider处于活跃状态并且有当前广告Widget，显示它
-          if (fullAdCarouselProvider.isActive) {
-            final currentAdWidget = fullAdCarouselProvider.getCurrentAdWidget();
+          if (fullscreenAdProvider.isActive) {
+            final currentAdWidget = fullscreenAdProvider.getCurrentWidget();
             if (currentAdWidget != null) {
               return Container(
                 width: double.infinity,
@@ -55,11 +52,11 @@ class _FullscreenAdsPageState extends State<FullscreenAdsPage> {
           }
 
           // 默认显示第一个广告（用于初始化时）
-          if (fullAdCarouselProvider.adWidgets.isNotEmpty) {
+          if (fullscreenAdProvider.adWidgets.isNotEmpty) {
             return Container(
               width: double.infinity,
               height: double.infinity,
-              child: fullAdCarouselProvider.adWidgets.first,
+              child: fullscreenAdProvider.adWidgets.first,
             );
           }
 

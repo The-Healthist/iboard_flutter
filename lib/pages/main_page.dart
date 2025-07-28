@@ -133,11 +133,16 @@ class _MainPageState extends State<MainPage> {
             child: Listener(
               onPointerDown: (PointerDownEvent event) {
                 // 檢測到按下後，調用用戶交互方法
-                carouselState.onUserInteraction();
-                if (kDebugMode) {
-                  print('User interaction detected');
-                  print(carouselState.getStateDescription());
-                }
+                // 使用 addPostFrameCallback 延迟执行，避免在构建过程中调用 setState()
+                WidgetsBinding.instance.addPostFrameCallback((_) {
+                  if (mounted) {
+                    carouselState.onUserInteraction();
+                    if (kDebugMode) {
+                      print('User interaction detected');
+                      print(carouselState.getStateDescription());
+                    }
+                  }
+                });
               },
               child: AnnouncementPage(),
             ),
