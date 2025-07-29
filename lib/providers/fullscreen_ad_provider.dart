@@ -78,7 +78,7 @@ class FullscreenAdProvider extends ChangeNotifier {
   Future<void> setCarouselList(List<AdModel> customOrderList) async {
     _customOrderFullscreenAds = List.from(customOrderList);
     await _saveCustomOrder();
-    _logger.i('🔄 设置自定义全屏广告轮播顺序: ${_customOrderFullscreenAds.length} 个广告');
+    // _logger.i('🔄 设置自定义全屏广告轮播顺序: ${_customOrderFullscreenAds.length} 个广告');
 
     // 重新创建广告Widget
     _createAdWidgets();
@@ -98,7 +98,7 @@ class FullscreenAdProvider extends ChangeNotifier {
           .toList();
       await prefs.setString(
           'fullscreen_ad_carousel_order', json.encode(orderData));
-      _logger.i('💾 全屏广告轮播自定义顺序已保存到缓存');
+      // _logger.i('💾 全屏广告轮播自定义顺序已保存到缓存');
     } catch (e) {
       _logger.e('保存全屏广告轮播顺序失败', error: e);
     }
@@ -111,7 +111,7 @@ class FullscreenAdProvider extends ChangeNotifier {
       final orderString = prefs.getString('fullscreen_ad_carousel_order');
       if (orderString != null) {
         final orderData = json.decode(orderString) as List;
-        _logger.i('📂 从缓存加载全屏广告轮播自定义顺序: ${orderData.length} 个配置');
+        // _logger.i('📂 从缓存加载全屏广告轮播自定义顺序: ${orderData.length} 个配置');
       }
     } catch (e) {
       _logger.e('加载全屏广告轮播顺序失败', error: e);
@@ -184,7 +184,7 @@ class FullscreenAdProvider extends ChangeNotifier {
     _adWidgets = this.fullscreenAds.asMap().entries.map((entry) {
       return _createSingleAdWidget(entry.value, entry.key);
     }).toList();
-    _logger.i('📺 创建了 ${_adWidgets.length} 个广告Widget');
+    // _logger.i('📺 创建了 ${_adWidgets.length} 个广告Widget');
   }
 
   ///8, 创建单个广告Widget
@@ -212,7 +212,7 @@ class FullscreenAdProvider extends ChangeNotifier {
           }
         }
       },
-      onVideoDisposed: () => _logger.i('🎬 全屏广告 ${ad.id} 资源已释放'),
+      // onVideoDisposed: () => _logger.i('🎬 全屏广告 ${ad.id} 资源已释放'),
     );
   }
 
@@ -257,20 +257,20 @@ class FullscreenAdProvider extends ChangeNotifier {
     // 检查当前广告的个人时间是否小于fullscreenAdDuration
     // 如果小于，说明需要在该全屏广告状态下切换，直接切换即可
     if (_adDuration.inSeconds < fullscreenAdDuration) {
-      _logger.i(
-          '📝 记录全屏广告开始时间: $_currentAdStartTime, 索引: $_currentAdIndex, 时长: ${_adDuration.inSeconds}秒, 剩余时间: ${_adDuration.inSeconds}秒');
+      // _logger.i(
+      //     '📝 记录全屏广告开始时间: $_currentAdStartTime, 索引: $_currentAdIndex, 时长: ${_adDuration.inSeconds}秒, 剩余时间: ${_adDuration.inSeconds}秒');
       _fullscreenTimer = Timer(Duration(seconds: _adDuration.inSeconds), () {
         if (_isActive && !_isPaused) {
-          _logger.d('⏭️ 全屏广告计时器到期，切换到下一个');
+          // _logger.d('⏭️ 全屏广告计时器到期，切换到下一个');
           _nextAd();
         }
       });
     } else {
       // 如果等于或大于fullscreenAdDuration，则设置定时器为fullscreenAdDuration时长
-      _logger.i('📝 广告时长大于等于设置的播放时间，将按照设置时间播放: ${fullscreenAdDuration}秒');
+      // _logger.i('📝 广告时长大于等于设置的播放时间，将按照设置时间播放: ${fullscreenAdDuration}秒');
       _fullscreenTimer = Timer(Duration(seconds: fullscreenAdDuration), () {
         if (_isActive && !_isPaused) {
-          _logger.d('⏭️ 全屏广告计时器到期，切换到下一个');
+          // _logger.d('⏭️ 全屏广告计时器到期，切换到下一个');
           _nextAd();
         }
       });
@@ -295,7 +295,7 @@ class FullscreenAdProvider extends ChangeNotifier {
 
   ///12, 暂停轮播
   void pauseCarousel() {
-    _logger.i('🛑 暂停全屏广告轮播');
+    // _logger.i('🛑 暂停全屏广告轮播');
 
     // 记录当前播放时间
     _currentAdPauseTime = DateTime.now();
@@ -331,7 +331,7 @@ class FullscreenAdProvider extends ChangeNotifier {
 
   ///13, 恢复轮播
   void resumeCarousel() {
-    _logger.i('▶️ 恢复全屏广告轮播');
+    // _logger.i('▶️ 恢复全屏广告轮播');
 
     _isPaused = false;
 
@@ -377,7 +377,7 @@ class FullscreenAdProvider extends ChangeNotifier {
       } else {
         _fullscreenTimer = Timer(remainingTime, () {
           if (_isActive && !_isPaused) {
-            _logger.i('⏰ [定时] 全屏广告时间到，切换到下一个');
+            // _logger.i('⏰ [定时] 全屏广告时间到，切换到下一个');
             _nextAd();
           }
         });
@@ -456,7 +456,7 @@ class FullscreenAdProvider extends ChangeNotifier {
 
   ///17, 暂停所有计时器（用于设置页面）
   void pauseAllTimersForSettings() {
-    _logger.i('⚙️ 全屏广告 - 暂停所有计时器（设置页面）');
+    // _logger.i('⚙️ 全屏广告 - 暂停所有计时器（设置页面）');
     _fullscreenTimer?.cancel();
     _debugTimer?.cancel();
     _isPaused = true;
@@ -465,7 +465,7 @@ class FullscreenAdProvider extends ChangeNotifier {
 
   ///18, 从设置页面恢复所有计时器
   void resumeAllTimersFromSettings() {
-    _logger.i('↩️ 全屏广告 - 从设置页面恢复所有计时器');
+    // _logger.i('↩️ 全屏广告 - 从设置页面恢复所有计时器');
     _isPaused = false;
 
     // 如果处于活跃状态，恢复轮播

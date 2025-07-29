@@ -12,8 +12,9 @@ import 'package:iboard_app/providers/app_data_provider.dart';
 import 'package:iboard_app/providers/state_provider.dart';
 import 'package:iboard_app/providers/top_ad_carousel_provider.dart';
 import 'package:iboard_app/providers/fullscreen_ad_provider.dart';
+import 'package:iboard_app/providers/bottom_weather_qrcode_carousel_provider.dart';
 import 'package:iboard_app/widgets/carousel_widget.dart' as custom_carousel;
-import 'package:iboard_app/widgets/mainscreen/bottom_display/weather_widget.dart';
+import 'package:iboard_app/widgets/mainscreen/bottom_display/bottom_display_widget.dart';
 import 'package:iboard_app/pages/settings_page.dart';
 import 'package:logger/logger.dart';
 import 'package:provider/provider.dart';
@@ -52,30 +53,35 @@ class _AnnouncementPageState extends State<AnnouncementPage> {
       final topAdProvider = context.read<TopAdCarouselProvider>();
       final announcementCarouselProvider =
           context.read<AnnouncementCarouselProvider>();
+      final bottomProvider =
+          context.read<BottomWeatherQrcodeCarouselProvider>();
 
       switch (appState) {
         case AppState.defaultState:
           // 默认状态：所有轮播都正常播放
           topAdProvider.updateCarouselPauseState(false);
           announcementCarouselProvider.updateCarouselPauseState(false);
+          bottomProvider.updateCarouselPauseState(false);
           _isBottomCarouselPaused = false;
           break;
         case AppState.fullscreenAd:
           // 全屏广告状态：所有轮播都暂停
           topAdProvider.updateCarouselPauseState(true);
           announcementCarouselProvider.updateCarouselPauseState(true);
+          bottomProvider.updateCarouselPauseState(true);
           _isBottomCarouselPaused = true;
           break;
         case AppState.manualOperation:
           // 手动操作状态：顶部和底部继续，中部暂停
           topAdProvider.updateCarouselPauseState(false);
           announcementCarouselProvider.updateCarouselPauseState(true);
+          bottomProvider.updateCarouselPauseState(false);
           _isBottomCarouselPaused = false;
           break;
       }
 
       _logger.i(
-          '🎛️ 轮播状态更新[${appState.name}]: Top=${!topAdProvider.isTopCarouselPaused ? "运行" : "暂停"}, Mid=${!announcementCarouselProvider.isMidCarouselPaused ? "运行" : "暂停"}, Bottom=${!_isBottomCarouselPaused ? "运行" : "暂停"}');
+          '🎛️ 轮播状态更新[${appState.name}]: Top=${!topAdProvider.isTopCarouselPaused ? "运行" : "暂停"}, Mid=${!announcementCarouselProvider.isMidCarouselPaused ? "运行" : "暂停"}, Bottom=${!bottomProvider.isBottomCarouselPaused ? "运行" : "暂停"}');
     });
   }
 
@@ -199,12 +205,16 @@ class _AnnouncementPageState extends State<AnnouncementPage> {
     final announcementCarouselProvider =
         context.read<AnnouncementCarouselProvider>();
     final fullAdCarouselProvider = context.read<FullscreenAdProvider>();
+    final bottomProvider = context.read<BottomWeatherQrcodeCarouselProvider>();
 
     // 暂停顶部广告计时器
     topAdProvider.pauseAllTimersForSettings();
 
     // 暂停通告轮播计时器
     announcementCarouselProvider.pauseAllTimersForSettings();
+
+    // 暂停底部天气二维码轮播计时器
+    bottomProvider.pauseAllTimersForSettings();
 
     // 暂停全屏广告轮播（如果活跃状态）
     if (fullAdCarouselProvider.isActive) {
@@ -238,6 +248,7 @@ class _AnnouncementPageState extends State<AnnouncementPage> {
     final announcementCarouselProvider =
         context.read<AnnouncementCarouselProvider>();
     final fullAdCarouselProvider = context.read<FullscreenAdProvider>();
+    final bottomProvider = context.read<BottomWeatherQrcodeCarouselProvider>();
 
     // 恢复默认状态
     final carouselStateProvider = context.read<CarouselStateProvider>();
@@ -250,6 +261,9 @@ class _AnnouncementPageState extends State<AnnouncementPage> {
     final apiNoticeStayDuration = carouselStateProvider.noticeStayDuration;
     announcementCarouselProvider
         .resumeAllTimersFromSettings(apiNoticeStayDuration);
+
+    // 恢复底部天气二维码轮播
+    bottomProvider.resumeAllTimersFromSettings();
 
     // 恢复全屏广告轮播（如果之前处于活跃状态）
     if (fullAdCarouselProvider.isActive && fullAdCarouselProvider.isPaused) {
@@ -266,17 +280,6 @@ class _AnnouncementPageState extends State<AnnouncementPage> {
     // 重新启动调试定时器和监控定时器
     _startDebugTimer();
     _startCarouselWatchdog();
-
-    // 恢复底部轮播
-    if (_bottomCarouselController.widgetCount > 1) {
-      _bottomTimer = Timer.periodic(const Duration(seconds: 10), (timer) {
-        if (mounted &&
-            _bottomCarouselController.widgetCount > 1 &&
-            !_isBottomCarouselPaused) {
-          _bottomCarouselController.playNext();
-        }
-      });
-    }
 
     _logger.i('↩️ 设置页面返回 - 所有轮播已恢复');
   }
@@ -425,19 +428,10 @@ class _AnnouncementPageState extends State<AnnouncementPage> {
 
   ///10，初始化底部轮播
   void _initializeBottomWidgets() {
-    final sampleWidgets = [const WeatherWidget()];
-    _bottomCarouselController.setCarouselArray(sampleWidgets);
-
-    _bottomTimer?.cancel();
-    if (sampleWidgets.length > 1 && !_isBottomCarouselPaused) {
-      _bottomTimer = Timer.periodic(const Duration(seconds: 10), (timer) {
-        if (mounted &&
-            _bottomCarouselController.widgetCount > 1 &&
-            !_isBottomCarouselPaused) {
-          _bottomCarouselController.playNext();
-        }
-      });
-    }
+    // 底部轮播现在由BottomWeatherQrcodeCarouselProvider管理
+    final bottomProvider = context.read<BottomWeatherQrcodeCarouselProvider>();
+    bottomProvider.initializeBottomCarousel();
+    _logger.i('🌤️ [初始化] 底部天气二维码轮播初始化完成');
   }
 
   ///12，处理设备ID点击事件
@@ -506,7 +500,7 @@ class _AnnouncementPageState extends State<AnnouncementPage> {
         if (!mounted) return;
 
         if (currentAppState == AppState.fullscreenAd) {
-          _logger.i('📺 进入全屏广告状态');
+          // _logger.i('📺 进入全屏广告状态');
           _pauseAllCarousels();
         } else if (currentAppState == AppState.manualOperation) {
           _logger.i('🖱️ 进入手动操作状态');
@@ -537,7 +531,7 @@ class _AnnouncementPageState extends State<AnnouncementPage> {
             _initializeMidWidgets();
             _previousAnnouncementsForBuild =
                 List.from(currentCarouselAnnouncements); // 更新存储的轮播通告列表
-            _logger.i('通告轮播更新成功: ${currentCarouselAnnouncements.length} 个通告');
+            // _logger.i('通告轮播更新成功: ${currentCarouselAnnouncements.length} 个通告');
           } catch (e) {
             _logger.e('初始化中部轮播失败，保持现有状态', error: e);
             // 不更新 _previousAnnouncementsForBuild，保持现有状态
@@ -571,7 +565,7 @@ class _AnnouncementPageState extends State<AnnouncementPage> {
             // 新的Provider不需要设置AppDataProvider引用
             final fullAds = advertisementProvider.fullAdvertisements;
             fullAdCarouselProvider.updateFullscreenAds(fullAds);
-            _logger.i('全屏广告数据已更新: ${fullAds.length} 个全屏广告');
+            // _logger.i('全屏广告数据已更新: ${fullAds.length} 个全屏广告');
 
             _previousAdvertisementsForBuild =
                 List.from(currentAdvertisements); // Update the stored list
@@ -639,22 +633,12 @@ class _AnnouncementPageState extends State<AnnouncementPage> {
                     },
                   )),
             ),
-            // 底部區域 - 4/24 比例 (缩小了天气显示区域)
+            // 底部區域 - 4/24 比例 (天气和二维码轮播区域)
             Expanded(
               flex: 4,
               child: Container(
                 width: double.infinity,
-                child: custom_carousel.CarouselWidget(
-                  controller: _bottomCarouselController,
-                  autoPlayDuration: const Duration(seconds: 10),
-                  showIndicators: false,
-                  allowManualSwipe: false,
-                  onPageChanged: (index) {
-                    // setState(() {
-                    //   _bottomCurrentIndex = index;
-                    // });
-                  },
-                ),
+                child: const BottomDisplayWidget(),
               ),
             ),
             // 设备ID显示区域 - 1/24 比例

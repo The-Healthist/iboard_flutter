@@ -13,7 +13,14 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:provider/provider.dart'; // 添加Provider导入
 
 class WeatherWidget extends StatefulWidget {
-  const WeatherWidget({Key? key}) : super(key: key);
+  final bool showOnlyLeft;
+  final bool showOnlyRight;
+
+  const WeatherWidget({
+    Key? key,
+    this.showOnlyLeft = false,
+    this.showOnlyRight = false,
+  }) : super(key: key);
 
   @override
   _WeatherWidgetState createState() => _WeatherWidgetState();
@@ -452,232 +459,194 @@ class _WeatherWidgetState extends State<WeatherWidget> {
     ); // Column结束 - _buildForecastSection函数的返回值
   } // _buildForecastSection函数结束
 
+  // 构建左侧当前天气部分
+  Widget buildCurrentWeatherPart() {
+    return FutureBuilder<CurrentWeatherDataModel?>(
+      future: _currentWeatherDataFuture,
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting &&
+            _forecastDataFuture != null) {
+          return Container(
+            margin: const EdgeInsets.only(right: 8.0),
+            decoration: BoxDecoration(
+                color: Colors.lightBlue[50],
+                borderRadius: BorderRadius.circular(10.0),
+                border: Border.all(color: Colors.lightBlue.shade200, width: 1)),
+            child: const Center(
+                child: CircularProgressIndicator(strokeWidth: 2.0)),
+          );
+        }
+
+        if (snapshot.hasError || !snapshot.hasData || snapshot.data == null) {
+          _logger.d('Current weather data unavailable', error: snapshot.error);
+          return Container(
+            margin: const EdgeInsets.only(right: 8.0),
+            padding: const EdgeInsets.only(left: 8.0, right: 8.0, bottom: 8.0),
+            decoration: BoxDecoration(
+                color: Colors.lightBlue[50],
+                borderRadius: BorderRadius.circular(10.0),
+                border: Border.all(color: Colors.lightBlue.shade200, width: 1)),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                Padding(
+                  padding:
+                      const EdgeInsets.only(left: 4.0, top: 0, bottom: 4.0),
+                  child: Text(
+                    DateFormat('yyyy-MM-dd (EEEE)', 'zh_HK')
+                        .format(_currentTime),
+                    style: TextStyle(fontSize: 10, color: Colors.blueGrey[600]),
+                    textAlign: TextAlign.left,
+                  ),
+                ),
+                Expanded(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                    crossAxisAlignment: CrossAxisAlignment.center,
+                    children: [
+                      FutureBuilder<WeatherWarningModel?>(
+                        future: _weatherWarningFuture,
+                        builder: (context, warningSnapshot) {
+                          if (warningSnapshot.hasData &&
+                              warningSnapshot.data != null &&
+                              warningSnapshot.data!.warnings.isNotEmpty) {
+                            final warnings = warningSnapshot.data!
+                                .getActiveWarningDescriptions();
+                            final warningText =
+                                warnings.isNotEmpty ? warnings.first : '';
+                            return Text(
+                              warningText,
+                              style: TextStyle(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.red[600]),
+                              textAlign: TextAlign.center,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            );
+                          }
+                          return const SizedBox.shrink();
+                        },
+                      ),
+                      Text(
+                        '天氣資料獲取中',
+                        style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.blueGrey[800]),
+                        textAlign: TextAlign.center,
+                      ),
+                      const Icon(Icons.cloud_off, size: 50, color: Colors.grey),
+                      Text(
+                        '--°C',
+                        style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.blue[800]),
+                      ),
+                      IconButton(
+                        icon: const Icon(Icons.refresh, size: 12),
+                        onPressed: _fetchWeatherData,
+                        tooltip: '重試',
+                        splashRadius: 10,
+                        padding: EdgeInsets.zero,
+                        constraints:
+                            const BoxConstraints(minWidth: 22, minHeight: 22),
+                      )
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          );
+        }
+        return _buildCurrentWeatherSection(snapshot.data!);
+      },
+    );
+  }
+
+  // 构建右侧天气预报部分
+  Widget buildForecastPart() {
+    return FutureBuilder<WeatherData?>(
+      future: _forecastDataFuture,
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Center(child: CircularProgressIndicator());
+        }
+        if (snapshot.hasError || !snapshot.hasData || snapshot.data == null) {
+          _logger.d('Forecast weather data unavailable', error: snapshot.error);
+          return Container(
+            margin: const EdgeInsets.all(4.0),
+            decoration: BoxDecoration(
+              color: Colors.grey[100],
+              borderRadius: BorderRadius.circular(8.0),
+              border: Border.all(color: Colors.grey.shade300, width: 1),
+            ),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const Icon(Icons.cloud_off, size: 40, color: Colors.grey),
+                const SizedBox(height: 8),
+                const Text('天氣預報暫時無法取得',
+                    style: TextStyle(fontSize: 12, color: Colors.grey)),
+                const SizedBox(height: 8),
+                ElevatedButton.icon(
+                  onPressed: _fetchWeatherData,
+                  icon: const Icon(Icons.refresh, size: 16),
+                  label: const Text('重試', style: TextStyle(fontSize: 12)),
+                  style: ElevatedButton.styleFrom(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+                    minimumSize: const Size(0, 32),
+                  ),
+                )
+              ],
+            ),
+          );
+        }
+        return _buildForecastSection(snapshot.data!);
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
-    // 主容器 - 整个天气组件的最外层容器
+    // 如果只显示左侧部分
+    if (widget.showOnlyLeft) {
+      return Container(
+        padding: const EdgeInsets.fromLTRB(8.0, 0, 8.0, 6.0),
+        height: 145,
+        child: buildCurrentWeatherPart(),
+      );
+    }
+
+    // 如果只显示右侧部分
+    if (widget.showOnlyRight) {
+      return Container(
+        padding: const EdgeInsets.fromLTRB(8.0, 0, 8.0, 6.0),
+        height: 145,
+        child: buildForecastPart(),
+      );
+    }
+
+    // 默认显示完整的天气组件
     return Container(
-      // 设置内边距：左8，上8，右8，下6像素
-      padding: const EdgeInsets.fromLTRB(8.0, 0, 8.0, 6.0), // 减少底部内边距以节省空间
-      height: 145, // 固定高度145像素，防止布局溢出
-      // 使用Row布局 - 水平排列当前天气和预报天气两个部分
+      padding: const EdgeInsets.fromLTRB(8.0, 0, 8.0, 6.0),
+      height: 145,
       child: Row(
         children: [
-          // 左侧部分：当前天气显示区域 - 使用Expanded使其与右侧预报区域高度一致
+          // 左侧部分：当前天气显示区域
           Expanded(
             flex: 2,
-            child: FutureBuilder<CurrentWeatherDataModel?>(
-              future: _currentWeatherDataFuture, // 异步获取当前天气数据的Future
-              builder: (context, snapshot) {
-                // 数据加载中状态 - 显示加载指示器
-                if (snapshot.connectionState == ConnectionState.waiting &&
-                    _forecastDataFuture != null) {
-                  return Container(
-                    margin:
-                        const EdgeInsets.only(right: 8.0), // 右外边距8像素，与预报区域分隔
-                    decoration: BoxDecoration(
-                        color: Colors.lightBlue[50], // 浅蓝色背景
-                        borderRadius: BorderRadius.circular(10.0), // 圆角10像素
-                        border: Border.all(
-                            color: Colors.lightBlue.shade200,
-                            width: 1)), // 浅蓝色边框，宽度1像素
-                    child: const Center(
-                        child: CircularProgressIndicator(
-                      strokeWidth: 2.0, // 加载圆圈的线条粗细
-                    )),
-                  );
-                }
-
-                // 数据获取失败或无数据状态 - 显示错误占位界面
-                if (snapshot.hasError ||
-                    !snapshot.hasData ||
-                    snapshot.data == null) {
-                  // 记录调试日志，降低级别避免正常网络问题时的错误显示
-                  _logger.d('Current weather data unavailable',
-                      error: snapshot.error);
-                  // 错误状态的占位容器 - 充满整个Expanded高度
-                  return Container(
-                    margin:
-                        const EdgeInsets.only(right: 8.0), // 右外边距8像素，与预报区域分隔
-                    padding: const EdgeInsets.only(
-                        left: 8.0,
-                        right: 8.0,
-                        bottom: 8.0), // 移除顶部内边距，让日期文本贴顶显示
-                    decoration: BoxDecoration(
-                        color: Colors.lightBlue[50], // 浅蓝色背景
-                        borderRadius: BorderRadius.circular(10.0), // 圆角10像素
-                        border: Border.all(
-                            color: Colors.lightBlue.shade200,
-                            width: 1)), // 浅蓝色边框，宽度1像素
-                    // 使用Column垂直布局排列错误状态的各个元素，充满整个容器高度
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.center, // 水平居中对齐
-                      children: [
-                        // 日期显示文本 - 与右侧预报标题对齐
-                        Padding(
-                          padding: const EdgeInsets.only(
-                              left: 4.0,
-                              top: 0,
-                              bottom: 4.0), // 左边距4像素，上边距2像素，下边距4像素，与右侧对齐
-                          child: Text(
-                            DateFormat('yyyy-MM-dd (EEEE)', 'zh_HK')
-                                .format(_currentTime), // 格式化显示当前日期和星期
-                            style: TextStyle(
-                                fontSize: 10, // 字体大小10像素（精简以节省空间）
-                                color: Colors.blueGrey[600]), // 蓝灰色文字
-                            textAlign: TextAlign.left, // 文本左对齐，与右侧预报标题一致
-                          ),
-                        ),
-                        // 使用Expanded填充剩余空间
-                        Expanded(
-                          child: Column(
-                            mainAxisAlignment:
-                                MainAxisAlignment.spaceEvenly, // 垂直空间均匀分布
-                            crossAxisAlignment:
-                                CrossAxisAlignment.center, // 水平居中对齐
-                            children: [
-                              // 天气警告区域 - 在错误状态下也显示警告信息
-                              FutureBuilder<WeatherWarningModel?>(
-                                future: _weatherWarningFuture, // 异步获取天气警告数据
-                                builder: (context, warningSnapshot) {
-                                  // 检查是否有警告数据且警告列表不为空
-                                  if (warningSnapshot.hasData &&
-                                      warningSnapshot.data != null &&
-                                      warningSnapshot
-                                          .data!.warnings.isNotEmpty) {
-                                    // 获取活跃的警告描述
-                                    final warnings = warningSnapshot.data!
-                                        .getActiveWarningDescriptions();
-                                    final warningText = warnings.isNotEmpty
-                                        ? warnings.first
-                                        : '';
-                                    // 显示警告文本
-                                    return Text(
-                                      warningText, // 显示警告内容
-                                      style: TextStyle(
-                                          fontSize: 11, // 字体大小11像素
-                                          fontWeight: FontWeight.bold, // 粗体字
-                                          color: Colors.red[600]), // 红色警告文字
-                                      textAlign: TextAlign.center, // 文本居中对齐
-                                      maxLines: 1, // 只显示1行
-                                      overflow:
-                                          TextOverflow.ellipsis, // 超出部分显示省略号
-                                    );
-                                  }
-                                  return const SizedBox.shrink(); // 没有警告时不占用空间
-                                },
-                              ),
-                              // 错误状态提示文本
-                              Text(
-                                '天氣資料獲取中', // 显示"正在获取天气数据"的提示
-                                style: TextStyle(
-                                    fontSize: 12, // 字体大小12像素
-                                    fontWeight: FontWeight.bold, // 粗体字
-                                    color: Colors.blueGrey[800]), // 更深的蓝灰色文字
-                                textAlign: TextAlign.center, // 文本居中对齐
-                              ),
-                              // 错误状态图标
-                              const Icon(Icons.cloud_off,
-                                  size: 50,
-                                  color: Colors.grey), // 云朵关闭图标，大小50像素，灰色
-                              // 默认温度显示
-                              Text(
-                                '--°C', // 显示默认温度占位符
-                                style: TextStyle(
-                                    fontSize: 16, // 字体大小16像素
-                                    fontWeight: FontWeight.bold, // 粗体字
-                                    color: Colors.blue[800]), // 深蓝色文字
-                              ),
-                              // 刷新按钮
-                              IconButton(
-                                icon: const Icon(Icons.refresh,
-                                    size: 12), // 刷新图标，大小12像素
-                                onPressed: _fetchWeatherData, // 点击时执行获取天气数据的函数
-                                tooltip: '重試', // 鼠标悬停时显示的提示文字
-                                splashRadius: 10, // 点击水波效果的半径10像素
-                                padding: EdgeInsets.zero, // 移除按钮内边距
-                                constraints: const BoxConstraints(
-                                    minWidth: 22,
-                                    minHeight: 22), // 限制按钮最小尺寸22x22像素
-                              )
-                            ],
-                          ),
-                        ),
-                      ],
-                    ),
-                  );
-                }
-                // 数据获取成功时，调用构建当前天气显示区域的函数
-                return _buildCurrentWeatherSection(snapshot.data!);
-              }, // FutureBuilder的builder结束
-            ), // FutureBuilder结束
-          ), // Expanded结束
-          // 右侧部分：天气预报区域 - 使用Expanded占满Row的剩余空间
-          Expanded(
-            flex: 6, // 右侧占用3份空间（约60%宽度）
-            child: FutureBuilder<WeatherData?>(
-              future: _forecastDataFuture, // 异步获取天气预报数据的Future
-              builder: (context, snapshot) {
-                // 数据加载中状态 - 显示加载指示器
-                if (snapshot.connectionState == ConnectionState.waiting) {
-                  return const Center(
-                      child: CircularProgressIndicator()); // 居中显示加载圆圈
-                }
-                // 数据获取失败或无数据状态 - 显示错误占位界面
-                if (snapshot.hasError ||
-                    !snapshot.hasData ||
-                    snapshot.data == null) {
-                  // 记录调试日志，降低级别避免正常网络问题时的错误显示
-                  _logger.d('Forecast weather data unavailable',
-                      error: snapshot.error);
-                  // 预报区域的错误状态容器
-                  return Container(
-                    margin: const EdgeInsets.all(4.0), // 外边距4像素
-                    // 容器装饰 - 设置背景色、圆角、边框
-                    decoration: BoxDecoration(
-                      color: Colors.grey[100], // 浅灰色背景
-                      borderRadius: BorderRadius.circular(8.0), // 圆角8像素
-                      border: Border.all(
-                          color: Colors.grey.shade300, width: 1), // 灰色边框，宽度1像素
-                    ),
-                    // 使用Column垂直布局排列错误状态的各个元素
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center, // 垂直居中对齐
-                      children: [
-                        // 错误状态图标
-                        const Icon(Icons.cloud_off,
-                            size: 40, color: Colors.grey), // 云朵关闭图标，大小40像素，灰色
-                        const SizedBox(height: 8), // 垂直间距8像素
-                        // 错误提示文本
-                        const Text('天氣預報暫時無法取得', // 显示"天气预报暂时无法获取"
-                            style: TextStyle(
-                                fontSize: 12, color: Colors.grey)), // 字体12像素，灰色
-                        const SizedBox(height: 8), // 垂直间距8像素
-                        // 重试按钮
-                        ElevatedButton.icon(
-                          onPressed: _fetchWeatherData, // 点击时执行获取天气数据的函数
-                          icon: const Icon(Icons.refresh,
-                              size: 16), // 刷新图标，大小16像素
-                          label: const Text('重試',
-                              style:
-                                  TextStyle(fontSize: 12)), // 按钮文字"重试"，字体12像素
-                          style: ElevatedButton.styleFrom(
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 16,
-                                vertical: 4), // 按钮内边距：水平16像素，垂直4像素
-                            minimumSize: const Size(0, 32), // 按钮最小尺寸：高度32像素
-                          ),
-                        )
-                      ],
-                    ),
-                  );
-                }
-                // 数据获取成功时，调用构建天气预报显示区域的函数
-                return _buildForecastSection(snapshot.data!);
-              },
-            ),
+            child: buildCurrentWeatherPart(),
           ),
-        ], // Row的children结束
-      ), // Row结束
-    ); // Container结束
-  } // build方法结束
+          // 右侧部分：天气预报区域
+          Expanded(
+            flex: 6,
+            child: buildForecastPart(),
+          ),
+        ],
+      ),
+    );
+  }
 }

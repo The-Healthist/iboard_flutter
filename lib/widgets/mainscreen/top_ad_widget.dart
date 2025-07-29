@@ -115,7 +115,7 @@ class _TopAdWidgetState extends State<TopAdWidget> {
         _videoController!.value.isPlaying) {
       _videoController!.pause();
       _isManuallyPaused = true;
-      _logger.i('📱 手动暂停顶部广告视频播放 - ${widget.ad.title}');
+      // _logger.i('📱 手动暂停顶部广告视频播放 - ${widget.ad.title}');
     } else {
       _logger.i('📱 视频不需要暂停或已经暂停 - 状态: ${_videoController?.value.isPlaying}');
     }
@@ -129,7 +129,7 @@ class _TopAdWidgetState extends State<TopAdWidget> {
         _isManuallyPaused) {
       _videoController!.play();
       _isManuallyPaused = false;
-      _logger.i('📱 手动恢复顶部广告视频播放 - ${widget.ad.title}');
+      // _logger.i('📱 手动恢复顶部广告视频播放 - ${widget.ad.title}');
     } else {
       _logger.i(
           '📱 视频不需要恢复或已经播放 - 状态: ${_videoController?.value.isPlaying}, 手动暂停: $_isManuallyPaused');
@@ -153,12 +153,12 @@ class _TopAdWidgetState extends State<TopAdWidget> {
     if (_videoController != null && _videoController!.value.isInitialized) {
       if (isMediaPaused && _videoController!.value.isPlaying) {
         _videoController!.pause();
-        _logger.d('暂停顶部广告视频播放');
+        // _logger.d('暂停顶部广告视频播放');
       } else if (!isMediaPaused &&
           !_videoController!.value.isPlaying &&
           !_isManuallyPaused) {
         _videoController!.play();
-        _logger.d('恢复顶部广告视频播放');
+        // _logger.d('恢复顶部广告视频播放');
       }
     }
 

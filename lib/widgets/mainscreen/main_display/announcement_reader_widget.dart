@@ -166,10 +166,10 @@ class AnnouncementReaderWidgetState extends State<AnnouncementReaderWidget> {
     if (_videoController != null && _videoController!.value.isInitialized) {
       if (isMediaPaused && _videoController!.value.isPlaying) {
         _videoController!.pause();
-        _logger.d('暂停通告视频播放');
+        // _logger.d('暂停通告视频播放');
       } else if (!isMediaPaused && !_videoController!.value.isPlaying) {
         _videoController!.play();
-        _logger.d('恢复通告视频播放');
+        // _logger.d('恢复通告视频播放');
       }
     }
 

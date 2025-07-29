@@ -19,6 +19,12 @@ class AppDataProvider extends ChangeNotifier {
   bool _isLoading = false;
   String? _error;
 
+  // 二维码缓存相关
+  String? _cachedComplaintQrCode;
+  String? _cachedRegistrationQrCode;
+  static const String _complaintQrCodeKey = 'complaint_qr_code';
+  static const String _registrationQrCodeKey = 'registration_qr_code';
+
   // Getters
   SettingsModel? get settingsModel => _settingsModel;
   ArrearProvider? get arrearProvider =>
@@ -31,6 +37,10 @@ class AppDataProvider extends ChangeNotifier {
   ApiClient get apiClient => _apiClient;
   String? get deviceId => _deviceId;
   bool get isLoggedIn => _settingsModel != null && token != null;
+
+  // 二维码相关getters
+  String? get cachedComplaintQrCode => _cachedComplaintQrCode;
+  String? get cachedRegistrationQrCode => _cachedRegistrationQrCode;
 
   static const String _deviceIdKey = 'deviceId';
 
@@ -134,6 +144,8 @@ class AppDataProvider extends ChangeNotifier {
         final buildingIsmartId = _settingsModel!.building.ismartId;
         if (buildingIsmartId.isNotEmpty) {
           setBuildingIdToArrearProvider(buildingIsmartId);
+          // 初始化二维码
+          await initializeQrCodes();
         } else {
           _logger.w('楼宇ID为空，无法设置楼宇ID');
         }
@@ -177,6 +189,8 @@ class AppDataProvider extends ChangeNotifier {
           final building = _settingsModel?.building;
           if (building?.ismartId != null) {
             setBuildingIdToArrearProvider(building!.ismartId);
+            // 初始化二维码
+            await initializeQrCodes();
           } else {
             _logger.w('楼宇信息不完整，无法设置楼宇ID');
           }
@@ -373,6 +387,143 @@ class AppDataProvider extends ChangeNotifier {
       } else {
         _logger.w('AppDataProvider: ArrearProvider已被销毁，无法初始化欠费数据');
       }
+    }
+  }
+
+  ///1，生成意见投诉二维码
+  Future<String?> generateComplaintQrCode() async {
+    if (_cachedComplaintQrCode != null) {
+      _logger.i('📱 使用缓存的意见投诉二维码');
+      return _cachedComplaintQrCode;
+    }
+
+    final ismartId = _settingsModel?.building.ismartId;
+    if (ismartId == null || ismartId.isEmpty) {
+      _logger.w('⚠️ 无法生成意见投诉二维码：ismartId为空');
+      return null;
+    }
+
+    try {
+      final qrCodeUrl =
+          'https://api.qrserver.com/v1/create-qr-code/?size=112x112&data=https://ismart.legend-in.com.hk/blg_cs_public/$ismartId';
+      _cachedComplaintQrCode = qrCodeUrl;
+
+      // 保存到缓存
+      await _saveQrCodeToCache(_complaintQrCodeKey, qrCodeUrl);
+
+      _logger.i('✅ 意见投诉二维码生成成功并缓存');
+      return qrCodeUrl;
+    } catch (e) {
+      _logger.e('❌ 生成意见投诉二维码失败', error: e);
+      return null;
+    }
+  }
+
+  ///2，生成住户登记二维码
+  Future<String?> generateRegistrationQrCode() async {
+    if (_cachedRegistrationQrCode != null) {
+      _logger.i('📱 使用缓存的住户登记二维码');
+      return _cachedRegistrationQrCode;
+    }
+
+    final ismartId = _settingsModel?.building.ismartId;
+    if (ismartId == null || ismartId.isEmpty) {
+      _logger.w('⚠️ 无法生成住户登记二维码：ismartId为空');
+      return null;
+    }
+
+    try {
+      final qrCodeUrl =
+          'https://api.qrserver.com/v1/create-qr-code/?size=112x112&data=https://ismart.legend-in.com.hk/regform/$ismartId';
+      _cachedRegistrationQrCode = qrCodeUrl;
+
+      // 保存到缓存
+      await _saveQrCodeToCache(_registrationQrCodeKey, qrCodeUrl);
+
+      _logger.i('✅ 住户登记二维码生成成功并缓存');
+      return qrCodeUrl;
+    } catch (e) {
+      _logger.e('❌ 生成住户登记二维码失败', error: e);
+      return null;
+    }
+  }
+
+  ///3，保存二维码到缓存
+  Future<void> _saveQrCodeToCache(String key, String qrCodeUrl) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(key, qrCodeUrl);
+      _logger.d('💾 二维码已保存到缓存: $key');
+    } catch (e) {
+      _logger.e('❌ 保存二维码到缓存失败', error: e);
+    }
+  }
+
+  ///4，从缓存加载二维码
+  Future<void> _loadQrCodesFromCache() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      _cachedComplaintQrCode = prefs.getString(_complaintQrCodeKey);
+      _cachedRegistrationQrCode = prefs.getString(_registrationQrCodeKey);
+
+      if (_cachedComplaintQrCode != null) {
+        _logger.i('📂 从缓存加载意见投诉二维码');
+      }
+      if (_cachedRegistrationQrCode != null) {
+        _logger.i('📂 从缓存加载住户登记二维码');
+      }
+    } catch (e) {
+      _logger.e('❌ 从缓存加载二维码失败', error: e);
+    }
+  }
+
+  ///5，初始化二维码（在获得ismartId后调用）
+  Future<void> initializeQrCodes() async {
+    _logger.i('🚀 开始初始化二维码');
+
+    // 先从缓存加载
+    await _loadQrCodesFromCache();
+
+    // 如果缓存中没有或ismartId发生变化，重新生成
+    final ismartId = _settingsModel?.building.ismartId;
+    if (ismartId != null && ismartId.isNotEmpty) {
+      // 检查缓存的二维码是否包含当前的ismartId
+      bool needRegenerateComplaint = _cachedComplaintQrCode == null ||
+          !_cachedComplaintQrCode!.contains(ismartId);
+      bool needRegenerateRegistration = _cachedRegistrationQrCode == null ||
+          !_cachedRegistrationQrCode!.contains(ismartId);
+
+      if (needRegenerateComplaint) {
+        _cachedComplaintQrCode = null; // 清除旧缓存
+        await generateComplaintQrCode();
+      }
+
+      if (needRegenerateRegistration) {
+        _cachedRegistrationQrCode = null; // 清除旧缓存
+        await generateRegistrationQrCode();
+      }
+
+      _logger.i('✅ 二维码初始化完成');
+      notifyListeners();
+    } else {
+      _logger.w('⚠️ ismartId为空，无法初始化二维码');
+    }
+  }
+
+  ///6，清除二维码缓存
+  Future<void> clearQrCodeCache() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.remove(_complaintQrCodeKey);
+      await prefs.remove(_registrationQrCodeKey);
+
+      _cachedComplaintQrCode = null;
+      _cachedRegistrationQrCode = null;
+
+      _logger.i('🗑️ 二维码缓存已清除');
+      notifyListeners();
+    } catch (e) {
+      _logger.e('❌ 清除二维码缓存失败', error: e);
     }
   }
 }

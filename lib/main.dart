@@ -7,6 +7,7 @@ import 'package:iboard_app/providers/app_data_provider.dart';
 import 'package:iboard_app/providers/state_provider.dart'; // Added CarouselStateProvider import
 import 'package:iboard_app/providers/top_ad_carousel_provider.dart'; // Added TopAdCarouselProvider import
 import 'package:iboard_app/providers/fullscreen_ad_provider.dart';
+import 'package:iboard_app/providers/bottom_weather_qrcode_carousel_provider.dart';
 import 'package:iboard_app/managers/file_manager.dart';
 import 'package:iboard_app/utils/device_id_util.dart';
 import 'package:provider/provider.dart';
@@ -72,6 +73,9 @@ void main() {
           ChangeNotifierProvider(
               create: (_) =>
                   FullscreenAdProvider()), // Add FullscreenAdProvider here
+          ChangeNotifierProvider(
+              create: (_) =>
+                  BottomWeatherQrcodeCarouselProvider()), // Add BottomWeatherQrcodeCarouselProvider here
           ChangeNotifierProvider<ArrearProvider>(
             create: (context) => ArrearProvider(
               apiClient: Provider.of<AppDataProvider>(context, listen: false)

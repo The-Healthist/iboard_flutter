@@ -195,7 +195,7 @@ class CarouselStateProvider extends ChangeNotifier {
   // 媒體控制狀態 - 按區域分別控制
   bool _isTopMediaPaused = false; // 頂部廣告媒體暫停狀態
   bool _isMiddleMediaPaused = false; // 中部通告媒體暫停狀態
-  bool _isBottomMediaPaused = false; // 底部區域媒體暫停狀態
+  bool _isBottomMediaPaused = false; // 底部區域媒體暫停狀態（包括天气和二维码轮播）
 
   // 時間配置（從服務器獲取，帶默認值）
   Settings? _settings;
@@ -212,7 +212,7 @@ class CarouselStateProvider extends ChangeNotifier {
       print('CarouselStateProvider: Settings updated');
       if (settings != null) {
         print('✅ 動態時間設置成功！');
-        print('- 全屏廣告播放時間: ${settings.advertisementPlayDuration}秒');
+        // print('- 全屏廣告播放時間: ${settings.advertisementPlayDuration}秒');
         print('- 每個公告停留時間: ${settings.noticeStayDuration}秒');
         print('- 無操作/手動操作超時時間: ${settings.spareDuration}秒');
         print('- 廣告更新間隔: ${settings.advertisementUpdateDuration}分鐘');
@@ -331,13 +331,13 @@ class CarouselStateProvider extends ChangeNotifier {
         // 手動操作狀態：頂部廣告和底部繼續播放，只暫停中部通告
         _isTopMediaPaused = false; // 顶部广告继续播放
         _isMiddleMediaPaused = true; // 中部通告暂停
-        _isBottomMediaPaused = false; // 底部继续播放
+        _isBottomMediaPaused = false; // 底部天气二维码轮播继续播放
         break;
     }
 
     if (kDebugMode) {
       print(
-          '🎵 媒體狀態更新[${_currentState.currentAppState.name}]: Top=${!_isTopMediaPaused ? "播放" : "暫停"}, Middle=${!_isMiddleMediaPaused ? "播放" : "暫停"}, Bottom=${!_isBottomMediaPaused ? "播放" : "暫停"}');
+          '🎵 媒體狀態更新[${_currentState.currentAppState.name}]: Top=${!_isTopMediaPaused ? "播放" : "暫停"}, Middle=${!_isMiddleMediaPaused ? "播放" : "暫停"}, Bottom=${!_isBottomMediaPaused ? "天气二维码轮播播放" : "天气二维码轮播暫停"}');
     }
   }
 
@@ -390,7 +390,7 @@ class CarouselStateProvider extends ChangeNotifier {
       _onShowFullscreenAd?.call();
 
       if (kDebugMode) {
-        print('✅ 進入全屏廣告狀態，啟動動態計時器: ${fullscreenAdDuration}秒');
+        // print('✅ 進入全屏廣告狀態，啟動動態計時器: ${fullscreenAdDuration}秒');
       }
     }
   }
@@ -432,7 +432,7 @@ class CarouselStateProvider extends ChangeNotifier {
       // 注意：通告轮播现在由 mainscreen_page.dart 管理，避免双重管理冲突
       if (_isNoticeCarouselActive) {
         if (kDebugMode) {
-          print('🔄 [STATE] 檢測到通告輪播激活狀態，但交由 mainscreen_page 管理');
+          // print('🔄 [STATE] 檢測到通告輪播激活狀態，但交由 mainscreen_page 管理');
         }
         // _resumeNoticeCarousel(); // 暫時注釋以避免與 mainscreen_page 衝突
       }
@@ -470,7 +470,7 @@ class CarouselStateProvider extends ChangeNotifier {
     _fullscreenAdTimer = Timer(duration, () {
       if (_currentState.currentAppState == AppState.fullscreenAd) {
         if (kDebugMode) {
-          print('⏰ 全屏廣告定時器到期 (${fullscreenAdDuration}秒)，切換到默認狀態');
+          // print('⏰ 全屏廣告定時器到期 (${fullscreenAdDuration}秒)，切換到默認狀態');
         }
         enterDefaultState();
       }
@@ -480,7 +480,7 @@ class CarouselStateProvider extends ChangeNotifier {
     _startAdSwitchCheckTimer();
 
     if (kDebugMode) {
-      print('🎬 启动全屏广告定时器: ${fullscreenAdDuration}秒');
+      // print('🎬 启动全屏广告定时器: ${fullscreenAdDuration}秒');
     }
   }
 
@@ -506,7 +506,7 @@ class CarouselStateProvider extends ChangeNotifier {
     _manualOperationTimer = Timer(duration, () {
       if (_currentState.currentAppState == AppState.manualOperation) {
         if (kDebugMode) {
-          print('⏰ 手動操作動態計時器到期 (${manualOperationTimeout}秒)，切換到全屏廣告');
+          // print('⏰ 手動操作動態計時器到期 (${manualOperationTimeout}秒)，切換到全屏廣告');
         }
         enterFullscreenAd();
       }
@@ -528,7 +528,7 @@ class CarouselStateProvider extends ChangeNotifier {
     _defaultStateTimer = Timer(duration, () {
       if (_currentState.currentAppState == AppState.defaultState) {
         if (kDebugMode) {
-          print('⏰ 默認狀態動態計時器到期 (${noActivityTimeout}秒)，切換到全屏廣告');
+          // print('⏰ 默認狀態動態計時器到期 (${noActivityTimeout}秒)，切換到全屏廣告');
         }
         enterFullscreenAd();
       }
@@ -652,7 +652,7 @@ Timer Info: $timerInfo
   void startNoticeCarousel() {
     if (_isNoticeCarouselActive) {
       if (kDebugMode) {
-        print('⚠️ 通告轮播已经在运行中');
+        // print('⚠️ 通告轮播已经在运行中');
       }
       return;
     }
@@ -666,7 +666,7 @@ Timer Info: $timerInfo
     _startNoticeLogTimer();
 
     if (kDebugMode) {
-      print('✅ 启动通告轮播 - 停留时间: ${noticeStayDuration}秒');
+      // print('✅ 启动通告轮播 - 停留时间: ${noticeStayDuration}秒');
     }
     notifyListeners();
   }
@@ -680,7 +680,7 @@ Timer Info: $timerInfo
     _clearNoticeCarouselTimers();
 
     if (kDebugMode) {
-      print('🛑 停止通告轮播');
+      // print('🛑 停止通告轮播');
     }
     notifyListeners();
   }
@@ -699,7 +699,7 @@ Timer Info: $timerInfo
     _clearNoticeCarouselTimers();
 
     if (kDebugMode) {
-      print('⏸️ 暂停通告轮播 - 已播放: ${_noticeElapsedTime.inSeconds}秒');
+      // print('⏸️ 暂停通告轮播 - 已播放: ${_noticeElapsedTime.inSeconds}秒');
     }
   }
 
@@ -726,7 +726,7 @@ Timer Info: $timerInfo
     _startNoticeLogTimer();
 
     if (kDebugMode) {
-      print('▶️ 恢复通告轮播 - 剩余时间: ${remainingTime.inSeconds}秒');
+      // print('▶️ 恢复通告轮播 - 剩余时间: ${remainingTime.inSeconds}秒');
     }
   }
 
@@ -761,7 +761,7 @@ Timer Info: $timerInfo
         final remainingSeconds = remaining.isNegative ? 0 : remaining.inSeconds;
 
         if (kDebugMode) {
-          print('📢 通告: ${remainingSeconds}s/${noticeStayDuration}s');
+          // print('📢 通告: ${remainingSeconds}s/${noticeStayDuration}s');
         }
       }
     });

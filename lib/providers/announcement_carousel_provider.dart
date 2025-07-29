@@ -78,7 +78,7 @@ class AnnouncementCarouselProvider extends ChangeNotifier {
           .toList();
       await prefs.setString(
           'announcement_carousel_order', json.encode(orderData));
-      _logger.i('💾 通告轮播自定义顺序已保存到缓存');
+      // _logger.i('💾 通告轮播自定义顺序已保存到缓存');
     } catch (e) {
       _logger.e('保存通告轮播顺序失败', error: e);
     }
@@ -92,7 +92,7 @@ class AnnouncementCarouselProvider extends ChangeNotifier {
       if (orderString != null) {
         final orderData = json.decode(orderString) as List;
         // 这里只加载顺序配置，实际的通告数据需要等待API数据后再应用
-        _logger.i('📂 从缓存加载通告轮播自定义顺序: ${orderData.length} 个配置');
+        // _logger.i('📂 从缓存加载通告轮播自定义顺序: ${orderData.length} 个配置');
       }
     } catch (e) {
       _logger.e('加载通告轮播顺序失败', error: e);
@@ -208,7 +208,7 @@ class AnnouncementCarouselProvider extends ChangeNotifier {
 
     _logger.i(
         '🎬 [初始化] 中部轮播初始化完成: 主屏幕 + ${this.carouselAnnouncements.length} 个轮播通告 (只包含緊急和一般通告)');
-    _logger.i('📋 [配置] 使用API配置的通告停留时间: ${apiNoticeStayDuration}秒');
+    // _logger.i('📋 [配置] 使用API配置的通告停留时间: ${apiNoticeStayDuration}秒');
 
     _midTimer?.cancel();
     _delayedNoticeTimer?.cancel(); // 取消之前的延迟定时器
@@ -218,7 +218,7 @@ class AnnouncementCarouselProvider extends ChangeNotifier {
     _midCarouselController.jumpToIndex(0); // 确保显示主屏幕
 
     if (announcementWidgets.length > 0 && !_isMidCarouselPaused) {
-      _logger.i('⏳ [启动延迟] 应用启动，在主屏幕停留 ${delayBeforeNotice}秒后开始无限通告轮播');
+      // _logger.i('⏳ [启动延迟] 应用启动，在主屏幕停留 ${delayBeforeNotice}秒后开始无限通告轮播');
 
       // 启动延迟定时器，等待 spareDuration 时间后开始通告轮播
       _delayedNoticeTimer = Timer(Duration(seconds: delayBeforeNotice), () {
@@ -264,7 +264,7 @@ class AnnouncementCarouselProvider extends ChangeNotifier {
       _currentNoticeIndex = 1; // 从第一个通告开始
       _midCarouselController.jumpToIndex(_currentNoticeIndex);
       _currentNoticeStartTime = DateTime.now();
-      _logger.i('🔄 [初始化] 跳转到第一个通告，索引: $_currentNoticeIndex');
+      // _logger.i('🔄 [初始化] 跳转到第一个通告，索引: $_currentNoticeIndex');
     }
 
     // 启动真正的无限循环定时器
@@ -302,7 +302,7 @@ class AnnouncementCarouselProvider extends ChangeNotifier {
         // 发生错误时，尝试重新启动轮播
         Future.delayed(Duration(seconds: 1), () {
           if (!_isMidCarouselPaused) {
-            _logger.i('🔄 [恢复] 尝试重新启动通告轮播');
+            // _logger.i('🔄 [恢复] 尝试重新启动通告轮播');
             _startContinuousNoticeCarousel(apiNoticeStayDuration);
           }
         });
@@ -315,7 +315,7 @@ class AnnouncementCarouselProvider extends ChangeNotifier {
 
   ///3，暂停通告轮播
   void pauseMidCarousel() {
-    _logger.i('🛑 暂停通告轮播 - 进入全屏广告状态');
+    // _logger.i('🛑 暂停通告轮播 - 进入全屏广告状态');
 
     // 记录当前播放时间
     _currentNoticePauseTime = DateTime.now();
@@ -342,7 +342,7 @@ class AnnouncementCarouselProvider extends ChangeNotifier {
 
   ///4，恢复通告轮播
   void resumeMidCarousel(int apiNoticeStayDuration) {
-    _logger.i('▶️ 恢复通告轮播 - 退出全屏广告状态');
+    // _logger.i('▶️ 恢复通告轮播 - 退出全屏广告状态');
 
     // 设置轮播为运行状态
     _isMidCarouselPaused = false;
@@ -365,7 +365,7 @@ class AnnouncementCarouselProvider extends ChangeNotifier {
       if (_currentNoticeIndex < 1) {
         _currentNoticeIndex = 1; // 从第一个通告开始
         _midCarouselController.jumpToIndex(_currentNoticeIndex);
-        _logger.i('🔄 [恢复] 设置索引到第一个通告: $_currentNoticeIndex');
+        // _logger.i('🔄 [恢复] 设置索引到第一个通告: $_currentNoticeIndex');
       }
 
       if (remainingNoticeTime.inSeconds > 1) {
@@ -410,7 +410,7 @@ class AnnouncementCarouselProvider extends ChangeNotifier {
   ///5，更新轮播暂停状态
   void updateCarouselPauseState(bool isPaused) {
     _isMidCarouselPaused = isPaused;
-    _logger.i('🎛️ 通告轮播状态更新: ${!_isMidCarouselPaused ? "运行" : "暂停"}');
+    // _logger.i('🎛️ 通告轮播状态更新: ${!_isMidCarouselPaused ? "运行" : "暂停"}');
     notifyListeners();
   }
 
@@ -430,7 +430,7 @@ class AnnouncementCarouselProvider extends ChangeNotifier {
           _midCarouselController.jumpToIndex(_currentNoticeIndex);
         }
 
-        _logger.i('🔄 恢复通告轮播，当前索引: $_currentNoticeIndex');
+        // _logger.i('🔄 恢复通告轮播，当前索引: $_currentNoticeIndex');
         _startContinuousNoticeCarousel(apiNoticeStayDuration);
       }
     } else {
@@ -483,7 +483,7 @@ class AnnouncementCarouselProvider extends ChangeNotifier {
 
   ///9，暂停所有计时器（用于设置页面）
   void pauseAllTimersForSettings() {
-    _logger.i('⚙️ 通告轮播 - 暂停所有计时器（设置页面）');
+    // _logger.i('⚙️ 通告轮播 - 暂停所有计时器（设置页面）');
     _midTimer?.cancel();
     _debugTimer?.cancel();
     _delayedNoticeTimer?.cancel();
@@ -494,7 +494,7 @@ class AnnouncementCarouselProvider extends ChangeNotifier {
 
   ///10，从设置页面恢复所有计时器
   void resumeAllTimersFromSettings(int apiNoticeStayDuration) {
-    _logger.i('↩️ 通告轮播 - 从设置页面恢复所有计时器');
+    // _logger.i('↩️ 通告轮播 - 从设置页面恢复所有计时器');
     _isMidCarouselPaused = false;
     _midCarouselController.resumeAllMedia();
 
@@ -523,7 +523,7 @@ class AnnouncementCarouselProvider extends ChangeNotifier {
       _currentNoticeIndex = index;
       _midCarouselController.jumpToIndex(index);
       _currentNoticeStartTime = DateTime.now();
-      _logger.i('🔄 跳转到通告索引: $index');
+      // _logger.i('🔄 跳转到通告索引: $index');
       notifyListeners();
     }
   }

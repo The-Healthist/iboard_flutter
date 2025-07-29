@@ -45,7 +45,7 @@ class _FullAdWidgetState extends State<FullAdWidget> {
 
   @override
   void dispose() {
-    _logger.i('🔄 开始释放全屏广告Widget资源');
+    // _logger.i('🔄 开始释放全屏广告Widget资源');
 
     // 安全释放视频控制器
     if (_videoController != null) {
@@ -74,7 +74,7 @@ class _FullAdWidgetState extends State<FullAdWidget> {
     }
 
     super.dispose();
-    _logger.i('✅ 全屏广告Widget资源释放完成');
+    // _logger.i('✅ 全屏广告Widget资源释放完成');
   }
 
   ///1，视频播放进度变化监听器
@@ -159,7 +159,7 @@ class _FullAdWidgetState extends State<FullAdWidget> {
       // 自动播放视频（不循环，让Provider控制播放）
       _videoController!.setLooping(false);
       await _videoController!.play();
-      _logger.i('🎬 视频初始化成功并开始播放');
+      // _logger.i('🎬 视频初始化成功并开始播放');
     } catch (e) {
       _logger.e('❌ 视频初始化失败: $e');
 

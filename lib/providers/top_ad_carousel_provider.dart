@@ -54,7 +54,7 @@ class TopAdCarouselProvider extends ChangeNotifier {
   Future<void> setCarouselList(List<AdModel> customOrderList) async {
     _customOrderTopAds = List.from(customOrderList);
     await _saveCustomOrder();
-    _logger.i('🔄 设置自定义顶部广告轮播顺序: ${_customOrderTopAds.length} 个广告');
+    // _logger.i('🔄 设置自定义顶部广告轮播顺序: ${_customOrderTopAds.length} 个广告');
     notifyListeners();
   }
 
@@ -70,7 +70,7 @@ class TopAdCarouselProvider extends ChangeNotifier {
               })
           .toList();
       await prefs.setString('top_ad_carousel_order', json.encode(orderData));
-      _logger.i('💾 顶部广告轮播自定义顺序已保存到缓存');
+      // _logger.i('💾 顶部广告轮播自定义顺序已保存到缓存');
     } catch (e) {
       _logger.e('保存顶部广告轮播顺序失败', error: e);
     }
@@ -83,7 +83,7 @@ class TopAdCarouselProvider extends ChangeNotifier {
       final orderString = prefs.getString('top_ad_carousel_order');
       if (orderString != null) {
         final orderData = json.decode(orderString) as List;
-        _logger.i('📂 从缓存加载顶部广告轮播自定义顺序: ${orderData.length} 个配置');
+        // _logger.i('📂 从缓存加载顶部广告轮播自定义顺序: ${orderData.length} 个配置');
       }
     } catch (e) {
       _logger.e('加载顶部广告轮播顺序失败', error: e);
@@ -162,7 +162,7 @@ class TopAdCarouselProvider extends ChangeNotifier {
       startTopAdTimer(0); // Start timer for the first ad
     }
 
-    _logger.i('🎬 [初始化] 顶部广告轮播初始化完成，广告数量: ${this.topAds.length}');
+    // _logger.i('🎬 [初始化] 顶部广告轮播初始化完成，广告数量: ${this.topAds.length}');
   }
 
   ///7，启动顶部广告计时器
@@ -188,13 +188,13 @@ class TopAdCarouselProvider extends ChangeNotifier {
     // 只有当切换到新广告时才重置已播放时间
     _topAdElapsedTime = Duration.zero;
 
-    _logger.d('▶️ 启动顶部广告计时器: ${ad.title}, duration=${ad.durationObject}');
-    _logger.i(
-        '📝 记录顶部广告开始时间: $_currentTopAdStartTime, 索引: $_currentTopAdIndex, 时长: ${_topAdDuration.inSeconds}秒');
+    // _logger.d('▶️ 启动顶部广告计时器: ${ad.title}, duration=${ad.durationObject}');
+    // _logger.i(
+    //     '📝 记录顶部广告开始时间: $_currentTopAdStartTime, 索引: $_currentTopAdIndex, 时长: ${_topAdDuration.inSeconds}秒');
 
     _topTimer = Timer(ad.durationObject, () {
       if (_topCarouselController.widgetCount > 1 && !_isTopCarouselPaused) {
-        _logger.d('⏭️ 顶部广告计时器到期，切换到下一个');
+        // _logger.d('⏭️ 顶部广告计时器到期，切换到下一个');
         _topCarouselController.playNext();
         // onPageChanged will then call startTopAdTimer for the new page
       }
@@ -203,7 +203,7 @@ class TopAdCarouselProvider extends ChangeNotifier {
 
   /// 暂停顶部轮播
   void pauseTopCarousel() {
-    _logger.i('🛑 暂停顶部轮播 - 进入全屏广告状态');
+    // _logger.i('🛑 暂停顶部轮播 - 进入全屏广告状态');
 
     // 记录当前播放时间
     _currentTopAdPauseTime = DateTime.now();
@@ -220,14 +220,14 @@ class TopAdCarouselProvider extends ChangeNotifier {
         // 广告已经播放完成，应该准备切换到下一个
         _topAdElapsedTime = _topAdDuration;
         final remainingTop = Duration.zero;
-        _logger.i(
-            '📊 [暂停] 顶部广告 - 已播放: ${_topAdElapsedTime.inSeconds}s/${_topAdDuration.inSeconds}s, 剩余: ${remainingTop.inSeconds}s (广告已完成)');
+        // _logger.i(
+        //     '📊 [暂停] 顶部广告 - 已播放: ${_topAdElapsedTime.inSeconds}s/${_topAdDuration.inSeconds}s, 剩余: ${remainingTop.inSeconds}s (广告已完成)');
       } else {
         // 广告还在播放中
         _topAdElapsedTime = totalElapsed;
         final remainingTop = _topAdDuration - _topAdElapsedTime;
-        _logger.i(
-            '📊 [暂停] 顶部广告 - 已播放: ${_topAdElapsedTime.inSeconds}s/${_topAdDuration.inSeconds}s, 剩余: ${remainingTop.inSeconds}s');
+        // _logger.i(
+        //     '📊 [暂停] 顶部广告 - 已播放: ${_topAdElapsedTime.inSeconds}s/${_topAdDuration.inSeconds}s, 剩余: ${remainingTop.inSeconds}s');
       }
     }
 
@@ -245,7 +245,7 @@ class TopAdCarouselProvider extends ChangeNotifier {
 
   /// 恢复顶部轮播
   void resumeTopCarousel() {
-    _logger.i('▶️ 恢复顶部轮播 - 退出全屏广告状态');
+    // _logger.i('▶️ 恢复顶部轮播 - 退出全屏广告状态');
 
     // 设置顶部轮播为运行状态
     _isTopCarouselPaused = false;
@@ -256,8 +256,8 @@ class TopAdCarouselProvider extends ChangeNotifier {
     // 计算剩余播放时间并恢复定时器
     if (_topAds.isNotEmpty && _currentTopAdStartTime != null) {
       final remainingTopTime = _topAdDuration - _topAdElapsedTime;
-      _logger.i(
-          '🔄 [恢复] 顶部广告 - 继续播放剩余时间：${remainingTopTime.inSeconds}s (已播放: ${_topAdElapsedTime.inSeconds}s)');
+      // _logger.i(
+      //     '🔄 [恢复] 顶部广告 - 继续播放剩余时间：${remainingTopTime.inSeconds}s (已播放: ${_topAdElapsedTime.inSeconds}s)');
 
       if (remainingTopTime.inSeconds > 0) {
         // 更新当前广告开始时间，使其能正确计算剩余时间
@@ -267,14 +267,14 @@ class TopAdCarouselProvider extends ChangeNotifier {
         // 继续播放剩余时间
         _topTimer = Timer(remainingTopTime, () {
           if (!_isTopCarouselPaused) {
-            _logger.i('⏰ [定时] 顶部广告时间到，切换到下一个');
+            // _logger.i('⏰ [定时] 顶部广告时间到，切换到下一个');
             _topCarouselController.playNext();
             // Note: onPageChanged will handle calling startTopAdTimer for the new page
           }
         });
       } else {
         // 时间已到，直接切换到下一个
-        _logger.i('⚡ [跳过] 顶部广告剩余时间为0，直接切换到下一个');
+        // _logger.i('⚡ [跳过] 顶部广告剩余时间为0，直接切换到下一个');
         _topCarouselController.playNext();
         // Note: onPageChanged will handle calling startTopAdTimer for the new page
       }
@@ -286,7 +286,7 @@ class TopAdCarouselProvider extends ChangeNotifier {
   /// 更新轮播暂停状态
   void updateCarouselPauseState(bool isPaused) {
     _isTopCarouselPaused = isPaused;
-    _logger.i('🎛️ 顶部轮播状态更新: ${!_isTopCarouselPaused ? "运行" : "暂停"}');
+    // _logger.i('🎛️ 顶部轮播状态更新: ${!_isTopCarouselPaused ? "运行" : "暂停"}');
     notifyListeners();
   }
 
@@ -299,7 +299,7 @@ class TopAdCarouselProvider extends ChangeNotifier {
       if (_topTimer == null || !_topTimer!.isActive) {
         _logger.w('🔧 检测到顶部广告轮播中断，尝试恢复...');
         final currentIndex = _topCarouselController.currentIndex;
-        _logger.i('🔄 恢复顶部广告轮播，当前索引: $currentIndex');
+        // _logger.i('🔄 恢复顶部广告轮播，当前索引: $currentIndex');
 
         startTopAdTimer(currentIndex);
       }
@@ -358,7 +358,7 @@ class TopAdCarouselProvider extends ChangeNotifier {
 
   /// 暂停所有计时器（用于设置页面）
   void pauseAllTimersForSettings() {
-    _logger.i('⚙️ 顶部广告 - 暂停所有计时器（设置页面）');
+    // _logger.i('⚙️ 顶部广告 - 暂停所有计时器（设置页面）');
     _topTimer?.cancel();
     _debugTimer?.cancel();
     _topCarouselController.pauseAllMedia();
@@ -368,7 +368,7 @@ class TopAdCarouselProvider extends ChangeNotifier {
 
   /// 从设置页面恢复所有计时器
   void resumeAllTimersFromSettings() {
-    _logger.i('↩️ 顶部广告 - 从设置页面恢复所有计时器');
+    // _logger.i('↩️ 顶部广告 - 从设置页面恢复所有计时器');
     _isTopCarouselPaused = false;
     _topCarouselController.resumeAllMedia();
 
