@@ -80,7 +80,7 @@ API请求通过 apis/index.ts 中的 getArrearage 函数发送到后端
 
 
 //我需要存在我的应用内存中的东西
-1,当我初始化使用deviceID,login以后得到的数据,
+1(已完成),当我初始化使用deviceID,login以后得到的数据,
 ```
 {
   "data": {
@@ -119,7 +119,7 @@ API请求通过 apis/index.ts 中的 getArrearage 函数发送到后端
 }
 ```
 我需要将上面的这个data不仅仅保存到provider,还需要保存到应用缓存里面,这样的话如果我登录失败,我就不更新这个保存的loing_device_data
-2,使用上面的token,get得到的advertisement和announcement
+2(已完成),使用上面的token,get得到的advertisement和announcement
 ```
 {
   "data": [

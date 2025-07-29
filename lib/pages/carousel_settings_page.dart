@@ -8,6 +8,7 @@ import 'package:iboard_app/providers/fullscreen_ad_provider.dart';
 import 'package:iboard_app/providers/top_ad_carousel_provider.dart';
 import 'package:iboard_app/widgets/carousel_widget.dart';
 import 'package:provider/provider.dart';
+import 'package:iboard_app/utils/debug_cache_util.dart';
 
 class CarouselSettingsPage extends StatefulWidget {
   const CarouselSettingsPage({Key? key}) : super(key: key);
@@ -82,6 +83,16 @@ class _CarouselSettingsPageState extends State<CarouselSettingsPage> {
                           fontWeight: FontWeight.bold,
                           color: Colors.grey.shade800,
                         ),
+                      ),
+                      Spacer(),
+                      IconButton(
+                        onPressed: () async {
+                          await DebugCacheUtil.testCarouselOrderPersistence();
+                          await DebugCacheUtil.checkAllCarouselOrders();
+                          await DebugCacheUtil.checkRawDataCache();
+                        },
+                        icon: Icon(Icons.bug_report, color: Colors.blue),
+                        tooltip: '调试缓存',
                       ),
                     ],
                   ),

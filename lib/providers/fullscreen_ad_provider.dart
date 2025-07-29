@@ -22,6 +22,7 @@ class FullscreenAdProvider extends ChangeNotifier {
   List<AdModel> _fullscreenAds = [];
   List<AdModel> _customOrderFullscreenAds = []; // 自定义顺序的全屏广告
   List<Widget> _adWidgets = [];
+  List<dynamic>? _cachedOrderData; // 缓存的顺序配置数据
 
   // 状态管理
   bool _isPaused = false;
@@ -111,7 +112,9 @@ class FullscreenAdProvider extends ChangeNotifier {
       final orderString = prefs.getString('fullscreen_ad_carousel_order');
       if (orderString != null) {
         final orderData = json.decode(orderString) as List;
-        // _logger.i('📂 从缓存加载全屏广告轮播自定义顺序: ${orderData.length} 个配置');
+        // 保存顺序配置，等待API数据到达后再应用
+        _cachedOrderData = orderData;
+        _logger.i('📂 从缓存加载全屏广告轮播自定义顺序: ${orderData.length} 个配置');
       }
     } catch (e) {
       _logger.e('加载全屏广告轮播顺序失败', error: e);
@@ -122,7 +125,10 @@ class FullscreenAdProvider extends ChangeNotifier {
   void updateFullscreenAdsWithCustomOrder(List<AdModel> newAds) {
     _fullscreenAds = newAds;
 
-    if (_customOrderFullscreenAds.isEmpty) {
+    // 如果有缓存的顺序配置且自定义顺序为空，应用缓存的顺序
+    if (_customOrderFullscreenAds.isEmpty && _cachedOrderData != null) {
+      _applyCachedOrder(newAds);
+    } else if (_customOrderFullscreenAds.isEmpty) {
       // 如果没有自定义顺序，使用默认顺序
       _customOrderFullscreenAds = List.from(newAds);
     } else {
@@ -171,6 +177,43 @@ class FullscreenAdProvider extends ChangeNotifier {
 
     _logger.i(
         '📝 智能更新自定义顺序: 移除${newAds.length - newAdsMap.length}个, 新增${newItems.length}个');
+  }
+
+  ///6，应用缓存的顺序配置
+  void _applyCachedOrder(List<AdModel> newAds) {
+    try {
+      if (_cachedOrderData == null) return;
+
+      // 创建API数据的ID映射
+      final Map<int, AdModel> newAdsMap = {
+        for (AdModel ad in newAds) ad.id: ad
+      };
+
+      // 按照缓存的顺序重新排列
+      final List<AdModel> orderedAds = [];
+
+      // 首先添加缓存顺序中存在的广告
+      for (final orderItem in _cachedOrderData!) {
+        final id = orderItem['id'] as int;
+        if (newAdsMap.containsKey(id)) {
+          orderedAds.add(newAdsMap[id]!);
+          newAdsMap.remove(id); // 移除已处理的广告
+        }
+      }
+
+      // 然后添加新增的广告（不在缓存顺序中的）
+      orderedAds.addAll(newAdsMap.values);
+
+      _customOrderFullscreenAds = orderedAds;
+
+      // 保存更新后的顺序
+      _saveCustomOrder();
+
+      _logger.i('📋 应用缓存的全屏广告顺序: ${orderedAds.length}个广告');
+    } catch (e) {
+      _logger.e('应用缓存顺序失败，使用默认顺序', error: e);
+      _customOrderFullscreenAds = List.from(newAds);
+    }
   }
 
   ///6, 更新全屏广告数据

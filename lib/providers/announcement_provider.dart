@@ -7,6 +7,8 @@ import 'package:iboard_app/providers/app_data_provider.dart'; // Assuming AppDat
 import 'package:iboard_app/managers/file_manager.dart'; // 引入 FileManager
 import 'package:logger/logger.dart';
 import 'package:path_provider/path_provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'dart:convert';
 
 class AnnouncementProvider extends ChangeNotifier {
   final Logger _logger = Logger();
@@ -22,6 +24,9 @@ class AnnouncementProvider extends ChangeNotifier {
   Timer? _updateTimer; // 定时更新定时器
   bool _isPeriodicUpdateActive = false; // 是否正在进行定期更新
 
+  static const String _announcementsDataKey =
+      'announcements_data'; // 原始通告数据缓存key
+
   // Getters
   List<AnnouncementModel> get announcements => _announcements;
   List<AnnouncementModel> get carouselAnnouncements =>
@@ -32,8 +37,103 @@ class AnnouncementProvider extends ChangeNotifier {
   AnnouncementProvider(
       this._apiClient, this._appDataProvider, this._fileManager) {
     _logger.i('AnnouncementProvider initialized.');
-    // Optionally fetch announcements immediately or provide a method to do so.
-    // fetchNotices(); // Example: Fetch on init if desired
+    _loadAnnouncementsFromCache(); // 启动时从缓存加载数据
+  }
+
+  ///1，保存通告数据到SharedPreferences缓存
+  Future<void> _saveAnnouncementsToCache(
+      List<AnnouncementModel> announcements) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final List<Map<String, dynamic>> announcementsJson =
+          announcements.map((announcement) => announcement.toJson()).toList();
+      final jsonString = json.encode(announcementsJson);
+      await prefs.setString(_announcementsDataKey, jsonString);
+      _logger.i('💾 通告数据已保存到缓存: ${announcements.length}个通告');
+    } catch (e) {
+      _logger.e('保存通告数据到缓存失败', error: e);
+    }
+  }
+
+  ///2，从SharedPreferences缓存加载通告数据
+  Future<void> _loadAnnouncementsFromCache() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final jsonString = prefs.getString(_announcementsDataKey);
+      if (jsonString != null && jsonString.isNotEmpty) {
+        final List<dynamic> announcementsJson =
+            json.decode(jsonString) as List<dynamic>;
+        final List<AnnouncementModel> cachedAnnouncements = announcementsJson
+            .map((announcementJson) => AnnouncementModel.fromJson(
+                announcementJson as Map<String, dynamic>))
+            .toList();
+
+        _announcements = cachedAnnouncements;
+        _updateCarouselAnnouncements(); // 更新轮播通告数组
+        _logger.i('📂 从缓存加载通告数据成功: ${cachedAnnouncements.length}个通告');
+        notifyListeners();
+      } else {
+        _logger.w('缓存中没有找到通告数据');
+      }
+    } catch (e) {
+      _logger.e('从缓存加载通告数据失败', error: e);
+    }
+  }
+
+  ///3，清除通告数据缓存
+  Future<void> _clearAnnouncementsCache() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.remove(_announcementsDataKey);
+      _logger.i('通告数据缓存已清除');
+    } catch (e) {
+      _logger.e('清除通告数据缓存失败', error: e);
+    }
+  }
+
+  ///4，检查数据是否真的发生了变化
+  bool _hasDataChanged(List<AnnouncementModel> newAnnouncements) {
+    if (_announcements.length != newAnnouncements.length) {
+      return true;
+    }
+
+    // 创建ID到通告的映射以便快速比较
+    final currentAnnouncementsMap = {
+      for (AnnouncementModel announcement in _announcements)
+        announcement.id: announcement
+    };
+    final newAnnouncementsMap = {
+      for (AnnouncementModel announcement in newAnnouncements)
+        announcement.id: announcement
+    };
+
+    // 检查是否有新增或删除的通告
+    if (currentAnnouncementsMap.keys
+            .toSet()
+            .difference(newAnnouncementsMap.keys.toSet())
+            .isNotEmpty ||
+        newAnnouncementsMap.keys
+            .toSet()
+            .difference(currentAnnouncementsMap.keys.toSet())
+            .isNotEmpty) {
+      return true;
+    }
+
+    // 检查现有通告是否有内容变化
+    for (final id in currentAnnouncementsMap.keys) {
+      final currentAnnouncement = currentAnnouncementsMap[id]!;
+      final newAnnouncement = newAnnouncementsMap[id]!;
+
+      // 比较关键字段
+      if (currentAnnouncement.title != newAnnouncement.title ||
+          currentAnnouncement.description != newAnnouncement.description ||
+          currentAnnouncement.file.url != newAnnouncement.file.url ||
+          currentAnnouncement.file.md5 != newAnnouncement.file.md5) {
+        return true;
+      }
+    }
+
+    return false;
   }
 
   @override
@@ -177,10 +277,18 @@ class AnnouncementProvider extends ChangeNotifier {
     }
   }
 
-  /// 智能对比更新通告列表
+  ///5，智能对比更新通告列表
   Future<void> _smartUpdateAnnouncements(
       List<AnnouncementModel> newAnnouncements) async {
     try {
+      // 检查数据是否真的发生了变化
+      if (!_hasDataChanged(newAnnouncements)) {
+        _logger.i('通告数据没有变化，跳过更新操作');
+        return;
+      }
+
+      _logger.i('检测到通告数据变化，开始更新...');
+
       // 将现有通告转换为 Map，以 ID 为键方便查找
       final Map<int, AnnouncementModel> currentAnnouncementsMap = {
         for (AnnouncementModel announcement in _announcements)
@@ -264,6 +372,9 @@ class AnnouncementProvider extends ChangeNotifier {
       // 更新轮播通告数组
       _updateCarouselAnnouncements();
 
+      // 保存更新后的数据到缓存
+      await _saveAnnouncementsToCache(_announcements);
+
       _logger.i('Smart announcement update completed successfully.');
     } catch (e, stackTrace) {
       _logger.e('Error in smart announcement update',
@@ -272,6 +383,7 @@ class AnnouncementProvider extends ChangeNotifier {
       try {
         _announcements = List<AnnouncementModel>.from(newAnnouncements);
         _updateCarouselAnnouncements();
+        await _saveAnnouncementsToCache(_announcements);
         _logger.w('Fallback to basic announcement update completed.');
       } catch (fallbackError) {
         _logger.e('Even fallback announcement update failed',

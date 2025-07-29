@@ -26,6 +26,7 @@ class AnnouncementCarouselProvider extends ChangeNotifier {
   // 通告数据
   List<AnnouncementModel> _carouselAnnouncements = [];
   List<AnnouncementModel> _customOrderCarouselAnnouncements = []; // 自定义顺序的轮播通告
+  List<dynamic>? _cachedOrderData; // 缓存的顺序配置数据
 
   // 状态管理
   bool _isMidCarouselPaused = false;
@@ -53,6 +54,11 @@ class AnnouncementCarouselProvider extends ChangeNotifier {
   AnnouncementCarouselProvider() {
     _midCarouselController = custom_carousel.CarouselController();
     _loadCustomOrder(); // 加载自定义顺序
+    // 添加调试日志
+    Future.delayed(Duration(seconds: 2), () {
+      _logger.i(
+          '🔍 AnnouncementCarouselProvider 初始化完成，缓存数据: ${_cachedOrderData?.length ?? 0}个配置');
+    });
   }
 
   ///1，设置自定义轮播通告顺序
@@ -91,8 +97,9 @@ class AnnouncementCarouselProvider extends ChangeNotifier {
       final orderString = prefs.getString('announcement_carousel_order');
       if (orderString != null) {
         final orderData = json.decode(orderString) as List;
-        // 这里只加载顺序配置，实际的通告数据需要等待API数据后再应用
-        // _logger.i('📂 从缓存加载通告轮播自定义顺序: ${orderData.length} 个配置');
+        // 保存顺序配置，等待API数据到达后再应用
+        _cachedOrderData = orderData;
+        _logger.i('📂 从缓存加载通告轮播自定义顺序: ${orderData.length} 个配置');
       }
     } catch (e) {
       _logger.e('加载通告轮播顺序失败', error: e);
@@ -104,7 +111,10 @@ class AnnouncementCarouselProvider extends ChangeNotifier {
       List<AnnouncementModel> newAnnouncements) {
     _carouselAnnouncements = newAnnouncements;
 
-    if (_customOrderCarouselAnnouncements.isEmpty) {
+    // 如果有缓存的顺序配置且自定义顺序为空，应用缓存的顺序
+    if (_customOrderCarouselAnnouncements.isEmpty && _cachedOrderData != null) {
+      _applyCachedOrder(newAnnouncements);
+    } else if (_customOrderCarouselAnnouncements.isEmpty) {
       // 如果没有自定义顺序，使用默认顺序
       _customOrderCarouselAnnouncements = List.from(newAnnouncements);
     } else {
@@ -150,7 +160,45 @@ class AnnouncementCarouselProvider extends ChangeNotifier {
         '📝 智能更新自定义顺序: 移除${newAnnouncements.length - newAnnouncementsMap.length}个, 新增${newItems.length}个');
   }
 
-  ///6，初始化中部轮播
+  ///6，应用缓存的顺序配置
+  void _applyCachedOrder(List<AnnouncementModel> newAnnouncements) {
+    try {
+      if (_cachedOrderData == null) return;
+
+      // 创建API数据的ID映射
+      final Map<int, AnnouncementModel> newAnnouncementsMap = {
+        for (AnnouncementModel announcement in newAnnouncements)
+          announcement.id: announcement
+      };
+
+      // 按照缓存的顺序重新排列
+      final List<AnnouncementModel> orderedAnnouncements = [];
+
+      // 首先添加缓存顺序中存在的通告
+      for (final orderItem in _cachedOrderData!) {
+        final id = orderItem['id'] as int;
+        if (newAnnouncementsMap.containsKey(id)) {
+          orderedAnnouncements.add(newAnnouncementsMap[id]!);
+          newAnnouncementsMap.remove(id); // 移除已处理的通告
+        }
+      }
+
+      // 然后添加新增的通告（不在缓存顺序中的）
+      orderedAnnouncements.addAll(newAnnouncementsMap.values);
+
+      _customOrderCarouselAnnouncements = orderedAnnouncements;
+
+      // 保存更新后的顺序
+      _saveCustomOrder();
+
+      _logger.i('📋 应用缓存的通告顺序: ${orderedAnnouncements.length}个通告');
+    } catch (e) {
+      _logger.e('应用缓存顺序失败，使用默认顺序', error: e);
+      _customOrderCarouselAnnouncements = List.from(newAnnouncements);
+    }
+  }
+
+  ///7，初始化中部轮播
   void initializeMidWidgets({
     required List<AnnouncementModel> carouselAnnouncements,
     required int apiNoticeStayDuration,

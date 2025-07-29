@@ -23,6 +23,7 @@ class TopAdCarouselProvider extends ChangeNotifier {
   // 广告数据
   List<AdModel> _topAds = [];
   List<AdModel> _customOrderTopAds = []; // 自定义顺序的顶部广告
+  List<dynamic>? _cachedOrderData; // 缓存的顺序配置数据
 
   // 状态管理
   bool _isTopCarouselPaused = false;
@@ -48,6 +49,11 @@ class TopAdCarouselProvider extends ChangeNotifier {
   TopAdCarouselProvider() {
     _topCarouselController = custom_carousel.CarouselController();
     _loadCustomOrder(); // 加载自定义顺序
+    // 添加调试日志
+    Future.delayed(Duration(seconds: 2), () {
+      _logger.i(
+          '🔍 TopAdCarouselProvider 初始化完成，缓存数据: ${_cachedOrderData?.length ?? 0}个配置');
+    });
   }
 
   ///1，设置自定义轮播顶部广告顺序
@@ -83,7 +89,9 @@ class TopAdCarouselProvider extends ChangeNotifier {
       final orderString = prefs.getString('top_ad_carousel_order');
       if (orderString != null) {
         final orderData = json.decode(orderString) as List;
-        // _logger.i('📂 从缓存加载顶部广告轮播自定义顺序: ${orderData.length} 个配置');
+        // 保存顺序配置，等待API数据到达后再应用
+        _cachedOrderData = orderData;
+        _logger.i('📂 从缓存加载顶部广告轮播自定义顺序: ${orderData.length} 个配置');
       }
     } catch (e) {
       _logger.e('加载顶部广告轮播顺序失败', error: e);
@@ -94,16 +102,25 @@ class TopAdCarouselProvider extends ChangeNotifier {
   void updateTopAdsWithCustomOrder(List<AdModel> newTopAds) {
     _topAds = newTopAds;
 
-    if (_customOrderTopAds.isEmpty) {
+    _logger.i(
+        '🔄 开始更新顶部广告轮播数据: API数据${newTopAds.length}个，当前自定义顺序${_customOrderTopAds.length}个，缓存配置${_cachedOrderData?.length ?? 0}个');
+
+    // 如果有缓存的顺序配置且自定义顺序为空，应用缓存的顺序
+    if (_customOrderTopAds.isEmpty && _cachedOrderData != null) {
+      _logger.i('📋 应用缓存的顶部广告顺序配置');
+      _applyCachedOrder(newTopAds);
+    } else if (_customOrderTopAds.isEmpty) {
       // 如果没有自定义顺序，使用默认顺序
+      _logger.i('📋 使用默认的顶部广告顺序');
       _customOrderTopAds = List.from(newTopAds);
     } else {
       // 有自定义顺序，需要智能更新
+      _logger.i('📋 智能更新顶部广告自定义顺序');
       _updateCustomOrderWithNewData(newTopAds);
     }
 
     _logger.i(
-        '🔄 更新顶部广告轮播数据: 原始${newTopAds.length}个，自定义顺序${_customOrderTopAds.length}个');
+        '🔄 更新顶部广告轮播数据完成: 原始${newTopAds.length}个，自定义顺序${_customOrderTopAds.length}个');
   }
 
   ///5，智能更新自定义顺序列表
@@ -135,7 +152,44 @@ class TopAdCarouselProvider extends ChangeNotifier {
         '📝 智能更新自定义顺序: 移除${newTopAds.length - newAdsMap.length}个, 新增${newItems.length}个');
   }
 
-  ///6，初始化顶部轮播
+  ///6，应用缓存的顺序配置
+  void _applyCachedOrder(List<AdModel> newTopAds) {
+    try {
+      if (_cachedOrderData == null) return;
+
+      // 创建API数据的ID映射
+      final Map<int, AdModel> newAdsMap = {
+        for (AdModel ad in newTopAds) ad.id: ad
+      };
+
+      // 按照缓存的顺序重新排列
+      final List<AdModel> orderedAds = [];
+
+      // 首先添加缓存顺序中存在的广告
+      for (final orderItem in _cachedOrderData!) {
+        final id = orderItem['id'] as int;
+        if (newAdsMap.containsKey(id)) {
+          orderedAds.add(newAdsMap[id]!);
+          newAdsMap.remove(id); // 移除已处理的广告
+        }
+      }
+
+      // 然后添加新增的广告（不在缓存顺序中的）
+      orderedAds.addAll(newAdsMap.values);
+
+      _customOrderTopAds = orderedAds;
+
+      // 保存更新后的顺序
+      _saveCustomOrder();
+
+      _logger.i('📋 应用缓存的顶部广告顺序: ${orderedAds.length}个广告');
+    } catch (e) {
+      _logger.e('应用缓存顺序失败，使用默认顺序', error: e);
+      _customOrderTopAds = List.from(newTopAds);
+    }
+  }
+
+  ///7，初始化顶部轮播
   void initializeTopWidgets(List<AdModel> topAds) {
     if (topAds.isEmpty) {
       _logger.w('No top advertisements available');

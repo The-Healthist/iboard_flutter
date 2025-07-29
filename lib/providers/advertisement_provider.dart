@@ -7,6 +7,8 @@ import 'package:iboard_app/providers/app_data_provider.dart';
 import 'package:iboard_app/managers/file_manager.dart';
 import 'package:logger/logger.dart';
 import 'package:path_provider/path_provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'dart:convert';
 
 class AdvertisementProvider extends ChangeNotifier {
   final Logger _logger = Logger();
@@ -19,6 +21,9 @@ class AdvertisementProvider extends ChangeNotifier {
   String? _error;
   Timer? _updateTimer; // 定时更新定时器
   bool _isPeriodicUpdateActive = false; // 是否正在进行定期更新
+
+  static const String _advertisementsDataKey =
+      'advertisements_data'; // 原始广告数据缓存key
 
   // Getters
   List<AdModel> get advertisements => _advertisements;
@@ -38,8 +43,94 @@ class AdvertisementProvider extends ChangeNotifier {
   AdvertisementProvider(
       this._apiClient, this._appDataProvider, this._fileManager) {
     _logger.i('AdvertisementProvider initialized.');
-    // Optionally fetch advertisements immediately or provide a method to do so.
-    // fetchAdvertisements(); // Example: Fetch on init if desired
+    _loadAdvertisementsFromCache(); // 启动时从缓存加载数据
+  }
+
+  ///1，保存广告数据到SharedPreferences缓存
+  Future<void> _saveAdvertisementsToCache(List<AdModel> advertisements) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final List<Map<String, dynamic>> adsJson =
+          advertisements.map((ad) => ad.toJson()).toList();
+      final jsonString = json.encode(adsJson);
+      await prefs.setString(_advertisementsDataKey, jsonString);
+      _logger.i('💾 广告数据已保存到缓存: ${advertisements.length}个广告');
+    } catch (e) {
+      _logger.e('保存广告数据到缓存失败', error: e);
+    }
+  }
+
+  ///2，从SharedPreferences缓存加载广告数据
+  Future<void> _loadAdvertisementsFromCache() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final jsonString = prefs.getString(_advertisementsDataKey);
+      if (jsonString != null && jsonString.isNotEmpty) {
+        final List<dynamic> adsJson = json.decode(jsonString) as List<dynamic>;
+        final List<AdModel> cachedAds = adsJson
+            .map((adJson) => AdModel.fromJson(adJson as Map<String, dynamic>))
+            .toList();
+
+        _advertisements = cachedAds;
+        _logger.i('📂 从缓存加载广告数据成功: ${cachedAds.length}个广告');
+        notifyListeners();
+      } else {
+        _logger.w('缓存中没有找到广告数据');
+      }
+    } catch (e) {
+      _logger.e('从缓存加载广告数据失败', error: e);
+    }
+  }
+
+  ///3，清除广告数据缓存
+  Future<void> _clearAdvertisementsCache() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.remove(_advertisementsDataKey);
+      _logger.i('广告数据缓存已清除');
+    } catch (e) {
+      _logger.e('清除广告数据缓存失败', error: e);
+    }
+  }
+
+  ///4，检查数据是否真的发生了变化
+  bool _hasDataChanged(List<AdModel> newAdvertisements) {
+    if (_advertisements.length != newAdvertisements.length) {
+      return true;
+    }
+
+    // 创建ID到广告的映射以便快速比较
+    final currentAdsMap = {for (AdModel ad in _advertisements) ad.id: ad};
+    final newAdsMap = {for (AdModel ad in newAdvertisements) ad.id: ad};
+
+    // 检查是否有新增或删除的广告
+    if (currentAdsMap.keys
+            .toSet()
+            .difference(newAdsMap.keys.toSet())
+            .isNotEmpty ||
+        newAdsMap.keys
+            .toSet()
+            .difference(currentAdsMap.keys.toSet())
+            .isNotEmpty) {
+      return true;
+    }
+
+    // 检查现有广告是否有内容变化
+    for (final id in currentAdsMap.keys) {
+      final currentAd = currentAdsMap[id]!;
+      final newAd = newAdsMap[id]!;
+
+      // 比较关键字段
+      if (currentAd.title != newAd.title ||
+          currentAd.description != newAd.description ||
+          currentAd.duration != newAd.duration ||
+          currentAd.file.url != newAd.file.url ||
+          currentAd.file.md5 != newAd.file.md5) {
+        return true;
+      }
+    }
+
+    return false;
   }
 
   @override
@@ -182,10 +273,18 @@ class AdvertisementProvider extends ChangeNotifier {
     }
   }
 
-  /// 智能对比更新广告列表
+  ///5，智能对比更新广告列表
   Future<void> _smartUpdateAdvertisements(
       List<AdModel> newAdvertisements) async {
     try {
+      // 检查数据是否真的发生了变化
+      if (!_hasDataChanged(newAdvertisements)) {
+        _logger.i('广告数据没有变化，跳过更新操作');
+        return;
+      }
+
+      _logger.i('检测到广告数据变化，开始更新...');
+
       // 将现有广告转换为 Map，以 ID 为键方便查找
       final Map<int, AdModel> currentAdsMap = {
         for (AdModel ad in _advertisements) ad.id: ad
@@ -259,6 +358,9 @@ class AdvertisementProvider extends ChangeNotifier {
       // 更新广告列表（主要操作，确保成功）
       _advertisements = List<AdModel>.from(newAdvertisements); // 创建副本，避免引用问题
 
+      // 保存更新后的数据到缓存
+      await _saveAdvertisementsToCache(_advertisements);
+
       _logger.i('Smart advertisement update completed successfully.');
 
       // 通知listeners，这会触发mainscreen_page.dart中的监听器更新轮播
@@ -268,6 +370,7 @@ class AdvertisementProvider extends ChangeNotifier {
       // 如果智能更新失败，至少确保基本更新完成
       try {
         _advertisements = List<AdModel>.from(newAdvertisements);
+        await _saveAdvertisementsToCache(_advertisements);
         _logger.w('Fallback to basic advertisement update completed.');
       } catch (fallbackError) {
         _logger.e('Even fallback advertisement update failed',
