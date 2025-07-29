@@ -188,8 +188,8 @@ class BottomWeatherQrcodeCarouselProvider extends ChangeNotifier {
         final remaining = _bottomDuration - elapsed;
         final remainingSeconds = remaining.isNegative ? 0 : remaining.inSeconds;
 
-        _logger.d(
-            '🌤️ 底部轮播: ${_showWeather ? "天气" : "二维码"} ${remainingSeconds}s/${_bottomDuration.inSeconds}s');
+        _logger.i(
+            '🐛 🌤️ 底部轮播: ${_showWeather ? "天气" : "二维码"} ${remainingSeconds}s/${_bottomDuration.inSeconds}s');
       }
     });
   }

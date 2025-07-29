@@ -442,38 +442,41 @@ class AnnouncementCarouselProvider extends ChangeNotifier {
   ///7，启动调试定时器 - 每秒输出通告轮播的实时状态
   void startDebugTimer(int apiNoticeStayDuration, {bool enableLogging = true}) {
     _debugTimer?.cancel();
-    _debugTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
-      // 如果不启用日志，直接返回
-      if (!enableLogging) return;
+    // 禁用通告轮播调试定时器以减少日志输出
+    return;
 
-      // 计算通告剩余时间 - 使用实时API配置
-      int noticeRemaining = 0;
-      String statusInfo = '';
+    // _debugTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
+    //   // 如果不启用日志，直接返回
+    //   if (!enableLogging) return;
 
-      if (_isMidCarouselPaused) {
-        statusInfo = ' [暂停状态]';
-      } else if (_currentNoticeStartTime != null) {
-        final elapsed = DateTime.now().difference(_currentNoticeStartTime!);
-        final remaining = Duration(seconds: apiNoticeStayDuration) - elapsed;
-        noticeRemaining = remaining.isNegative ? 0 : remaining.inSeconds;
-      } else {
-        statusInfo = ' [未启动]';
-      }
+    //   // 计算通告剩余时间 - 使用实时API配置
+    //   int noticeRemaining = 0;
+    //   String statusInfo = '';
 
-      // 获取当前通告信息
-      String currentNoticeInfo = '';
-      if (_currentNoticeIndex > 0 &&
-          _currentNoticeIndex <= this.carouselAnnouncements.length) {
-        final currentAnnouncement =
-            this.carouselAnnouncements[_currentNoticeIndex - 1];
-        currentNoticeInfo = ' - ${currentAnnouncement.title}';
-      } else if (_currentNoticeIndex == 0) {
-        currentNoticeInfo = ' - 主屏幕';
-      }
+    //   if (_isMidCarouselPaused) {
+    //     statusInfo = ' [暂停状态]';
+    //   } else if (_currentNoticeStartTime != null) {
+    //     final elapsed = DateTime.now().difference(_currentNoticeStartTime!);
+    //     final remaining = Duration(seconds: apiNoticeStayDuration) - elapsed;
+    //     noticeRemaining = remaining.isNegative ? 0 : remaining.inSeconds;
+    //   } else {
+    //     statusInfo = ' [未启动]';
+    //   }
 
-      _logger.i(
-          '🕐 [调试] 通告轮播: ${noticeRemaining}s/${apiNoticeStayDuration}s$statusInfo 索引:$_currentNoticeIndex$currentNoticeInfo');
-    });
+    //   // 获取当前通告信息
+    //   String currentNoticeInfo = '';
+    //   if (_currentNoticeIndex > 0 &&
+    //       _currentNoticeIndex <= this.carouselAnnouncements.length) {
+    //     final currentAnnouncement =
+    //         this.carouselAnnouncements[_currentNoticeIndex - 1];
+    //     currentNoticeInfo = ' - ${currentAnnouncement.title}';
+    //   } else if (_currentNoticeIndex == 0) {
+    //     currentNoticeInfo = ' - 主屏幕';
+    //   }
+
+    //   _logger.i(
+    //       '🕐 [调试] 通告轮播: ${noticeRemaining}s/${apiNoticeStayDuration}s$statusInfo 索引:$_currentNoticeIndex$currentNoticeInfo');
+    // });
   }
 
   ///8，停止调试定时器

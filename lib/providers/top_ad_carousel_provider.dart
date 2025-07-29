@@ -309,39 +309,42 @@ class TopAdCarouselProvider extends ChangeNotifier {
     }
   }
 
-  /// 启动调试定时器 - 每秒输出顶部广告的实时状态
+  /// 启动调试定时器 - 每秒输出顶部广告的实时状态（已禁用）
   void startDebugTimer() {
     _debugTimer?.cancel();
-    _debugTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
-      // 计算顶部广告剩余时间
-      int topAdRemaining = 0;
-      if (_currentTopAdStartTime != null) {
-        if (_isTopCarouselPaused) {
-          // 暂停状态：使用暂停时的剩余时间
-          final remaining = _topAdDuration - _topAdElapsedTime;
-          topAdRemaining = remaining.isNegative ? 0 : remaining.inSeconds;
-        } else {
-          // 运行状态：计算当前剩余时间
-          final currentElapsed =
-              DateTime.now().difference(_currentTopAdStartTime!);
+    // 禁用顶部广告调试定时器以减少日志输出
+    return;
 
-          // 如果有已播放时间记录（说明经历了暂停恢复），需要加上之前的播放时间
-          final totalElapsed = currentElapsed + _topAdElapsedTime;
+    // _debugTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
+    //   // 计算顶部广告剩余时间
+    //   int topAdRemaining = 0;
+    //   if (_currentTopAdStartTime != null) {
+    //     if (_isTopCarouselPaused) {
+    //       // 暂停状态：使用暂停时的剩余时间
+    //       final remaining = _topAdDuration - _topAdElapsedTime;
+    //       topAdRemaining = remaining.isNegative ? 0 : remaining.inSeconds;
+    //     } else {
+    //       // 运行状态：计算当前剩余时间
+    //       final currentElapsed =
+    //           DateTime.now().difference(_currentTopAdStartTime!);
 
-          final remaining = _topAdDuration - totalElapsed;
-          topAdRemaining = remaining.isNegative ? 0 : remaining.inSeconds;
-        }
-      }
+    //       // 如果有已播放时间记录（说明经历了暂停恢复），需要加上之前的播放时间
+    //       final totalElapsed = currentElapsed + _topAdElapsedTime;
 
-      // 输出调试信息
-      String statusInfo = '';
-      if (_isTopCarouselPaused) {
-        statusInfo = ' [暂停状态]';
-      }
+    //       final remaining = _topAdDuration - totalElapsed;
+    //       topAdRemaining = remaining.isNegative ? 0 : remaining.inSeconds;
+    //     }
+    //   }
 
-      _logger.i(
-          '🕐 [调试] 顶部广告: ${topAdRemaining}s/${_topAdDuration.inSeconds}s$statusInfo');
-    });
+    //   // 输出调试信息
+    //   String statusInfo = '';
+    //   if (_isTopCarouselPaused) {
+    //     statusInfo = ' [暂停状态]';
+    //   }
+
+    //   _logger.i(
+    //       '🕐 [调试] 顶部广告: ${topAdRemaining}s/${_topAdDuration.inSeconds}s$statusInfo');
+    // });
   }
 
   /// 停止调试定时器

@@ -27,7 +27,7 @@ class _BottomDisplayWidgetState extends State<BottomDisplayWidget> {
       builder: (context, bottomProvider, child) {
         return Container(
           padding: const EdgeInsets.fromLTRB(8.0, 0, 8.0, 6.0),
-          height: 145,
+          height: 160, // 增加高度以匹配QrcodeWidget
           child: Row(
             children: [
               // 左侧部分：当前天气显示区域 - 固定显示天气组件的左侧部分

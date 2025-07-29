@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:iboard_app/providers/app_data_provider.dart';
+import 'package:iboard_app/widgets/qr_debug_widget.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:logger/logger.dart';
+import 'dart:io';
 
 class QrcodeWidget extends StatefulWidget {
   const QrcodeWidget({Key? key}) : super(key: key);
@@ -13,111 +15,247 @@ class QrcodeWidget extends StatefulWidget {
 
 class _QrcodeWidgetState extends State<QrcodeWidget> {
   final Logger _logger = Logger();
-  bool _showComplaintQr = true; // true显示意见投诉，false显示住户登记
 
   @override
   void initState() {
     super.initState();
     _logger.i('🔲 QrcodeWidget初始化');
-  }
 
-  ///1，切换二维码显示
-  void _switchQrCode() {
-    setState(() {
-      _showComplaintQr = !_showComplaintQr;
+    // 在Widget初始化后立即检查并生成二维码
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _checkAndGenerateQrCodes();
     });
-    _logger.i('🔄 二维码切换: ${_showComplaintQr ? "意见投诉" : "住户登记"}');
   }
 
-  ///2，构建二维码卡片
+  ///1，检查并生成二维码（带自动修复）
+  void _checkAndGenerateQrCodes() {
+    final appDataProvider = context.read<AppDataProvider>();
+    _logger.i('🔍 检查二维码生成状态...');
+
+    // 检查投诉二维码
+    if (appDataProvider.cachedComplaintQrCode == null) {
+      _logger.w('⚠️ 投诉二维码未生成，尝试初始化...');
+    } else {
+      _logger.d('投诉二维码: ${appDataProvider.cachedComplaintQrCode}');
+    }
+
+    // 检查登记二维码
+    if (appDataProvider.cachedRegistrationQrCode == null) {
+      _logger.w('⚠️ 登记二维码未生成，尝试初始化...');
+    } else {
+      _logger.d('登记二维码: ${appDataProvider.cachedRegistrationQrCode}');
+    }
+
+    // 如果二维码未生成，尝试初始化
+    if (appDataProvider.cachedComplaintQrCode == null ||
+        appDataProvider.cachedRegistrationQrCode == null) {
+      _logger.w('⚠️ 二维码未生成，尝试完整初始化...');
+      appDataProvider.initializeQrCodes();
+    }
+  }
+
+  ///2，构建二维码图片组件（支持本地文件和网络URL）- 增强版
+  Widget _buildQrCodeImage(String imagePath) {
+    _logger.d('🖼️ 构建二维码图片: $imagePath');
+
+    // 判断是本地文件路径还是网络URL
+    if (imagePath.startsWith('http://') || imagePath.startsWith('https://')) {
+      _logger.d('🌐 使用网络图片: $imagePath');
+      // 网络图片 - 使用增强的错误处理
+      return CachedNetworkImage(
+        imageUrl: imagePath,
+        width: 88,
+        height: 88,
+        fit: BoxFit.contain,
+        // 增加更多的请求头
+        httpHeaders: const {
+          'User-Agent': 'Mozilla/5.0 (compatible; Flutter App)',
+          'Accept': 'image/*,*/*;q=0.8',
+        },
+        placeholder: (context, url) {
+          _logger.d('⏳ 加载中: $url');
+          return const SizedBox(
+            width: 24,
+            height: 24,
+            child: CircularProgressIndicator(strokeWidth: 2.0),
+          );
+        },
+        errorWidget: (context, url, error) {
+          _logger.e('❌ 网络图片加载失败: $url, 错误: $error');
+
+          // 显示错误信息和重试按钮
+          return Container(
+            width: 88,
+            height: 88,
+            decoration: BoxDecoration(
+              border: Border.all(color: Colors.red.shade300),
+              borderRadius: BorderRadius.circular(4),
+            ),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(
+                  Icons.error_outline,
+                  size: 30,
+                  color: Colors.red.shade400,
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  '加载失败',
+                  style: TextStyle(
+                    fontSize: 10,
+                    color: Colors.red.shade600,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                GestureDetector(
+                  onTap: () {
+                    _logger.i('🔄 用户点击重试加载二维码');
+                    // 清除缓存并重新加载
+                    CachedNetworkImage.evictFromCache(url);
+                    // 触发重建
+                    if (mounted) {
+                      setState(() {});
+                    }
+                  },
+                  child: Container(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: Colors.blue.shade100,
+                      borderRadius: BorderRadius.circular(2),
+                    ),
+                    child: Text(
+                      '重试',
+                      style: TextStyle(
+                        fontSize: 8,
+                        color: Colors.blue.shade700,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          );
+        },
+        // 设置缓存时间
+        cacheKey: imagePath,
+        memCacheWidth: 88,
+        memCacheHeight: 88,
+      );
+    } else {
+      _logger.d('📱 使用本地文件: $imagePath');
+      // 本地文件
+      final file = File(imagePath);
+      return FutureBuilder<bool>(
+        future: file.exists(),
+        builder: (context, snapshot) {
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            return const SizedBox(
+              width: 24,
+              height: 24,
+              child: CircularProgressIndicator(strokeWidth: 2.0),
+            );
+          }
+
+          if (snapshot.data == true) {
+            return Image.file(
+              file,
+              width: 88,
+              height: 88,
+              fit: BoxFit.contain,
+              errorBuilder: (context, error, stackTrace) {
+                _logger.e('❌ 本地文件加载失败: $imagePath, 错误: $error');
+                return const Icon(
+                  Icons.qr_code,
+                  size: 60,
+                  color: Colors.grey,
+                );
+              },
+            );
+          } else {
+            _logger.w('⚠️ 本地二维码文件不存在: $imagePath');
+            return const Icon(
+              Icons.qr_code,
+              size: 60,
+              color: Colors.grey,
+            );
+          }
+        },
+      );
+    }
+  }
+
+  ///3，构建单个二维码卡片
   Widget _buildQrCodeCard({
     required String title,
     required String subtitle,
     required String? qrCodeUrl,
-    required VoidCallback onTap,
   }) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        margin: const EdgeInsets.symmetric(horizontal: 2.0),
-        padding: const EdgeInsets.all(8.0),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(10.0),
-          border: Border.all(color: Colors.lightBlue.shade200, width: 1),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.06),
-              blurRadius: 8,
-              offset: const Offset(0, 2),
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12.0),
+        border: Border.all(color: Colors.grey.shade300, width: 1),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.06),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      padding: const EdgeInsets.all(16.0),
+      child: Row(
+        children: [
+          // 二维码区域 - 调整尺寸避免溢出
+          Container(
+            width: 100,
+            height: 100,
+            decoration: BoxDecoration(
+              color: Colors.grey.shade50,
+              borderRadius: BorderRadius.circular(8.0),
             ),
-          ],
-        ),
-        child: Row(
-          children: [
-            // 二维码区域
-            Container(
-              width: 80,
-              height: 80,
-              decoration: BoxDecoration(
-                color: Colors.grey.shade50,
-                borderRadius: BorderRadius.circular(8.0),
-              ),
+            child: Center(
               child: qrCodeUrl != null
-                  ? CachedNetworkImage(
-                      imageUrl: qrCodeUrl,
-                      width: 70,
-                      height: 70,
-                      fit: BoxFit.contain,
-                      placeholder: (context, url) => const Center(
-                        child: SizedBox(
-                          width: 20,
-                          height: 20,
-                          child: CircularProgressIndicator(strokeWidth: 2.0),
-                        ),
-                      ),
-                      errorWidget: (context, url, error) => const Icon(
-                        Icons.qr_code,
-                        size: 40,
-                        color: Colors.grey,
-                      ),
-                    )
+                  ? _buildQrCodeImage(qrCodeUrl)
                   : const Icon(
                       Icons.qr_code,
-                      size: 40,
+                      size: 60,
                       color: Colors.grey,
                     ),
             ),
-            const SizedBox(width: 12),
-            // 文字区域
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Text(
-                    title,
-                    style: TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w600,
-                      color: Colors.blueGrey[800],
-                    ),
+          ),
+          const SizedBox(width: 16),
+          // 文字区域
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Text(
+                  title,
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                    color: Colors.blueGrey[800],
                   ),
-                  const SizedBox(height: 4),
-                  Text(
-                    subtitle,
-                    style: TextStyle(
-                      fontSize: 11,
-                      color: Colors.blueGrey[600],
-                    ),
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  subtitle,
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: Colors.blueGrey[600],
                   ),
-                ],
-              ),
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ],
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
@@ -126,21 +264,64 @@ class _QrcodeWidgetState extends State<QrcodeWidget> {
   Widget build(BuildContext context) {
     return Consumer<AppDataProvider>(
       builder: (context, appDataProvider, child) {
-        // 根据当前显示状态选择对应的二维码数据
-        final qrCodeUrl = _showComplaintQr
-            ? appDataProvider.cachedComplaintQrCode
-            : appDataProvider.cachedRegistrationQrCode;
-
-        final title = _showComplaintQr ? '意見投訴' : '住戶登記';
-        final subtitle = _showComplaintQr ? '掃QRCode提交意見投訴' : '掃QRCode進行住戶登記';
+        _logger.d(
+            '🔍 检查二维码状态: 投诉=${appDataProvider.cachedComplaintQrCode != null}, 登记=${appDataProvider.cachedRegistrationQrCode != null}');
 
         return Container(
-          height: 100,
-          child: _buildQrCodeCard(
-            title: title,
-            subtitle: subtitle,
-            qrCodeUrl: qrCodeUrl,
-            onTap: _switchQrCode,
+          height: 150, // 调整高度适应父容器
+          padding: const EdgeInsets.symmetric(horizontal: 4.0),
+          child: Stack(
+            children: [
+              Row(
+                children: [
+                  // 意见投诉二维码
+                  Expanded(
+                    child: _buildQrCodeCard(
+                      title: '意見投訴',
+                      subtitle: '掃QRCode提交意見投訴',
+                      qrCodeUrl: appDataProvider.cachedComplaintQrCode,
+                    ),
+                  ),
+                  const SizedBox(width: 16),
+                  // 住户登记二维码
+                  Expanded(
+                    child: _buildQrCodeCard(
+                      title: '住戶登記',
+                      subtitle: '掃QRCode進行住戶登記',
+                      qrCodeUrl: appDataProvider.cachedRegistrationQrCode,
+                    ),
+                  ),
+                ],
+              ),
+              // 调试按钮（仅在Debug模式显示）
+              if (const bool.fromEnvironment('dart.vm.product') == false)
+                Positioned(
+                  top: 0,
+                  right: 0,
+                  child: GestureDetector(
+                    onTap: () {
+                      Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (context) => const QrDebugWidget(),
+                        ),
+                      );
+                    },
+                    child: Container(
+                      width: 30,
+                      height: 30,
+                      decoration: BoxDecoration(
+                        color: Colors.red.withOpacity(0.8),
+                        borderRadius: BorderRadius.circular(15),
+                      ),
+                      child: const Icon(
+                        Icons.bug_report,
+                        size: 20,
+                        color: Colors.white,
+                      ),
+                    ),
+                  ),
+                ),
+            ],
           ),
         );
       },

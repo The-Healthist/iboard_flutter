@@ -407,46 +407,49 @@ class FullscreenAdProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  ///15, 启动调试定时器 - 每秒输出全屏广告的实时状态
+  ///15, 启动调试定时器 - 每秒输出全屏广告的实时状态（已禁用）
   void startDebugTimer() {
     _debugTimer?.cancel();
-    _debugTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
-      if (!_isActive) return;
+    // 禁用全屏广告调试定时器以减少日志输出
+    return;
 
-      String statusText = _isPaused ? '⏸️ 暂停' : '▶️ 播放';
-      String timeInfo = '';
+    // _debugTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
+    //   if (!_isActive) return;
 
-      if (_currentAdStartTime != null &&
-          _currentAdIndex < this.fullscreenAds.length) {
-        // 确保预计已播放时间不会超过广告总时长
-        Duration safeExpectedElapsed = _expectedAdElapsedTime > _adDuration
-            ? _adDuration
-            : _expectedAdElapsedTime;
+    //   String statusText = _isPaused ? '⏸️ 暂停' : '▶️ 播放';
+    //   String timeInfo = '';
 
-        Duration remaining = _adDuration - _adElapsedTime;
+    //   if (_currentAdStartTime != null &&
+    //       _currentAdIndex < this.fullscreenAds.length) {
+    //     // 确保预计已播放时间不会超过广告总时长
+    //     Duration safeExpectedElapsed = _expectedAdElapsedTime > _adDuration
+    //         ? _adDuration
+    //         : _expectedAdElapsedTime;
 
-        if (_isPaused) {
-          timeInfo =
-              '剩余: ${remaining.inSeconds}s/${_adDuration.inSeconds}s | 实际已播放: ${_adElapsedTime.inSeconds}s | 预计已播放: ${safeExpectedElapsed.inSeconds}s';
-        } else {
-          final currentElapsed =
-              DateTime.now().difference(_currentAdStartTime!);
-          final totalElapsed = currentElapsed + _adElapsedTime;
-          remaining = _adDuration - totalElapsed;
-          timeInfo =
-              '剩余: ${remaining.inSeconds.clamp(0, _adDuration.inSeconds)}s/${_adDuration.inSeconds}s | 实际已播放: ${_adElapsedTime.inSeconds}s | 预计已播放: ${safeExpectedElapsed.inSeconds}s';
-        }
-      }
+    //     Duration remaining = _adDuration - _adElapsedTime;
 
-      final currentAd = this.fullscreenAds.isNotEmpty
-          ? this.fullscreenAds[_currentAdIndex]
-          : null;
-      final adTitle = currentAd?.title ?? '无广告';
-      final timerActive = _fullscreenTimer?.isActive ?? false;
+    //     if (_isPaused) {
+    //       timeInfo =
+    //           '剩余: ${remaining.inSeconds}s/${_adDuration.inSeconds}s | 实际已播放: ${_adElapsedTime.inSeconds}s | 预计已播放: ${safeExpectedElapsed.inSeconds}s';
+    //     } else {
+    //       final currentElapsed =
+    //           DateTime.now().difference(_currentAdStartTime!);
+    //       final totalElapsed = currentElapsed + _adElapsedTime;
+    //       remaining = _adDuration - totalElapsed;
+    //       timeInfo =
+    //           '剩余: ${remaining.inSeconds.clamp(0, _adDuration.inSeconds)}s/${_adDuration.inSeconds}s | 实际已播放: ${_adElapsedTime.inSeconds}s | 预计已播放: ${safeExpectedElapsed.inSeconds}s';
+    //     }
+    //   }
 
-      _logger.i(
-          '🎬 [全屏广告] $statusText | [${_currentAdIndex + 1}/${this.fullscreenAds.length}] $adTitle | $timeInfo | Timer活跃: $timerActive');
-    });
+    //   final currentAd = this.fullscreenAds.isNotEmpty
+    //       ? this.fullscreenAds[_currentAdIndex]
+    //       : null;
+    //   final adTitle = currentAd?.title ?? '无广告';
+    //   final timerActive = _fullscreenTimer?.isActive ?? false;
+
+    //   _logger.i(
+    //       '🎬 [全屏广告] $statusText | [${_currentAdIndex + 1}/${this.fullscreenAds.length}] $adTitle | $timeInfo | Timer活跃: $timerActive');
+    // });
   }
 
   ///16, 停止调试定时器
