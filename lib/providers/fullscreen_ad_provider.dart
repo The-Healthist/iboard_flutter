@@ -254,31 +254,27 @@ class FullscreenAdProvider extends ChangeNotifier {
     _adDuration = ad.durationObject;
     _currentAdIndex = currentIndex;
 
-    // 计算当前状态下的剩余时间:fullscreenAdDuration - 当前时间 + 当前状态开始时间
-    int remainStateTime = fullscreenAdDuration -
-        (DateTime.now().difference(_currentStateStartTime!).inSeconds);
-
-    // 确保剩余时间不为负数
-    if (remainStateTime < 0) {
-      remainStateTime = 0;
+    // 检查当前广告的个人时间是否小于fullscreenAdDuration
+    // 如果小于，说明需要在该全屏广告状态下切换，直接切换即可
+    if (_adDuration.inSeconds < fullscreenAdDuration) {
+      _logger.i(
+          '📝 记录全屏广告开始时间: $_currentAdStartTime, 索引: $_currentAdIndex, 时长: ${_adDuration.inSeconds}秒, 剩余时间: ${_adDuration.inSeconds}秒');
+      _fullscreenTimer = Timer(Duration(seconds: _adDuration.inSeconds), () {
+        if (_isActive && !_isPaused) {
+          _logger.d('⏭️ 全屏广告计时器到期，切换到下一个');
+          _nextAd();
+        }
+      });
+    } else {
+      // 如果等于或大于fullscreenAdDuration，则设置定时器为fullscreenAdDuration时长
+      _logger.i('📝 广告时长大于等于设置的播放时间，将按照设置时间播放: ${fullscreenAdDuration}秒');
+      _fullscreenTimer = Timer(Duration(seconds: fullscreenAdDuration), () {
+        if (_isActive && !_isPaused) {
+          _logger.d('⏭️ 全屏广告计时器到期，切换到下一个');
+          _nextAd();
+        }
+      });
     }
-
-    // 使用remainStateTime作为播放时间限制
-    // 如果广告时长小于剩余时间，则按广告时长播放
-    // 如果广告时长大于剩余时间，则按剩余时间播放
-    int playTime = _adDuration.inSeconds < remainStateTime
-        ? _adDuration.inSeconds
-        : remainStateTime;
-
-    _logger.i(
-        '📝 记录全屏广告开始时间: $_currentAdStartTime, 索引: $_currentAdIndex, 广告时长: ${_adDuration.inSeconds}秒, 状态剩余时间: $remainStateTime秒, 实际播放时间: $playTime秒');
-
-    _fullscreenTimer = Timer(Duration(seconds: playTime), () {
-      if (_isActive && !_isPaused) {
-        _logger.d('⏭️ 全屏广告计时器到期，切换到下一个');
-        _nextAd();
-      }
-    });
   }
 
   ///11, 切换到下一个广告
@@ -354,36 +350,20 @@ class FullscreenAdProvider extends ChangeNotifier {
     }
 
     // 计算剩余播放时间并恢复定时器
-    if (this.fullscreenAds.isNotEmpty &&
-        _currentAdStartTime != null &&
-        _currentStateStartTime != null) {
+    if (this.fullscreenAds.isNotEmpty && _currentAdStartTime != null) {
       final currentAd = getCurrentAd();
       if (currentAd != null) {
         _adDuration = currentAd.durationObject;
       }
 
-      // 计算当前状态下的剩余时间
-      int remainStateTime = fullscreenAdDuration -
-          (DateTime.now().difference(_currentStateStartTime!).inSeconds);
-
-      // 确保剩余时间不为负数
-      if (remainStateTime < 0) {
-        remainStateTime = 0;
-      }
-
-      // 使用remainStateTime作为播放时间限制
-      // 如果广告时长小于剩余时间，则按广告时长播放
-      // 如果广告时长大于剩余时间，则按剩余时间播放
-      int playTime = _adDuration.inSeconds < remainStateTime
-          ? _adDuration.inSeconds
-          : remainStateTime;
-
+      // 根据新的逻辑，我们按照fullscreenAdDuration来设置定时器
       // 计算已经播放的时间
       Duration alreadyPlayed = _expectedAdElapsedTime;
-      final remainingTime = Duration(seconds: playTime) - alreadyPlayed;
+      final remainingTime =
+          Duration(seconds: fullscreenAdDuration) - alreadyPlayed;
 
       _logger.i(
-          '🔄 [恢复] 全屏广告 - 状态剩余时间: $remainStateTime秒, 实际播放时间: $playTime秒, 已播放: ${alreadyPlayed.inSeconds}s, 剩余播放时间: ${remainingTime.inSeconds}s');
+          '🔄 [恢复] 全屏广告 - 继续播放剩余时间：${remainingTime.inSeconds}s (已播放: ${alreadyPlayed.inSeconds}s, 广告总时长: ${_adDuration.inSeconds}s)');
 
       // 如果剩余时间 <= 0，应该立即切换到下一个广告
       if (remainingTime.inSeconds <= 0) {
@@ -437,8 +417,7 @@ class FullscreenAdProvider extends ChangeNotifier {
       String timeInfo = '';
 
       if (_currentAdStartTime != null &&
-          _currentAdIndex < this.fullscreenAds.length &&
-          _currentStateStartTime != null) {
+          _currentAdIndex < this.fullscreenAds.length) {
         // 确保预计已播放时间不会超过广告总时长
         Duration safeExpectedElapsed = _expectedAdElapsedTime > _adDuration
             ? _adDuration
@@ -446,20 +425,16 @@ class FullscreenAdProvider extends ChangeNotifier {
 
         Duration remaining = _adDuration - _adElapsedTime;
 
-        // 计算当前状态下的剩余时间
-        int remainStateTime = fullscreenAdDuration -
-            (DateTime.now().difference(_currentStateStartTime!).inSeconds);
-
         if (_isPaused) {
           timeInfo =
-              '状态剩余: ${remainStateTime.clamp(0, fullscreenAdDuration)}s | 广告剩余: ${remaining.inSeconds}s/${_adDuration.inSeconds}s | 实际已播放: ${_adElapsedTime.inSeconds}s | 预计已播放: ${safeExpectedElapsed.inSeconds}s';
+              '剩余: ${remaining.inSeconds}s/${_adDuration.inSeconds}s | 实际已播放: ${_adElapsedTime.inSeconds}s | 预计已播放: ${safeExpectedElapsed.inSeconds}s';
         } else {
           final currentElapsed =
               DateTime.now().difference(_currentAdStartTime!);
           final totalElapsed = currentElapsed + _adElapsedTime;
           remaining = _adDuration - totalElapsed;
           timeInfo =
-              '状态剩余: ${remainStateTime.clamp(0, fullscreenAdDuration)}s | 广告剩余: ${remaining.inSeconds.clamp(0, _adDuration.inSeconds)}s/${_adDuration.inSeconds}s | 实际已播放: ${_adElapsedTime.inSeconds}s | 预计已播放: ${safeExpectedElapsed.inSeconds}s';
+              '剩余: ${remaining.inSeconds.clamp(0, _adDuration.inSeconds)}s/${_adDuration.inSeconds}s | 实际已播放: ${_adElapsedTime.inSeconds}s | 预计已播放: ${safeExpectedElapsed.inSeconds}s';
         }
       }
 
