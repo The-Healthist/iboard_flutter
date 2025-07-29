@@ -5,6 +5,7 @@ import 'package:iboard_app/models/weather_forecast_model.dart';
 import 'package:iboard_app/models/current_weather_model.dart';
 import 'package:iboard_app/models/weather_warning_model.dart';
 import 'package:iboard_app/providers/app_data_provider.dart';
+import 'package:iboard_app/widgets/weather_icon_widget.dart';
 import 'package:intl/intl.dart';
 import 'package:intl/date_symbol_data_local.dart';
 import 'package:logger/logger.dart';
