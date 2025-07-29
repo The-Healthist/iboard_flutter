@@ -168,8 +168,9 @@ class _HomePageState extends State<HomePage> {
           });
 
           // 执行登录
-          await appDataProvider.initializeAndLogin(deviceIdToSet: deviceId);
 
+          // await appDataProvider.initializeAndLogin(deviceIdToSet: deviceId);
+          await appDataProvider.initialize(deviceIdToSet: deviceId);
           // 登录成功后启动定时更新和初始化欠费数据
           if (appDataProvider.isLoggedIn) {
             advertisementProvider.startPeriodicUpdate();
