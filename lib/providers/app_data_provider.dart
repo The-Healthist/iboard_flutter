@@ -350,19 +350,22 @@ class AppDataProvider extends ChangeNotifier {
     if (_arrearProvider != null && !(_arrearProvider!.isDisposed)) {
       try {
         // 确保我们有有效的楼宇ID
-        final buildingIsmartId = _settingsModel != null ? _settingsModel!.building.ismartId : null;
+        final buildingIsmartId =
+            _settingsModel != null ? _settingsModel!.building.ismartId : null;
         if (buildingIsmartId != null && buildingIsmartId.isNotEmpty) {
           _logger.i('AppDataProvider: 使用楼宇ID $buildingIsmartId 初始化欠费数据');
           // 设置楼宇ID到ArrearProvider
           _arrearProvider!.setSelectedBuildingId(buildingIsmartId);
           // 获取欠费数据
-          await _arrearProvider!.fetchArrears(reset: true, buildingId: buildingIsmartId);
+          await _arrearProvider!
+              .fetchArrears(reset: true, buildingId: buildingIsmartId);
           _logger.i('AppDataProvider: 欠费数据初始化完成');
         } else {
           _logger.w('AppDataProvider: 楼宇ID无效，无法初始化欠费数据');
         }
       } catch (e, stackTrace) {
-        _logger.e('AppDataProvider: 欠费数据初始化失败: $e', error: e, stackTrace: stackTrace);
+        _logger.e('AppDataProvider: 欠费数据初始化失败: $e',
+            error: e, stackTrace: stackTrace);
       }
     } else {
       if (_arrearProvider == null) {

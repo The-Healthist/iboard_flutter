@@ -72,14 +72,10 @@ void main() {
           ChangeNotifierProvider(
               create: (_) =>
                   FullscreenAdProvider()), // Add FullscreenAdProvider here
-          ChangeNotifierProxyProvider<AppDataProvider, ArrearProvider>(
+          ChangeNotifierProvider<ArrearProvider>(
             create: (context) => ArrearProvider(
               apiClient: Provider.of<AppDataProvider>(context, listen: false)
                   .apiClient,
-            ),
-            update: (context, appDataProvider, previousArrearProvider) =>
-                ArrearProvider(
-              apiClient: appDataProvider.apiClient,
             ),
           ),
         ],

@@ -79,6 +79,61 @@ class ApiClient {
     return headers;
   }
 
+  ///2, 处理返回数组数据的HTTP响应
+  Future<List<Map<String, dynamic>>> _handleArrayResponse(
+      http.Response response, String apiName) async {
+    final String decodedBody = utf8.decode(response.bodyBytes);
+
+    if (response.statusCode >= 200 && response.statusCode < 300) {
+      _logger.i('$apiName successful (Status: ${response.statusCode})');
+      if (decodedBody.isEmpty) {
+        return []; // Return empty list for empty successful response
+      }
+      try {
+        final decoded = json.decode(decodedBody);
+        if (decoded is List) {
+          return decoded
+              .map((item) => Map<String, dynamic>.from(item as Map))
+              .toList();
+        } else if (decoded is Map &&
+            decoded.containsKey('data') &&
+            decoded['data'] is List) {
+          return (decoded['data'] as List)
+              .map((item) => Map<String, dynamic>.from(item as Map))
+              .toList();
+        } else {
+          throw Exception(
+              'Expected array response but got: ${decoded.runtimeType}');
+        }
+      } catch (e, stackTrace) {
+        _logger.e(
+            'Failed to decode JSON array for $apiName. Body: $decodedBody',
+            error: e,
+            stackTrace: stackTrace);
+        throw ApiException(
+          statusCode: response.statusCode,
+          message:
+              'Successfully received response for $apiName, but failed to decode JSON array.',
+          errorData: decodedBody,
+        );
+      }
+    } else {
+      _logger.w(
+          '$apiName failed (Status: ${response.statusCode}), Body: $decodedBody');
+      dynamic errorData;
+      try {
+        errorData = decodedBody.isNotEmpty ? json.decode(decodedBody) : null;
+      } catch (_) {
+        errorData = decodedBody;
+      }
+      throw ApiException(
+        statusCode: response.statusCode,
+        message: '$apiName failed',
+        errorData: errorData,
+      );
+    }
+  }
+
   Future<Map<String, dynamic>> _handleResponse(
       http.Response response, String apiName) async {
     final String decodedBody = utf8.decode(response.bodyBytes);
@@ -501,7 +556,7 @@ class ApiClient {
   /// 8. 获取欠费数据
   /// Endpoint: POST https://uqf0jqfm77.execute-api.ap-east-1.amazonaws.com/prod/v1/building_board/building-mf-table
   /// Body: {"blg_id": "string", "ptype": "mf"}
-  Future<Map<String, dynamic>> getArrearage({String? buildingId}) async {
+  Future<List<Map<String, dynamic>>> getArrearage({String? buildingId}) async {
     const String fullUrl =
         'https://uqf0jqfm77.execute-api.ap-east-1.amazonaws.com/prod/v1/building_board/building-mf-table';
     final Uri url = _buildUri(fullUrl, null);
@@ -517,6 +572,6 @@ class ApiClient {
     final http.Response response = await _sendRequest(
         () => http.post(url, headers: headers, body: requestBody),
         apiNameForLog: 'getArrearage');
-    return _handleResponse(response, 'getArrearage');
+    return _handleArrayResponse(response, 'getArrearage');
   }
 }
