@@ -18,22 +18,11 @@ class CarouselSettingsPage extends StatefulWidget {
 }
 
 class _CarouselSettingsPageState extends State<CarouselSettingsPage> {
-  ///1，恢复所有轮播和计时器
-  void _resumeAllCarouselsFromSettings() {
-    // 强制发送媒体恢复通知，确保所有视频都恢复播放
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) {
-        MediaResumeNotification().dispatch(context);
-      }
-    });
-  }
-
   @override
   Widget build(BuildContext context) {
     return WillPopScope(
       onWillPop: () async {
-        // 在返回前恢复所有轮播
-        _resumeAllCarouselsFromSettings();
+        // 直接返回，不恢复轮播，因为这只是返回到设置页面
         return true; // 允许返回
       },
       child: Scaffold(
@@ -63,8 +52,7 @@ class _CarouselSettingsPageState extends State<CarouselSettingsPage> {
                     children: [
                       IconButton(
                         onPressed: () {
-                          // 在返回前恢复所有轮播
-                          _resumeAllCarouselsFromSettings();
+                          // 直接返回，不恢复轮播
                           Navigator.pop(context);
                         },
                         icon: Icon(Icons.arrow_back, size: 28),

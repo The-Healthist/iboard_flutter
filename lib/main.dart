@@ -171,6 +171,18 @@ class _HomePageState extends State<HomePage> {
             // 新的Provider没有预加载方法
           });
 
+          // 初始化天气数据（不需要登录，公开API）
+          try {
+            final weatherProvider =
+                Provider.of<WeatherProvider>(context, listen: false);
+            await weatherProvider.fetchAllWeatherData();
+            weatherProvider.startPeriodicUpdate(
+                interval: const Duration(hours: 2));
+            print('天气数据初始化完成');
+          } catch (e) {
+            print('天气数据初始化失败: $e');
+          }
+
           // 执行登录
 
           // await appDataProvider.initializeAndLogin(deviceIdToSet: deviceId);

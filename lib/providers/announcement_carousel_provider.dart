@@ -214,7 +214,8 @@ class AnnouncementCarouselProvider extends ChangeNotifier {
     Widget mainScreenWidget = MainScreenWidget(
       onAnnouncementTap: (AnnouncementModel? announcement) {
         if (announcement == null) {
-          // 显示欠费查询界面
+          // 显示欠费查询界面 - 立即进入手动操作状态
+          _logger.i('💰 用户点击欠费查询按钮，立即进入手动操作状态');
           _showArrearQueryWidget(onHomeButtonPressed);
         } else {
           // 查找announcement在轮播通告列表中的索引
@@ -583,16 +584,8 @@ class AnnouncementCarouselProvider extends ChangeNotifier {
   void _showArrearQueryWidget(VoidCallback onHomeButtonPressed) {
     _logger.i('💰 显示欠费查询界面');
 
-    // 检查是否已经存在欠费查询界面
-    int existingArrearIndex = -1;
-    for (int i = 0; i < _midCarouselController.widgetCount; i++) {
-      // 这里我们需要检查当前索引是否已经是欠费查询界面
-      if (i == _currentNoticeIndex && _currentNoticeIndex > 0) {
-        // 如果当前已经在欠费查询界面，直接返回
-        _logger.i('💰 已经在欠费查询界面，无需重复跳转');
-        return;
-      }
-    }
+    // 移除不必要的检查逻辑，确保每次点击都能进入欠费查询界面
+    // 这样可以解决刚启动应用时无法进入欠费查询的问题
 
     // 创建欠费查询组件
     Widget arrearQueryWidget = ArrearDisplayWidget(

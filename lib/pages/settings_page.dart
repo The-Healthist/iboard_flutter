@@ -4,7 +4,9 @@ import 'package:iboard_app/providers/announcement_carousel_provider.dart';
 import 'package:iboard_app/providers/fullscreen_ad_provider.dart';
 import 'package:iboard_app/providers/state_provider.dart';
 import 'package:iboard_app/providers/top_ad_carousel_provider.dart';
+import 'package:iboard_app/providers/bottom_weather_qrcode_carousel_provider.dart';
 import 'package:iboard_app/widgets/carousel_widget.dart'; // 导入通知类
+
 import 'package:provider/provider.dart';
 
 class SettingsPage extends StatefulWidget {
@@ -13,6 +15,8 @@ class SettingsPage extends StatefulWidget {
 }
 
 class _SettingsPageState extends State<SettingsPage> {
+  bool _isExitingSettings = false; // 添加标志来跟踪是否真正退出设置页面
+
   ///1, 初始化状态 - 暂停所有轮播
   @override
   void initState() {
@@ -24,17 +28,20 @@ class _SettingsPageState extends State<SettingsPage> {
     });
   }
 
-  ///2, 销毁状态 - 恢复所有轮播
+  ///2, 销毁状态 - 只有在真正退出设置页面时才恢复所有轮播
   @override
   void dispose() {
-    _resumeAllCarouselsFromSettings();
+    // 只有在真正退出设置页面时才恢复轮播
+    if (_isExitingSettings) {
+      _resumeAllCarouselsFromSettings();
 
-    // 延迟发送媒体恢复通知，确保所有视频都恢复播放
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) {
-        MediaResumeNotification().dispatch(context);
-      }
-    });
+      // 延迟发送媒体恢复通知，确保所有视频都恢复播放
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) {
+          MediaResumeNotification().dispatch(context);
+        }
+      });
+    }
 
     super.dispose();
   }
@@ -45,6 +52,7 @@ class _SettingsPageState extends State<SettingsPage> {
     final announcementCarouselProvider =
         context.read<AnnouncementCarouselProvider>();
     final fullAdCarouselProvider = context.read<FullscreenAdProvider>();
+    final bottomProvider = context.read<BottomWeatherQrcodeCarouselProvider>();
     final carouselStateProvider = context.read<CarouselStateProvider>();
 
     // 1. 进入手动操作状态以防止自动切换到全屏广告
@@ -62,10 +70,13 @@ class _SettingsPageState extends State<SettingsPage> {
     // 4. 暂停顶部广告轮播
     topAdProvider.pauseAllTimersForSettings();
 
-    // 5. 暂停其他定时器
+    // 5. 暂停底部天气二维码轮播
+    bottomProvider.pauseAllTimersForSettings();
+
+    // 6. 暂停其他定时器
     carouselStateProvider.pauseAllStateTimers();
 
-    // 6. 强制发送媒体暂停通知，确保所有视频都暂停
+    // 7. 强制发送媒体暂停通知，确保所有视频都暂停
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) {
         MediaPauseNotification().dispatch(context);
@@ -80,9 +91,10 @@ class _SettingsPageState extends State<SettingsPage> {
     final announcementCarouselProvider =
         context.read<AnnouncementCarouselProvider>();
     final fullAdCarouselProvider = context.read<FullscreenAdProvider>();
+    final bottomProvider = context.read<BottomWeatherQrcodeCarouselProvider>();
 
-    // 确保保持在手动操作状态
-    carouselStateProvider.enterManualOperation();
+    // 恢复到默认状态
+    carouselStateProvider.enterDefaultState();
 
     // 恢复顶部广告轮播
     topAdProvider.resumeAllTimersFromSettings();
@@ -91,6 +103,9 @@ class _SettingsPageState extends State<SettingsPage> {
     final apiNoticeStayDuration = carouselStateProvider.noticeStayDuration;
     announcementCarouselProvider
         .resumeAllTimersFromSettings(apiNoticeStayDuration);
+
+    // 恢复底部天气二维码轮播
+    bottomProvider.resumeAllTimersFromSettings();
 
     // 恢复全屏广告轮播（如果之前处于活跃状态）
     if (fullAdCarouselProvider.isActive && fullAdCarouselProvider.isPaused) {
@@ -106,11 +121,31 @@ class _SettingsPageState extends State<SettingsPage> {
     });
   }
 
+  ///5, 处理导航到子页面 - 不恢复轮播
+  void _navigateToSubPage(Widget page) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (context) => page),
+    );
+  }
+
+  ///6, 处理导航到轮播设置页面 - 不恢复轮播
+  void _navigateToCarouselSettings() {
+    Navigator.pushNamed(context, '/carousel-settings');
+  }
+
+  ///7, 处理真正退出设置页面 - 恢复轮播
+  void _exitSettingsPage() {
+    _isExitingSettings = true; // 设置退出标志
+    Navigator.pop(context);
+  }
+
   @override
   Widget build(BuildContext context) {
     return WillPopScope(
       onWillPop: () async {
-        // 在返回前恢复所有轮播
+        // 在返回前设置退出标志并恢复所有轮播
+        _isExitingSettings = true;
         _resumeAllCarouselsFromSettings();
         return true; // 允许返回
       },
@@ -140,11 +175,7 @@ class _SettingsPageState extends State<SettingsPage> {
                   child: Row(
                     children: [
                       IconButton(
-                        onPressed: () {
-                          // 在返回前恢复所有轮播
-                          _resumeAllCarouselsFromSettings();
-                          Navigator.pop(context);
-                        },
+                        onPressed: _exitSettingsPage, // 使用新的退出方法
                         icon: Icon(Icons.arrow_back, size: 28),
                       ),
                       SizedBox(width: 16),
@@ -223,23 +254,14 @@ class _SettingsPageState extends State<SettingsPage> {
                           icon: Icons.schedule,
                           title: '時間設定',
                           subtitle: '查看設備資訊和系統時間參數設置',
-                          onTap: () {
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (context) => TimeSettingsPage(),
-                              ),
-                            );
-                          },
+                          onTap: () => _navigateToSubPage(TimeSettingsPage()),
                         ),
                         SizedBox(height: 16),
                         _buildSettingsItem(
                           icon: Icons.display_settings,
                           title: '顯示設置',
                           subtitle: '調整螢幕顯示參數和輪播順序',
-                          onTap: () {
-                            Navigator.pushNamed(context, '/carousel-settings');
-                          },
+                          onTap: _navigateToCarouselSettings,
                         ),
                         SizedBox(height: 16),
                         _buildSettingsItem(
@@ -248,6 +270,7 @@ class _SettingsPageState extends State<SettingsPage> {
                           subtitle: '配置網絡連接',
                           onTap: () {},
                         ),
+                        SizedBox(height: 16),
                       ],
                     ),
                   ),

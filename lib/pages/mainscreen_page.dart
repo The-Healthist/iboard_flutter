@@ -387,8 +387,10 @@ class _AnnouncementPageState extends State<AnnouncementPage> {
       delayBeforeNotice: delayBeforeNotice,
       onAnnouncementTap: (AnnouncementModel? announcement) {
         if (announcement == null) {
-          // 显示欠费查询界面
-          _logger.i('💰 从主页面跳转到欠费查询界面');
+          // 显示欠费查询界面 - 立即进入手动操作状态
+          _logger.i('💰 从主页面跳转到欠费查询界面，立即进入手动操作状态');
+          // 触发手动操作状态
+          carouselStateProvider.enterManualOperation();
         } else {
           // 查找announcement在轮播通告列表中的索引
           int announcementIndex = carouselAnnouncements.indexOf(announcement);
@@ -399,6 +401,8 @@ class _AnnouncementPageState extends State<AnnouncementPage> {
             announcementCarouselProvider.jumpToAnnouncementIndex(carouselIndex);
             _logger.i(
                 '跳转到轮播通告: $carouselIndex (${announcement.title}) - 类型: ${announcement.uiType}');
+            // 触发手动操作状态
+            carouselStateProvider.enterManualOperation();
           } else {
             // 如果点击的通告不在轮播列表中（不是緊急或一般通告），提示用户
             _logger.w(
@@ -453,10 +457,7 @@ class _AnnouncementPageState extends State<AnnouncementPage> {
       Navigator.push(
         context,
         MaterialPageRoute(builder: (context) => SettingsPage()),
-      ).then((_) {
-        // 从设置页面返回后恢复所有轮播
-        _resumeAllCarouselsFromSettings();
-      });
+      );
     } else {
       // 设置5秒后重置计数器
       _clickResetTimer = Timer(const Duration(seconds: 5), () {

@@ -223,10 +223,14 @@ class ArrearDisplayWidgetState extends State<ArrearDisplayWidget> {
                 padding:
                     const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                 decoration: BoxDecoration(
-                  color: isSelected ? Colors.blue : Colors.grey.shade100,
+                  color: isSelected
+                      ? Theme.of(context).primaryColor
+                      : Colors.grey.shade100,
                   borderRadius: BorderRadius.circular(8),
                   border: Border.all(
-                    color: isSelected ? Colors.blue : Colors.grey.shade300,
+                    color: isSelected
+                        ? Theme.of(context).primaryColor
+                        : Colors.grey.shade300,
                     width: 1,
                   ),
                 ),
@@ -281,10 +285,14 @@ class ArrearDisplayWidgetState extends State<ArrearDisplayWidget> {
                 padding:
                     const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                 decoration: BoxDecoration(
-                  color: isSelected ? Colors.blue : Colors.grey.shade100,
+                  color: isSelected
+                      ? Theme.of(context).primaryColor
+                      : Colors.grey.shade100,
                   borderRadius: BorderRadius.circular(8),
                   border: Border.all(
-                    color: isSelected ? Colors.blue : Colors.grey.shade300,
+                    color: isSelected
+                        ? Theme.of(context).primaryColor
+                        : Colors.grey.shade300,
                     width: 1,
                   ),
                 ),
@@ -313,7 +321,8 @@ class ArrearDisplayWidgetState extends State<ArrearDisplayWidget> {
       child: ElevatedButton(
         onPressed: canQuery ? _handleQuery : null,
         style: ElevatedButton.styleFrom(
-          backgroundColor: canQuery ? Colors.blue : Colors.grey.shade300,
+          backgroundColor:
+              canQuery ? Theme.of(context).primaryColor : Colors.grey.shade300,
           foregroundColor: canQuery ? Colors.white : Colors.grey.shade600,
           padding: const EdgeInsets.symmetric(vertical: 16),
           shape: RoundedRectangleBorder(
@@ -544,8 +553,9 @@ class ArrearDisplayWidgetState extends State<ArrearDisplayWidget> {
                 }
               : null,
           style: ElevatedButton.styleFrom(
-            backgroundColor:
-                _currentPage > 1 ? Colors.blue : Colors.grey.shade300,
+            backgroundColor: _currentPage > 1
+                ? Theme.of(context).primaryColor
+                : Colors.grey.shade300,
             foregroundColor:
                 _currentPage > 1 ? Colors.white : Colors.grey.shade600,
             shape: RoundedRectangleBorder(
@@ -578,8 +588,9 @@ class ArrearDisplayWidgetState extends State<ArrearDisplayWidget> {
                 }
               : null,
           style: ElevatedButton.styleFrom(
-            backgroundColor:
-                _currentPage < totalPages ? Colors.blue : Colors.grey.shade300,
+            backgroundColor: _currentPage < totalPages
+                ? Theme.of(context).primaryColor
+                : Colors.grey.shade300,
             foregroundColor:
                 _currentPage < totalPages ? Colors.white : Colors.grey.shade600,
             shape: RoundedRectangleBorder(

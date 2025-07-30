@@ -15,45 +15,11 @@ class TimeSettingsPage extends StatefulWidget {
 }
 
 class _TimeSettingsPageState extends State<TimeSettingsPage> {
-  /// 恢复所有轮播和计时器
-  void _resumeAllCarouselsFromSettings() {
-    final carouselStateProvider = context.read<CarouselStateProvider>();
-    final topAdProvider = context.read<TopAdCarouselProvider>();
-    final announcementCarouselProvider =
-        context.read<AnnouncementCarouselProvider>();
-    final fullAdCarouselProvider = context.read<FullscreenAdProvider>();
-
-    // 确保保持在手动操作状态
-    carouselStateProvider.enterManualOperation();
-
-    // 恢复顶部广告轮播
-    topAdProvider.resumeAllTimersFromSettings();
-
-    // 恢复通告轮播
-    final apiNoticeStayDuration = carouselStateProvider.noticeStayDuration;
-    announcementCarouselProvider
-        .resumeAllTimersFromSettings(apiNoticeStayDuration);
-
-    // 恢复全屏广告轮播（如果之前处于活跃状态）
-    if (fullAdCarouselProvider.isActive && fullAdCarouselProvider.isPaused) {
-      fullAdCarouselProvider.resumeCarousel();
-      fullAdCarouselProvider.startDebugTimer();
-    }
-
-    // 强制发送媒体恢复通知，确保所有视频都恢复播放
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) {
-        MediaResumeNotification().dispatch(context);
-      }
-    });
-  }
-
   @override
   Widget build(BuildContext context) {
     return WillPopScope(
       onWillPop: () async {
-        // 在返回前恢复所有轮播
-        _resumeAllCarouselsFromSettings();
+        // 直接返回，不恢复轮播，因为这只是返回到设置页面
         return true; // 允许返回
       },
       child: Consumer<AppDataProvider>(
@@ -92,8 +58,7 @@ class _TimeSettingsPageState extends State<TimeSettingsPage> {
                         children: [
                           IconButton(
                             onPressed: () {
-                              // 在返回前恢复所有轮播
-                              _resumeAllCarouselsFromSettings();
+                              // 直接返回，不恢复轮播
                               Navigator.pop(context);
                             },
                             icon: Icon(Icons.arrow_back, size: 28),
