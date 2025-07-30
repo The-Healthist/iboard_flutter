@@ -587,6 +587,7 @@ class AnnouncementCarouselProvider extends ChangeNotifier {
   ///12，显示欠费查询界面
   void showArrearQueryWidget(VoidCallback onHomeButtonPressed) {
     _logger.i('💰 显示欠费查询界面');
+    _logger.i('轮播数组状态: widgetCount=${_midCarouselController.widgetCount}');
 
     // 设置显示欠费查询状态
     _isShowingArrearQuery = true;
@@ -595,6 +596,9 @@ class AnnouncementCarouselProvider extends ChangeNotifier {
     _midTimer?.cancel();
     _delayedNoticeTimer?.cancel();
 
+    // 不要清空轮播数组，只是暂停轮播
+    // 轮播数组应该保持原样，这样返回时才能正常显示
+
     notifyListeners();
   }
 
@@ -602,9 +606,19 @@ class AnnouncementCarouselProvider extends ChangeNotifier {
   void hideArrearQueryWidget(VoidCallback onHomeButtonPressed,
       int apiNoticeStayDuration, int delayBeforeNotice) {
     _logger.i('🏠 隐藏欠费查询界面，返回轮播');
+    _logger.i('轮播数组状态: widgetCount=${_midCarouselController.widgetCount}');
 
     // 重置显示欠费查询状态
     _isShowingArrearQuery = false;
+
+    // 检查轮播数组是否为空
+    if (_midCarouselController.widgetCount == 0) {
+      _logger.w('⚠️ 轮播数组为空，需要重新初始化轮播');
+      // 如果轮播数组为空，尝试重新构建轮播数组
+      _rebuildCarouselArray();
+      notifyListeners();
+      return;
+    }
 
     // 跳转回主屏幕
     _midCarouselController.jumpToIndex(0);
@@ -614,6 +628,49 @@ class AnnouncementCarouselProvider extends ChangeNotifier {
     _restartCarouselAfterArrearQuery(apiNoticeStayDuration, delayBeforeNotice);
 
     notifyListeners();
+  }
+
+  ///15，重新构建轮播数组
+  void _rebuildCarouselArray() {
+    _logger.i('🔄 重新构建轮播数组');
+
+    // 检查是否有通告数据
+    if (carouselAnnouncements.isEmpty) {
+      _logger.w('⚠️ 没有通告数据，无法重建轮播数组');
+      return;
+    }
+
+    // 创建主屏幕部件
+    Widget mainScreenWidget = MainScreenWidget(
+      onAnnouncementTap: (AnnouncementModel? announcement) {
+        // 这里需要传入正确的回调，暂时使用空函数
+        if (announcement == null) {
+          showArrearQueryWidget(() {});
+        }
+      },
+    );
+
+    // 创建通告部件
+    List<Widget> announcementWidgets =
+        carouselAnnouncements.map((announcement) {
+      FileManager fileManager = FileManager();
+      fileManager.getFile(announcement.file);
+      return Center(
+        child: AnnouncementReaderWidget(
+          announcement: announcement,
+          fileManager: fileManager,
+          onHomeButtonPressed: () {},
+        ),
+      );
+    }).toList();
+
+    final midWidgets = [
+      mainScreenWidget,
+      ...announcementWidgets,
+    ];
+
+    _midCarouselController.setCarouselArray(midWidgets);
+    _logger.i('✅ 轮播数组重建完成，共 ${midWidgets.length} 个部件');
   }
 
   ///14，从欠费查询界面恢复轮播
