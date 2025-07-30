@@ -43,6 +43,7 @@ class MainScreenWidgetState extends State<MainScreenWidget> {
               // 处理功能按钮点击
               if (chineseTitle == '欠費查詢') {
                 // 调用回调函数来显示欠费查询界面
+                // 确保立即进入手动操作状态并显示欠费查询界面
                 widget.onAnnouncementTap?.call(null); // 传递null表示显示欠费查询
               } else {
                 print('$chineseTitle pressed');
@@ -201,15 +202,34 @@ class MainScreenWidgetState extends State<MainScreenWidget> {
                         ],
                       ),
                       const SizedBox(height: 8),
+                      // 智能错误显示：网络错误且有缓存数据时不显示错误信息
                       if (announcementProvider.error != null &&
-                          !announcementProvider.isLoading)
-                        Padding(
-                          padding: const EdgeInsets.symmetric(vertical: 16.0),
-                          child: Text(
-                            'Error: ${announcementProvider.error}',
-                            style: const TextStyle(color: Colors.red),
-                          ),
+                          !announcementProvider.isLoading) ...[
+                        Builder(
+                          builder: (context) {
+                            // 检查是否是网络错误且有缓存数据
+                            final error = announcementProvider.error!;
+                            final hasCachedData =
+                                announcementProvider.announcements.isNotEmpty;
+                            final isNetworkError = error.contains('网络连接失败') ||
+                                error.contains('请求超时') ||
+                                error.contains('使用缓存的');
+
+                            // 只有在非网络错误或没有缓存数据时才显示错误
+                            if (!isNetworkError || !hasCachedData) {
+                              return Padding(
+                                padding:
+                                    const EdgeInsets.symmetric(vertical: 16.0),
+                                child: Text(
+                                  'Error: $error',
+                                  style: const TextStyle(color: Colors.red),
+                                ),
+                              );
+                            }
+                            return const SizedBox.shrink();
+                          },
                         ),
+                      ],
                       Expanded(
                         child: announcementProvider.isLoading &&
                                 filteredAnnouncements.isEmpty

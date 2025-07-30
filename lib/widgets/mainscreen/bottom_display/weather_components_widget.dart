@@ -1,11 +1,12 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
-import 'package:iboard_app/http/weather.dart';
+import 'package:iboard_app/providers/weather_provider.dart';
 import 'package:iboard_app/models/weather_forecast_model.dart';
 import 'package:iboard_app/models/current_weather_model.dart';
 import 'package:iboard_app/models/weather_warning_model.dart';
 import 'package:iboard_app/providers/app_data_provider.dart';
 import 'package:iboard_app/widgets/weather_icon_widget.dart';
+import 'package:iboard_app/widgets/weather_data_debug_widget.dart'; // 添加天气数据调试组件导入
 import 'package:intl/intl.dart';
 import 'package:intl/date_symbol_data_local.dart';
 import 'package:logger/logger.dart';
@@ -21,14 +22,9 @@ class WeatherComponentsWidget extends StatefulWidget {
 }
 
 class _WeatherComponentsWidgetState extends State<WeatherComponentsWidget> {
-  final WeatherService _weatherService = WeatherService();
-  Future<WeatherData?>? _forecastDataFuture;
-  Future<CurrentWeatherDataModel?>? _currentWeatherDataFuture;
-  Future<WeatherWarningModel?>? _weatherWarningFuture;
   final Logger _logger = Logger();
   String _currentWeatherLocation = '香港天文台';
   Timer? _timeUpdateTimer;
-  Timer? _weatherUpdateTimer;
   DateTime _currentTime = DateTime.now();
 
   @override
@@ -38,30 +34,36 @@ class _WeatherComponentsWidgetState extends State<WeatherComponentsWidget> {
     _logger.i(
         'WeatherComponentsWidget初始化时间: ${DateFormat('yyyy-MM-dd HH:mm:ss').format(_currentTime)}');
 
-    initializeDateFormatting('zh_HK', null).then((_) {
+    initializeDateFormatting('zh_HK', null).then((_) async {
       _updateLocationFromProvider();
-      _fetchWeatherData();
-      _startWeatherUpdateTimer();
+      _startTimeUpdateTimer();
+      await _initializeWeatherData();
     });
   }
 
   @override
   void dispose() {
     _timeUpdateTimer?.cancel();
-    _weatherUpdateTimer?.cancel();
     super.dispose();
   }
 
-  ///1，获取天气数据
-  void _fetchWeatherData() {
-    _updateLocationFromProvider();
+  ///1，初始化天气数据
+  Future<void> _initializeWeatherData() async {
+    final weatherProvider =
+        Provider.of<WeatherProvider>(context, listen: false);
 
-    setState(() {
-      _forecastDataFuture = _weatherService.fetchWeatherData();
-      _currentWeatherDataFuture = _weatherService.fetchCurrentWeatherData();
-      _weatherWarningFuture = _weatherService.fetchWeatherWarnings();
-    });
-    _logger.i('开始获取天气数据，当前位置: $_currentWeatherLocation');
+    // 等待WeatherProvider完成初始化
+    await weatherProvider.waitForInitialization();
+
+    // 优先使用缓存数据，如果有缓存数据就使用，没有才获取新数据
+    if (weatherProvider.hasForecastData ||
+        weatherProvider.hasCurrentData ||
+        weatherProvider.hasWarningData) {
+      _logger.i('使用缓存的天气数据');
+    } else {
+      _logger.i('缓存中缺少天气数据，开始获取...');
+      weatherProvider.fetchAllWeatherData();
+    }
   }
 
   ///2，从AppDataProvider获取location信息
@@ -82,152 +84,174 @@ class _WeatherComponentsWidgetState extends State<WeatherComponentsWidget> {
     }
   }
 
-  ///3，启动天气数据定时更新器（每2小时）
-  void _startWeatherUpdateTimer() {
-    _logger.i('启动天气数据定时更新器，间隔：2小时');
-    _weatherUpdateTimer = Timer.periodic(const Duration(hours: 2), (timer) {
+  ///3，启动时间更新定时器
+  void _startTimeUpdateTimer() {
+    _logger.i('启动时间更新定时器，每秒更新一次');
+    _timeUpdateTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
       if (mounted) {
-        _logger.i('定时更新天气数据...');
-        _updateLocationFromProvider();
-        _fetchWeatherData();
+        setState(() {
+          _currentTime = DateTime.now();
+        });
       } else {
         timer.cancel();
       }
     });
   }
 
+  ///4，打开天气数据调试页面
+  void _openWeatherDebugPage() {
+    _logger.i('🐛 打开天气数据调试页面');
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => const WeatherDataDebugWidget(),
+      ),
+    );
+  }
+
   String _getWeatherIconUrl(int iconCode) {
     return 'https://www.hko.gov.hk/images/HKOWxIconOutline/pic$iconCode.png';
   }
 
-  String _formatDate(String yyyyMMdd) {
+  String _formatDate(String dateString) {
     try {
-      final date = DateTime.parse(yyyyMMdd);
+      final date = DateTime.parse(dateString);
       return DateFormat('MM/dd').format(date);
     } catch (e) {
-      _logger.e('Error formatting date: $yyyyMMdd', error: e);
-      return yyyyMMdd;
+      return dateString;
     }
   }
 
+  @override
+  Widget build(BuildContext context) {
+    return Consumer<WeatherProvider>(
+      builder: (context, weatherProvider, child) {
+        return Container(
+          width: double.infinity,
+          height: 120,
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(8),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.grey.withOpacity(0.3),
+                spreadRadius: 1,
+                blurRadius: 3,
+                offset: const Offset(0, 2),
+              ),
+            ],
+          ),
+          child: Stack(
+            children: [
+              Row(
+                children: [
+                  // 左侧：当前天气信息
+                  Expanded(
+                    flex: 2,
+                    child: _buildCurrentWeatherSection(weatherProvider),
+                  ),
+                  // 右侧：天气预报信息
+                  Expanded(
+                    flex: 3,
+                    child: weatherProvider.hasForecastData
+                        ? _buildForecastSection(
+                            weatherProvider.weatherForecastData!)
+                        : _buildNoDataSection('天氣預報'),
+                  ),
+                ],
+              ),
+              // 调试按钮 - 始终显示在右上角（已注释）
+              // Positioned(
+              //   top: 4,
+              //   right: 4,
+              //   child: GestureDetector(
+              //     onTap: _openWeatherDebugPage,
+              //     child: Container(
+              //       width: 24,
+              //       height: 24,
+              //       decoration: BoxDecoration(
+              //         color: Colors.blue.withOpacity(0.8),
+              //         borderRadius: BorderRadius.circular(12),
+              //       ),
+              //       child: const Icon(
+              //         Icons.bug_report,
+              //         size: 16,
+              //         color: Colors.white,
+              //       ),
+              //     ),
+              //   ),
+              // ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
   // 构建当前天气显示区域的函数
-  Widget _buildCurrentWeatherSection(
-      CurrentWeatherDataModel currentWeatherData) {
-    CurrentTemperatureDataModel? tempLocationData;
-    if (currentWeatherData.temperature?.data != null) {
-      try {
-        tempLocationData = currentWeatherData.temperature!.data
-            .firstWhere((t) => t.place == _currentWeatherLocation);
-        _logger.i(
-            '找到匹配位置的温度数据: $_currentWeatherLocation, ${tempLocationData.value}°C');
-      } catch (e) {
-        try {
-          tempLocationData = currentWeatherData.temperature!.data
-              .firstWhere((t) => t.place == '香港天文台');
-          _logger.w(
-              '未找到位置 $_currentWeatherLocation 的温度数据，使用香港天文台数据: ${tempLocationData.value}°C');
-        } catch (e2) {
-          if (currentWeatherData.temperature!.data.isNotEmpty) {
-            tempLocationData = currentWeatherData.temperature!.data.first;
-            _logger.w(
-                '未找到香港天文台数据，使用第一个可用数据: ${tempLocationData.place}, ${tempLocationData.value}°C');
-          }
-        }
-      }
+  Widget _buildCurrentWeatherSection(WeatherProvider weatherProvider) {
+    final currentData = weatherProvider.currentWeatherData;
+
+    // 检查是否有当前天气数据
+    if (currentData == null) {
+      return _buildNoDataSection('當前天氣');
     }
 
-    int? currentIcon = currentWeatherData.icon?.isNotEmpty == true
-        ? currentWeatherData.icon!.first
-        : null;
+    // 尝试获取温度数据
+    CurrentTemperatureDataModel? tempLocationData;
+    try {
+      tempLocationData = currentData.temperature?.data.firstWhere(
+        (temp) => temp.place == _currentWeatherLocation,
+        orElse: () =>
+            currentData.temperature?.data.first ??
+            CurrentTemperatureDataModel(place: '香港天文台', value: 0, unit: 'C'),
+      );
+    } catch (e) {
+      _logger.w('获取温度数据失败: $e');
+    }
 
-    final formattedDate = DateFormat('yyyy-MM-dd').format(_currentTime);
-    final formattedWeekday = DateFormat('EEEE', 'zh_HK').format(_currentTime);
+    final currentIcon =
+        currentData.icon?.isNotEmpty == true ? currentData.icon!.first : null;
 
-    return Container(
-      margin: const EdgeInsets.only(right: 8.0),
-      padding: const EdgeInsets.only(left: 8.0, right: 8.0, bottom: 8.0),
-      decoration: BoxDecoration(
-          color: Colors.lightBlue[50],
-          borderRadius: BorderRadius.circular(10.0),
-          border: Border.all(color: Colors.lightBlue.shade200, width: 1)),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.center,
-        children: [
-          Padding(
-            padding: const EdgeInsets.only(left: 4.0, top: 2.0, bottom: 4.0),
-            child: Text(
-              '$formattedDate ($formattedWeekday)',
-              style: TextStyle(fontSize: 10, color: Colors.blueGrey[600]),
-              textAlign: TextAlign.left,
+    return Column(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Text(
+              _currentWeatherLocation,
+              style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.blueGrey[800]),
+              textAlign: TextAlign.center,
             ),
-          ),
-          Expanded(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-              crossAxisAlignment: CrossAxisAlignment.center,
-              children: [
-                FutureBuilder<WeatherWarningModel?>(
-                  future: _weatherWarningFuture,
-                  builder: (context, warningSnapshot) {
-                    if (warningSnapshot.hasData &&
-                        warningSnapshot.data != null &&
-                        warningSnapshot.data!.warnings.isNotEmpty) {
-                      final warnings =
-                          warningSnapshot.data!.getActiveWarningDescriptions();
-                      final warningText =
-                          warnings.isNotEmpty ? warnings.first : '';
-                      return Text(
-                        warningText,
-                        style: TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.bold,
-                            color: const Color.fromARGB(255, 8, 12, 133)),
-                        textAlign: TextAlign.center,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      );
-                    }
-                    return const SizedBox.shrink();
-                  },
-                ),
-                Text(
-                  tempLocationData != null
-                      ? '${tempLocationData.place}'
-                      : '即時天氣',
-                  style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.blueGrey[800]),
-                  textAlign: TextAlign.center,
-                ),
-                if (currentIcon != null)
-                  CachedNetworkImage(
-                    imageUrl: _getWeatherIconUrl(currentIcon),
+            if (currentIcon != null)
+              CachedNetworkImage(
+                imageUrl: _getWeatherIconUrl(currentIcon),
+                width: 50,
+                height: 50,
+                placeholder: (context, url) => const SizedBox(
                     width: 50,
                     height: 50,
-                    placeholder: (context, url) => const SizedBox(
-                        width: 50,
-                        height: 50,
-                        child: CircularProgressIndicator(strokeWidth: 2.0)),
-                    errorWidget: (context, url, error) =>
-                        const Icon(Icons.cloud_off, size: 50),
-                  ),
-                if (currentIcon == null && tempLocationData == null)
-                  const SizedBox(height: 50),
-                Text(
-                  tempLocationData != null
-                      ? '${tempLocationData.value}°${tempLocationData.unit}'
-                      : '--°C',
-                  style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.blue[800]),
-                )
-              ],
-            ),
-          ),
-        ],
-      ),
+                    child: CircularProgressIndicator(strokeWidth: 2.0)),
+                errorWidget: (context, url, error) =>
+                    const Icon(Icons.cloud_off, size: 50),
+              ),
+            if (currentIcon == null) const SizedBox(height: 50),
+            Text(
+              tempLocationData != null
+                  ? '${tempLocationData.value}°${tempLocationData.unit}'
+                  : '--°C',
+              style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.blue[800]),
+            )
+          ],
+        ),
+      ],
     );
   }
 
@@ -301,10 +325,14 @@ class _WeatherComponentsWidgetState extends State<WeatherComponentsWidget> {
                           ),
                           const SizedBox(height: 3),
                           Text(
-                            '${forecast.forecastMintemp.value}°${forecast.forecastMintemp.unit} - ${forecast.forecastMaxtemp.value}°${forecast.forecastMaxtemp.unit}',
+                            '${forecast.forecastMintemp.value}°${forecast.forecastMintemp.unit}',
                             style: const TextStyle(
-                                fontWeight: FontWeight.bold, fontSize: 12),
-                            textAlign: TextAlign.center,
+                                fontSize: 12, color: Colors.blue),
+                          ),
+                          Text(
+                            '${forecast.forecastMaxtemp.value}°${forecast.forecastMaxtemp.unit}',
+                            style: const TextStyle(
+                                fontSize: 12, color: Colors.red),
                           ),
                         ],
                       ),
@@ -319,158 +347,36 @@ class _WeatherComponentsWidgetState extends State<WeatherComponentsWidget> {
     );
   }
 
-  // 构建左侧当前天气部分
-  Widget buildCurrentWeatherPart() {
-    return FutureBuilder<CurrentWeatherDataModel?>(
-      future: _currentWeatherDataFuture,
-      builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.waiting &&
-            _forecastDataFuture != null) {
-          return Container(
-            margin: const EdgeInsets.only(right: 8.0),
-            decoration: BoxDecoration(
-                color: Colors.lightBlue[50],
-                borderRadius: BorderRadius.circular(10.0),
-                border: Border.all(color: Colors.lightBlue.shade200, width: 1)),
-            child: const Center(
-                child: CircularProgressIndicator(strokeWidth: 2.0)),
-          );
-        }
-
-        if (snapshot.hasError || !snapshot.hasData || snapshot.data == null) {
-          _logger.d('Current weather data unavailable', error: snapshot.error);
-          return Container(
-            margin: const EdgeInsets.only(right: 8.0),
-            padding: const EdgeInsets.only(left: 8.0, right: 8.0, bottom: 8.0),
-            decoration: BoxDecoration(
-                color: Colors.lightBlue[50],
-                borderRadius: BorderRadius.circular(10.0),
-                border: Border.all(color: Colors.lightBlue.shade200, width: 1)),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.center,
-              children: [
-                Padding(
-                  padding:
-                      const EdgeInsets.only(left: 4.0, top: 0, bottom: 4.0),
-                  child: Text(
-                    DateFormat('yyyy-MM-dd (EEEE)', 'zh_HK')
-                        .format(_currentTime),
-                    style: TextStyle(fontSize: 10, color: Colors.blueGrey[600]),
-                    textAlign: TextAlign.left,
-                  ),
-                ),
-                Expanded(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                    crossAxisAlignment: CrossAxisAlignment.center,
-                    children: [
-                      FutureBuilder<WeatherWarningModel?>(
-                        future: _weatherWarningFuture,
-                        builder: (context, warningSnapshot) {
-                          if (warningSnapshot.hasData &&
-                              warningSnapshot.data != null &&
-                              warningSnapshot.data!.warnings.isNotEmpty) {
-                            final warnings = warningSnapshot.data!
-                                .getActiveWarningDescriptions();
-                            final warningText =
-                                warnings.isNotEmpty ? warnings.first : '';
-                            return Text(
-                              warningText,
-                              style: TextStyle(
-                                  fontSize: 11,
-                                  fontWeight: FontWeight.bold,
-                                  color: Colors.red[600]),
-                              textAlign: TextAlign.center,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                            );
-                          }
-                          return const SizedBox.shrink();
-                        },
-                      ),
-                      Text(
-                        '天氣資料獲取中',
-                        style: TextStyle(
-                            fontSize: 12,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.blueGrey[800]),
-                        textAlign: TextAlign.center,
-                      ),
-                      const Icon(Icons.cloud_off, size: 50, color: Colors.grey),
-                      Text(
-                        '--°C',
-                        style: TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.blue[800]),
-                      ),
-                      IconButton(
-                        icon: const Icon(Icons.refresh, size: 12),
-                        onPressed: _fetchWeatherData,
-                        tooltip: '重試',
-                        splashRadius: 10,
-                        padding: EdgeInsets.zero,
-                        constraints:
-                            const BoxConstraints(minWidth: 22, minHeight: 22),
-                      )
-                    ],
-                  ),
-                ),
-              ],
+  // 构建无数据时的显示区域
+  Widget _buildNoDataSection(String title) {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(
+            Icons.cloud_off,
+            size: 40,
+            color: Colors.grey[400],
+          ),
+          const SizedBox(height: 8),
+          Text(
+            title,
+            style: TextStyle(
+              fontSize: 14,
+              color: Colors.grey[600],
+              fontWeight: FontWeight.w500,
             ),
-          );
-        }
-        return _buildCurrentWeatherSection(snapshot.data!);
-      },
+          ),
+          const SizedBox(height: 4),
+          Text(
+            '暫無數據',
+            style: TextStyle(
+              fontSize: 12,
+              color: Colors.grey[500],
+            ),
+          ),
+        ],
+      ),
     );
-  }
-
-  // 构建右侧天气预报部分
-  Widget buildForecastPart() {
-    return FutureBuilder<WeatherData?>(
-      future: _forecastDataFuture,
-      builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.waiting) {
-          return const Center(child: CircularProgressIndicator());
-        }
-        if (snapshot.hasError || !snapshot.hasData || snapshot.data == null) {
-          _logger.d('Forecast weather data unavailable', error: snapshot.error);
-          return Container(
-            margin: const EdgeInsets.all(4.0),
-            decoration: BoxDecoration(
-              color: Colors.grey[100],
-              borderRadius: BorderRadius.circular(8.0),
-              border: Border.all(color: Colors.grey.shade300, width: 1),
-            ),
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                const Icon(Icons.cloud_off, size: 40, color: Colors.grey),
-                const SizedBox(height: 8),
-                const Text('天氣預報暫時無法取得',
-                    style: TextStyle(fontSize: 12, color: Colors.grey)),
-                const SizedBox(height: 8),
-                ElevatedButton.icon(
-                  onPressed: _fetchWeatherData,
-                  icon: const Icon(Icons.refresh, size: 16),
-                  label: const Text('重試', style: TextStyle(fontSize: 12)),
-                  style: ElevatedButton.styleFrom(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-                    minimumSize: const Size(0, 32),
-                  ),
-                )
-              ],
-            ),
-          );
-        }
-        return _buildForecastSection(snapshot.data!);
-      },
-    );
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(); // 这个widget主要提供方法，不需要实际渲染
   }
 }

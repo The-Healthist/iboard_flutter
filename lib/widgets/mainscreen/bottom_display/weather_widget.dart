@@ -7,8 +7,10 @@ import 'package:iboard_app/models/current_weather_model.dart'; // Added
 import 'package:iboard_app/models/weather_warning_model.dart'; // 恢复天气警告模型导入
 import 'package:iboard_app/providers/app_data_provider.dart'; // 添加AppDataProvider导入
 import 'package:iboard_app/widgets/weather_icon_widget.dart';
-import 'package:iboard_app/widgets/weather_debug_widget.dart'; // 添加天气调试组件导入
+import 'package:iboard_app/widgets/weather_debug_widget.dart'; // 添加天气图标调试组件导入
+import 'package:iboard_app/widgets/weather_data_debug_widget.dart'; // 添加天气数据调试组件导入
 import 'package:iboard_app/widgets/mainscreen/bottom_display/weather_warning_widget.dart'; // 添加天气警告组件导入
+import 'package:iboard_app/providers/weather_provider.dart'; // 添加天气provider导入
 import 'package:intl/intl.dart';
 import 'package:intl/date_symbol_data_local.dart'; // Added import
 import 'package:logger/logger.dart';
@@ -51,8 +53,7 @@ class _WeatherWidgetState extends State<WeatherWidget> {
     initializeDateFormatting('zh_HK', null).then((_) {
       // Added initialization
       _updateLocationFromProvider(); // 获取location
-      _fetchWeatherData(); // 初始获取天气数据
-      // _startTimeUpdateTimer(); // Start timer for updating time - 注释掉时间更新器
+      _initializeWeatherData(); // 初始化天气数据
       _startWeatherUpdateTimer(); // 启动天气数据定时更新器（每2小时）
     });
   }
@@ -106,7 +107,24 @@ class _WeatherWidgetState extends State<WeatherWidget> {
   }
   */
 
-  ///2, 获取天气数据
+  ///2, 初始化天气数据
+  void _initializeWeatherData() {
+    // 使用WeatherProvider获取天气数据
+    final weatherProvider =
+        Provider.of<WeatherProvider>(context, listen: false);
+
+    // 如果provider中没有数据，则获取数据
+    if (!weatherProvider.hasForecastData ||
+        !weatherProvider.hasCurrentData ||
+        !weatherProvider.hasWarningData) {
+      _logger.i('WeatherProvider中没有缓存数据，开始获取天气数据');
+      weatherProvider.fetchAllWeatherData();
+    } else {
+      _logger.i('WeatherProvider中有缓存数据，使用缓存数据');
+    }
+  }
+
+  ///3, 获取天气数据（保留原有方法用于兼容）
   void _fetchWeatherData() {
     // 每次获取天气数据时也更新location
     _updateLocationFromProvider();
@@ -139,13 +157,13 @@ class _WeatherWidgetState extends State<WeatherWidget> {
     }
   }
 
-  ///4，打开天气图标调试页面
+  ///4，打开天气数据调试页面
   void _openWeatherDebugPage() {
-    _logger.i('🐛 打开天气图标调试页面');
+    _logger.i('🐛 打开天气数据调试页面');
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (context) => const WeatherDebugWidget(),
+        builder: (context) => const WeatherDataDebugWidget(),
       ),
     );
   }
@@ -155,14 +173,16 @@ class _WeatherWidgetState extends State<WeatherWidget> {
     // 立即执行一次更新
     _logger.i('启动天气数据定时更新器，间隔：2小时');
 
-    // 每2小时更新一次天气数据 - 可以改为较短时间进行测试
-    // 测试时可以使用: const Duration(minutes: 5)
-    // 生产环境使用: const Duration(hours: 2)
+    // 使用WeatherProvider的定时更新功能
+    final weatherProvider =
+        Provider.of<WeatherProvider>(context, listen: false);
+    weatherProvider.startPeriodicUpdate(interval: const Duration(hours: 2));
+
+    // 保留原有的定时器用于更新location
     _weatherUpdateTimer = Timer.periodic(const Duration(hours: 2), (timer) {
       if (mounted) {
-        _logger.i('定时更新天气数据...');
-        _updateLocationFromProvider(); // 同时更新location
-        _fetchWeatherData(); // 更新天气数据
+        _logger.i('定时更新location信息...');
+        _updateLocationFromProvider(); // 更新location
       } else {
         timer.cancel();
       }
@@ -630,44 +650,130 @@ class _WeatherWidgetState extends State<WeatherWidget> {
     );
   }
 
+  // 使用WeatherProvider构建当前天气部分
+  Widget _buildCurrentWeatherPartWithProvider(WeatherProvider weatherProvider) {
+    if (weatherProvider.isLoadingCurrent) {
+      return const Center(child: CircularProgressIndicator());
+    }
+
+    if (weatherProvider.currentError != null ||
+        !weatherProvider.hasCurrentData) {
+      return Container(
+        margin: const EdgeInsets.all(4.0),
+        decoration: BoxDecoration(
+          color: Colors.grey[100],
+          borderRadius: BorderRadius.circular(8.0),
+          border: Border.all(color: Colors.grey.shade300, width: 1),
+        ),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Icon(Icons.cloud_off, size: 40, color: Colors.grey),
+            const SizedBox(height: 8),
+            const Text('當前天氣暫時無法取得',
+                style: TextStyle(fontSize: 12, color: Colors.grey)),
+            const SizedBox(height: 8),
+            ElevatedButton.icon(
+              onPressed: () => weatherProvider.fetchCurrentWeather(),
+              icon: const Icon(Icons.refresh, size: 16),
+              label: const Text('重試', style: TextStyle(fontSize: 12)),
+              style: ElevatedButton.styleFrom(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+                minimumSize: const Size(0, 32),
+              ),
+            )
+          ],
+        ),
+      );
+    }
+
+    return _buildCurrentWeatherSection(weatherProvider.currentWeatherData!);
+  }
+
+  // 使用WeatherProvider构建天气预报部分
+  Widget _buildForecastPartWithProvider(WeatherProvider weatherProvider) {
+    if (weatherProvider.isLoadingForecast) {
+      return const Center(child: CircularProgressIndicator());
+    }
+
+    if (weatherProvider.forecastError != null ||
+        !weatherProvider.hasForecastData) {
+      return Container(
+        margin: const EdgeInsets.all(4.0),
+        decoration: BoxDecoration(
+          color: Colors.grey[100],
+          borderRadius: BorderRadius.circular(8.0),
+          border: Border.all(color: Colors.grey.shade300, width: 1),
+        ),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Icon(Icons.cloud_off, size: 40, color: Colors.grey),
+            const SizedBox(height: 8),
+            const Text('天氣預報暫時無法取得',
+                style: TextStyle(fontSize: 12, color: Colors.grey)),
+            const SizedBox(height: 8),
+            ElevatedButton.icon(
+              onPressed: () => weatherProvider.fetchWeatherForecast(),
+              icon: const Icon(Icons.refresh, size: 16),
+              label: const Text('重試', style: TextStyle(fontSize: 12)),
+              style: ElevatedButton.styleFrom(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+                minimumSize: const Size(0, 32),
+              ),
+            )
+          ],
+        ),
+      );
+    }
+
+    return _buildForecastSection(weatherProvider.weatherForecastData!);
+  }
+
   @override
   Widget build(BuildContext context) {
-    // 如果只显示左侧部分
-    if (widget.showOnlyLeft) {
-      return Container(
-        padding: const EdgeInsets.fromLTRB(8.0, 0, 8.0, 6.0),
-        height: 145,
-        child: buildCurrentWeatherPart(),
-      );
-    }
+    return Consumer<WeatherProvider>(
+      builder: (context, weatherProvider, child) {
+        // 如果只显示左侧部分
+        if (widget.showOnlyLeft) {
+          return Container(
+            padding: const EdgeInsets.fromLTRB(8.0, 0, 8.0, 6.0),
+            height: 145,
+            child: _buildCurrentWeatherPartWithProvider(weatherProvider),
+          );
+        }
 
-    // 如果只显示右侧部分
-    if (widget.showOnlyRight) {
-      return Container(
-        padding: const EdgeInsets.fromLTRB(8.0, 0, 8.0, 6.0),
-        height: 145,
-        child: buildForecastPart(),
-      );
-    }
+        // 如果只显示右侧部分
+        if (widget.showOnlyRight) {
+          return Container(
+            padding: const EdgeInsets.fromLTRB(8.0, 0, 8.0, 6.0),
+            height: 145,
+            child: _buildForecastPartWithProvider(weatherProvider),
+          );
+        }
 
-    // 默认显示完整的天气组件
-    return Container(
-      padding: const EdgeInsets.fromLTRB(8.0, 0, 8.0, 6.0),
-      height: 145,
-      child: Row(
-        children: [
-          // 左侧部分：当前天气显示区域
-          Expanded(
-            flex: 2,
-            child: buildCurrentWeatherPart(),
+        // 默认显示完整的天气组件
+        return Container(
+          padding: const EdgeInsets.fromLTRB(8.0, 0, 8.0, 6.0),
+          height: 145,
+          child: Row(
+            children: [
+              // 左侧部分：当前天气显示区域
+              Expanded(
+                flex: 2,
+                child: _buildCurrentWeatherPartWithProvider(weatherProvider),
+              ),
+              // 右侧部分：天气预报区域
+              Expanded(
+                flex: 6,
+                child: _buildForecastPartWithProvider(weatherProvider),
+              ),
+            ],
           ),
-          // 右侧部分：天气预报区域
-          Expanded(
-            flex: 6,
-            child: buildForecastPart(),
-          ),
-        ],
-      ),
+        );
+      },
     );
   }
 }

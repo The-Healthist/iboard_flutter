@@ -15,6 +15,14 @@ class WeatherWarningModel {
     return WeatherWarningModel(warnings: warnings);
   }
 
+  Map<String, dynamic> toJson() {
+    Map<String, dynamic> result = {};
+    warnings.forEach((key, value) {
+      result[key] = value.toJson();
+    });
+    return result;
+  }
+
   // 获取警告描述的映射
   static const Map<String, String> warningDescriptions = {
     'WFIRE': '火災危險警告',
@@ -64,5 +72,15 @@ class WeatherWarningInfo {
       issueTime: json['issueTime'] ?? '',
       updateTime: json['updateTime'] ?? '',
     );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'name': name,
+      'code': code,
+      'actionCode': actionCode,
+      'issueTime': issueTime,
+      'updateTime': updateTime,
+    };
   }
 }

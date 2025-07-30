@@ -10,6 +10,13 @@ class LightningDataModel {
       occur: (json['occur'] as String).toLowerCase() == 'true',
     );
   }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'place': place,
+      'occur': occur.toString(),
+    };
+  }
 }
 
 class LightningInfoModel {
@@ -30,6 +37,14 @@ class LightningInfoModel {
       startTime: json['startTime'] as String?,
       endTime: json['endTime'] as String?,
     );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'data': data.map((d) => d.toJson()).toList(),
+      'startTime': startTime,
+      'endTime': endTime,
+    };
   }
 }
 
@@ -57,6 +72,16 @@ class RainfallDataModel {
       min: json['min'] as num?,
     );
   }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'unit': unit,
+      'place': place,
+      'max': max,
+      'main': main,
+      'min': min,
+    };
+  }
 }
 
 class RainfallInfoModel {
@@ -78,6 +103,14 @@ class RainfallInfoModel {
       endTime: json['endTime'] as String?,
     );
   }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'data': data.map((d) => d.toJson()).toList(),
+      'startTime': startTime,
+      'endTime': endTime,
+    };
+  }
 }
 
 class CurrentTemperatureDataModel {
@@ -94,6 +127,14 @@ class CurrentTemperatureDataModel {
       value: json['value'] as int,
       unit: json['unit'] as String,
     );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'place': place,
+      'value': value,
+      'unit': unit,
+    };
   }
 }
 
@@ -114,6 +155,13 @@ class CurrentTemperatureInfoModel {
       recordTime: json['recordTime'] as String,
     );
   }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'data': data.map((d) => d.toJson()).toList(),
+      'recordTime': recordTime,
+    };
+  }
 }
 
 class HumidityDataModel {
@@ -130,6 +178,14 @@ class HumidityDataModel {
       value: json['value'] as int,
       place: json['place'] as String,
     );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'unit': unit,
+      'value': value,
+      'place': place,
+    };
   }
 }
 
@@ -149,6 +205,69 @@ class HumidityInfoModel {
       data: dataList,
     );
   }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'recordTime': recordTime,
+      'data': data.map((d) => d.toJson()).toList(),
+    };
+  }
+}
+
+class UvIndexDataModel {
+  final String place;
+  final int value;
+  final String desc;
+
+  UvIndexDataModel({
+    required this.place,
+    required this.value,
+    required this.desc,
+  });
+
+  factory UvIndexDataModel.fromJson(Map<String, dynamic> json) {
+    return UvIndexDataModel(
+      place: json['place'] as String,
+      value: json['value'] as int,
+      desc: json['desc'] as String,
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'place': place,
+      'value': value,
+      'desc': desc,
+    };
+  }
+}
+
+class UvIndexInfoModel {
+  final List<UvIndexDataModel> data;
+  final String recordDesc;
+
+  UvIndexInfoModel({
+    required this.data,
+    required this.recordDesc,
+  });
+
+  factory UvIndexInfoModel.fromJson(Map<String, dynamic> json) {
+    var list = json['data'] as List;
+    List<UvIndexDataModel> dataList = list
+        .map((i) => UvIndexDataModel.fromJson(i as Map<String, dynamic>))
+        .toList();
+    return UvIndexInfoModel(
+      data: dataList,
+      recordDesc: json['recordDesc'] as String,
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'data': data.map((d) => d.toJson()).toList(),
+      'recordDesc': recordDesc,
+    };
+  }
 }
 
 class CurrentWeatherDataModel {
@@ -165,6 +284,7 @@ class CurrentWeatherDataModel {
   final String? rainfallLastMonth;
   final String? rainfallJanuaryToLastMonth;
   final HumidityInfoModel? humidity;
+  final UvIndexInfoModel? uvindex;
 
   CurrentWeatherDataModel({
     this.lightning,
@@ -180,6 +300,7 @@ class CurrentWeatherDataModel {
     this.rainfallLastMonth,
     this.rainfallJanuaryToLastMonth,
     this.humidity,
+    this.uvindex,
   });
 
   factory CurrentWeatherDataModel.fromJson(Map<String, dynamic> json) {
@@ -224,6 +345,28 @@ class CurrentWeatherDataModel {
       humidity: json['humidity'] != null
           ? HumidityInfoModel.fromJson(json['humidity'] as Map<String, dynamic>)
           : null,
+      uvindex: json['uvindex'] != null
+          ? UvIndexInfoModel.fromJson(json['uvindex'] as Map<String, dynamic>)
+          : null,
     );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'lightning': lightning?.toJson(),
+      'rainfall': rainfall?.toJson(),
+      'warningMessage': warningMessage,
+      'icon': icon,
+      'iconUpdateTime': iconUpdateTime,
+      'updateTime': updateTime,
+      'temperature': temperature?.toJson(),
+      'tcmessage': tcmessage,
+      'mintempFrom00To09': mintempFrom00To09,
+      'rainfallFrom00To12': rainfallFrom00To12,
+      'rainfallLastMonth': rainfallLastMonth,
+      'rainfallJanuaryToLastMonth': rainfallJanuaryToLastMonth,
+      'humidity': humidity?.toJson(),
+      'uvindex': uvindex?.toJson(),
+    };
   }
 }
