@@ -11,6 +11,7 @@ import 'dart:typed_data';
 import 'package:path_provider/path_provider.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
+import 'dart:async';
 
 class AppDataProvider extends ChangeNotifier {
   final Logger _logger = Logger();
@@ -34,6 +35,11 @@ class AppDataProvider extends ChangeNotifier {
   // 添加登录设备数据持久化相关常量
   static const String _loginDeviceDataKey = 'login_device_data';
 
+  // 定时登录相关
+  Timer? _loginTimer; // 定时登录定时器
+  bool _isPeriodicLoginActive = false; // 是否正在进行定期登录
+  static const int _loginIntervalHours = 12; // 12小时登录一次
+
   // Getters
   SettingsModel? get settingsModel => _settingsModel;
   ArrearProvider? get arrearProvider =>
@@ -50,6 +56,9 @@ class AppDataProvider extends ChangeNotifier {
   // 二维码相关getters
   String? get cachedComplaintQrCode => _cachedComplaintQrCode;
   String? get cachedRegistrationQrCode => _cachedRegistrationQrCode;
+
+  // 定时登录状态getter
+  bool get isPeriodicLoginActive => _isPeriodicLoginActive;
 
   static const String _deviceIdKey = 'deviceId';
 
@@ -155,6 +164,8 @@ class AppDataProvider extends ChangeNotifier {
 
           _error = null;
           _logger.i('应用从缓存初始化完成');
+          _logger.i(
+              '登录状态检查: isLoggedIn=${isLoggedIn}, token=${token != null ? '有效' : '无效'}, settingsModel=${_settingsModel != null ? '已设置' : '未设置'}');
         } catch (e) {
           _logger.e('解析缓存的登录设备数据失败，将重新登录', error: e);
           // 清除损坏的缓存数据
@@ -204,6 +215,8 @@ class AppDataProvider extends ChangeNotifier {
       }
 
       _error = null;
+      _logger.i(
+          '登录状态检查: isLoggedIn=${isLoggedIn}, token=${token != null ? '有效' : '无效'}, settingsModel=${_settingsModel != null ? '已设置' : '未设置'}');
     } catch (e) {
       _logger.e('登录失败', error: e);
       _error = 'Login failed: $e';
@@ -1090,5 +1103,53 @@ class AppDataProvider extends ChangeNotifier {
     await _saveQrCodeToCache(_registrationQrCodeKey, qrCodeUrl);
     _logger.i('✅ 登记二维码已直接设置: $qrCodeUrl');
     notifyListeners();
+  }
+
+  ///13，开始定时登录任务
+  void startPeriodicLogin() {
+    if (_isPeriodicLoginActive) {
+      _logger.i('Periodic login is already active.');
+      return;
+    }
+
+    _logger
+        .i('Starting periodic login with interval: $_loginIntervalHours hours');
+    _isPeriodicLoginActive = true;
+
+    // 设置定时器进行周期性登录
+    _loginTimer =
+        Timer.periodic(Duration(hours: _loginIntervalHours), (timer) async {
+      if (_isPeriodicLoginActive && _deviceId != null) {
+        _logger.i('Performing periodic login...');
+        try {
+          await initializeAndLogin(deviceIdToSet: _deviceId);
+          if (isLoggedIn) {
+            _logger.i('Periodic login successful');
+          } else {
+            _logger.w('Periodic login failed');
+          }
+        } catch (e) {
+          _logger.e('Periodic login error', error: e);
+        }
+      } else {
+        timer.cancel();
+      }
+    });
+  }
+
+  ///14，停止定时登录任务
+  void stopPeriodicLogin() {
+    if (_loginTimer != null) {
+      _loginTimer!.cancel();
+      _loginTimer = null;
+    }
+    _isPeriodicLoginActive = false;
+    _logger.i('Periodic login stopped.');
+  }
+
+  @override
+  void dispose() {
+    stopPeriodicLogin();
+    super.dispose();
   }
 }

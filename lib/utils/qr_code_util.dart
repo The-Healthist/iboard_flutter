@@ -1,7 +1,6 @@
 import 'dart:typed_data';
 import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
-import 'package:flutter/rendering.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 import 'package:logger/logger.dart';
 
@@ -33,12 +32,12 @@ class QrCodeUtil {
       final qrPainter = QrPainter(
         data: data,
         version: QrVersions.auto,
-        color: foregroundColor,
-        emptyColor: backgroundColor,
         gapless: false,
         embeddedImage: null,
         embeddedImageStyle: null,
         errorCorrectionLevel: errorCorrectionLevel,
+        color: foregroundColor,
+        emptyColor: backgroundColor,
       );
 
       // 创建图片记录器
@@ -93,7 +92,14 @@ class QrCodeUtil {
       embeddedImage: null,
       embeddedImageStyle: null,
       errorCorrectionLevel: errorCorrectionLevel,
-      foregroundColor: foregroundColor,
+      eyeStyle: QrEyeStyle(
+        eyeShape: QrEyeShape.square,
+        color: foregroundColor,
+      ),
+      dataModuleStyle: QrDataModuleStyle(
+        dataModuleShape: QrDataModuleShape.square,
+        color: foregroundColor,
+      ),
       backgroundColor: backgroundColor,
     );
 
@@ -141,7 +147,14 @@ class QrCodeUtil {
           embeddedImage: null,
           embeddedImageStyle: null,
           errorCorrectionLevel: errorCorrectionLevel,
-          foregroundColor: foregroundColor,
+          eyeStyle: QrEyeStyle(
+            eyeShape: QrEyeShape.square,
+            color: foregroundColor,
+          ),
+          dataModuleStyle: QrDataModuleStyle(
+            dataModuleShape: QrDataModuleShape.square,
+            color: foregroundColor,
+          ),
           backgroundColor: backgroundColor,
         ),
         Container(

@@ -33,11 +33,22 @@ class AnnouncementProvider extends ChangeNotifier {
       _carouselAnnouncements; // 轮播通告获取器
   bool get isLoading => _isLoading;
   String? get error => _error;
+  bool get isPeriodicUpdateActive => _isPeriodicUpdateActive;
 
   AnnouncementProvider(
       this._apiClient, this._appDataProvider, this._fileManager) {
     _logger.i('AnnouncementProvider initialized.');
     _loadAnnouncementsFromCache(); // 启动时从缓存加载数据
+
+    // 延迟检查AppDataProvider登录状态，确保初始化完成
+    Future.delayed(const Duration(milliseconds: 100), () {
+      if (_appDataProvider.isLoggedIn) {
+        _logger.i('AppDataProvider已登录，自动启动通告定时更新');
+        startPeriodicUpdate();
+      } else {
+        _logger.w('AppDataProvider未登录，跳过自动启动通告定时更新');
+      }
+    });
   }
 
   ///1，保存通告数据到SharedPreferences缓存
