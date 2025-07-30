@@ -175,7 +175,19 @@ class _HomePageState extends State<HomePage> {
           try {
             final weatherProvider =
                 Provider.of<WeatherProvider>(context, listen: false);
-            await weatherProvider.fetchAllWeatherData();
+
+            // 等待WeatherProvider完成初始化
+            await weatherProvider.waitForInitialization();
+
+            // 如果缓存中没有数据，才获取新数据
+            if (!weatherProvider.hasForecastData &&
+                !weatherProvider.hasCurrentData &&
+                !weatherProvider.hasWarningData) {
+              await weatherProvider.fetchAllWeatherData();
+            } else {
+              print('使用缓存的天气数据');
+            }
+
             weatherProvider.startPeriodicUpdate(
                 interval: const Duration(hours: 2));
             print('天气数据初始化完成');

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:iboard_app/providers/advertisement_provider.dart';
 import 'package:iboard_app/providers/fullscreen_ad_provider.dart';
 import 'package:provider/provider.dart';
+import 'package:logger/logger.dart';
 
 class FullscreenAdsPage extends StatefulWidget {
   @override
@@ -9,6 +10,8 @@ class FullscreenAdsPage extends StatefulWidget {
 }
 
 class _FullscreenAdsPageState extends State<FullscreenAdsPage> {
+  final Logger _logger = Logger();
+
   @override
   void initState() {
     super.initState();
@@ -23,7 +26,16 @@ class _FullscreenAdsPageState extends State<FullscreenAdsPage> {
 
           // 检查是否有错误
           if (advertisementProvider.error != null) {
-            return _buildErrorState(advertisementProvider.error!);
+            // 检查是否是网络错误，如果是网络错误且有缓存数据，则继续使用缓存数据
+            final error = advertisementProvider.error!;
+            if ((error.contains('网络连接失败') ||
+                    error.contains('请求超时') ||
+                    error.contains('使用缓存的')) &&
+                fullAds.isNotEmpty) {
+              // 继续使用缓存的数据，不显示错误界面
+            } else {
+              return _buildErrorState(error);
+            }
           }
 
           // 检查是否正在加载

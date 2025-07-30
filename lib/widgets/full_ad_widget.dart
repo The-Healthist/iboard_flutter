@@ -219,18 +219,42 @@ class _FullAdWidgetState extends State<FullAdWidget> {
   }
 
   Widget _buildImageAd() {
-    return Container(
-      width: double.infinity,
-      height: double.infinity,
-      child: widget.ad.file.localFilePath != null
-          ? Image.asset(
-              widget.ad.file.localFilePath!,
+    return FutureBuilder<File?>(
+      future: widget.fileManager.getFile(widget.ad.file),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return Container(
+            width: double.infinity,
+            height: double.infinity,
+            color: Colors.black,
+            child: const Center(
+              child: CircularProgressIndicator(color: Colors.white),
+            ),
+          );
+        }
+
+        if (snapshot.hasData && snapshot.data != null) {
+          final localFile = snapshot.data!;
+          return Container(
+            width: double.infinity,
+            height: double.infinity,
+            child: Image.file(
+              localFile,
               fit: BoxFit.cover,
+              width: double.infinity,
+              height: double.infinity,
               errorBuilder: (context, error, stackTrace) {
+                _logger.e('本地图片加载失败: ${localFile.path}', error: error);
                 return _buildNetworkImage();
               },
-            )
-          : _buildNetworkImage(),
+            ),
+          );
+        }
+
+        // 如果本地文件不存在，使用网络图片
+        _logger.w('本地图片文件不存在，使用网络图片: ${widget.ad.file.url}');
+        return _buildNetworkImage();
+      },
     );
   }
 

@@ -7,6 +7,7 @@ import 'package:iboard_app/providers/advertisement_provider.dart';
 import 'package:iboard_app/providers/fullscreen_ad_provider.dart';
 import 'package:iboard_app/providers/top_ad_carousel_provider.dart';
 import 'package:iboard_app/widgets/carousel_widget.dart';
+import 'package:iboard_app/widgets/fullscreen_ad_debug_widget.dart';
 import 'package:provider/provider.dart';
 import 'package:iboard_app/utils/debug_cache_util.dart';
 
@@ -360,6 +361,26 @@ class _CarouselSettingsPageState extends State<CarouselSettingsPage> {
                     style: TextStyle(
                       fontSize: 14,
                       color: Colors.grey.shade600,
+                    ),
+                  ),
+                  SizedBox(width: 8),
+                  ElevatedButton.icon(
+                    onPressed: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => const FullscreenAdDebugWidget(),
+                        ),
+                      );
+                    },
+                    icon: const Icon(Icons.bug_report, size: 16),
+                    label: const Text('调试', style: TextStyle(fontSize: 12)),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.orange.shade100,
+                      foregroundColor: Colors.orange.shade800,
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 8, vertical: 4),
+                      minimumSize: const Size(0, 32),
                     ),
                   ),
                 ],

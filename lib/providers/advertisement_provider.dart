@@ -460,8 +460,40 @@ class AdvertisementProvider extends ChangeNotifier {
     } catch (e, stackTrace) {
       _logger.e('An unexpected error occurred while fetching advertisements',
           error: e, stackTrace: stackTrace);
-      _error = 'An unexpected error occurred: $e';
-      // 发生意外错误时不清除现有数据，保持现状
+
+      // 详细的网络错误处理
+      String errorMessage;
+      bool isNetworkError = false;
+
+      if (e.toString().contains('SocketException') ||
+          e.toString().contains('Connection timed out') ||
+          e.toString().contains('ClientException')) {
+        errorMessage = '网络连接失败，使用缓存的广告数据继续轮播';
+        isNetworkError = true;
+        _logger.w('网络连接问题检测到，保持现有数据: $e');
+      } else if (e.toString().contains('TimeoutException') ||
+          e.toString().contains('请求超时')) {
+        errorMessage = '请求超时，使用缓存的广告数据继续轮播';
+        isNetworkError = true;
+        _logger.w('请求超时检测到，保持现有数据: $e');
+      } else if (e.toString().contains('FormatException')) {
+        errorMessage = '服务器返回数据格式错误，保持现有广告数据';
+        _logger.w('数据格式错误检测到，保持现有数据: $e');
+      } else {
+        errorMessage = '发生未知错误，保持现有广告数据: $e';
+        _logger.w('未知错误检测到，保持现有数据: $e');
+      }
+
+      _error = errorMessage;
+
+      // 网络错误时检查并确保有可用的广告数据
+      if (isNetworkError) {
+        await _ensureCachedAdvertisementsAvailable();
+      }
+
+      // 发生任何错误时都不清除现有数据，保持现状让轮播继续
+      _logger.i(
+          '错误处理完成，保持现有广告数据: ${_advertisements.length}个广告，${topAdvertisements.length}个顶部广告，${fullAdvertisements.length}个全屏广告');
     } finally {
       _isLoading = false;
       notifyListeners();
@@ -480,6 +512,27 @@ class AdvertisementProvider extends ChangeNotifier {
   // Get advertisements by display type
   List<AdModel> getAdvertisementsByDisplay(AdDisplayType display) {
     return _advertisements.where((ad) => ad.display == display).toList();
+  }
+
+  /// 确保在网络错误时有可用的缓存广告数据
+  Future<void> _ensureCachedAdvertisementsAvailable() async {
+    try {
+      // 如果当前没有广告数据，尝试从缓存中加载
+      if (_advertisements.isEmpty) {
+        _logger.i('当前广告列表为空，尝试从缓存中恢复广告数据...');
+        await _loadAdvertisementsFromCache();
+
+        if (_advertisements.isNotEmpty) {
+          _logger.i('从缓存成功恢复广告数据: ${_advertisements.length}个广告');
+        } else {
+          _logger.w('缓存中也没有可用的广告数据');
+        }
+      } else {
+        _logger.i('当前已有广告数据，继续使用现有数据: ${_advertisements.length}个广告');
+      }
+    } catch (e) {
+      _logger.e('确保缓存广告数据可用时发生错误', error: e);
+    }
   }
 
   // Potentially add methods to add/update/delete advertisements if the API supports it
