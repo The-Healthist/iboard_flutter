@@ -15,6 +15,7 @@ import 'package:iboard_app/providers/fullscreen_ad_provider.dart';
 import 'package:iboard_app/providers/bottom_weather_qrcode_carousel_provider.dart';
 import 'package:iboard_app/widgets/carousel_widget.dart' as custom_carousel;
 import 'package:iboard_app/widgets/mainscreen/bottom_display/bottom_display_widget.dart';
+import 'package:iboard_app/widgets/mainscreen/main_display/arrear_display_widget.dart';
 import 'package:iboard_app/pages/settings_page.dart';
 import 'package:logger/logger.dart';
 import 'package:provider/provider.dart';
@@ -391,6 +392,8 @@ class _AnnouncementPageState extends State<AnnouncementPage> {
           _logger.i('💰 从主页面跳转到欠费查询界面，立即进入手动操作状态');
           // 触发手动操作状态
           carouselStateProvider.enterManualOperation();
+          // 调用新的显示欠费查询方法
+          announcementCarouselProvider.showArrearQueryWidget(() {});
         } else {
           // 查找announcement在轮播通告列表中的索引
           int announcementIndex = carouselAnnouncements.indexOf(announcement);
@@ -624,6 +627,27 @@ class _AnnouncementPageState extends State<AnnouncementPage> {
                       Colors.grey.shade50, // Background for the carousel area
                   child: Consumer<AnnouncementCarouselProvider>(
                     builder: (context, announcementCarouselProvider, child) {
+                      // 如果正在显示欠费查询页面，显示欠费查询组件
+                      if (announcementCarouselProvider.isShowingArrearQuery) {
+                        return ArrearDisplayWidget(
+                          onHomeButtonPressed: () {
+                            // 主頁按鈕被按下時，隱藏欠费查询界面，返回轮播
+                            final carouselStateProvider =
+                                context.read<CarouselStateProvider>();
+                            final apiNoticeStayDuration =
+                                carouselStateProvider.noticeStayDuration;
+                            final delayBeforeNotice =
+                                carouselStateProvider.noActivityTimeout;
+                            announcementCarouselProvider.hideArrearQueryWidget(
+                              () {}, // 空的回调，因为我们已经在这里处理了
+                              apiNoticeStayDuration,
+                              delayBeforeNotice,
+                            );
+                          },
+                        );
+                      }
+
+                      // 否则显示轮播内容
                       return custom_carousel.CarouselWidget(
                         controller:
                             announcementCarouselProvider.midCarouselController,
