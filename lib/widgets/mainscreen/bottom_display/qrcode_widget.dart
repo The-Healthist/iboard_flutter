@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:iboard_app/providers/app_data_provider.dart';
-import 'package:iboard_app/widgets/qr_debug_widget.dart';
+import 'package:iboard_app/utils/qr_code_util.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:logger/logger.dart';
 import 'dart:io';
@@ -54,7 +54,7 @@ class _QrcodeWidgetState extends State<QrcodeWidget> {
     }
   }
 
-  ///2，构建二维码图片组件（支持本地文件和网络URL）- 增强版
+  ///2，构建二维码图片组件（支持本地生成、本地文件和网络URL）- 增强版
   Widget _buildQrCodeImage(String imagePath) {
     _logger.d('🖼️ 构建二维码图片: $imagePath');
 
@@ -187,11 +187,24 @@ class _QrcodeWidgetState extends State<QrcodeWidget> {
     }
   }
 
+  ///2.1，构建本地生成的二维码Widget
+  Widget _buildLocalGeneratedQrCode({
+    required String qrData,
+    double size = 88.0,
+  }) {
+    _logger.d('🔲 使用本地生成二维码: $qrData');
+    return QrCodeUtil().generateQrCodeWidget(
+      data: qrData,
+      size: size,
+    );
+  }
+
   ///3，构建单个二维码卡片
   Widget _buildQrCodeCard({
     required String title,
     required String subtitle,
     required String? qrCodeUrl,
+    String? qrData,
   }) {
     return Container(
       decoration: BoxDecoration(
@@ -218,13 +231,7 @@ class _QrcodeWidgetState extends State<QrcodeWidget> {
               borderRadius: BorderRadius.circular(8.0),
             ),
             child: Center(
-              child: qrCodeUrl != null
-                  ? _buildQrCodeImage(qrCodeUrl)
-                  : const Icon(
-                      Icons.qr_code,
-                      size: 60,
-                      color: Colors.grey,
-                    ),
+              child: _buildQrCodeContent(qrCodeUrl, qrData),
             ),
           ),
           const SizedBox(width: 16),
@@ -260,6 +267,47 @@ class _QrcodeWidgetState extends State<QrcodeWidget> {
     );
   }
 
+  ///3.1，构建二维码内容（优先使用本地生成）
+  Widget _buildQrCodeContent(String? qrCodeUrl, String? qrData) {
+    // 优先使用本地生成的二维码数据
+    if (qrData != null) {
+      _logger.d('🔲 使用本地生成的二维码数据');
+      return _buildLocalGeneratedQrCode(qrData: qrData);
+    }
+
+    // 其次使用缓存的二维码URL
+    if (qrCodeUrl != null) {
+      _logger.d('🖼️ 使用缓存的二维码URL');
+      return _buildQrCodeImage(qrCodeUrl);
+    }
+
+    // 最后显示默认图标
+    _logger.w('⚠️ 没有可用的二维码数据，显示默认图标');
+    return const Icon(
+      Icons.qr_code,
+      size: 60,
+      color: Colors.grey,
+    );
+  }
+
+  ///3.2，构建意见投诉二维码数据
+  String? _buildComplaintQrCodeData(AppDataProvider appDataProvider) {
+    final ismartId = appDataProvider.settingsModel?.building.ismartId;
+    if (ismartId != null && ismartId.isNotEmpty) {
+      return 'https://ismart.legend-in.com.hk/blg_cs_public/$ismartId';
+    }
+    return null;
+  }
+
+  ///3.3，构建住户登记二维码数据
+  String? _buildRegistrationQrCodeData(AppDataProvider appDataProvider) {
+    final ismartId = appDataProvider.settingsModel?.building.ismartId;
+    if (ismartId != null && ismartId.isNotEmpty) {
+      return 'https://ismart.legend-in.com.hk/regform/$ismartId';
+    }
+    return null;
+  }
+
   @override
   Widget build(BuildContext context) {
     return Consumer<AppDataProvider>(
@@ -280,6 +328,7 @@ class _QrcodeWidgetState extends State<QrcodeWidget> {
                       title: '意見投訴',
                       subtitle: '掃QRCode提交意見投訴',
                       qrCodeUrl: appDataProvider.cachedComplaintQrCode,
+                      qrData: _buildComplaintQrCodeData(appDataProvider),
                     ),
                   ),
                   const SizedBox(width: 16),
@@ -289,36 +338,66 @@ class _QrcodeWidgetState extends State<QrcodeWidget> {
                       title: '住戶登記',
                       subtitle: '掃QRCode進行住戶登記',
                       qrCodeUrl: appDataProvider.cachedRegistrationQrCode,
+                      qrData: _buildRegistrationQrCodeData(appDataProvider),
                     ),
                   ),
                 ],
               ),
-              // 调试按钮（仅在Debug模式显示）（已注释）
+              // 调试按钮（仅在Debug模式显示）- 已注释
               // if (const bool.fromEnvironment('dart.vm.product') == false)
               //   Positioned(
               //     top: 0,
               //     right: 0,
-              //     child: GestureDetector(
-              //       onTap: () {
-              //         Navigator.of(context).push(
-              //           MaterialPageRoute(
-              //             builder: (context) => const QrDebugWidget(),
+              //     child: Row(
+              //       children: [
+              //         // 二维码测试按钮
+              //         GestureDetector(
+              //           onTap: () {
+              //             Navigator.of(context).push(
+              //               MaterialPageRoute(
+              //                 builder: (context) => const QrCodeTestPage(),
+              //               ),
+              //             );
+              //           },
+              //           child: Container(
+              //             width: 30,
+              //             height: 30,
+              //             margin: const EdgeInsets.only(right: 8),
+              //             decoration: BoxDecoration(
+              //               color: Colors.blue.withOpacity(0.8),
+              //               borderRadius: BorderRadius.circular(15),
+              //             ),
+              //             child: const Icon(
+              //               Icons.qr_code,
+              //               size: 20,
+              //               color: Colors.white,
+              //             ),
               //           ),
-              //         );
-              //       },
-              //       child: Container(
-              //         width: 30,
-              //         height: 30,
-              //         decoration: BoxDecoration(
-              //           color: Colors.red.withOpacity(0.8),
-              //           borderRadius: BorderRadius.circular(15),
               //         ),
-              //         child: const Icon(
-              //           Icons.bug_report,
-              //           size: 20,
-              //           color: Colors.white,
+              //         // 原有调试按钮
+              //         GestureDetector(
+              //           onTap: () {
+              //             Navigator.of(context).push(
+              //               MaterialPageRoute(
+              //                 builder: (context) => const QrDebugWidget(),
+              //               ),
+              //             );
+              //           },
+              //           child: Container(
+              //             width: 30,
+              //             height: 30,
+              //             decoration: BoxDecoration(
+              //               color: Colors.red.withOpacity(0.8),
+              //               borderRadius: BorderRadius.circular(15),
+              //             ),
+              //             child: const Icon(
+              //               Icons.bug_report,
+              //               size: 20,
+              //               color: Colors.white,
+              //             ),
+              //           ),
               //         ),
-              //       ),
+              //       ],
               //     ),
               //   ),
             ],

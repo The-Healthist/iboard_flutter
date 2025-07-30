@@ -17,6 +17,7 @@ import 'pages/settings_page.dart';
 import 'pages/carousel_settings_page.dart'; // 添加轮播设置页面导入
 import 'pages/error_page.dart'; // 添加错误页面导入
 import 'providers/arrear_provider.dart'; // 添加欠费provider导入
+import 'providers/weather_provider.dart'; // 添加天气provider导入
 import 'dart:async';
 
 void main() {
@@ -82,6 +83,9 @@ void main() {
               apiClient: Provider.of<AppDataProvider>(context, listen: false)
                   .apiClient,
             ),
+          ),
+          ChangeNotifierProvider(
+            create: (context) => WeatherProvider(),
           ),
         ],
         child: MyApp(),

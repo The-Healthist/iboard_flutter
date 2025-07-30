@@ -5,6 +5,7 @@ import 'package:iboard_app/providers/state_provider.dart';
 import 'package:logger/logger.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:iboard_app/providers/arrear_provider.dart';
+import 'package:iboard_app/utils/qr_code_util.dart';
 import 'dart:io';
 import 'dart:typed_data';
 import 'package:path_provider/path_provider.dart';
@@ -684,23 +685,17 @@ class AppDataProvider extends ChangeNotifier {
     }
   }
 
-  ///1，生成意见投诉二维码（下载到本地）
+  ///1，生成意见投诉二维码（使用本地生成工具）
   Future<String?> generateComplaintQrCode() async {
     if (_cachedComplaintQrCode != null) {
-      // 检查是网络URL还是本地文件
-      if (_cachedComplaintQrCode!.startsWith('http')) {
-        _logger.i('📱 使用缓存的意见投诉二维码URL: $_cachedComplaintQrCode');
+      // 检查本地文件是否存在
+      final file = File(_cachedComplaintQrCode!);
+      if (await file.exists()) {
+        _logger.i('📱 使用缓存的意见投诉二维码文件: $_cachedComplaintQrCode');
         return _cachedComplaintQrCode;
       } else {
-        // 检查本地文件是否存在
-        final file = File(_cachedComplaintQrCode!);
-        if (await file.exists()) {
-          _logger.i('📱 使用缓存的意见投诉二维码文件: $_cachedComplaintQrCode');
-          return _cachedComplaintQrCode;
-        } else {
-          _logger.w('⚠️ 缓存的二维码文件不存在，重新下载');
-          _cachedComplaintQrCode = null;
-        }
+        _logger.w('⚠️ 缓存的二维码文件不存在，重新生成');
+        _cachedComplaintQrCode = null;
       }
     }
 
@@ -712,52 +707,53 @@ class AppDataProvider extends ChangeNotifier {
     }
 
     try {
-      final qrCodeUrl =
-          'https://api.qrserver.com/v1/create-qr-code/?size=88x88&data=https://ismart.legend-in.com.hk/blg_cs_public/$ismartId';
-      _logger.i('🔗 生成的投诉二维码URL: $qrCodeUrl');
+      // 构建投诉二维码的目标URL
+      final targetUrl =
+          'https://ismart.legend-in.com.hk/blg_cs_public/$ismartId';
+      _logger.i('🔗 投诉二维码目标URL: $targetUrl');
 
-      // 下载二维码图片到本地
-      _logger.i('🔄 开始尝试下载投诉二维码到本地...');
-      final localPath =
-          await _downloadQrCodeToLocal(qrCodeUrl, 'complaint_qr_$ismartId.png');
-      if (localPath != null) {
-        _cachedComplaintQrCode = localPath;
-        await _saveQrCodeToCache(_complaintQrCodeKey, localPath);
-        _logger.i('✅ 意见投诉二维码下载成功并缓存到: $localPath');
-        notifyListeners();
-        return localPath;
-      } else {
-        // 回退策略：如果下载失败，直接使用网络URL
-        _logger.w('⚠️ 下载意见投诉二维码失败，回退到使用网络URL');
-        _cachedComplaintQrCode = qrCodeUrl;
-        await _saveQrCodeToCache(_complaintQrCodeKey, qrCodeUrl);
-        _logger.i('🔄 意见投诉二维码回退到网络URL: $qrCodeUrl');
-        notifyListeners();
-        return qrCodeUrl;
+      // 使用本地二维码生成工具
+      final qrCodeUtil = QrCodeUtil();
+      final qrCodeImageData = await qrCodeUtil.generateQrCodeImageData(
+        data: targetUrl,
+        size: 88,
+      );
+
+      if (qrCodeImageData != null) {
+        // 保存到本地文件
+        final localPath = await _saveQrCodeImageToLocal(
+          qrCodeImageData,
+          'complaint_qr_$ismartId.png',
+        );
+
+        if (localPath != null) {
+          _cachedComplaintQrCode = localPath;
+          await _saveQrCodeToCache(_complaintQrCodeKey, localPath);
+          _logger.i('✅ 意见投诉二维码生成成功并保存到: $localPath');
+          notifyListeners();
+          return localPath;
+        }
       }
+
+      _logger.e('❌ 生成意见投诉二维码失败');
+      return null;
     } catch (e) {
-      _logger.e('❌ 生成意见投诉二维码失败', error: e);
+      _logger.e('❌ 生成意见投诉二维码异常', error: e);
       return null;
     }
   }
 
-  ///2，生成住户登记二维码（下载到本地）
+  ///2，生成住户登记二维码（使用本地生成工具）
   Future<String?> generateRegistrationQrCode() async {
     if (_cachedRegistrationQrCode != null) {
-      // 检查是网络URL还是本地文件
-      if (_cachedRegistrationQrCode!.startsWith('http')) {
-        _logger.i('📱 使用缓存的住户登记二维码URL: $_cachedRegistrationQrCode');
+      // 检查本地文件是否存在
+      final file = File(_cachedRegistrationQrCode!);
+      if (await file.exists()) {
+        _logger.i('📱 使用缓存的住户登记二维码文件: $_cachedRegistrationQrCode');
         return _cachedRegistrationQrCode;
       } else {
-        // 检查本地文件是否存在
-        final file = File(_cachedRegistrationQrCode!);
-        if (await file.exists()) {
-          _logger.i('📱 使用缓存的住户登记二维码文件: $_cachedRegistrationQrCode');
-          return _cachedRegistrationQrCode;
-        } else {
-          _logger.w('⚠️ 缓存的二维码文件不存在，重新下载');
-          _cachedRegistrationQrCode = null;
-        }
+        _logger.w('⚠️ 缓存的二维码文件不存在，重新生成');
+        _cachedRegistrationQrCode = null;
       }
     }
 
@@ -769,30 +765,37 @@ class AppDataProvider extends ChangeNotifier {
     }
 
     try {
-      final qrCodeUrl =
-          'https://api.qrserver.com/v1/create-qr-code/?size=88x88&data=https://ismart.legend-in.com.hk/regform/$ismartId';
-      _logger.i('🔗 生成的登记二维码URL: $qrCodeUrl');
+      // 构建登记二维码的目标URL
+      final targetUrl = 'https://ismart.legend-in.com.hk/regform/$ismartId';
+      _logger.i('🔗 登记二维码目标URL: $targetUrl');
 
-      // 下载二维码图片到本地
-      final localPath = await _downloadQrCodeToLocal(
-          qrCodeUrl, 'registration_qr_$ismartId.png');
-      if (localPath != null) {
-        _cachedRegistrationQrCode = localPath;
-        await _saveQrCodeToCache(_registrationQrCodeKey, localPath);
-        _logger.i('✅ 住户登记二维码下载成功并缓存到: $localPath');
-        notifyListeners();
-        return localPath;
-      } else {
-        // 回退策略：如果下载失败，直接使用网络URL
-        _logger.w('⚠️ 下载住户登记二维码失败，回退到使用网络URL');
-        _cachedRegistrationQrCode = qrCodeUrl;
-        await _saveQrCodeToCache(_registrationQrCodeKey, qrCodeUrl);
-        _logger.i('🔄 住户登记二维码回退到网络URL: $qrCodeUrl');
-        notifyListeners();
-        return qrCodeUrl;
+      // 使用本地二维码生成工具
+      final qrCodeUtil = QrCodeUtil();
+      final qrCodeImageData = await qrCodeUtil.generateQrCodeImageData(
+        data: targetUrl,
+        size: 88,
+      );
+
+      if (qrCodeImageData != null) {
+        // 保存到本地文件
+        final localPath = await _saveQrCodeImageToLocal(
+          qrCodeImageData,
+          'registration_qr_$ismartId.png',
+        );
+
+        if (localPath != null) {
+          _cachedRegistrationQrCode = localPath;
+          await _saveQrCodeToCache(_registrationQrCodeKey, localPath);
+          _logger.i('✅ 住户登记二维码生成成功并保存到: $localPath');
+          notifyListeners();
+          return localPath;
+        }
       }
+
+      _logger.e('❌ 生成住户登记二维码失败');
+      return null;
     } catch (e) {
-      _logger.e('❌ 生成住户登记二维码失败', error: e);
+      _logger.e('❌ 生成住户登记二维码异常', error: e);
       return null;
     }
   }
@@ -867,7 +870,36 @@ class AppDataProvider extends ChangeNotifier {
     return null;
   }
 
-  ///4，保存二维码路径到SharedPreferences缓存
+  ///4，保存二维码图片数据到本地文件
+  Future<String?> _saveQrCodeImageToLocal(
+      Uint8List imageData, String fileName) async {
+    try {
+      _logger.i('💾 开始保存二维码图片到本地: $fileName');
+
+      // 获取应用文档目录
+      final directory = await getApplicationDocumentsDirectory();
+      final qrCodeDir = Directory('${directory.path}/qr_codes');
+
+      // 确保目录存在
+      if (!await qrCodeDir.exists()) {
+        await qrCodeDir.create(recursive: true);
+        _logger.d('📁 创建二维码目录: ${qrCodeDir.path}');
+      }
+
+      // 保存文件
+      final filePath = '${qrCodeDir.path}/$fileName';
+      final file = File(filePath);
+      await file.writeAsBytes(imageData);
+
+      _logger.i('✅ 二维码图片已保存到本地: $filePath (文件大小: ${imageData.length} bytes)');
+      return filePath;
+    } catch (e) {
+      _logger.e('❌ 保存二维码图片到本地失败', error: e);
+      return null;
+    }
+  }
+
+  ///5，保存二维码路径到SharedPreferences缓存
   Future<void> _saveQrCodeToCache(String key, String localPath) async {
     try {
       final prefs = await SharedPreferences.getInstance();
@@ -885,12 +917,7 @@ class AppDataProvider extends ChangeNotifier {
       return true;
     }
 
-    // 如果是网络URL，不需要检查文件存在
-    if (cachedQrCode.startsWith('http')) {
-      return false;
-    }
-
-    // 如果是本地文件路径，检查文件是否存在
+    // 检查本地文件是否存在
     return !await File(cachedQrCode).exists();
   }
 
@@ -976,18 +1003,14 @@ class AppDataProvider extends ChangeNotifier {
   void _ensureQrCodeFallback() {
     final ismartId = _settingsModel?.building.ismartId;
     if (ismartId != null && ismartId.isNotEmpty) {
-      // 如果投诉二维码为空，使用网络URL
+      // 如果投诉二维码为空，记录日志但不设置网络URL
       if (_cachedComplaintQrCode == null) {
-        _cachedComplaintQrCode =
-            'https://api.qrserver.com/v1/create-qr-code/?size=88x88&data=https://ismart.legend-in.com.hk/blg_cs_public/$ismartId';
-        _logger.i('🔄 投诉二维码使用网络URL备选方案');
+        _logger.w('⚠️ 投诉二维码为空，需要重新生成');
       }
 
-      // 如果登记二维码为空，使用网络URL
+      // 如果登记二维码为空，记录日志但不设置网络URL
       if (_cachedRegistrationQrCode == null) {
-        _cachedRegistrationQrCode =
-            'https://api.qrserver.com/v1/create-qr-code/?size=88x88&data=https://ismart.legend-in.com.hk/regform/$ismartId';
-        _logger.i('🔄 登记二维码使用网络URL备选方案');
+        _logger.w('⚠️ 登记二维码为空，需要重新生成');
       }
     }
     notifyListeners(); // 通知UI更新
@@ -999,22 +1022,12 @@ class AppDataProvider extends ChangeNotifier {
       await generateComplaintQrCode().timeout(
         const Duration(seconds: 30),
         onTimeout: () {
-          _logger.w('⏰ 投诉二维码生成超时，使用网络URL');
-          final ismartId = _settingsModel?.building.ismartId;
-          if (ismartId != null) {
-            _cachedComplaintQrCode =
-                'https://api.qrserver.com/v1/create-qr-code/?size=88x88&data=https://ismart.legend-in.com.hk/blg_cs_public/$ismartId';
-          }
+          _logger.w('⏰ 投诉二维码生成超时');
           return null;
         },
       );
     } catch (e) {
-      _logger.w('⚠️ 投诉二维码生成失败，使用网络URL备选方案', error: e);
-      final ismartId = _settingsModel?.building.ismartId;
-      if (ismartId != null) {
-        _cachedComplaintQrCode =
-            'https://api.qrserver.com/v1/create-qr-code/?size=88x88&data=https://ismart.legend-in.com.hk/blg_cs_public/$ismartId';
-      }
+      _logger.w('⚠️ 投诉二维码生成失败', error: e);
     }
   }
 
@@ -1024,22 +1037,12 @@ class AppDataProvider extends ChangeNotifier {
       await generateRegistrationQrCode().timeout(
         const Duration(seconds: 30),
         onTimeout: () {
-          _logger.w('⏰ 登记二维码生成超时，使用网络URL');
-          final ismartId = _settingsModel?.building.ismartId;
-          if (ismartId != null) {
-            _cachedRegistrationQrCode =
-                'https://api.qrserver.com/v1/create-qr-code/?size=88x88&data=https://ismart.legend-in.com.hk/regform/$ismartId';
-          }
+          _logger.w('⏰ 登记二维码生成超时');
           return null;
         },
       );
     } catch (e) {
-      _logger.w('⚠️ 登记二维码生成失败，使用网络URL备选方案', error: e);
-      final ismartId = _settingsModel?.building.ismartId;
-      if (ismartId != null) {
-        _cachedRegistrationQrCode =
-            'https://api.qrserver.com/v1/create-qr-code/?size=88x88&data=https://ismart.legend-in.com.hk/regform/$ismartId';
-      }
+      _logger.w('⚠️ 登记二维码生成失败', error: e);
     }
     notifyListeners(); // 通知UI更新
   }
