@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:iboard_app/models/arrear_model.dart';
 import 'package:iboard_app/http/api_client.dart';
 import 'package:logger/logger.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'dart:convert';
 
 class ArrearProvider extends ChangeNotifier {
   final Logger _logger = Logger();
@@ -15,6 +17,10 @@ class ArrearProvider extends ChangeNotifier {
 
   // 存储API返回的原始数据
   List<Map<String, dynamic>> _rawArrearData = [];
+
+  // 缓存键
+  static const String _cacheKey = 'arrearage_data_cache';
+  static const String _lastUpdateKey = 'arrearage_last_update';
 
   ArrearProvider({required ApiClient apiClient}) : _apiClient = apiClient;
 
@@ -35,6 +41,109 @@ class ArrearProvider extends ChangeNotifier {
   String? get selectedBuildingId => _selectedBuildingId;
   String? get selectedUnit => _selectedUnit;
   List<Map<String, dynamic>> get rawArrearData => _rawArrearData;
+
+  ///1, 从缓存加载欠费数据
+  Future<void> loadFromCache() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final cachedData = prefs.getString(_cacheKey);
+      final lastUpdate = prefs.getString(_lastUpdateKey);
+
+      if (cachedData != null) {
+        final List<dynamic> decodedData = json.decode(cachedData);
+        final List<Map<String, dynamic>> records =
+            decodedData.map((item) => Map<String, dynamic>.from(item)).toList();
+
+        _rawArrearData = records;
+        _arrears = records.map((item) => ArrearModel.fromJson(item)).toList();
+
+        _logger.i('✅ 从缓存加载欠费数据成功，共 ${records.length} 条记录');
+        if (lastUpdate != null) {
+          _logger.i('📅 缓存更新时间: $lastUpdate');
+        }
+
+        // 自动选择第一个楼号
+        if (_rawArrearData.isNotEmpty && _selectedBuildingId == null) {
+          final firstBuilding = buildings.isNotEmpty ? buildings[0] : null;
+          if (firstBuilding != null) {
+            setSelectedBuildingId(firstBuilding);
+          }
+        }
+
+        notifyListeners();
+      } else {
+        _logger.i('📭 缓存中没有欠费数据');
+      }
+    } catch (e) {
+      _logger.e('❌ 从缓存加载欠费数据失败: $e');
+    }
+  }
+
+  ///2, 保存欠费数据到缓存
+  Future<void> saveToCache() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final jsonData = json.encode(_rawArrearData);
+      final now = DateTime.now().toIso8601String();
+
+      await prefs.setString(_cacheKey, jsonData);
+      await prefs.setString(_lastUpdateKey, now);
+
+      _logger.i('✅ 欠费数据已保存到缓存，共 ${_rawArrearData.length} 条记录');
+      _logger.i('📅 缓存更新时间: $now');
+    } catch (e) {
+      _logger.e('❌ 保存欠费数据到缓存失败: $e');
+    }
+  }
+
+  ///3, 获取缓存更新时间
+  Future<String?> getLastUpdateTime() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      return prefs.getString(_lastUpdateKey);
+    } catch (e) {
+      _logger.e('❌ 获取缓存更新时间失败: $e');
+      return null;
+    }
+  }
+
+  ///4, 清除缓存
+  Future<void> clearCache() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.remove(_cacheKey);
+      await prefs.remove(_lastUpdateKey);
+
+      _logger.i('🗑️ 欠费数据缓存已清除');
+    } catch (e) {
+      _logger.e('❌ 清除缓存失败: $e');
+    }
+  }
+
+  ///5, 检查缓存状态
+  Future<Map<String, dynamic>> getCacheStatus() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final cachedData = prefs.getString(_cacheKey);
+      final lastUpdate = prefs.getString(_lastUpdateKey);
+
+      return {
+        'hasCache': cachedData != null,
+        'lastUpdate': lastUpdate,
+        'cacheSize': cachedData?.length ?? 0,
+        'recordCount': _rawArrearData.length,
+      };
+    } catch (e) {
+      _logger.e('❌ 获取缓存状态失败: $e');
+      return {
+        'hasCache': false,
+        'lastUpdate': null,
+        'cacheSize': 0,
+        'recordCount': 0,
+        'error': e.toString(),
+      };
+    }
+  }
 
   ///1, 获取所有楼号
   List<String> get buildings {
@@ -136,11 +245,17 @@ class ArrearProvider extends ChangeNotifier {
   /// 初始化获取欠费数据
   Future<void> initGetArrearData() async {
     _logger.i('开始初始化获取欠费数据');
+
+    // 首先尝试从缓存加载数据
+    await loadFromCache();
+
     if (_selectedBuildingId == null || _selectedBuildingId!.isEmpty) {
       _logger.w('楼宇ID未设置，无法初始化欠费数据');
       return;
     }
-    await fetchArrears(reset: true, buildingId: _selectedBuildingId);
+
+    // 然后尝试从网络获取最新数据（不重置缓存数据，如果失败则保持缓存数据）
+    await fetchArrears(reset: false, buildingId: _selectedBuildingId);
   }
 
   /// 获取欠费列表
@@ -153,9 +268,11 @@ class ArrearProvider extends ChangeNotifier {
     _isLoading = true;
     _error = null;
 
+    // 只有在明确要求重置时才清空数据
     if (reset) {
       _arrears = [];
       _rawArrearData = [];
+      _logger.i('重置欠费数据');
     }
 
     notifyListeners();
@@ -164,7 +281,6 @@ class ArrearProvider extends ChangeNotifier {
       // 确保我们有有效的楼宇ID
       final targetBuildingId = buildingId ?? _selectedBuildingId;
       if (targetBuildingId == null || targetBuildingId.isEmpty) {
-        _error = '楼宇ID不能为空';
         _logger.w('无法获取欠费数据：楼宇ID为空');
         return;
       }
@@ -195,10 +311,20 @@ class ArrearProvider extends ChangeNotifier {
       _arrears = parsedArrears;
       _logger.i('成功解析 ${parsedArrears.length} 条欠费记录');
 
+      // 保存到缓存
+      await saveToCache();
+
       _error = null;
     } catch (e, stackTrace) {
-      _error = '网络请求失败: $e';
       _logger.e('获取欠费数据时发生异常: $e', error: e, stackTrace: stackTrace);
+
+      // 网络请求失败时，静默处理，不清空现有数据，也不设置错误
+      if (_rawArrearData.isNotEmpty) {
+        _logger.i('网络请求失败，保持现有缓存数据，共 ${_rawArrearData.length} 条记录');
+      } else {
+        _logger.i('网络请求失败，且无缓存数据');
+      }
+      // 不设置_error，保持静默
     } finally {
       _isLoading = false;
       notifyListeners();

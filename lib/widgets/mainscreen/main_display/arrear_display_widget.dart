@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:iboard_app/providers/arrear_provider.dart';
+import 'package:iboard_app/widgets/arrear_debug_widget.dart';
 
 class ArrearDisplayWidget extends StatefulWidget {
   final VoidCallback? onHomeButtonPressed; // 添加主頁按鈕回調
@@ -25,6 +26,13 @@ class ArrearDisplayWidgetState extends State<ArrearDisplayWidget> {
   void initState() {
     super.initState();
     // 数据已在main.dart中通过AppDataProvider初始化
+    // 优先从缓存加载数据，确保即使网络失败也能显示数据
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final provider = Provider.of<ArrearProvider>(context, listen: false);
+      if (provider.rawArrearData.isEmpty) {
+        provider.loadFromCache();
+      }
+    });
   }
 
   @override
@@ -113,6 +121,38 @@ class ArrearDisplayWidgetState extends State<ArrearDisplayWidget> {
                   ),
                 ),
               ),
+
+            // 调试按钮 - 位于左上角（已注释）
+            // Positioned(
+            //   top: 16,
+            //   left: 16,
+            //   child: Material(
+            //     color: Colors.transparent,
+            //     child: InkWell(
+            //       onTap: () {
+            //         Navigator.push(
+            //           context,
+            //           MaterialPageRoute(
+            //             builder: (context) => const ArrearDebugWidget(),
+            //           ),
+            //         );
+            //       },
+            //       borderRadius: BorderRadius.circular(20),
+            //       child: Container(
+            //         padding: const EdgeInsets.all(8),
+            //         decoration: BoxDecoration(
+            //           color: Colors.green.withOpacity(0.8),
+            //           borderRadius: BorderRadius.circular(20),
+            //         ),
+            //         child: const Icon(
+            //           Icons.bug_report,
+            //           color: Colors.white,
+            //           size: 24,
+            //         ),
+            //       ),
+            //     ),
+            //   ),
+            // ),
           ],
         );
       },
@@ -302,7 +342,7 @@ class ArrearDisplayWidgetState extends State<ArrearDisplayWidget> {
     }
   }
 
-  ///6, 构建结果容器
+  ///6, 构建结果容器 - 静默使用缓存数据
   Widget _buildResultsContainer(ArrearProvider provider) {
     if (provider.isLoading) {
       return Container(
@@ -313,68 +353,57 @@ class ArrearDisplayWidgetState extends State<ArrearDisplayWidget> {
       );
     }
 
-    if (provider.error != null) {
-      return Container(
-        padding: const EdgeInsets.all(40),
-        child: Center(
-          child: Column(
-            children: [
-              Icon(Icons.error_outline, color: Colors.red, size: 60),
-              const SizedBox(height: 16),
-              Text(
-                '查詢失敗: ${provider.error}',
-                style: const TextStyle(color: Colors.red, fontSize: 16),
-                textAlign: TextAlign.center,
-              ),
-            ],
-          ),
-        ),
-      );
+    final arrears = provider.arrears;
+    final hasData = arrears.isNotEmpty || provider.rawArrearData.isNotEmpty;
+
+    // 如果有数据就显示，没有数据就显示空状态
+    if (hasData) {
+      return _buildDataContent(provider);
     }
 
-    final arrears = provider.arrears;
-
-    if (arrears.isEmpty) {
-      return Container(
-        padding: const EdgeInsets.all(40),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(12),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.06),
-              blurRadius: 8,
-              offset: const Offset(0, 2),
+    // 没有数据时显示空状态
+    return Container(
+      padding: const EdgeInsets.all(40),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.06),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: const Center(
+        child: Column(
+          children: [
+            Icon(Icons.info_outline, color: Colors.grey, size: 60),
+            SizedBox(height: 16),
+            Text(
+              '暫無欠費數據',
+              style: TextStyle(
+                fontSize: 18,
+                color: Colors.grey,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+            SizedBox(height: 8),
+            Text(
+              '請稍後再試或聯繫管理員',
+              style: TextStyle(
+                fontSize: 14,
+                color: Colors.grey,
+              ),
             ),
           ],
         ),
-        child: const Center(
-          child: Column(
-            children: [
-              Icon(Icons.info_outline, color: Colors.grey, size: 60),
-              SizedBox(height: 16),
-              Text(
-                '暫無欠費數據',
-                style: TextStyle(
-                  fontSize: 18,
-                  color: Colors.grey,
-                  fontWeight: FontWeight.w500,
-                ),
-              ),
-              SizedBox(height: 8),
-              Text(
-                '請稍後再試或聯繫管理員',
-                style: TextStyle(
-                  fontSize: 14,
-                  color: Colors.grey,
-                ),
-              ),
-            ],
-          ),
-        ),
-      );
-    }
+      ),
+    );
+  }
 
+  ///7, 构建数据内容
+  Widget _buildDataContent(ArrearProvider provider) {
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
@@ -420,7 +449,7 @@ class ArrearDisplayWidgetState extends State<ArrearDisplayWidget> {
     );
   }
 
-  ///7, 构建欠费记录列表
+  ///8, 构建欠费记录列表
   Widget _buildArrearList(ArrearProvider provider) {
     final currentArrearage = provider.currentArrearage;
 
@@ -490,7 +519,7 @@ class ArrearDisplayWidgetState extends State<ArrearDisplayWidget> {
     return Colors.black87;
   }
 
-  ///8, 构建分页控制
+  ///9, 构建分页控制
   Widget _buildPagination(ArrearProvider provider) {
     final currentArrearage = provider.currentArrearage;
     if (currentArrearage == null) {

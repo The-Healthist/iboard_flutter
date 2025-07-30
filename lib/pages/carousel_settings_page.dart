@@ -84,16 +84,16 @@ class _CarouselSettingsPageState extends State<CarouselSettingsPage> {
                           color: Colors.grey.shade800,
                         ),
                       ),
-                      Spacer(),
-                      IconButton(
-                        onPressed: () async {
-                          await DebugCacheUtil.testCarouselOrderPersistence();
-                          await DebugCacheUtil.checkAllCarouselOrders();
-                          await DebugCacheUtil.checkRawDataCache();
-                        },
-                        icon: Icon(Icons.bug_report, color: Colors.blue),
-                        tooltip: '调试缓存',
-                      ),
+                      // Spacer(),
+                      // IconButton(
+                      //   onPressed: () async {
+                      //     await DebugCacheUtil.testCarouselOrderPersistence();
+                      //     await DebugCacheUtil.checkAllCarouselOrders();
+                      //     await DebugCacheUtil.checkRawDataCache();
+                      //   },
+                      //   icon: Icon(Icons.bug_report, color: Colors.blue),
+                      //   tooltip: '调试缓存',
+                      // ),
                     ],
                   ),
                 ),

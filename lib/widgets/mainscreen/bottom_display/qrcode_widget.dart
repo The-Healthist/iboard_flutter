@@ -293,34 +293,34 @@ class _QrcodeWidgetState extends State<QrcodeWidget> {
                   ),
                 ],
               ),
-              // 调试按钮（仅在Debug模式显示）
-              if (const bool.fromEnvironment('dart.vm.product') == false)
-                Positioned(
-                  top: 0,
-                  right: 0,
-                  child: GestureDetector(
-                    onTap: () {
-                      Navigator.of(context).push(
-                        MaterialPageRoute(
-                          builder: (context) => const QrDebugWidget(),
-                        ),
-                      );
-                    },
-                    child: Container(
-                      width: 30,
-                      height: 30,
-                      decoration: BoxDecoration(
-                        color: Colors.red.withOpacity(0.8),
-                        borderRadius: BorderRadius.circular(15),
-                      ),
-                      child: const Icon(
-                        Icons.bug_report,
-                        size: 20,
-                        color: Colors.white,
-                      ),
-                    ),
-                  ),
-                ),
+              // 调试按钮（仅在Debug模式显示）（已注释）
+              // if (const bool.fromEnvironment('dart.vm.product') == false)
+              //   Positioned(
+              //     top: 0,
+              //     right: 0,
+              //     child: GestureDetector(
+              //       onTap: () {
+              //         Navigator.of(context).push(
+              //           MaterialPageRoute(
+              //             builder: (context) => const QrDebugWidget(),
+              //           ),
+              //         );
+              //       },
+              //       child: Container(
+              //         width: 30,
+              //         height: 30,
+              //         decoration: BoxDecoration(
+              //           color: Colors.red.withOpacity(0.8),
+              //           borderRadius: BorderRadius.circular(15),
+              //         ),
+              //         child: const Icon(
+              //           Icons.bug_report,
+              //           size: 20,
+              //           color: Colors.white,
+              //         ),
+              //       ),
+              //     ),
+              //   ),
             ],
           ),
         );

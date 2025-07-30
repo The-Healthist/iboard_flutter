@@ -583,6 +583,17 @@ class AnnouncementCarouselProvider extends ChangeNotifier {
   void _showArrearQueryWidget(VoidCallback onHomeButtonPressed) {
     _logger.i('💰 显示欠费查询界面');
 
+    // 检查是否已经存在欠费查询界面
+    int existingArrearIndex = -1;
+    for (int i = 0; i < _midCarouselController.widgetCount; i++) {
+      // 这里我们需要检查当前索引是否已经是欠费查询界面
+      if (i == _currentNoticeIndex && _currentNoticeIndex > 0) {
+        // 如果当前已经在欠费查询界面，直接返回
+        _logger.i('💰 已经在欠费查询界面，无需重复跳转');
+        return;
+      }
+    }
+
     // 创建欠费查询组件
     Widget arrearQueryWidget = ArrearDisplayWidget(
       onHomeButtonPressed: onHomeButtonPressed,
@@ -591,10 +602,29 @@ class AnnouncementCarouselProvider extends ChangeNotifier {
     // 将欠费查询组件添加到轮播数组中
     // 注意：这里需要重新构建整个轮播数组，因为CarouselController没有getCarouselArray方法
     List<Widget> currentWidgets = [
-      // 主屏幕
+      // 主屏幕 - 保持原有的回调函数
       MainScreenWidget(
         onAnnouncementTap: (announcement) {
-          // 这里可以处理从欠费查询界面返回的逻辑
+          if (announcement == null) {
+            // 显示欠费查询界面
+            _showArrearQueryWidget(onHomeButtonPressed);
+          } else {
+            // 查找announcement在轮播通告列表中的索引
+            int announcementIndex =
+                this.carouselAnnouncements.indexOf(announcement);
+            if (announcementIndex != -1) {
+              // 计算在carousel中的实际索引（主屏幕是索引0，所以announcement从索引1开始）
+              int carouselIndex = announcementIndex + 1;
+              // 跳转到对应的公告页面
+              jumpToAnnouncementIndex(carouselIndex);
+              _logger.i(
+                  '跳转到轮播通告: $carouselIndex (${announcement.title}) - 类型: ${announcement.uiType}');
+            } else {
+              // 如果点击的通告不在轮播列表中（不是緊急或一般通告），提示用户
+              _logger.w(
+                  '点击的通告不在轮播列表中: ${announcement.title} - 类型: ${announcement.uiType}');
+            }
+          }
         },
       ),
       // 通告组件

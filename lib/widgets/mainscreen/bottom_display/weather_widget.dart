@@ -337,27 +337,27 @@ class _WeatherWidgetState extends State<WeatherWidget> {
               ),
             ], // Column的children结束
           ), // Column结束
-          // 调试按钮 - 定位在右上角
-          Positioned(
-            top: 4,
-            right: 4,
-            child: GestureDetector(
-              onTap: _openWeatherDebugPage,
-              child: Container(
-                width: 24,
-                height: 24,
-                decoration: BoxDecoration(
-                  color: Colors.blue.withOpacity(0.8),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: const Icon(
-                  Icons.bug_report,
-                  size: 16,
-                  color: Colors.white,
-                ),
-              ),
-            ),
-          ),
+          // 调试按钮 - 定位在右上角（已注释）
+          // Positioned(
+          //   top: 4,
+          //   right: 4,
+          //   child: GestureDetector(
+          //     onTap: _openWeatherDebugPage,
+          //     child: Container(
+          //       width: 24,
+          //       height: 24,
+          //       decoration: BoxDecoration(
+          //         color: Colors.blue.withOpacity(0.8),
+          //         borderRadius: BorderRadius.circular(12),
+          //       ),
+          //       child: const Icon(
+          //         Icons.bug_report,
+          //         size: 16,
+          //         color: Colors.white,
+          //       ),
+          //     ),
+          //   ),
+          // ),
         ], // Stack的children结束
       ), // Stack结束
     ); // Container结束
