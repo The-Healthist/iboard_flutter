@@ -16,7 +16,6 @@ import 'package:iboard_app/providers/bottom_weather_qrcode_carousel_provider.dar
 import 'package:iboard_app/widgets/carousel_widget.dart' as custom_carousel;
 import 'package:iboard_app/widgets/mainscreen/bottom_display/bottom_display_widget.dart';
 import 'package:iboard_app/widgets/mainscreen/main_display/arrear_display_widget.dart';
-import 'package:iboard_app/widgets/mainscreen/main_display/mainscreen_widget.dart';
 import 'package:iboard_app/pages/settings_page.dart';
 import 'package:logger/logger.dart';
 import 'package:provider/provider.dart';
@@ -649,26 +648,6 @@ class _AnnouncementPageState extends State<AnnouncementPage> {
                       }
 
                       // 否则显示轮播内容
-                      print(
-                          '显示轮播内容，widgetCount: ${announcementCarouselProvider.midCarouselController.widgetCount}');
-
-                      // 如果轮播数组为空，显示默认主页内容
-                      if (announcementCarouselProvider
-                              .midCarouselController.widgetCount ==
-                          0) {
-                        print('轮播数组为空，显示默认主页内容');
-                        return MainScreenWidget(
-                          onAnnouncementTap: (announcement) {
-                            // 处理通告点击
-                            if (announcement == null) {
-                              // 显示欠费查询界面
-                              announcementCarouselProvider
-                                  .showArrearQueryWidget(() {});
-                            }
-                          },
-                        );
-                      }
-
                       return custom_carousel.CarouselWidget(
                         controller:
                             announcementCarouselProvider.midCarouselController,
