@@ -42,9 +42,11 @@ class MainScreenWidgetState extends State<MainScreenWidget> {
             onPressed: () {
               // 处理功能按钮点击
               if (chineseTitle == '欠費查詢') {
+                print('🔵 [MainScreenWidget] 用户点击欠费查询按钮');
                 // 调用回调函数来显示欠费查询界面
                 // 确保立即进入手动操作状态并显示欠费查询界面
                 widget.onAnnouncementTap?.call(null); // 传递null表示显示欠费查询
+                print('🔵 [MainScreenWidget] 已调用 onAnnouncementTap(null)');
               } else {
                 print('$chineseTitle pressed');
               }
@@ -253,11 +255,13 @@ class MainScreenWidgetState extends State<MainScreenWidget> {
                                           subtitle: Text(
                                               '${_getAnnouncementTypeText(announcement.uiType)} - ${announcement.description}'),
                                           onTap: () {
+                                            print(
+                                                '📰 [MainScreenWidget] 用户点击通告: ${announcement.title} (类型: ${announcement.uiType})');
                                             // 调用回调函数传递announcement对象
                                             widget.onAnnouncementTap
                                                 ?.call(announcement);
                                             print(
-                                                'Tapped on ${announcement.title}');
+                                                '📰 [MainScreenWidget] 已调用 onAnnouncementTap(${announcement.title})');
                                           },
                                         ),
                                       );

@@ -389,27 +389,39 @@ class _AnnouncementPageState extends State<AnnouncementPage> {
       onAnnouncementTap: (AnnouncementModel? announcement) {
         if (announcement == null) {
           // 显示欠费查询界面 - 立即进入手动操作状态
-          _logger.i('💰 从主页面跳转到欠费查询界面，立即进入手动操作状态');
+          _logger.i('🔵 [MainScreenPage] 接收到欠费查询请求，从主页面跳转到欠费查询界面');
+          _logger.i(
+              '🔵 [MainScreenPage] 当前应用状态: ${carouselStateProvider.currentAppState}');
           // 触发手动操作状态
+          _logger.i('🔵 [MainScreenPage] 准备进入手动操作状态');
           carouselStateProvider.enterManualOperation();
+          _logger.i(
+              '🔵 [MainScreenPage] 已进入手动操作状态: ${carouselStateProvider.currentAppState}');
           // 调用新的显示欠费查询方法
+          _logger.i('🔵 [MainScreenPage] 准备调用 showArrearQueryWidget');
           announcementCarouselProvider.showArrearQueryWidget(() {});
+          _logger.i('🔵 [MainScreenPage] showArrearQueryWidget 调用完成');
         } else {
+          _logger.i('📰 [MainScreenPage] 接收到通告点击请求: ${announcement.title}');
           // 查找announcement在轮播通告列表中的索引
           int announcementIndex = carouselAnnouncements.indexOf(announcement);
           if (announcementIndex != -1) {
             // 计算在carousel中的实际索引（主屏幕是索引0，所以announcement从索引1开始）
             int carouselIndex = announcementIndex + 1;
+            _logger.i('📰 [MainScreenPage] 准备跳转到轮播索引: $carouselIndex');
             // 跳转到对应的公告页面
             announcementCarouselProvider.jumpToAnnouncementIndex(carouselIndex);
             _logger.i(
-                '跳转到轮播通告: $carouselIndex (${announcement.title}) - 类型: ${announcement.uiType}');
+                '📰 [MainScreenPage] 已跳转到轮播通告: $carouselIndex (${announcement.title}) - 类型: ${announcement.uiType}');
             // 触发手动操作状态
+            _logger.i('📰 [MainScreenPage] 准备进入手动操作状态');
             carouselStateProvider.enterManualOperation();
+            _logger.i(
+                '📰 [MainScreenPage] 已进入手动操作状态: ${carouselStateProvider.currentAppState}');
           } else {
             // 如果点击的通告不在轮播列表中（不是緊急或一般通告），提示用户
             _logger.w(
-                '点击的通告不在轮播列表中: ${announcement.title} - 类型: ${announcement.uiType}');
+                '⚠️ [MainScreenPage] 点击的通告不在轮播列表中: ${announcement.title} - 类型: ${announcement.uiType}');
           }
         }
       },
@@ -622,41 +634,57 @@ class _AnnouncementPageState extends State<AnnouncementPage> {
             Expanded(
               flex: 14,
               child: Container(
-                  width: double.infinity,
-                  color:
-                      Colors.grey.shade50, // Background for the carousel area
-                  child: Consumer<AnnouncementCarouselProvider>(
-                    builder: (context, announcementCarouselProvider, child) {
-                      // 如果正在显示欠费查询页面，显示欠费查询组件
-                      if (announcementCarouselProvider.isShowingArrearQuery) {
-                        return ArrearDisplayWidget(
-                          onHomeButtonPressed: () {
-                            // 主頁按鈕被按下時，隱藏欠费查询界面，返回轮播
-                            final carouselStateProvider =
-                                context.read<CarouselStateProvider>();
-                            final apiNoticeStayDuration =
-                                carouselStateProvider.noticeStayDuration;
-                            final delayBeforeNotice =
-                                carouselStateProvider.noActivityTimeout;
-                            announcementCarouselProvider.hideArrearQueryWidget(
-                              () {}, // 空的回调，因为我们已经在这里处理了
-                              apiNoticeStayDuration,
-                              delayBeforeNotice,
-                            );
-                          },
+                width: double.infinity,
+                color: Colors.grey.shade50, // Background for the carousel area
+                child: Stack(
+                  children: [
+                    // 轮播内容 - 始终存在，不被销毁
+                    Consumer<AnnouncementCarouselProvider>(
+                      builder: (context, announcementCarouselProvider, child) {
+                        _logger.i('🎬 [MainScreenPage] 轮播组件构建中');
+                        return custom_carousel.CarouselWidget(
+                          controller: announcementCarouselProvider
+                              .midCarouselController,
+                          showIndicators: false,
+                          allowManualSwipe: false,
+                          onPageChanged: (index) {},
                         );
-                      }
+                      },
+                    ),
+                    // 欠费查询覆盖层 - 按需显示
+                    Consumer<AnnouncementCarouselProvider>(
+                      builder: (context, announcementCarouselProvider, child) {
+                        _logger.i(
+                            '🔄 [MainScreenPage Overlay] 检查覆盖层 - isShowingArrearQuery: ${announcementCarouselProvider.isShowingArrearQuery}');
 
-                      // 否则显示轮播内容
-                      return custom_carousel.CarouselWidget(
-                        controller:
-                            announcementCarouselProvider.midCarouselController,
-                        showIndicators: false,
-                        allowManualSwipe: false,
-                        onPageChanged: (index) {},
-                      );
-                    },
-                  )),
+                        if (announcementCarouselProvider.isShowingArrearQuery) {
+                          _logger.i('💰 [MainScreenPage Overlay] 显示欠费查询覆盖层');
+                          return Container(
+                            width: double.infinity,
+                            height: double.infinity,
+                            child: ArrearDisplayWidget(
+                              onHomeButtonPressed: () {
+                                _logger.i(
+                                    '🏠 [MainScreenPage Overlay] 返回按钮被点击，隐藏覆盖层');
+                                announcementCarouselProvider
+                                    .hideArrearQueryWidget(
+                                  () {},
+                                  10, // 简化参数
+                                  10,
+                                );
+                                _logger.i('🏠 [MainScreenPage Overlay] 覆盖层已隐藏');
+                              },
+                            ),
+                          );
+                        }
+
+                        // 不显示欠费查询时返回空容器
+                        return const SizedBox.shrink();
+                      },
+                    ),
+                  ],
+                ),
+              ),
             ),
             // 底部區域 - 4/24 比例 (天气和二维码轮播区域)
             Expanded(
