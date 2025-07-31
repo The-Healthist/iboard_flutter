@@ -41,16 +41,12 @@ void main() {
               Provider.of<FileManager>(context, listen: false),
             ),
             update: (context, appDataProvider, fileManager,
-                previousAnnouncementProvider) {
-              // 如果之前的Provider存在，先停止其定时更新
-              previousAnnouncementProvider?.stopPeriodicUpdate();
-              // 创建新的Provider
-              return AnnouncementProvider(
-                appDataProvider.apiClient,
-                appDataProvider,
-                fileManager,
-              );
-            },
+                    previousAnnouncementProvider) =>
+                AnnouncementProvider(
+              appDataProvider.apiClient,
+              appDataProvider,
+              fileManager,
+            ),
           ),
           ChangeNotifierProxyProvider2<AppDataProvider, FileManager,
               AdvertisementProvider>(
@@ -60,16 +56,12 @@ void main() {
               Provider.of<FileManager>(context, listen: false),
             ),
             update: (context, appDataProvider, fileManager,
-                previousAdvertisementProvider) {
-              // 如果之前的Provider存在，先停止其定时更新
-              previousAdvertisementProvider?.stopPeriodicUpdate();
-              // 创建新的Provider
-              return AdvertisementProvider(
-                appDataProvider.apiClient,
-                appDataProvider,
-                fileManager,
-              );
-            },
+                    previousAdvertisementProvider) =>
+                AdvertisementProvider(
+              appDataProvider.apiClient,
+              appDataProvider,
+              fileManager,
+            ),
           ),
           ChangeNotifierProvider(
               create: (_) =>
@@ -205,37 +197,12 @@ class _HomePageState extends State<HomePage> {
 
           // 执行登录
 
+          // await appDataProvider.initializeAndLogin(deviceIdToSet: deviceId);
           await appDataProvider.initialize(deviceIdToSet: deviceId);
           // 登录成功后启动定时更新和初始化欠费数据
-          print('初始化完成，登录状态: ${appDataProvider.isLoggedIn}');
-          print('Token状态: ${appDataProvider.token != null ? '有效' : '无效'}');
-          print(
-              '设备设置状态: ${appDataProvider.deviceSettings != null ? '已加载' : '未加载'}');
-
           if (appDataProvider.isLoggedIn) {
-            // 启动定时登录任务（12小时一次）
-            appDataProvider.startPeriodicLogin();
-            print('定时登录任务已启动');
-
-            // 启动广告定时更新
-            print(
-                '准备启动广告定时更新，设备设置: ${appDataProvider.deviceSettings?.advertisementUpdateDuration ?? '未设置'}');
             advertisementProvider.startPeriodicUpdate();
-            print('广告定时更新已启动');
-
-            // 启动通告定时更新
-            print(
-                '准备启动通告定时更新，设备设置: ${appDataProvider.deviceSettings?.noticeUpdateDuration ?? '未设置'}');
             announcementProvider.startPeriodicUpdate();
-            print('通告定时更新已启动');
-
-            // 启动欠费数据定时更新
-            final deviceSettings = appDataProvider.deviceSettings;
-            final arrearUpdateInterval =
-                deviceSettings?.arrearageUpdateDuration ?? 1;
-            arrearProvider.startPeriodicUpdate(
-                updateIntervalMinutes: arrearUpdateInterval);
-            print('欠费数据定时更新已启动，间隔: ${arrearUpdateInterval}分钟');
 
             // 初始化欠费数据
             try {

@@ -4,7 +4,6 @@ import 'package:iboard_app/http/api_client.dart';
 import 'package:logger/logger.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:convert';
-import 'dart:async';
 
 class ArrearProvider extends ChangeNotifier {
   final Logger _logger = Logger();
@@ -25,20 +24,12 @@ class ArrearProvider extends ChangeNotifier {
 
   ArrearProvider({required ApiClient apiClient}) : _apiClient = apiClient;
 
-  // 定时更新相关
-  Timer? _updateTimer; // 定时更新定时器
-  bool _isPeriodicUpdateActive = false; // 是否正在进行定期更新
-
   // 检查Provider是否已被销毁的简单方法
   bool get isDisposed => _disposed;
   bool _disposed = false;
 
-  // 定时更新状态getter
-  bool get isPeriodicUpdateActive => _isPeriodicUpdateActive;
-
   @override
   void dispose() {
-    stopPeriodicUpdate();
     _disposed = true;
     super.dispose();
   }
@@ -391,46 +382,5 @@ class ArrearProvider extends ChangeNotifier {
     _selectedBuildingId = null;
     _selectedUnit = null;
     notifyListeners();
-  }
-
-  ///10，开始定期更新欠费数据
-  void startPeriodicUpdate({int? updateIntervalMinutes}) {
-    if (_isPeriodicUpdateActive) {
-      _logger.i('Periodic arrear update is already active.');
-      return;
-    }
-
-    // 获取更新间隔时间（从设置中获取，单位：分钟）
-    final intervalMinutes = updateIntervalMinutes ?? 1; // 默认1分钟
-    final intervalSeconds = intervalMinutes * 60; // 转换为秒
-    _logger.i(
-        'Starting periodic arrear update with interval: ${intervalMinutes} minutes (${intervalSeconds} seconds)');
-
-    _isPeriodicUpdateActive = true;
-
-    // 立即执行一次更新
-    if (_selectedBuildingId != null) {
-      fetchArrears(reset: false, buildingId: _selectedBuildingId);
-    }
-
-    // 设置定时器进行周期性更新
-    _updateTimer = Timer.periodic(Duration(seconds: intervalSeconds), (timer) {
-      if (_isPeriodicUpdateActive && _selectedBuildingId != null) {
-        _logger.i('Performing periodic arrear update...');
-        fetchArrears(reset: false, buildingId: _selectedBuildingId);
-      } else {
-        timer.cancel();
-      }
-    });
-  }
-
-  ///11，停止定期更新
-  void stopPeriodicUpdate() {
-    if (_updateTimer != null) {
-      _updateTimer!.cancel();
-      _updateTimer = null;
-    }
-    _isPeriodicUpdateActive = false;
-    _logger.i('Periodic arrear update stopped.');
   }
 }

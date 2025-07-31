@@ -5,7 +5,6 @@ import 'package:iboard_app/providers/fullscreen_ad_provider.dart';
 import 'package:iboard_app/providers/state_provider.dart';
 import 'package:iboard_app/providers/top_ad_carousel_provider.dart';
 import 'package:iboard_app/widgets/carousel_widget.dart';
-import 'package:iboard_app/widgets/timer_debug_widget.dart';
 import 'package:provider/provider.dart';
 
 class TimeSettingsPage extends StatefulWidget {
@@ -78,24 +77,6 @@ class _TimeSettingsPageState extends State<TimeSettingsPage> {
                               fontWeight: FontWeight.bold,
                               color: Colors.grey.shade800,
                             ),
-                          ),
-                          Spacer(),
-                          IconButton(
-                            onPressed: () {
-                              Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (context) =>
-                                      const TimerDebugWidget(),
-                                ),
-                              );
-                            },
-                            icon: Icon(
-                              Icons.bug_report,
-                              color: Colors.orange.shade600,
-                              size: 28,
-                            ),
-                            tooltip: '定时更新调试',
                           ),
                         ],
                       ),
@@ -223,17 +204,17 @@ class _TimeSettingsPageState extends State<TimeSettingsPage> {
                                     SizedBox(height: 24),
                                     _buildTimeSettingRow(
                                       '欠费更新间隔',
-                                      '${deviceSettings.arrearageUpdateDuration}分钟',
+                                      '${deviceSettings.arrearageUpdateDuration}秒',
                                     ),
                                     SizedBox(height: 12),
                                     _buildTimeSettingRow(
                                       '通告更新间隔',
-                                      '${deviceSettings.noticeUpdateDuration}分钟',
+                                      '${deviceSettings.noticeUpdateDuration}秒',
                                     ),
                                     SizedBox(height: 12),
                                     _buildTimeSettingRow(
                                       '广告更新间隔',
-                                      '${deviceSettings.advertisementUpdateDuration}分钟',
+                                      '${deviceSettings.advertisementUpdateDuration}秒',
                                     ),
                                     SizedBox(height: 12),
                                     _buildTimeSettingRow(
