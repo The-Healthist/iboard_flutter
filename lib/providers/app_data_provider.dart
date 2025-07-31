@@ -110,7 +110,7 @@ class AppDataProvider extends ChangeNotifier {
     }
   }
 
-  ///4，应用启动时的完整初始化方法 - 先从缓存加载，如果缓存无效则重新登录
+  ///4，应用启动时的完整初始化方法 - 优先登录，失败时使用缓存数据作为备用
   Future<void> initialize({String? deviceIdToSet}) async {
     _isLoading = true;
     _error = null;
@@ -132,16 +132,39 @@ class AppDataProvider extends ChangeNotifier {
         return;
       }
 
-      // 尝试从缓存加载登录设备数据
+      _logger.i('优先尝试登录，如果失败则使用缓存数据，设备ID: $_deviceId');
+
+      // 尝试登录
+      try {
+        await _performLogin();
+        _logger.i('登录成功，已更新最新数据到缓存');
+      } catch (loginError) {
+        _logger.w('登录失败，尝试使用缓存数据作为备用: $loginError');
+
+        // 登录失败，尝试从缓存加载数据
+        await _loadFromCacheAsFallback();
+      }
+    } catch (e) {
+      _logger.e('应用初始化失败', error: e);
+      _error = 'Application initialization failed: $e';
+    }
+
+    _isLoading = false;
+    notifyListeners();
+  }
+
+  ///5，登录失败时的缓存数据备用加载方法
+  Future<void> _loadFromCacheAsFallback() async {
+    try {
       final cachedData = await _loadLoginDeviceData();
       if (cachedData != null) {
         try {
           _settingsModel = SettingsModel.fromJson(cachedData);
-          _logger.i('从缓存成功初始化登录设备数据');
+          _logger.i('从缓存成功加载备用数据');
 
           // 设置API客户端的token
           if (_settingsModel?.token != null) {
-            _apiClient.setAuthToken(_settingsModel!.token!);
+            _apiClient.setAuthToken(_settingsModel!.token);
             _logger.i('API客户端token已从缓存设置');
           }
 
@@ -162,29 +185,28 @@ class AppDataProvider extends ChangeNotifier {
             }
           }
 
+          // 清除登录错误，因为缓存数据可用
           _error = null;
-          _logger.i('应用从缓存初始化完成');
+          _logger.i('使用缓存数据初始化完成');
           _logger.i(
-              '登录状态检查: isLoggedIn=${isLoggedIn}, token=${token != null ? '有效' : '无效'}, settingsModel=${_settingsModel != null ? '已设置' : '未设置'}');
+              '缓存数据状态: isLoggedIn=${isLoggedIn}, token=${token != null ? '有效' : '无效'}, settingsModel=${_settingsModel != null ? '已设置' : '未设置'}');
         } catch (e) {
-          _logger.e('解析缓存的登录设备数据失败，将重新登录', error: e);
+          _logger.e('解析缓存数据失败', error: e);
           // 清除损坏的缓存数据
           await _clearLoginDeviceData();
-          // 缓存数据无效，进行重新登录
-          await _performLogin();
+          _error = 'Login failed and cached data is corrupted: $e';
+          _settingsModel = null;
         }
       } else {
-        _logger.i('缓存中未找到登录设备数据，将进行登录');
-        // 没有缓存数据，进行登录
-        await _performLogin();
+        _logger.w('没有可用的缓存数据作为备用');
+        _error = 'Login failed and no cached data available';
+        _settingsModel = null;
       }
     } catch (e) {
-      _logger.e('应用初始化失败', error: e);
-      _error = 'Application initialization failed: $e';
+      _logger.e('加载缓存备用数据时发生错误', error: e);
+      _error = 'Failed to load cached data: $e';
+      _settingsModel = null;
     }
-
-    _isLoading = false;
-    notifyListeners();
   }
 
   ///10，执行登录逻辑的私有方法
@@ -242,7 +264,7 @@ class AppDataProvider extends ChangeNotifier {
 
           // 设置API客户端的token
           if (_settingsModel?.token != null) {
-            _apiClient.setAuthToken(_settingsModel!.token!);
+            _apiClient.setAuthToken(_settingsModel!.token);
             _logger.i('API客户端token已从缓存设置');
           }
 

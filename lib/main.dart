@@ -206,13 +206,15 @@ class _HomePageState extends State<HomePage> {
           // 执行登录
 
           await appDataProvider.initialize(deviceIdToSet: deviceId);
-          // 登录成功后启动定时更新和初始化欠费数据
+          // 初始化完成后启动定时更新和初始化欠费数据（数据可能来自登录或缓存）
           print('初始化完成，登录状态: ${appDataProvider.isLoggedIn}');
           print('Token状态: ${appDataProvider.token != null ? '有效' : '无效'}');
           print(
               '设备设置状态: ${appDataProvider.deviceSettings != null ? '已加载' : '未加载'}');
+          print('数据源: ${appDataProvider.isLoggedIn ? '最新登录数据' : '缓存备用数据'}');
 
-          if (appDataProvider.isLoggedIn) {
+          // 如果有设备设置数据（无论是从登录还是缓存获取），就启动应用
+          if (appDataProvider.deviceSettings != null) {
             // 启动定时登录任务（12小时一次）
             appDataProvider.startPeriodicLogin();
             print('定时登录任务已启动');
@@ -249,10 +251,10 @@ class _HomePageState extends State<HomePage> {
             if (mounted) {
               Navigator.pushReplacementNamed(context, '/main');
             }
-          } else if (appDataProvider.error != null) {
-            // 登录失败，显示错误信息
+          } else {
+            // 既没有登录成功也没有可用的缓存数据
             setState(() {
-              _initializationError = appDataProvider.error;
+              _initializationError = appDataProvider.error ?? '无法获取设备配置数据';
             });
           }
         } catch (e) {
