@@ -10,6 +10,7 @@ class WeatherWarningWidget extends StatelessWidget {
   final Color textColor;
   final double iconSize;
   final double verticalSpacing;
+  final bool useSimulatedData; // 添加模拟数据开关
 
   const WeatherWarningWidget({
     Key? key,
@@ -18,11 +19,28 @@ class WeatherWarningWidget extends StatelessWidget {
     this.textColor = const Color.fromARGB(255, 8, 12, 133),
     this.iconSize = 16.0,
     this.verticalSpacing = 2.0,
+    this.useSimulatedData = false, // 默认关闭模拟数据
   }) : super(key: key);
 
   static final Logger _logger = Logger();
 
-  ///1，构建单个警告行
+  ///1，创建模拟天气警告数据 - 用于样式调试
+  static WeatherWarningModel _createSimulatedWarningData() {
+    final simulatedWarnings = <String, WeatherWarningInfo>{
+      'WRAIN': WeatherWarningInfo(
+        name: '暴雨警告信號',
+        code: 'WRAIN',
+        actionCode: 'ISSUE',
+        issueTime: '2024-01-15T10:00:00+08:00',
+        updateTime: '2024-01-15T10:00:00+08:00',
+      ),
+    };
+
+    _logger.i('🧪 使用模拟天气警告数据: 暴雨警告 + 雷暴警告');
+    return WeatherWarningModel(warnings: simulatedWarnings);
+  }
+
+  ///2，构建单个警告行
   Widget _buildWarningRow(String warningCode, WeatherWarningInfo warningInfo) {
     final iconPath =
         WeatherIconUtil.getWeatherWarningIconPathByCode(warningCode);
@@ -67,7 +85,7 @@ class WeatherWarningWidget extends StatelessWidget {
     );
   }
 
-  ///2，构建所有警告的垂直列表显示
+  ///3，构建所有警告的垂直列表显示
   Widget _buildAllWarnings(Map<String, WeatherWarningInfo> warnings) {
     final warningEntries = warnings.entries.toList();
 
@@ -80,18 +98,32 @@ class WeatherWarningWidget extends StatelessWidget {
     );
   }
 
+  ///4，构建组件UI
   @override
   Widget build(BuildContext context) {
+    WeatherWarningModel? dataToUse;
+
+    // 根据模拟数据开关决定使用哪个数据源
+    if (useSimulatedData) {
+      dataToUse = _createSimulatedWarningData();
+      _logger.i('🧪 启用模拟模式，显示模拟天气警告数据');
+    } else {
+      dataToUse = warningData;
+    }
+
     // 如果没有警告数据，返回空组件
-    if (warningData == null || warningData!.warnings.isEmpty) {
-      _logger.d('🌤️ 没有天气警告数据');
+    if (dataToUse == null || dataToUse.warnings.isEmpty) {
+      if (!useSimulatedData) {
+        _logger.d('🌤️ 没有天气警告数据');
+      }
       return const SizedBox.shrink();
     }
 
-    final warnings = warningData!.warnings;
+    final warnings = dataToUse.warnings;
     final warningCount = warnings.length;
 
-    _logger.i('🌦️ 显示 $warningCount 个天气警告');
+    _logger.i(
+        '🌦️ 显示 $warningCount 个天气警告 ${useSimulatedData ? '(模拟数据)' : '(真实数据)'}');
 
     // 始终使用垂直列表显示所有警告，有多少显示多少
     return _buildAllWarnings(warnings);

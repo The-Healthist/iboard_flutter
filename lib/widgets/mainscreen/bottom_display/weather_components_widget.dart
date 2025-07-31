@@ -126,9 +126,14 @@ class _WeatherComponentsWidgetState extends State<WeatherComponentsWidget> {
   Widget build(BuildContext context) {
     return Consumer<WeatherProvider>(
       builder: (context, weatherProvider, child) {
+        // 使用MediaQuery计算动态高度，与其他组件保持一致
+        final screenSize = MediaQuery.of(context).size;
+        final dynamicHeight =
+            screenSize.height * (4 / 24) - 20; // 减去padding和margin
+
         return Container(
           width: double.infinity,
-          height: 120,
+          height: dynamicHeight,
           decoration: BoxDecoration(
             color: Colors.white,
             borderRadius: BorderRadius.circular(8),

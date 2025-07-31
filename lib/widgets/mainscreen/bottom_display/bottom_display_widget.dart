@@ -21,19 +21,25 @@ class _BottomDisplayWidgetState extends State<BottomDisplayWidget> {
     _logger.i('🌤️ BottomDisplayWidget初始化');
   }
 
+  ///1，构建底部显示组件 - 使用固定高度确保统一显示
   @override
   Widget build(BuildContext context) {
     return Consumer<BottomWeatherQrcodeCarouselProvider>(
       builder: (context, bottomProvider, child) {
+        // 获取屏幕尺寸，计算固定高度
+        final screenSize = MediaQuery.of(context).size;
+        final fixedHeight = screenSize.height * (4 / 24); // 根据布局比例 4/24 计算固定高度
+
         return Container(
           padding: const EdgeInsets.fromLTRB(8.0, 0, 8.0, 6.0),
-          height: 160, // 增加高度以匹配QrcodeWidget
+          height: fixedHeight, // 使用计算出的固定高度
           child: Row(
             children: [
               // 左侧部分：当前天气显示区域 - 固定显示天气组件的左侧部分
-              const Expanded(
+              Expanded(
                 flex: 2,
-                child: WeatherWidget(showOnlyLeft: true),
+                child: WeatherWidget(
+                    showOnlyLeft: true, containerHeight: fixedHeight),
               ),
               // 右侧部分：轮播区域 - 天气预报/二维码轮播
               Expanded(
@@ -50,11 +56,12 @@ class _BottomDisplayWidgetState extends State<BottomDisplayWidget> {
                   child: bottomProvider.showWeather
                       ? Container(
                           key: const ValueKey('weather_forecast'),
-                          child: const _WeatherForecastOnlyWidget(),
+                          child: _WeatherForecastOnlyWidget(
+                              containerHeight: fixedHeight),
                         )
                       : Container(
                           key: const ValueKey('qrcode'),
-                          child: const QrcodeWidget(),
+                          child: QrcodeWidget(containerHeight: fixedHeight),
                         ),
                 ),
               ),
@@ -66,12 +73,17 @@ class _BottomDisplayWidgetState extends State<BottomDisplayWidget> {
   }
 }
 
-// 只显示天气预报的组件
+///2，只显示天气预报的组件
 class _WeatherForecastOnlyWidget extends StatelessWidget {
-  const _WeatherForecastOnlyWidget({Key? key}) : super(key: key);
+  final double containerHeight;
+
+  const _WeatherForecastOnlyWidget({
+    Key? key,
+    required this.containerHeight,
+  }) : super(key: key);
 
   @override
   Widget build(BuildContext context) {
-    return const WeatherWidget(showOnlyRight: true);
+    return WeatherWidget(showOnlyRight: true, containerHeight: containerHeight);
   }
 }

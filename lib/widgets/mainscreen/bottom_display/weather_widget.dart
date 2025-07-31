@@ -7,7 +7,6 @@ import 'package:iboard_app/models/current_weather_model.dart'; // Added
 import 'package:iboard_app/models/weather_warning_model.dart'; // 恢复天气警告模型导入
 import 'package:iboard_app/providers/app_data_provider.dart'; // 添加AppDataProvider导入
 import 'package:iboard_app/widgets/weather_icon_widget.dart';
-import 'package:iboard_app/widgets/weather_debug_widget.dart'; // 添加天气图标调试组件导入
 import 'package:iboard_app/widgets/weather_data_debug_widget.dart'; // 添加天气数据调试组件导入
 import 'package:iboard_app/widgets/mainscreen/bottom_display/weather_warning_widget.dart'; // 添加天气警告组件导入
 import 'package:iboard_app/providers/weather_provider.dart'; // 添加天气provider导入
@@ -20,11 +19,13 @@ import 'package:provider/provider.dart'; // 添加Provider导入
 class WeatherWidget extends StatefulWidget {
   final bool showOnlyLeft;
   final bool showOnlyRight;
+  final double? containerHeight; // 可选的容器高度参数
 
   const WeatherWidget({
     Key? key,
     this.showOnlyLeft = false,
     this.showOnlyRight = false,
+    this.containerHeight,
   }) : super(key: key);
 
   @override
@@ -264,123 +265,89 @@ class _WeatherWidgetState extends State<WeatherWidget> {
         DateFormat('EEEE', 'zh_HK').format(_currentTime); // 格式化星期：使用香港中文本地化
 
     // 返回当前天气显示容器 - 使用全高度布局适配Expanded容器
+    // 外部Container仅负责浅蓝色卡片背景和外边距
     return Container(
-      margin: const EdgeInsets.only(right: 8.0), // 右外边距8像素，与预报区域分隔
-      padding: const EdgeInsets.only(
-          left: 8.0, right: 8.0, bottom: 8.0), // 移除顶部内边距，让日期文本贴顶显示
-      // 容器装饰样式
+      margin: const EdgeInsets.only(right: 8.0),
       decoration: BoxDecoration(
-          color: Colors.lightBlue[50], // 浅蓝色背景
-          borderRadius: BorderRadius.circular(10.0), // 圆角10像素
-          border: Border.all(
-              color: Colors.lightBlue.shade200, width: 1)), // 浅蓝色边框，宽度1像素
-      // 使用Stack布局在右上角放置调试按钮
-      child: Stack(
+        color: Colors.lightBlue[50],
+        borderRadius: BorderRadius.circular(10.0),
+        border: Border.all(color: Colors.lightBlue.shade200, width: 1),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start, // 顶部日期左对齐
         children: [
-          // 主要的Column布局
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.center, // 水平居中对齐
-            children: [
-              // 日期和星期显示 - 贴顶显示，无顶部间隙
-              Padding(
-                padding: const EdgeInsets.only(
-                    left: 4.0,
-                    top: 2.0,
-                    bottom: 4.0), // 保持左边距4像素对齐，最小顶部边距2像素，下边距4像素
-                child: Text(
-                  '$formattedDate ($formattedWeekday)', // 显示"日期 (星期)"格式
-                  style: TextStyle(
-                      fontSize: 10, // 字体大小10像素（精简以节省空间）
-                      color: Colors.blueGrey[600]), // 蓝灰色文字
-                  textAlign: TextAlign.left, // 文本左对齐，与右侧预报标题一致
-                ),
-              ),
-              // 使用Expanded填充剩余空间，但允许警告区域动态调整高度
-              Expanded(
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center, // 整体居中
-                  crossAxisAlignment: CrossAxisAlignment.center, // 水平居中对齐
-                  children: [
-                    // 天气警告区域 - 使用新的动态警告组件
-                    FutureBuilder<WeatherWarningModel?>(
-                      future: _weatherWarningFuture, // 异步获取天气警告数据
-                      builder: (context, warningSnapshot) {
-                        return WeatherWarningWidget(
-                          warningData: warningSnapshot.data,
-                          fontSize: 12.0, // 稍微减小字体大小以节省空间
-                          textColor:
-                              const Color.fromARGB(255, 8, 12, 133), // 警告文字颜色
-                          iconSize: 12.0, // 图标大小，与文字大小一致
-                          verticalSpacing: 1.0, // 垂直间距
-                        );
-                      },
+          // 顶部日期永远顶格
+          Padding(
+            padding: const EdgeInsets.only(left: 4.0, top: 2.0, bottom: 4.0),
+            child: Text(
+              '$formattedDate ($formattedWeekday)',
+              style: TextStyle(fontSize: 10, color: Colors.blueGrey[600]),
+              textAlign: TextAlign.left,
+            ),
+          ),
+          // 卡片内容区域居中显示（地区、警告、天气icon、温度）
+          Expanded(
+            child: Center(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: [
+                  // 天气警告区域
+                  FutureBuilder<WeatherWarningModel?>(
+                    future: _weatherWarningFuture,
+                    builder: (context, warningSnapshot) {
+                      // 判断警告条数，动态调整字号和图标
+                      final warningCount = warningSnapshot.data?.warnings.length ?? 0;
+                      final double fontSize = warningCount > 1 ? 14.0 : 12.0;
+                      final double iconSize = warningCount > 1 ? 16.0 : 12.0;
+                      return WeatherWarningWidget(
+                        warningData: warningSnapshot.data,
+                        fontSize: fontSize, // 多行时增大字号
+                        textColor: const Color.fromARGB(255, 8, 12, 133),
+                        iconSize: iconSize, // 多行时增大图标
+                        verticalSpacing: 1.0,
+                        useSimulatedData: false,
+                      );
+                    },
+                  ),
+                  const SizedBox(height: 6),
+                  // 地区名称
+                  Text(
+                    tempLocationData != null
+                        ? '${tempLocationData.place}'
+                        : '即時天氣',
+                    style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.blueGrey[800]),
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: 8),
+                  if (currentIcon != null)
+                    WeatherIconWidget(
+                      iconCode: currentIcon,
+                      width: 45,
+                      height: 45,
                     ),
-                    // 警告和地点之间的间距
-                    const SizedBox(height: 6),
-                    // 地点名称显示
-                    Text(
-                      tempLocationData != null
-                          ? '${tempLocationData.place}'
-                          : '即時天氣', // 显示温度数据的地点或默认"即时天气"
-                      style: TextStyle(
-                          fontSize: 16, // 字体大小14像素
-                          fontWeight: FontWeight.bold, // 粗体字
-                          color: Colors.blueGrey[800]), // 更深的蓝灰色文字
-                      textAlign: TextAlign.center, // 文本居中对齐
-                    ),
-                    // 地点和图标之间的间距
-                    const SizedBox(height: 8),
-                    // 天气图标显示 - 仅在有图标数据时显示
-                    if (currentIcon != null)
-                      WeatherIconWidget(
-                        iconCode: currentIcon, // 天气图标代码
-                        width: 45, // 稍微减小图标大小以适应更多内容
-                        height: 45, // 稍微减小图标大小以适应更多内容
-                      ),
-                    // 无图标且无温度数据时的占位空间
-                    if (currentIcon == null && tempLocationData == null)
-                      const SizedBox(height: 45), // 占位高度45像素，保持布局一致性
-                    // 图标和温度之间的间距
-                    const SizedBox(height: 6),
-                    // 温度显示
-                    Text(
-                      tempLocationData != null
-                          ? '${tempLocationData.value}°${tempLocationData.unit}' // 显示实际温度值和单位
-                          : '--°C', // 无数据时显示默认占位符
-                      style: TextStyle(
-                          fontSize: 16, // 字体大小16像素
-                          fontWeight: FontWeight.bold, // 粗体字
-                          color: Colors.blue[800]), // 深蓝色文字，突出温度显示
-                    )
-                  ],
-                ),
+                  if (currentIcon == null && tempLocationData == null)
+                    const SizedBox(height: 45),
+                  const SizedBox(height: 6),
+                  Text(
+                    tempLocationData != null
+                        ? '${tempLocationData.value}°${tempLocationData.unit}'
+                        : '--°C',
+                    style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.blue[800]),
+                  ),
+                ],
               ),
-            ], // Column的children结束
-          ), // Column结束
-          // 调试按钮 - 定位在右上角（已注释）
-          // Positioned(
-          //   top: 4,
-          //   right: 4,
-          //   child: GestureDetector(
-          //     onTap: _openWeatherDebugPage,
-          //     child: Container(
-          //       width: 24,
-          //       height: 24,
-          //       decoration: BoxDecoration(
-          //         color: Colors.blue.withOpacity(0.8),
-          //         borderRadius: BorderRadius.circular(12),
-          //       ),
-          //       child: const Icon(
-          //         Icons.bug_report,
-          //         size: 16,
-          //         color: Colors.white,
-          //       ),
-          //     ),
-          //   ),
-          // ),
-        ], // Stack的children结束
-      ), // Stack结束
-    ); // Container结束
+            ),
+          ),
+        ],
+      ),
+    );
   } // _buildCurrentWeatherSection函数结束
 
   // 构建天气预报显示区域的函数 - 适配已在Expanded容器中的布局
@@ -736,11 +703,14 @@ class _WeatherWidgetState extends State<WeatherWidget> {
   Widget build(BuildContext context) {
     return Consumer<WeatherProvider>(
       builder: (context, weatherProvider, child) {
+        // 计算容器高度 - 优先使用传入的高度，否则使用默认高度
+        final double containerHeight = widget.containerHeight ?? 145;
+
         // 如果只显示左侧部分
         if (widget.showOnlyLeft) {
           return Container(
             padding: const EdgeInsets.fromLTRB(8.0, 0, 8.0, 6.0),
-            height: 145,
+            height: containerHeight,
             child: _buildCurrentWeatherPartWithProvider(weatherProvider),
           );
         }
@@ -749,7 +719,7 @@ class _WeatherWidgetState extends State<WeatherWidget> {
         if (widget.showOnlyRight) {
           return Container(
             padding: const EdgeInsets.fromLTRB(8.0, 0, 8.0, 6.0),
-            height: 145,
+            height: containerHeight,
             child: _buildForecastPartWithProvider(weatherProvider),
           );
         }
@@ -757,7 +727,7 @@ class _WeatherWidgetState extends State<WeatherWidget> {
         // 默认显示完整的天气组件
         return Container(
           padding: const EdgeInsets.fromLTRB(8.0, 0, 8.0, 6.0),
-          height: 145,
+          height: containerHeight,
           child: Row(
             children: [
               // 左侧部分：当前天气显示区域

@@ -7,7 +7,12 @@ import 'package:logger/logger.dart';
 import 'dart:io';
 
 class QrcodeWidget extends StatefulWidget {
-  const QrcodeWidget({Key? key}) : super(key: key);
+  final double? containerHeight; // 可选的容器高度参数
+
+  const QrcodeWidget({
+    Key? key,
+    this.containerHeight,
+  }) : super(key: key);
 
   @override
   _QrcodeWidgetState createState() => _QrcodeWidgetState();
@@ -308,6 +313,7 @@ class _QrcodeWidgetState extends State<QrcodeWidget> {
     return null;
   }
 
+  ///4，构建二维码组件UI - 使用动态高度
   @override
   Widget build(BuildContext context) {
     return Consumer<AppDataProvider>(
@@ -315,8 +321,11 @@ class _QrcodeWidgetState extends State<QrcodeWidget> {
         _logger.d(
             '🔍 检查二维码状态: 投诉=${appDataProvider.cachedComplaintQrCode != null}, 登记=${appDataProvider.cachedRegistrationQrCode != null}');
 
+        // 计算容器高度 - 优先使用传入的高度，否则使用默认高度
+        final double containerHeight = widget.containerHeight ?? 150;
+
         return Container(
-          height: 150, // 调整高度适应父容器
+          height: containerHeight, // 使用动态计算的高度
           padding: const EdgeInsets.symmetric(horizontal: 4.0),
           child: Stack(
             children: [
