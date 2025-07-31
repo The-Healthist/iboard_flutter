@@ -320,7 +320,7 @@ class FullscreenAdProvider extends ChangeNotifier {
     }
   }
 
-  ///11, 切换到下一个广告
+  ///11, 切换到下一个广告（私有方法）
   void _nextAd() {
     if (this.fullscreenAds.isEmpty || _isPaused || !_isActive) return;
 
@@ -334,6 +334,17 @@ class FullscreenAdProvider extends ChangeNotifier {
 
     notifyListeners();
     startFullscreenAdTimer(_currentAdIndex);
+  }
+
+  ///24, 公开的切换到下一个广告方法（供外部调用）
+  void nextAd() {
+    if (!_isActive || _isPaused) {
+      _logger.w('⚠️ 全屏广告未激活或已暂停，无法切换');
+      return;
+    }
+
+    _logger.d('🔄 外部触发全屏广告切换');
+    _nextAd();
   }
 
   ///12, 暂停轮播

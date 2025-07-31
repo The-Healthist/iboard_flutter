@@ -164,6 +164,20 @@ class _TimeSettingsPageState extends State<TimeSettingsPage> {
                                         ? Colors.green.shade700
                                         : Colors.red.shade700,
                                   ),
+                                  if (settingsModel?.building != null) ...[
+                                    SizedBox(height: 12),
+                                    _buildInfoRow(
+                                        '地区', settingsModel!.building.location),
+                                    SizedBox(height: 12),
+                                    _buildInfoRow(
+                                        '建筑物', settingsModel!.building.name),
+                                    SizedBox(height: 12),
+                                    _buildInfoRow('iSmart ID',
+                                        settingsModel!.building.ismartId),
+                                    SizedBox(height: 12),
+                                    _buildInfoRow('位置信息',
+                                        settingsModel!.building.location),
+                                  ],
                                   if (error != null) ...[
                                     SizedBox(height: 12),
                                     _buildInfoRow(

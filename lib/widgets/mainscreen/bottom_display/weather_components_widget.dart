@@ -72,10 +72,19 @@ class _WeatherComponentsWidgetState extends State<WeatherComponentsWidget> {
       final appDataProvider =
           Provider.of<AppDataProvider>(context, listen: false);
       if (appDataProvider.buildingInfo?.location != null) {
-        setState(() {
-          _currentWeatherLocation = appDataProvider.buildingInfo!.location;
-        });
-        _logger.i('从Provider更新位置信息: $_currentWeatherLocation');
+        final newLocation = appDataProvider.buildingInfo!.location;
+        if (newLocation != _currentWeatherLocation) {
+          setState(() {
+            _currentWeatherLocation = newLocation;
+          });
+          _logger.i(
+              'WeatherComponentsWidget从Provider更新位置信息: $_currentWeatherLocation');
+
+          // 位置更新后重新获取天气数据
+          final weatherProvider =
+              Provider.of<WeatherProvider>(context, listen: false);
+          weatherProvider.fetchCurrentWeather();
+        }
       } else {
         _logger.w('Provider中没有位置信息，使用默认位置: $_currentWeatherLocation');
       }
@@ -124,6 +133,16 @@ class _WeatherComponentsWidgetState extends State<WeatherComponentsWidget> {
 
   @override
   Widget build(BuildContext context) {
+    // 监听AppDataProvider的变化以便更新位置信息
+    final appDataProvider = context.watch<AppDataProvider>();
+
+    // 当building location发生变化时更新天气位置
+    if (appDataProvider.buildingInfo?.location != null &&
+        appDataProvider.buildingInfo!.location != _currentWeatherLocation) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _updateLocationFromProvider();
+      });
+    }
     return Consumer<WeatherProvider>(
       builder: (context, weatherProvider, child) {
         // 使用MediaQuery计算动态高度，与其他组件保持一致

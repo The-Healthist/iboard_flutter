@@ -131,7 +131,10 @@ class _AnnouncementPageState extends State<AnnouncementPage> {
     // 设置智能轮播切换回调
     stateProvider
         .setSmartCarouselSwitchCallback((isNeedCarousel, carouselTime) {
-      // 新的Provider中没有这个方法，这里留空
+      // 当需要轮播时，触发全屏广告切换
+      if (isNeedCarousel) {
+        fullAdProvider.nextAd();
+      }
     });
   }
 

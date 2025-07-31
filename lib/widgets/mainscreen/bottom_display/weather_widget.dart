@@ -53,9 +53,11 @@ class _WeatherWidgetState extends State<WeatherWidget> {
 
     initializeDateFormatting('zh_HK', null).then((_) {
       // Added initialization
+      _logger.i('🚀 WeatherWidget初始化开始');
       _updateLocationFromProvider(); // 获取location
       _initializeWeatherData(); // 初始化天气数据
       _startWeatherUpdateTimer(); // 启动天气数据定时更新器（每2小时）
+      _logger.i('📍 初始化完成，当前位置: $_currentWeatherLocation');
     });
   }
 
@@ -114,14 +116,31 @@ class _WeatherWidgetState extends State<WeatherWidget> {
     final weatherProvider =
         Provider.of<WeatherProvider>(context, listen: false);
 
-    // 如果provider中没有数据，则获取数据
-    if (!weatherProvider.hasForecastData ||
-        !weatherProvider.hasCurrentData ||
+    _logger.i(
+        '🌤️ 初始化天气数据 - CurrentData: ${weatherProvider.hasCurrentData}, ForecastData: ${weatherProvider.hasForecastData}');
+
+    // 总是尝试获取最新数据，特别是当前天气数据
+    if (!weatherProvider.hasCurrentData) {
+      _logger.i('📡 WeatherProvider中没有当前天气数据，强制获取');
+      weatherProvider.fetchCurrentWeather();
+    }
+
+    if (!weatherProvider.hasForecastData) {
+      _logger.i('📡 WeatherProvider中没有预报数据，强制获取');
+      weatherProvider.fetchWeatherForecast();
+    }
+
+    if (!weatherProvider.hasWarningData) {
+      _logger.i('📡 WeatherProvider中没有警告数据，强制获取');
+      weatherProvider.fetchWeatherWarnings();
+    }
+
+    // 如果没有任何数据，获取全部
+    if (!weatherProvider.hasCurrentData &&
+        !weatherProvider.hasForecastData &&
         !weatherProvider.hasWarningData) {
-      _logger.i('WeatherProvider中没有缓存数据，开始获取天气数据');
+      _logger.i('📡 WeatherProvider中没有任何缓存数据，获取全部天气数据');
       weatherProvider.fetchAllWeatherData();
-    } else {
-      _logger.i('WeatherProvider中有缓存数据，使用缓存数据');
     }
   }
 
@@ -146,10 +165,21 @@ class _WeatherWidgetState extends State<WeatherWidget> {
       final appDataProvider =
           Provider.of<AppDataProvider>(context, listen: false);
       if (appDataProvider.buildingInfo?.location != null) {
-        setState(() {
-          _currentWeatherLocation = appDataProvider.buildingInfo!.location;
-        });
-        _logger.i('从Provider更新位置信息: $_currentWeatherLocation');
+        final newLocation = appDataProvider.buildingInfo!.location;
+        if (newLocation != _currentWeatherLocation) {
+          setState(() {
+            _currentWeatherLocation = newLocation;
+          });
+          _logger.i('🔄 从Provider更新位置信息: $_currentWeatherLocation');
+
+          // 位置更新后重新获取天气数据（如果需要的话）
+          final weatherProvider =
+              Provider.of<WeatherProvider>(context, listen: false);
+          if (!weatherProvider.hasCurrentData) {
+            _logger.i('📡 位置更新后触发天气数据重新获取');
+            weatherProvider.fetchCurrentWeather();
+          }
+        }
       } else {
         _logger.w('Provider中没有位置信息，使用默认位置: $_currentWeatherLocation');
       }
@@ -224,6 +254,8 @@ class _WeatherWidgetState extends State<WeatherWidget> {
   // 参数：当前天气数据模型
   Widget _buildCurrentWeatherSection(
       CurrentWeatherDataModel currentWeatherData) {
+    _logger.d('🌡️ 开始构建当前天气区域，当前位置设置: $_currentWeatherLocation');
+
     // 定义温度位置数据变量，用于存储匹配的温度信息
     CurrentTemperatureDataModel? tempLocationData;
     // 检查当前天气数据中是否包含温度信息
@@ -233,14 +265,22 @@ class _WeatherWidgetState extends State<WeatherWidget> {
         tempLocationData = currentWeatherData.temperature!.data
             .firstWhere((t) => t.place == _currentWeatherLocation);
         _logger.i(
-            '找到匹配位置的温度数据: $_currentWeatherLocation, ${tempLocationData.value}°C');
+            '✅ 找到匹配位置的温度数据: $_currentWeatherLocation, ${tempLocationData.value}°C');
+
+        // 输出可用地区列表以便调试
+        final availablePlaces =
+            currentWeatherData.temperature!.data.map((t) => t.place).join(', ');
+        _logger.d('可用天气地区: $availablePlaces');
+        _logger.d('当前查找的位置: $_currentWeatherLocation');
+        _logger.i(
+            '天气卡片将显示的地区名称: ${_currentWeatherLocation != '香港天文台' ? _currentWeatherLocation : tempLocationData.place}');
       } catch (e) {
         // 如果找不到匹配的位置，尝试查找"香港天文台"作为备选
+        _logger.w('❌ 未找到位置 $_currentWeatherLocation 的匹配数据，尝试香港天文台作为备选');
         try {
           tempLocationData = currentWeatherData.temperature!.data
               .firstWhere((t) => t.place == '香港天文台');
-          _logger.w(
-              '未找到位置 $_currentWeatherLocation 的温度数据，使用香港天文台数据: ${tempLocationData.value}°C');
+          _logger.w('🔄 使用香港天文台数据: ${tempLocationData.value}°C');
         } catch (e2) {
           // 如果连"香港天文台"都找不到，使用第一个可用数据作为最后备选
           if (currentWeatherData.temperature!.data.isNotEmpty) {
@@ -312,11 +352,13 @@ class _WeatherWidgetState extends State<WeatherWidget> {
                     },
                   ),
                   const SizedBox(height: 6),
-                  // 地区名称
+                  // 地区名称 - 显示building location，如果没有则显示API返回的place
                   Text(
-                    tempLocationData != null
-                        ? '${tempLocationData.place}'
-                        : '即時天氣',
+                    _currentWeatherLocation != '香港天文台'
+                        ? _currentWeatherLocation // 显示building location
+                        : (tempLocationData != null
+                            ? tempLocationData.place
+                            : '即時天氣'),
                     style: TextStyle(
                         fontSize: 16,
                         fontWeight: FontWeight.bold,
@@ -538,7 +580,9 @@ class _WeatherWidgetState extends State<WeatherWidget> {
                         },
                       ),
                       Text(
-                        '天氣資料獲取中',
+                        _currentWeatherLocation != '香港天文台'
+                            ? _currentWeatherLocation // 显示building location
+                            : '天氣資料獲取中',
                         style: TextStyle(
                             fontSize: 12,
                             fontWeight: FontWeight.bold,
@@ -620,12 +664,17 @@ class _WeatherWidgetState extends State<WeatherWidget> {
 
   // 使用WeatherProvider构建当前天气部分
   Widget _buildCurrentWeatherPartWithProvider(WeatherProvider weatherProvider) {
+    _logger.d(
+        'WeatherProvider状态 - Loading: ${weatherProvider.isLoadingCurrent}, HasData: ${weatherProvider.hasCurrentData}, Error: ${weatherProvider.currentError}');
+
     if (weatherProvider.isLoadingCurrent) {
       return const Center(child: CircularProgressIndicator());
     }
 
     if (weatherProvider.currentError != null ||
         !weatherProvider.hasCurrentData) {
+      _logger.w(
+          '天气数据不可用 - Error: ${weatherProvider.currentError}, HasData: ${weatherProvider.hasCurrentData}');
       return Container(
         margin: const EdgeInsets.all(4.0),
         decoration: BoxDecoration(
@@ -642,7 +691,12 @@ class _WeatherWidgetState extends State<WeatherWidget> {
                 style: TextStyle(fontSize: 12, color: Colors.grey)),
             const SizedBox(height: 8),
             ElevatedButton.icon(
-              onPressed: () => weatherProvider.fetchCurrentWeather(),
+              onPressed: () {
+                _logger.i('🔄 手动重试获取天气数据，当前位置: $_currentWeatherLocation');
+                // 先更新位置，再获取数据
+                _updateLocationFromProvider();
+                weatherProvider.fetchCurrentWeather();
+              },
               icon: const Icon(Icons.refresh, size: 16),
               label: const Text('重試', style: TextStyle(fontSize: 12)),
               style: ElevatedButton.styleFrom(

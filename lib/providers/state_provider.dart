@@ -484,19 +484,11 @@ class CarouselStateProvider extends ChangeNotifier {
     }
   }
 
-  /// 启动广告切换检查定时器
+  /// 启动广告切换检查定时器 - 已弃用，改由FullscreenAdProvider内部控制
   void _startAdSwitchCheckTimer() {
-    // 每秒检查一次是否需要切换广告
-    Timer.periodic(const Duration(seconds: 1), (timer) {
-      if (_currentState.currentAppState != AppState.fullscreenAd) {
-        // 如果不在全屏广告状态，取消定时器
-        timer.cancel();
-        return;
-      }
-
-      // 调用智能轮播切换回调
-      _onSmartCarouselSwitch?.call(true, 0);
-    });
+    // 此方法已弃用 - 现在由FullscreenAdProvider内部的定时器直接控制广告切换
+    // 不再需要外部的每秒检查回调机制
+    return;
   }
 
   ///9， 啟動手動操作計時器（使用配置的手動操作超時時間）
