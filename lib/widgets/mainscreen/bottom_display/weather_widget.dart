@@ -297,7 +297,8 @@ class _WeatherWidgetState extends State<WeatherWidget> {
                     future: _weatherWarningFuture,
                     builder: (context, warningSnapshot) {
                       // 判断警告条数，动态调整字号和图标
-                      final warningCount = warningSnapshot.data?.warnings.length ?? 0;
+                      final warningCount =
+                          warningSnapshot.data?.warnings.length ?? 0;
                       final double fontSize = warningCount > 1 ? 14.0 : 12.0;
                       final double iconSize = warningCount > 1 ? 16.0 : 12.0;
                       return WeatherWarningWidget(

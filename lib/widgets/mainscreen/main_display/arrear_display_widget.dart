@@ -434,7 +434,7 @@ class ArrearDisplayWidgetState extends State<ArrearDisplayWidget> {
               const Icon(Icons.receipt_long, color: Colors.blue, size: 24),
               const SizedBox(width: 8),
               Text(
-                '查詢結果 - ${_selectedBuilding}樓${_selectedFloor}層',
+                '查詢結果 - ${_selectedBuilding}樓${_selectedFloor}單元',
                 style: const TextStyle(
                   fontSize: 18,
                   fontWeight: FontWeight.w600,
