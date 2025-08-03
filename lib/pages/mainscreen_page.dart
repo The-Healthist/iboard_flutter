@@ -405,27 +405,25 @@ class _AnnouncementPageState extends State<AnnouncementPage> {
           announcementCarouselProvider.showArrearQueryWidget(() {});
           _logger.i('🔵 [MainScreenPage] showArrearQueryWidget 调用完成');
         } else {
-          _logger.i('📰 [MainScreenPage] 接收到通告点击请求: ${announcement.title}');
-          // 查找announcement在轮播通告列表中的索引
-          int announcementIndex = carouselAnnouncements.indexOf(announcement);
-          if (announcementIndex != -1) {
-            // 计算在carousel中的实际索引（主屏幕是索引0，所以announcement从索引1开始）
-            int carouselIndex = announcementIndex + 1;
-            _logger.i('📰 [MainScreenPage] 准备跳转到轮播索引: $carouselIndex');
-            // 跳转到对应的公告页面
-            announcementCarouselProvider.jumpToAnnouncementIndex(carouselIndex);
-            _logger.i(
-                '📰 [MainScreenPage] 已跳转到轮播通告: $carouselIndex (${announcement.title}) - 类型: ${announcement.uiType}');
-            // 触发手动操作状态
-            _logger.i('📰 [MainScreenPage] 准备进入手动操作状态');
-            carouselStateProvider.enterManualOperation();
-            _logger.i(
-                '📰 [MainScreenPage] 已进入手动操作状态: ${carouselStateProvider.currentAppState}');
-          } else {
-            // 如果点击的通告不在轮播列表中（不是緊急或一般通告），提示用户
-            _logger.w(
-                '⚠️ [MainScreenPage] 点击的通告不在轮播列表中: ${announcement.title} - 类型: ${announcement.uiType}');
-          }
+          _logger.i(
+              '📰 [MainScreenPage] 接收到通告点击请求: ${announcement.title} (ID: ${announcement.id})');
+
+          // 新逻辑：直接显示点击的通告，不依赖轮播列表查找
+          _logger.i(
+              '📰 [MainScreenPage] 直接显示点击的通告，根据文件MD5: ${announcement.file.md5}');
+
+          // 直接显示独立通告
+          announcementCarouselProvider.showIndependentAnnouncement(announcement,
+              () {
+            // 返回主页时跳转到主屏幕
+            announcementCarouselProvider.jumpToAnnouncementIndex(0);
+          });
+
+          // 触发手动操作状态
+          _logger.i('📰 [MainScreenPage] 准备进入手动操作状态');
+          carouselStateProvider.enterManualOperation();
+          _logger.i(
+              '📰 [MainScreenPage] 已进入手动操作状态: ${carouselStateProvider.currentAppState}');
         }
       },
       onHomeButtonPressed: () {

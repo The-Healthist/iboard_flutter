@@ -5,12 +5,9 @@ import 'package:iboard_app/models/announcement_model.dart';
 import 'package:iboard_app/widgets/carousel_widget.dart' as custom_carousel;
 import 'package:iboard_app/widgets/mainscreen/main_display/announcement_reader_widget.dart';
 import 'package:iboard_app/widgets/mainscreen/main_display/mainscreen_widget.dart';
-import 'package:iboard_app/widgets/mainscreen/main_display/arrear_display_widget.dart';
 import 'package:logger/logger.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:convert';
-import 'package:iboard_app/providers/state_provider.dart'; // Added import for CarouselStateProvider
-import 'package:provider/provider.dart'; // Added import for Provider
 
 /// 通告轮播Provider
 /// 负责管理通告轮播的逻辑、暂停恢复、定时器管理等
@@ -227,23 +224,14 @@ class AnnouncementCarouselProvider extends ChangeNotifier {
               '🔵 [AnnouncementCarouselProvider] showArrearQueryWidget 调用完成');
         } else {
           _logger.i(
-              '📰 [AnnouncementCarouselProvider] 接收到通告点击请求: ${announcement.title}');
-          // 查找announcement在轮播通告列表中的索引
-          int announcementIndex = carouselAnnouncements.indexOf(announcement);
-          if (announcementIndex != -1) {
-            // 计算在carousel中的实际索引（主屏幕是索引0，所以announcement从索引1开始）
-            int carouselIndex = announcementIndex + 1;
-            _logger.i(
-                '📰 [AnnouncementCarouselProvider] 准备跳转到轮播索引: $carouselIndex');
-            // 跳转到对应的公告页面
-            _midCarouselController.jumpToIndex(carouselIndex);
-            _logger.i(
-                '📰 [AnnouncementCarouselProvider] 已跳转到轮播通告: $carouselIndex (${announcement.title}) - 类型: ${announcement.uiType}');
-          } else {
-            // 如果点击的通告不在轮播列表中（不是緊急或一般通告），提示用户
-            _logger.w(
-                '⚠️ [AnnouncementCarouselProvider] 点击的通告不在轮播列表中: ${announcement.title} - 类型: ${announcement.uiType}');
-          }
+              '📰 [AnnouncementCarouselProvider] 接收到通告点击请求: ${announcement.title} (ID: ${announcement.id})');
+
+          // 新逻辑：直接显示点击的通告，不依赖轮播列表查找
+          _logger.i(
+              '📰 [AnnouncementCarouselProvider] 直接显示点击的通告，根据文件MD5: ${announcement.file.md5}');
+
+          // 直接显示独立通告
+          showIndependentAnnouncement(announcement, onHomeButtonPressed);
         }
       },
     );
@@ -622,6 +610,60 @@ class AnnouncementCarouselProvider extends ChangeNotifier {
     // 通知UI更新，隐藏覆盖层
     notifyListeners();
     _logger.i('🏠 [hideArrearQueryWidget] 覆盖层已隐藏，底层轮播内容保持不变');
+  }
+
+  ///14，直接显示独立通告（不依赖轮播逻辑）
+  void showIndependentAnnouncement(
+      AnnouncementModel announcement, VoidCallback? onHomeButtonPressed) {
+    _logger.i(
+        '📰 [独立通告] 直接显示通告: ${announcement.title} (ID: ${announcement.id}, MD5: ${announcement.file.md5})');
+
+    // 创建独立通告显示页面，直接根据通告的文件信息
+    FileManager fileManager = FileManager();
+    fileManager.getFile(announcement.file);
+
+    Widget announcementWidget = Center(
+      child: AnnouncementReaderWidget(
+        announcement: announcement,
+        fileManager: fileManager,
+        onHomeButtonPressed: onHomeButtonPressed ??
+            () {
+              // 默认返回主页行为：跳转到主屏幕
+              jumpToAnnouncementIndex(0);
+              _logger.i('📰 [独立通告] 用户点击返回主页，已跳转到主屏幕');
+            },
+      ),
+    );
+
+    // 创建临时轮播内容：只保留主屏幕和当前选中的通告
+    Widget mainScreenWidget =
+        _createMainScreenWidget(onHomeButtonPressed ?? () {});
+
+    List<Widget> tempWidgets = [
+      mainScreenWidget, // 主屏幕保持在索引0
+      announcementWidget, // 独立通告在索引1
+    ];
+
+    // 设置临时轮播内容
+    _midCarouselController.setCarouselArray(tempWidgets);
+    _midCarouselController.jumpToIndex(1); // 跳转到独立通告
+
+    _logger.i('📰 [独立通告] 已显示独立通告: ${announcement.title}，索引1，用户可通过返回按钮回到主屏幕');
+  }
+
+  ///15，创建主屏幕Widget（辅助方法）
+  Widget _createMainScreenWidget(VoidCallback onHomeButtonPressed) {
+    return MainScreenWidget(
+      onAnnouncementTap: (AnnouncementModel? announcement) {
+        if (announcement == null) {
+          // 显示欠费查询界面
+          showArrearQueryWidget(onHomeButtonPressed);
+        } else {
+          // 显示独立通告
+          showIndependentAnnouncement(announcement, onHomeButtonPressed);
+        }
+      },
+    );
   }
 
   @override
