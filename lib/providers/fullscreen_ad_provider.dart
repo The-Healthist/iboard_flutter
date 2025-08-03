@@ -268,10 +268,18 @@ class FullscreenAdProvider extends ChangeNotifier {
     _currentAdPauseTime = null;
 
     if (this.fullscreenAds.isNotEmpty) {
+      // 确保当前索引在有效范围内
+      if (_currentAdIndex < 0 || _currentAdIndex >= this.fullscreenAds.length) {
+        _logger.w('⚠️ 修正无效的广告索引: $_currentAdIndex → 0');
+        _currentAdIndex = 0;
+      }
+
       _createAdWidgets();
       startFullscreenAdTimer(_currentAdIndex);
       startDebugTimer();
       _currentStateStartTime = DateTime.now();
+      _logger.i(
+          '🚀 进入全屏广告模式: 索引=$_currentAdIndex, 总数=${this.fullscreenAds.length}');
     }
 
     notifyListeners();
@@ -283,12 +291,25 @@ class FullscreenAdProvider extends ChangeNotifier {
         '🎬 开始全屏广告计时器: index=$currentIndex, ads=${this.fullscreenAds.length}, paused=$_isPaused');
     _fullscreenTimer?.cancel();
 
-    if (this.fullscreenAds.isEmpty ||
-        currentIndex < 0 ||
-        currentIndex >= this.fullscreenAds.length ||
-        _isPaused) {
+    // 改进的边界检查逻辑
+    if (this.fullscreenAds.isEmpty) {
+      _logger.w('⚠️ 全屏广告列表为空，无法启动计时器');
+      return;
+    }
+
+    if (currentIndex < 0 || currentIndex >= this.fullscreenAds.length) {
       _logger.w(
-          '⚠️ 全屏广告计时器条件不满足: ads=${this.fullscreenAds.length}, index=$currentIndex, paused=$_isPaused');
+          '⚠️ 广告索引越界: $currentIndex (有效范围: 0-${this.fullscreenAds.length - 1})');
+      return;
+    }
+
+    if (_isPaused) {
+      _logger.w('⚠️ 广告已暂停，跳过计时器启动');
+      return;
+    }
+
+    if (!_isActive) {
+      _logger.w('⚠️ 广告未激活，跳过计时器启动');
       return;
     }
 
@@ -300,21 +321,25 @@ class FullscreenAdProvider extends ChangeNotifier {
     // 检查当前广告的个人时间是否小于fullscreenAdDuration
     // 如果小于，说明需要在该全屏广告状态下切换，直接切换即可
     if (_adDuration.inSeconds < fullscreenAdDuration) {
-      // _logger.i(
-      //     '📝 记录全屏广告开始时间: $_currentAdStartTime, 索引: $_currentAdIndex, 时长: ${_adDuration.inSeconds}秒, 剩余时间: ${_adDuration.inSeconds}秒');
+      _logger.i(
+          '⏰ 启动短时广告计时器: ${_adDuration.inSeconds}秒 (索引: $_currentAdIndex/${this.fullscreenAds.length})');
       _fullscreenTimer = Timer(Duration(seconds: _adDuration.inSeconds), () {
         if (_isActive && !_isPaused) {
-          // _logger.d('⏭️ 全屏广告计时器到期，切换到下一个');
+          _logger.d('⏭️ 短时广告计时器到期，切换到下一个');
           _nextAd();
+        } else {
+          _logger.w('⚠️ 计时器到期但条件不满足: active=$_isActive, paused=$_isPaused');
         }
       });
     } else {
-      // 如果等于或大于fullscreenAdDuration，则设置定时器为fullscreenAdDuration时长
-      // _logger.i('📝 广告时长大于等于设置的播放时间，将按照设置时间播放: ${fullscreenAdDuration}秒');
+      _logger.i(
+          '⏰ 启动标准广告计时器: ${fullscreenAdDuration}秒 (索引: $_currentAdIndex/${this.fullscreenAds.length})');
       _fullscreenTimer = Timer(Duration(seconds: fullscreenAdDuration), () {
         if (_isActive && !_isPaused) {
-          // _logger.d('⏭️ 全屏广告计时器到期，切换到下一个');
+          _logger.d('⏭️ 标准广告计时器到期，切换到下一个');
           _nextAd();
+        } else {
+          _logger.w('⚠️ 计时器到期但条件不满足: active=$_isActive, paused=$_isPaused');
         }
       });
     }
@@ -322,10 +347,21 @@ class FullscreenAdProvider extends ChangeNotifier {
 
   ///11, 切换到下一个广告（私有方法）
   void _nextAd() {
-    if (this.fullscreenAds.isEmpty || _isPaused || !_isActive) return;
+    if (this.fullscreenAds.isEmpty || _isPaused || !_isActive) {
+      _logger.w(
+          '⚠️ _nextAd被阻止: isEmpty=${this.fullscreenAds.isEmpty}, paused=$_isPaused, active=$_isActive');
+      return;
+    }
 
-    // 切换到下一个广告
+    final oldIndex = _currentAdIndex;
+    // 切换到下一个广告 - 使用模运算确保循环
     _currentAdIndex = (_currentAdIndex + 1) % this.fullscreenAds.length;
+
+    // 额外的安全检查
+    _validateAndFixIndex();
+
+    _logger.i(
+        '🔄 全屏广告切换: $oldIndex → $_currentAdIndex (总数: ${this.fullscreenAds.length})');
 
     // 重置时间记录
     _adElapsedTime = Duration.zero;
@@ -334,6 +370,23 @@ class FullscreenAdProvider extends ChangeNotifier {
 
     notifyListeners();
     startFullscreenAdTimer(_currentAdIndex);
+  }
+
+  ///25, 验证并修正广告索引
+  void _validateAndFixIndex() {
+    if (this.fullscreenAds.isEmpty) {
+      _currentAdIndex = 0;
+      return;
+    }
+
+    if (_currentAdIndex < 0) {
+      _logger.w('⚠️ 索引小于0，修正为0: $_currentAdIndex → 0');
+      _currentAdIndex = 0;
+    } else if (_currentAdIndex >= this.fullscreenAds.length) {
+      _logger.w(
+          '⚠️ 索引越界，修正为0: $_currentAdIndex → 0 (总数: ${this.fullscreenAds.length})');
+      _currentAdIndex = 0;
+    }
   }
 
   ///24, 公开的切换到下一个广告方法（供外部调用）

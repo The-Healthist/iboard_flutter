@@ -196,7 +196,7 @@ class ArrearDisplayWidgetState extends State<ArrearDisplayWidget> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         const Text(
-          '選擇樓號',
+          '選擇樓層',
           style: TextStyle(
             fontSize: 16,
             fontWeight: FontWeight.w600,
@@ -259,7 +259,7 @@ class ArrearDisplayWidgetState extends State<ArrearDisplayWidget> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         const Text(
-          '選擇樓層',
+          '選擇單位',
           style: TextStyle(
             fontSize: 16,
             fontWeight: FontWeight.w600,
@@ -434,7 +434,7 @@ class ArrearDisplayWidgetState extends State<ArrearDisplayWidget> {
               const Icon(Icons.receipt_long, color: Colors.blue, size: 24),
               const SizedBox(width: 8),
               Text(
-                '查詢結果 - ${_selectedBuilding}樓${_selectedFloor}單元',
+                '查詢結果 - ${_selectedBuilding}樓${_selectedFloor}單位',
                 style: const TextStyle(
                   fontSize: 18,
                   fontWeight: FontWeight.w600,

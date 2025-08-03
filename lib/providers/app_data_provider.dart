@@ -6,6 +6,7 @@ import 'package:logger/logger.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:iboard_app/providers/arrear_provider.dart';
 import 'package:iboard_app/utils/qr_code_util.dart';
+import 'package:iboard_app/utils/device_id_util.dart';
 import 'dart:io';
 import 'dart:typed_data';
 import 'package:path_provider/path_provider.dart';
@@ -132,11 +133,11 @@ class AppDataProvider extends ChangeNotifier {
         return;
       }
 
-      _logger.i('优先尝试登录，如果失败则使用缓存数据，设备ID: $_deviceId');
+      _logger.i('优先尝试登录（包含自动设备注册），如果失败则使用缓存数据，设备ID: $_deviceId');
 
-      // 尝试登录
+      // 尝试登录（包含自动设备注册逻辑）
       try {
-        await _performLogin();
+        await initializeAndLogin();
         _logger.i('登录成功，已更新最新数据到缓存');
       } catch (loginError) {
         _logger.w('登录失败，尝试使用缓存数据作为备用: $loginError');
@@ -151,6 +152,8 @@ class AppDataProvider extends ChangeNotifier {
 
     _isLoading = false;
     notifyListeners();
+    _logger.i(
+        'initialize方法完成，最终状态: isLoggedIn=${isLoggedIn}, token=${token != null ? '有效' : '无效'}, settingsModel=${_settingsModel != null ? '已设置' : '未设置'}');
   }
 
   ///5，登录失败时的缓存数据备用加载方法
@@ -408,17 +411,41 @@ class AppDataProvider extends ChangeNotifier {
       }
 
       _error = null;
+      _logger.i('登录成功，已更新最新数据到缓存');
+      _logger.i(
+          '最终状态检查: isLoggedIn=${isLoggedIn}, token=${token != null ? '有效' : '无效'}, settingsModel=${_settingsModel != null ? '已设置' : '未设置'}');
     } on ApiException catch (e) {
       _logger.e('Initial login failed',
           error: e, stackTrace: e.errorData is StackTrace ? e.errorData : null);
 
       // 检查是否是设备ID无效错误（状态码400且消息包含Invalid device ID）
-      if (e.statusCode == 400 &&
-          e.errorData is Map &&
-          e.errorData['message'] != null &&
-          e.errorData['message'].toString().contains('Invalid device ID')) {
+      // 改进错误检测逻辑，支持多种错误消息格式
+      bool isInvalidDeviceIdError = false;
+
+      if (e.statusCode == 400) {
+        String errorMessage = '';
+
+        // 尝试从不同位置获取错误消息
+        if (e.errorData is Map) {
+          errorMessage = e.errorData['message']?.toString() ?? '';
+        } else if (e.message.isNotEmpty) {
+          errorMessage = e.message;
+        }
+
+        // 检查多种可能的错误消息格式
+        isInvalidDeviceIdError =
+            errorMessage.toLowerCase().contains('invalid device id') ||
+                errorMessage.toLowerCase().contains('device not found') ||
+                errorMessage.toLowerCase().contains('device id not found') ||
+                errorMessage.toLowerCase().contains('设备不存在') ||
+                errorMessage.toLowerCase().contains('设备id无效');
+      }
+
+      if (isInvalidDeviceIdError) {
         _logger.w(
             'Device ID not found, attempting to register device: $_deviceId');
+        _logger.d(
+            'Error details - Status: ${e.statusCode}, Message: ${e.message}, ErrorData: ${e.errorData}');
 
         try {
           // 尝试注册设备
@@ -453,9 +480,13 @@ class AppDataProvider extends ChangeNotifier {
           }
 
           _error = null;
+          _logger.i('设备注册后登录成功，已更新最新数据到缓存');
+          _logger.i(
+              '设备注册后最终状态检查: isLoggedIn=${isLoggedIn}, token=${token != null ? '有效' : '无效'}, settingsModel=${_settingsModel != null ? '已设置' : '未设置'}');
         } catch (registrationError) {
           _logger.e('Device registration or retry login failed',
               error: registrationError);
+          _logger.e('Registration error details: $registrationError');
           _error = 'Device registration failed: $registrationError';
           _settingsModel = null;
         }
@@ -1167,6 +1198,45 @@ class AppDataProvider extends ChangeNotifier {
     }
     _isPeriodicLoginActive = false;
     _logger.i('Periodic login stopped.');
+  }
+
+  /// 强制重新生成设备ID并尝试登录
+  Future<void> forceRegenerateDeviceIdAndLogin() async {
+    _logger.i('强制重新生成设备ID并尝试登录');
+
+    try {
+      // 清除存储的设备ID
+      await DeviceIdUtil().clearStoredDeviceId();
+
+      // 重新生成设备ID
+      String newDeviceId = await DeviceIdUtil().generateUniqueDeviceId();
+      _logger.i('新生成的设备ID: $newDeviceId');
+
+      // 使用新设备ID尝试登录
+      await initializeAndLogin(deviceIdToSet: newDeviceId);
+    } catch (e) {
+      _logger.e('强制重新生成设备ID失败', error: e);
+      _error = '强制重新生成设备ID失败: $e';
+      notifyListeners();
+    }
+  }
+
+  /// 测试设备注册流程
+  Future<void> testDeviceRegistration() async {
+    _logger.i('开始测试设备注册流程');
+
+    if (_deviceId == null || _deviceId!.isEmpty) {
+      _logger.e('设备ID为空，无法测试注册');
+      return;
+    }
+
+    try {
+      await _registerNewDevice(_deviceId!);
+      _logger.i('设备注册测试成功');
+    } catch (e) {
+      _logger.e('设备注册测试失败', error: e);
+      throw e;
+    }
   }
 
   @override
