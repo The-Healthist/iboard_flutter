@@ -63,6 +63,7 @@ class FullscreenAdProvider extends ChangeNotifier {
   bool get isActive => _isActive;
   int get currentAdIndex => _currentAdIndex;
   DateTime? get currentAdStartTime => _currentAdStartTime;
+  DateTime? get currentStateStartTime => _currentStateStartTime;
   DateTime? get currentAdPauseTime => _currentAdPauseTime;
   Duration get adElapsedTime => _adElapsedTime;
   Duration get expectedAdElapsedTime => _expectedAdElapsedTime; //预计已播放时间
@@ -500,11 +501,18 @@ class FullscreenAdProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  ///14, 无人操作时退出全屏广告模式
+  ///14, 退出全屏广告模式
   void exitFullscreenMode() {
     if (!_isActive) return;
 
-    _nextAd();
+    _logger.i('🚪 退出全屏广告模式');
+
+    // 为下次进入准备下一个广告（但不触发切换逻辑）
+    if (this.fullscreenAds.isNotEmpty) {
+      _currentAdIndex = (_currentAdIndex + 1) % this.fullscreenAds.length;
+      _logger.i('🔄 广告索引更新为下一个: $_currentAdIndex');
+    }
+
     // 确保取消所有定时器
     _isActive = false;
     _fullscreenTimer?.cancel();

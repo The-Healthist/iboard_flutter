@@ -760,7 +760,7 @@ class AppDataProvider extends ChangeNotifier {
         _logger.i('📱 使用缓存的意见投诉二维码文件: $_cachedComplaintQrCode');
         return _cachedComplaintQrCode;
       } else {
-        _logger.w('⚠️ 缓存的二维码文件不存在，重新生成');
+        // _logger.w('⚠️ 缓存的二维码文件不存在，重新生成');
         _cachedComplaintQrCode = null;
       }
     }

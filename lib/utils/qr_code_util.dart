@@ -26,7 +26,7 @@ class QrCodeUtil {
     int errorCorrectionLevel = QrErrorCorrectLevel.M,
   }) async {
     try {
-      _logger.d('🔲 开始生成二维码: $data, 尺寸: ${size}x$size');
+      // _logger.d('🔲 开始生成二维码: $data, 尺寸: ${size}x$size');
 
       // 创建QR码绘制器
       final qrPainter = QrPainter(
@@ -59,14 +59,14 @@ class QrCodeUtil {
 
       if (byteData != null) {
         final bytes = byteData.buffer.asUint8List();
-        _logger.i('✅ 二维码生成成功: ${bytes.length} bytes');
+        // _logger.i('✅ 二维码生成成功: ${bytes.length} bytes');
         return bytes;
       } else {
-        _logger.e('❌ 二维码生成失败: byteData为null');
+        // _logger.e('❌ 二维码生成失败: byteData为null');
         return null;
       }
     } catch (e, stackTrace) {
-      _logger.e('❌ 二维码生成异常: $e\n$stackTrace');
+      // _logger.e('❌ 二维码生成异常: $e\n$stackTrace');
       return null;
     }
   }
@@ -82,7 +82,7 @@ class QrCodeUtil {
     EdgeInsetsGeometry? padding,
     BoxDecoration? decoration,
   }) {
-    _logger.d('🔲 创建二维码Widget: $data, 尺寸: ${size}x$size');
+    // _logger.d('🔲 创建二维码Widget: $data, 尺寸: ${size}x$size');
 
     Widget qrWidget = QrImageView(
       data: data,
@@ -133,8 +133,8 @@ class QrCodeUtil {
     Color backgroundColor = Colors.white,
     int errorCorrectionLevel = QrErrorCorrectLevel.M,
   }) {
-    _logger.d(
-        '🔲 创建带Logo的二维码Widget: $data, 尺寸: ${size}x$size, Logo尺寸: ${logoSize}x$logoSize');
+    // _logger.d(
+    //     '🔲 创建带Logo的二维码Widget: $data, 尺寸: ${size}x$size, Logo尺寸: ${logoSize}x$logoSize');
 
     return Stack(
       alignment: Alignment.center,

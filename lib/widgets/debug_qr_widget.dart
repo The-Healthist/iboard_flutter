@@ -122,7 +122,7 @@ class _QrDebugWidgetState extends State<QrDebugWidget> {
       _debugInfo = debugInfo;
     });
 
-    _logger.i('🐛 二维码调试信息: $_debugInfo');
+    // _logger.i('🐛 二维码调试信息: $_debugInfo');
   }
 
   ///添加本地生成工具信息
@@ -261,7 +261,7 @@ class _QrDebugWidgetState extends State<QrDebugWidget> {
 
   ///2，手动重新生成投诉二维码
   Future<void> _regenerateComplaintQrCode() async {
-    _logger.i('🔄 手动重新生成投诉二维码');
+    // _logger.i('🔄 手动重新生成投诉二维码');
     final appDataProvider = context.read<AppDataProvider>();
 
     try {
@@ -270,7 +270,7 @@ class _QrDebugWidgetState extends State<QrDebugWidget> {
 
       // 重新生成
       final result = await appDataProvider.generateComplaintQrCode();
-      _logger.i('✅ 投诉二维码本地重新生成结果: $result');
+      // _logger.i('✅ 投诉二维码本地重新生成结果: $result');
 
       // 刷新调试信息
       await _checkQrCodeStatus();
@@ -282,7 +282,7 @@ class _QrDebugWidgetState extends State<QrDebugWidget> {
         ),
       );
     } catch (e) {
-      _logger.e('❌ 重新生成投诉二维码失败', error: e);
+      // _logger.e('❌ 重新生成投诉二维码失败', error: e);
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('本地重新生成失败: $e'),
@@ -294,7 +294,7 @@ class _QrDebugWidgetState extends State<QrDebugWidget> {
 
   ///3，手动重新生成登记二维码
   Future<void> _regenerateRegistrationQrCode() async {
-    _logger.i('🔄 手动重新生成登记二维码');
+    // _logger.i('🔄 手动重新生成登记二维码');
     final appDataProvider = context.read<AppDataProvider>();
 
     try {
@@ -303,7 +303,7 @@ class _QrDebugWidgetState extends State<QrDebugWidget> {
 
       // 重新生成
       final result = await appDataProvider.generateRegistrationQrCode();
-      _logger.i('✅ 登记二维码本地重新生成结果: $result');
+      // _logger.i('✅ 登记二维码本地重新生成结果: $result');
 
       // 刷新调试信息
       await _checkQrCodeStatus();
@@ -315,7 +315,7 @@ class _QrDebugWidgetState extends State<QrDebugWidget> {
         ),
       );
     } catch (e) {
-      _logger.e('❌ 重新生成登记二维码失败', error: e);
+      // _logger.e('❌ 重新生成登记二维码失败', error: e);
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('本地重新生成失败: $e'),

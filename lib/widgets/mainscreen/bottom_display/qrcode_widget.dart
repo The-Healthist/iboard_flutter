@@ -24,7 +24,7 @@ class _QrcodeWidgetState extends State<QrcodeWidget> {
   @override
   void initState() {
     super.initState();
-    _logger.i('🔲 QrcodeWidget初始化');
+    // _logger.i('🔲 QrcodeWidget初始化');
 
     // 在Widget初始化后立即检查并生成二维码
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -35,37 +35,37 @@ class _QrcodeWidgetState extends State<QrcodeWidget> {
   ///1，检查并生成二维码（带自动修复）
   void _checkAndGenerateQrCodes() {
     final appDataProvider = context.read<AppDataProvider>();
-    _logger.i('🔍 检查二维码生成状态...');
+    // _logger.i('🔍 检查二维码生成状态...');
 
     // 检查投诉二维码
     if (appDataProvider.cachedComplaintQrCode == null) {
-      _logger.w('⚠️ 投诉二维码未生成，尝试初始化...');
+      // _logger.w('⚠️ 投诉二维码未生成，尝试初始化...');
     } else {
-      _logger.d('投诉二维码: ${appDataProvider.cachedComplaintQrCode}');
+      // _logger.d('投诉二维码: ${appDataProvider.cachedComplaintQrCode}');
     }
 
     // 检查登记二维码
     if (appDataProvider.cachedRegistrationQrCode == null) {
-      _logger.w('⚠️ 登记二维码未生成，尝试初始化...');
+      // _logger.w('⚠️ 登记二维码未生成，尝试初始化...');
     } else {
-      _logger.d('登记二维码: ${appDataProvider.cachedRegistrationQrCode}');
+      // _logger.d('登记二维码: ${appDataProvider.cachedRegistrationQrCode}');
     }
 
     // 如果二维码未生成，尝试初始化
     if (appDataProvider.cachedComplaintQrCode == null ||
         appDataProvider.cachedRegistrationQrCode == null) {
-      _logger.w('⚠️ 二维码未生成，尝试完整初始化...');
+      // _logger.w('⚠️ 二维码未生成，尝试完整初始化...');
       appDataProvider.initializeQrCodes();
     }
   }
 
   ///2，构建二维码图片组件（支持本地生成、本地文件和网络URL）- 增强版
   Widget _buildQrCodeImage(String imagePath) {
-    _logger.d('🖼️ 构建二维码图片: $imagePath');
+    // _logger.d('🖼️ 构建二维码图片: $imagePath');
 
     // 判断是本地文件路径还是网络URL
     if (imagePath.startsWith('http://') || imagePath.startsWith('https://')) {
-      _logger.d('🌐 使用网络图片: $imagePath');
+      // _logger.d('🌐 使用网络图片: $imagePath');
       // 网络图片 - 使用增强的错误处理
       return CachedNetworkImage(
         imageUrl: imagePath,
@@ -115,7 +115,7 @@ class _QrcodeWidgetState extends State<QrcodeWidget> {
                 const SizedBox(height: 2),
                 GestureDetector(
                   onTap: () {
-                    _logger.i('🔄 用户点击重试加载二维码');
+                    // _logger.i('🔄 用户点击重试加载二维码');
                     // 清除缓存并重新加载
                     CachedNetworkImage.evictFromCache(url);
                     // 触发重建
@@ -150,7 +150,7 @@ class _QrcodeWidgetState extends State<QrcodeWidget> {
         memCacheHeight: 88,
       );
     } else {
-      _logger.d('📱 使用本地文件: $imagePath');
+      // _logger.d('📱 使用本地文件: $imagePath');
       // 本地文件
       final file = File(imagePath);
       return FutureBuilder<bool>(
@@ -171,7 +171,7 @@ class _QrcodeWidgetState extends State<QrcodeWidget> {
               height: 88,
               fit: BoxFit.contain,
               errorBuilder: (context, error, stackTrace) {
-                _logger.e('❌ 本地文件加载失败: $imagePath, 错误: $error');
+                // _logger.e('❌ 本地文件加载失败: $imagePath, 错误: $error');
                 return const Icon(
                   Icons.qr_code,
                   size: 60,
@@ -180,7 +180,7 @@ class _QrcodeWidgetState extends State<QrcodeWidget> {
               },
             );
           } else {
-            _logger.w('⚠️ 本地二维码文件不存在: $imagePath');
+            // _logger.w('⚠️ 本地二维码文件不存在: $imagePath');
             return const Icon(
               Icons.qr_code,
               size: 60,
@@ -197,7 +197,7 @@ class _QrcodeWidgetState extends State<QrcodeWidget> {
     required String qrData,
     double size = 88.0,
   }) {
-    _logger.d('🔲 使用本地生成二维码: $qrData');
+    // _logger.d('🔲 使用本地生成二维码: $qrData');
     return QrCodeUtil().generateQrCodeWidget(
       data: qrData,
       size: size,
@@ -276,18 +276,18 @@ class _QrcodeWidgetState extends State<QrcodeWidget> {
   Widget _buildQrCodeContent(String? qrCodeUrl, String? qrData) {
     // 优先使用本地生成的二维码数据
     if (qrData != null) {
-      _logger.d('🔲 使用本地生成的二维码数据');
+      // _logger.d('🔲 使用本地生成的二维码数据');
       return _buildLocalGeneratedQrCode(qrData: qrData);
     }
 
     // 其次使用缓存的二维码URL
     if (qrCodeUrl != null) {
-      _logger.d('🖼️ 使用缓存的二维码URL');
+      // _logger.d('🖼️ 使用缓存的二维码URL');
       return _buildQrCodeImage(qrCodeUrl);
     }
 
     // 最后显示默认图标
-    _logger.w('⚠️ 没有可用的二维码数据，显示默认图标');
+    // _logger.w('⚠️ 没有可用的二维码数据，显示默认图标');
     return const Icon(
       Icons.qr_code,
       size: 60,
@@ -318,8 +318,8 @@ class _QrcodeWidgetState extends State<QrcodeWidget> {
   Widget build(BuildContext context) {
     return Consumer<AppDataProvider>(
       builder: (context, appDataProvider, child) {
-        _logger.d(
-            '🔍 检查二维码状态: 投诉=${appDataProvider.cachedComplaintQrCode != null}, 登记=${appDataProvider.cachedRegistrationQrCode != null}');
+        // _logger.d(
+        //     '🔍 检查二维码状态: 投诉=${appDataProvider.cachedComplaintQrCode != null}, 登记=${appDataProvider.cachedRegistrationQrCode != null}');
 
         // 计算容器高度 - 优先使用传入的高度，否则使用默认高度
         final double containerHeight = widget.containerHeight ?? 150;

@@ -15,8 +15,6 @@ class SettingsPage extends StatefulWidget {
 }
 
 class _SettingsPageState extends State<SettingsPage> {
-  bool _isExitingSettings = false; // 添加标志来跟踪是否真正退出设置页面
-
   ///1, 初始化状态 - 暂停所有轮播
   @override
   void initState() {
@@ -28,21 +26,11 @@ class _SettingsPageState extends State<SettingsPage> {
     });
   }
 
-  ///2, 销毁状态 - 只有在真正退出设置页面时才恢复所有轮播
+  ///2, 销毁状态 - 确保资源清理
   @override
   void dispose() {
-    // 只有在真正退出设置页面时才恢复轮播
-    if (_isExitingSettings) {
-      _resumeAllCarouselsFromSettings();
-
-      // 延迟发送媒体恢复通知，确保所有视频都恢复播放
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted) {
-          MediaResumeNotification().dispatch(context);
-        }
-      });
-    }
-
+    // dispose方法中不再需要恢复逻辑，因为在_exitSettingsPage中已经处理
+    // 这里只做必要的资源清理
     super.dispose();
   }
 
@@ -93,8 +81,8 @@ class _SettingsPageState extends State<SettingsPage> {
     final fullAdCarouselProvider = context.read<FullscreenAdProvider>();
     final bottomProvider = context.read<BottomWeatherQrcodeCarouselProvider>();
 
-    // 恢复到默认状态
-    carouselStateProvider.enterDefaultState();
+    // 从设置页面强制重置到默认状态（绕过手动操作状态的转换限制）
+    carouselStateProvider.resetToDefault();
 
     // 恢复顶部广告轮播
     topAdProvider.resumeAllTimersFromSettings();
@@ -136,7 +124,16 @@ class _SettingsPageState extends State<SettingsPage> {
 
   ///7, 处理真正退出设置页面 - 恢复轮播
   void _exitSettingsPage() {
-    _isExitingSettings = true; // 设置退出标志
+    // 立即恢复所有轮播和计时器
+    _resumeAllCarouselsFromSettings();
+
+    // 延迟发送媒体恢复通知，确保所有视频都恢复播放
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        MediaResumeNotification().dispatch(context);
+      }
+    });
+
     Navigator.pop(context);
   }
 
@@ -144,9 +141,16 @@ class _SettingsPageState extends State<SettingsPage> {
   Widget build(BuildContext context) {
     return WillPopScope(
       onWillPop: () async {
-        // 在返回前设置退出标志并恢复所有轮播
-        _isExitingSettings = true;
+        // 在返回前恢复所有轮播
         _resumeAllCarouselsFromSettings();
+
+        // 延迟发送媒体恢复通知，确保所有视频都恢复播放
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted) {
+            MediaResumeNotification().dispatch(context);
+          }
+        });
+
         return true; // 允许返回
       },
       child: Scaffold(

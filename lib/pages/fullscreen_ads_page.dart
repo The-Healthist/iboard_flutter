@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:iboard_app/providers/advertisement_provider.dart';
 import 'package:iboard_app/providers/fullscreen_ad_provider.dart';
+import 'package:iboard_app/widgets/debug_fullad_time_widget.dart';
 import 'package:provider/provider.dart';
 import 'package:logger/logger.dart';
 
@@ -59,20 +60,34 @@ class _FullscreenAdsPageState extends State<FullscreenAdsPage> {
           if (fullscreenAdProvider.isActive) {
             final currentAdWidget = fullscreenAdProvider.getCurrentWidget();
             if (currentAdWidget != null) {
-              return Container(
-                width: double.infinity,
-                height: double.infinity,
-                child: currentAdWidget,
+              return Stack(
+                children: [
+                  // 全屏广告内容
+                  Container(
+                    width: double.infinity,
+                    height: double.infinity,
+                    child: currentAdWidget,
+                  ),
+                  // 调试时间组件
+                  const DebugFullAdTimeWidget(),
+                ],
               );
             }
           }
 
           // 默认显示第一个广告（用于初始化时）
           if (fullscreenAdProvider.adWidgets.isNotEmpty) {
-            return Container(
-              width: double.infinity,
-              height: double.infinity,
-              child: fullscreenAdProvider.adWidgets.first,
+            return Stack(
+              children: [
+                // 全屏广告内容
+                Container(
+                  width: double.infinity,
+                  height: double.infinity,
+                  child: fullscreenAdProvider.adWidgets.first,
+                ),
+                // 调试时间组件
+                const DebugFullAdTimeWidget(),
+              ],
             );
           }
 
@@ -202,6 +217,8 @@ class _FullscreenAdsPageState extends State<FullscreenAdsPage> {
               ],
             ),
           ),
+          // 调试时间组件
+          const DebugFullAdTimeWidget(),
         ],
       ),
     );

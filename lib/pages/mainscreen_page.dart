@@ -451,7 +451,7 @@ class _AnnouncementPageState extends State<AnnouncementPage> {
     // 底部轮播现在由BottomWeatherQrcodeCarouselProvider管理
     final bottomProvider = context.read<BottomWeatherQrcodeCarouselProvider>();
     bottomProvider.initializeBottomCarousel();
-    _logger.i('🌤️ [初始化] 底部天气二维码轮播初始化完成');
+    // _logger.i('🌤️ [初始化] 底部天气二维码轮播初始化完成');
   }
 
   ///12，处理设备ID点击事件
