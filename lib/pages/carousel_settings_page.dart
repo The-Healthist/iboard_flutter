@@ -7,7 +7,7 @@ import 'package:iboard_app/providers/advertisement_provider.dart';
 import 'package:iboard_app/providers/fullscreen_ad_provider.dart';
 import 'package:iboard_app/providers/top_ad_carousel_provider.dart';
 import 'package:iboard_app/widgets/carousel_widget.dart';
-import 'package:iboard_app/widgets/fullscreen_ad_debug_widget.dart';
+import 'package:iboard_app/widgets/debug_fullscreen_ad_widget.dart';
 import 'package:provider/provider.dart';
 import 'package:iboard_app/utils/debug_cache_util.dart';
 

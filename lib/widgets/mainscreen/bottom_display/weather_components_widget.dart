@@ -6,7 +6,7 @@ import 'package:iboard_app/models/current_weather_model.dart';
 import 'package:iboard_app/models/weather_warning_model.dart';
 import 'package:iboard_app/providers/app_data_provider.dart';
 import 'package:iboard_app/widgets/weather_icon_widget.dart';
-import 'package:iboard_app/widgets/weather_data_debug_widget.dart'; // 添加天气数据调试组件导入
+import 'package:iboard_app/widgets/debug_weather_data_widget.dart'; // 添加天气数据调试组件导入
 import 'package:intl/intl.dart';
 import 'package:intl/date_symbol_data_local.dart';
 import 'package:logger/logger.dart';

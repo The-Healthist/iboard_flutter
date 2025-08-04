@@ -48,8 +48,12 @@ class _FullscreenAdsPageState extends State<FullscreenAdsPage> {
             return _buildDefaultFullscreenAd();
           }
 
-          // 确保Provider有最新的广告数据
-          fullscreenAdProvider.updateFullscreenAds(fullAds);
+          // 确保Provider有最新的广告数据 - 延迟到构建完成后执行避免setState错误
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (mounted) {
+              fullscreenAdProvider.updateFullscreenAds(fullAds);
+            }
+          });
 
           // 如果Provider处于活跃状态并且有当前广告Widget，显示它
           if (fullscreenAdProvider.isActive) {

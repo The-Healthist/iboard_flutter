@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:iboard_app/providers/arrear_provider.dart';
-import 'package:iboard_app/widgets/arrear_debug_widget.dart';
+import 'package:iboard_app/widgets/debug_arrear_widget.dart';
 
 class ArrearDisplayWidget extends StatefulWidget {
   final VoidCallback? onHomeButtonPressed; // 添加主頁按鈕回調

@@ -577,12 +577,16 @@ class _AnnouncementPageState extends State<AnnouncementPage> {
           try {
             _initializeTopWidgets();
 
-            // 同时更新全屏广告数据
-            final fullAdCarouselProvider = context.read<FullscreenAdProvider>();
-            // 新的Provider不需要设置AppDataProvider引用
-            final fullAds = advertisementProvider.fullAdvertisements;
-            fullAdCarouselProvider.updateFullscreenAds(fullAds);
-            // _logger.i('全屏广告数据已更新: ${fullAds.length} 个全屏广告');
+            // 同时更新全屏广告数据 - 延迟到构建完成后执行避免setState错误
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+              if (mounted) {
+                final fullAdCarouselProvider =
+                    context.read<FullscreenAdProvider>();
+                final fullAds = advertisementProvider.fullAdvertisements;
+                fullAdCarouselProvider.updateFullscreenAds(fullAds);
+                // _logger.i('全屏广告数据已更新: ${fullAds.length} 个全屏广告');
+              }
+            });
 
             _previousAdvertisementsForBuild =
                 List.from(currentAdvertisements); // Update the stored list

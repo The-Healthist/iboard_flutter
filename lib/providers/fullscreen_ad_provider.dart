@@ -123,6 +123,12 @@ class FullscreenAdProvider extends ChangeNotifier {
 
   ///4，根据API数据更新自定义顺序（保持用户自定义的顺序）
   void updateFullscreenAdsWithCustomOrder(List<AdModel> newAds) {
+    // 检查数据是否真的发生了变化，避免不必要的更新
+    if (_areAdsListsEqual(_fullscreenAds, newAds)) {
+      // _logger.d('📋 全屏广告数据未变化，跳过更新');
+      return;
+    }
+
     _fullscreenAds = newAds;
 
     // 如果有缓存的顺序配置且自定义顺序为空，应用缓存的顺序
@@ -289,7 +295,7 @@ class FullscreenAdProvider extends ChangeNotifier {
   void startFullscreenAdTimer(int currentIndex) {
     _logger.d(
         '🎬 开始全屏广告计时器: index=$currentIndex, ads=${this.fullscreenAds.length}, paused=$_isPaused');
-    _fullscreenTimer?.cancel();
+    _fullscreenTimer?.cancel(); // 取消之前的计时器
 
     // 改进的边界检查逻辑
     if (this.fullscreenAds.isEmpty) {
@@ -318,8 +324,8 @@ class FullscreenAdProvider extends ChangeNotifier {
     _adDuration = ad.durationObject;
     _currentAdIndex = currentIndex;
 
-    // 检查当前广告的个人时间是否小于fullscreenAdDuration
-    // 如果小于，说明需要在该全屏广告状态下切换，直接切换即可
+    // 检查当前广告的duration是否小于fullscreenAdDuration
+    // 如果小于，设置定时器 = duration 然后切换
     if (_adDuration.inSeconds < fullscreenAdDuration) {
       _logger.i(
           '⏰ 启动短时广告计时器: ${_adDuration.inSeconds}秒 (索引: $_currentAdIndex/${this.fullscreenAds.length})');
@@ -615,6 +621,20 @@ class FullscreenAdProvider extends ChangeNotifier {
   Widget? getCurrentWidget() {
     if (_currentAdIndex >= _adWidgets.length) return null;
     return _adWidgets[_currentAdIndex];
+  }
+
+  ///26，比较两个广告列表是否相等
+  bool _areAdsListsEqual(List<AdModel> list1, List<AdModel> list2) {
+    if (list1.length != list2.length) return false;
+
+    for (int i = 0; i < list1.length; i++) {
+      if (list1[i].id != list2[i].id ||
+          list1[i].title != list2[i].title ||
+          list1[i].updatedAt != list2[i].updatedAt) {
+        return false;
+      }
+    }
+    return true;
   }
 
   @override

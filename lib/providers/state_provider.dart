@@ -379,8 +379,6 @@ class CarouselStateProvider extends ChangeNotifier {
       // 更新媒體狀態
       _updateMediaStateBasedOnCurrentState();
 
-      _startFullscreenAdTimer();
-
       // 通知FullAdvertisementCarouselProvider进入全屏广告模式
       _onEnterFullscreenAdMode?.call();
 
@@ -463,33 +461,6 @@ class CarouselStateProvider extends ChangeNotifier {
   }
 
   ///8， 启动全屏广告定时器
-  void _startFullscreenAdTimer() {
-    _fullscreenAdTimer?.cancel();
-
-    final duration = Duration(seconds: fullscreenAdDuration);
-    _fullscreenAdTimer = Timer(duration, () {
-      if (_currentState.currentAppState == AppState.fullscreenAd) {
-        if (kDebugMode) {
-          // print('⏰ 全屏廣告定時器到期 (${fullscreenAdDuration}秒)，切換到默認狀態');
-        }
-        enterDefaultState();
-      }
-    });
-
-    // 启动一个周期性定时器来检查是否需要切换广告
-    _startAdSwitchCheckTimer();
-
-    if (kDebugMode) {
-      // print('🎬 启动全屏广告定时器: ${fullscreenAdDuration}秒');
-    }
-  }
-
-  /// 启动广告切换检查定时器 - 已弃用，改由FullscreenAdProvider内部控制
-  void _startAdSwitchCheckTimer() {
-    // 此方法已弃用 - 现在由FullscreenAdProvider内部的定时器直接控制广告切换
-    // 不再需要外部的每秒检查回调机制
-    return;
-  }
 
   ///9， 啟動手動操作計時器（使用配置的手動操作超時時間）
   void _startManualOperationTimer() {

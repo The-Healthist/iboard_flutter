@@ -7,7 +7,7 @@ import 'package:iboard_app/models/current_weather_model.dart'; // Added
 import 'package:iboard_app/models/weather_warning_model.dart'; // 恢复天气警告模型导入
 import 'package:iboard_app/providers/app_data_provider.dart'; // 添加AppDataProvider导入
 import 'package:iboard_app/widgets/weather_icon_widget.dart';
-import 'package:iboard_app/widgets/weather_data_debug_widget.dart'; // 添加天气数据调试组件导入
+import 'package:iboard_app/widgets/debug_weather_data_widget.dart'; // 添加天气数据调试组件导入
 import 'package:iboard_app/widgets/mainscreen/bottom_display/weather_warning_widget.dart'; // 添加天气警告组件导入
 import 'package:iboard_app/providers/weather_provider.dart'; // 添加天气provider导入
 import 'package:intl/intl.dart';
