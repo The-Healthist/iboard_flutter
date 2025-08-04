@@ -36,8 +36,8 @@ class _FullAdWidgetState extends State<FullAdWidget> {
   @override
   void initState() {
     super.initState();
-    _logger
-        .i('🎬 初始化全屏广告: "${widget.ad.title}" - 类型: ${widget.ad.file.mimeType}');
+    // _logger
+    //     .i('🎬 初始化全屏广告: "${widget.ad.title}" - 类型: ${widget.ad.file.mimeType}');
     if (widget.ad.file.mimeType.startsWith('video/')) {
       _initializeVideo();
     }

@@ -339,19 +339,19 @@ class _WeatherWidgetState extends State<WeatherWidget> {
                   Consumer<WeatherProvider>(
                     builder: (context, weatherProvider, child) {
                       final warningData = weatherProvider.weatherWarningData;
-                      // 判断警告条数，动态调整字号和图标（减小1px）
+                      // 判断警告条数，保持一致的字号和图标大小
                       final warningCount = warningData?.warnings.length ?? 0;
-                      final double fontSize = warningCount > 1 ? 13.0 : 11.0;
-                      final double iconSize = warningCount > 1 ? 15.0 : 11.0;
+                      final double fontSize = 13.0; // 统一使用较大字体
+                      final double iconSize = 15.0; // 统一使用较大图标
 
                       _logger.d(
                           '🌦️ 天气警告显示检查: warningData=${warningData != null}, 警告数=${warningCount}');
 
                       return WeatherWarningWidget(
                         warningData: warningData,
-                        fontSize: fontSize, // 多行时增大字号
+                        fontSize: fontSize, // 统一使用较大字号
                         textColor: const Color.fromARGB(255, 8, 12, 133),
-                        iconSize: iconSize, // 多行时增大图标
+                        iconSize: iconSize, // 统一使用较大图标
                         verticalSpacing: 1.0,
                         useSimulatedData:
                             warningData == null, // 如果没有真实数据，使用模拟数据测试

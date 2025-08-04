@@ -30,6 +30,7 @@ class AnnouncementCarouselProvider extends ChangeNotifier {
   // 状态管理
   bool _isMidCarouselPaused = false;
   bool _isShowingArrearQuery = false; // 新增：是否显示欠费查询页面
+  bool _isShowingArrearTable = false; // 新增：是否显示欠费总览页面
 
   // 时间记录相关 - 用于全屏广告暂停恢复
   DateTime? _currentNoticeStartTime; // 当前通告开始时间
@@ -47,6 +48,7 @@ class AnnouncementCarouselProvider extends ChangeNotifier {
           : _carouselAnnouncements;
   bool get isMidCarouselPaused => _isMidCarouselPaused;
   bool get isShowingArrearQuery => _isShowingArrearQuery; // 新增：获取欠费查询显示状态
+  bool get isShowingArrearTable => _isShowingArrearTable; // 新增：获取欠费总览显示状态
   Duration get noticeDuration => _noticeDuration;
   int get currentNoticeIndex => _currentNoticeIndex;
   DateTime? get currentNoticeStartTime => _currentNoticeStartTime;
@@ -233,6 +235,13 @@ class AnnouncementCarouselProvider extends ChangeNotifier {
           // 直接显示独立通告
           showIndependentAnnouncement(announcement, onHomeButtonPressed);
         }
+      },
+      onArrearTableTap: () {
+        // 显示欠费总览界面
+        _logger.i('📊 [AnnouncementCarouselProvider] 接收到欠费总览请求');
+        showArrearTableWidget(onHomeButtonPressed);
+        _logger
+            .i('📊 [AnnouncementCarouselProvider] showArrearTableWidget 调用完成');
       },
     );
 
@@ -612,6 +621,38 @@ class AnnouncementCarouselProvider extends ChangeNotifier {
     _logger.i('🏠 [hideArrearQueryWidget] 覆盖层已隐藏，底层轮播内容保持不变');
   }
 
+  ///13a，显示欠费总览界面
+  void showArrearTableWidget(VoidCallback onHomeButtonPressed) {
+    _logger.i('📊 [showArrearTableWidget] 开始显示欠费总览界面');
+    _logger.i(
+        '📊 [showArrearTableWidget] 当前状态 - isShowingArrearTable: $_isShowingArrearTable');
+
+    // 设置显示欠费总览状态
+    _isShowingArrearTable = true;
+    _logger.i('📊 [showArrearTableWidget] 已设置 isShowingArrearTable = true');
+
+    _logger.i('📊 [showArrearTableWidget] 准备调用 notifyListeners()');
+    notifyListeners();
+    _logger.i('📊 [showArrearTableWidget] notifyListeners() 调用完成');
+  }
+
+  ///13b，隐藏欠费总览覆盖层
+  void hideArrearTableWidget(VoidCallback onHomeButtonPressed,
+      int apiNoticeStayDuration, int delayBeforeNotice) {
+    _logger.i('🏠 [hideArrearTableWidget] 隐藏欠费总览覆盖层');
+    _logger.i(
+        '🏠 [hideArrearTableWidget] 当前状态 - isShowingArrearTable: $_isShowingArrearTable');
+
+    // 重置显示欠费总览状态，隐藏覆盖层
+    _isShowingArrearTable = false;
+    _logger.i(
+        '🏠 [hideArrearTableWidget] 已设置 isShowingArrearTable = false，覆盖层将被隐藏');
+
+    // 通知UI更新，隐藏覆盖层
+    notifyListeners();
+    _logger.i('🏠 [hideArrearTableWidget] 覆盖层已隐藏，底层轮播内容保持不变');
+  }
+
   ///14，直接显示独立通告（不依赖轮播逻辑）
   void showIndependentAnnouncement(
       AnnouncementModel announcement, VoidCallback? onHomeButtonPressed) {
@@ -663,6 +704,10 @@ class AnnouncementCarouselProvider extends ChangeNotifier {
           showIndependentAnnouncement(announcement, onHomeButtonPressed);
         }
       },
+      onArrearTableTap: () {
+        // 显示欠费总览界面
+        showArrearTableWidget(onHomeButtonPressed);
+      },
     );
   }
 
@@ -672,5 +717,34 @@ class AnnouncementCarouselProvider extends ChangeNotifier {
     _debugTimer?.cancel();
     _delayedNoticeTimer?.cancel();
     super.dispose();
+  }
+
+  ///15，自动隐藏所有覆盖层（用于全屏广告状态）
+  void autoHideAllOverlays() {
+    _logger.i('🎬 [autoHideAllOverlays] 全屏广告状态触发，自动隐藏所有覆盖层');
+
+    bool needsNotify = false;
+
+    // 如果欠费查询覆盖层正在显示，则隐藏它
+    if (_isShowingArrearQuery) {
+      _logger.i('🎬 [autoHideAllOverlays] 自动隐藏欠费查询覆盖层');
+      _isShowingArrearQuery = false;
+      needsNotify = true;
+    }
+
+    // 如果欠费总览覆盖层正在显示，则隐藏它
+    if (_isShowingArrearTable) {
+      _logger.i('🎬 [autoHideAllOverlays] 自动隐藏欠费总览覆盖层');
+      _isShowingArrearTable = false;
+      needsNotify = true;
+    }
+
+    // 只有在确实需要隐藏覆盖层时才通知UI更新
+    if (needsNotify) {
+      notifyListeners();
+      _logger.i('🎬 [autoHideAllOverlays] 所有覆盖层已自动隐藏，通告轮播现在可见');
+    } else {
+      _logger.i('🎬 [autoHideAllOverlays] 没有需要隐藏的覆盖层');
+    }
   }
 }

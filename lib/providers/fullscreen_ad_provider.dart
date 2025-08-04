@@ -5,7 +5,7 @@ import 'package:iboard_app/models/ad_model.dart';
 import 'package:iboard_app/widgets/full_ad_widget.dart';
 import 'package:logger/logger.dart';
 import 'package:iboard_app/providers/app_data_provider.dart';
-import 'package:video_player/video_player.dart';
+// import 'package:video_player/video_player.dart'; // 未使用的导入
 import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:convert';
 
@@ -294,8 +294,8 @@ class FullscreenAdProvider extends ChangeNotifier {
 
   ///10, 启动全屏广告计时器
   void startFullscreenAdTimer(int currentIndex) {
-    _logger.d(
-        '🎬 开始全屏广告计时器: index=$currentIndex, ads=${this.fullscreenAds.length}, paused=$_isPaused');
+    // _logger.d(
+    //     '🎬 开始全屏广告计时器: index=$currentIndex, ads=${this.fullscreenAds.length}, paused=$_isPaused');
     _fullscreenTimer?.cancel(); // 取消之前的计时器
 
     // 改进的边界检查逻辑
@@ -328,11 +328,11 @@ class FullscreenAdProvider extends ChangeNotifier {
     // 检查当前广告的duration是否小于fullscreenAdDuration
     // 如果小于，设置定时器 = duration 然后切换
     if (_adDuration.inSeconds < fullscreenAdDuration) {
-      _logger.i(
-          '⏰ 启动短时广告计时器: ${_adDuration.inSeconds}秒 (索引: $_currentAdIndex/${this.fullscreenAds.length})');
+      // _logger.i(
+      //     '⏰ 启动短时广告计时器: ${_adDuration.inSeconds}秒 (索引: $_currentAdIndex/${this.fullscreenAds.length})');
       _fullscreenTimer = Timer(Duration(seconds: _adDuration.inSeconds), () {
         if (_isActive && !_isPaused) {
-          _logger.d('⏭️ 短时广告计时器到期，切换到下一个');
+          // _logger.d('⏭️ 短时广告计时器到期，切换到下一个');
           _nextAd();
         } else {
           _logger.w('⚠️ 计时器到期但条件不满足: active=$_isActive, paused=$_isPaused');
@@ -360,15 +360,15 @@ class FullscreenAdProvider extends ChangeNotifier {
       return;
     }
 
-    final oldIndex = _currentAdIndex;
+    // final oldIndex = _currentAdIndex; // 注释掉因为日志被注释了
     // 切换到下一个广告 - 使用模运算确保循环
     _currentAdIndex = (_currentAdIndex + 1) % this.fullscreenAds.length;
 
     // 额外的安全检查
     _validateAndFixIndex();
 
-    _logger.i(
-        '🔄 全屏广告切换: $oldIndex → $_currentAdIndex (总数: ${this.fullscreenAds.length})');
+    // _logger.i(
+    //     '🔄 全屏广告切换: $oldIndex → $_currentAdIndex (总数: ${this.fullscreenAds.length})');
 
     // 重置时间记录
     _adElapsedTime = Duration.zero;
@@ -403,7 +403,7 @@ class FullscreenAdProvider extends ChangeNotifier {
       return;
     }
 
-    _logger.d('🔄 外部触发全屏广告切换');
+    // _logger.d('🔄 外部触发全屏广告切换');
     _nextAd();
   }
 

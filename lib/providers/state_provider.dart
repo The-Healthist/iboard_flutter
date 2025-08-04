@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:iboard_app/models/settings_model.dart';
+import 'package:iboard_app/providers/announcement_carousel_provider.dart';
 
 /// 播放狀態枚舉
 enum PlaybackState {
@@ -193,6 +194,9 @@ class CarouselStateProvider extends ChangeNotifier {
   Function(bool isNeedCarousel, int carouselTime)?
       _onSmartCarouselSwitch; // 智能轮播切换回调
 
+  // Provider引用
+  AnnouncementCarouselProvider? _announcementCarouselProvider; // 通告轮播Provider引用
+
   // 媒體控制狀態 - 按區域分別控制
   bool _isTopMediaPaused = false; // 頂部廣告媒體暫停狀態
   bool _isMiddleMediaPaused = false; // 中部通告媒體暫停狀態
@@ -280,6 +284,11 @@ class CarouselStateProvider extends ChangeNotifier {
   /// 設置通告轮播下一个回调
   void setNoticeCarouselNextCallback(VoidCallback? callback) {
     _onNoticeCarouselNext = callback;
+  }
+
+  /// 設置通告轮播Provider引用
+  void setAnnouncementCarouselProvider(AnnouncementCarouselProvider? provider) {
+    _announcementCarouselProvider = provider;
   }
 
   /// 獲取當前狀態
@@ -375,6 +384,9 @@ class CarouselStateProvider extends ChangeNotifier {
         _pauseNoticeCarousel();
       }
 
+      // 自动隐藏所有覆盖层（欠费查询和欠费总览）
+      _announcementCarouselProvider?.autoHideAllOverlays();
+
       _currentState = _currentState.toFullscreenAd();
 
       // 更新媒體狀態
@@ -462,9 +474,9 @@ class CarouselStateProvider extends ChangeNotifier {
     final now = DateTime.now();
     if (_currentState.currentAppState == AppState.manualOperation) {
       _lastUserInteractionTime = now;
-      // 添加节流机制：只有在距离上次重置定时器5秒后才允许重置
+      // 添加节流机制：只有在距离上次重置定时器1秒后才允许重置
       if (_lastTimerResetTime == null ||
-          now.difference(_lastTimerResetTime!).inSeconds >= 5) {
+          now.difference(_lastTimerResetTime!).inSeconds >= 1) {
         _lastTimerResetTime = now;
         _resetManualOperationTimer();
         if (kDebugMode) {
@@ -472,8 +484,8 @@ class CarouselStateProvider extends ChangeNotifier {
         }
       } else {
         if (kDebugMode) {
-          final remaining = 5 - now.difference(_lastTimerResetTime!).inSeconds;
-          print('⏸️ 用戶交互檢測到，但距離上次重置不足5秒，剩餘 ${remaining}秒');
+          final remaining = 1 - now.difference(_lastTimerResetTime!).inSeconds;
+          print('⏸️ 用戶交互檢測到，但距離上次重置不足1秒，剩餘 ${remaining}秒');
         }
       }
     } else {

@@ -13,7 +13,8 @@ class ArrearProvider extends ChangeNotifier {
   bool _isLoading = false;
   String? _error;
   List<ArrearModel> _arrears = [];
-  String? _selectedBuildingId;
+  String? _selectedBuildingId; // 实际存储的是ismartId，用于API调用
+  String? _selectedFloor; // 存储用户选择的楼层，用于UI显示和数据筛选
   String? _selectedUnit;
 
   // 存储API返回的原始数据
@@ -48,6 +49,7 @@ class ArrearProvider extends ChangeNotifier {
   String? get error => _error;
   List<ArrearModel> get arrears => _arrears;
   String? get selectedBuildingId => _selectedBuildingId;
+  String? get selectedFloor => _selectedFloor;
   String? get selectedUnit => _selectedUnit;
   List<Map<String, dynamic>> get rawArrearData => _rawArrearData;
 
@@ -71,11 +73,11 @@ class ArrearProvider extends ChangeNotifier {
           _logger.i('📅 缓存更新时间: $lastUpdate');
         }
 
-        // 自动选择第一个楼号
-        if (_rawArrearData.isNotEmpty && _selectedBuildingId == null) {
-          final firstBuilding = buildings.isNotEmpty ? buildings[0] : null;
-          if (firstBuilding != null) {
-            setSelectedBuildingId(firstBuilding);
+        // 自动选择第一个楼层（仅用于UI显示）
+        if (_rawArrearData.isNotEmpty && _selectedFloor == null) {
+          final firstFloor = buildings.isNotEmpty ? buildings[0] : null;
+          if (firstFloor != null) {
+            setSelectedFloor(firstFloor);
           }
         }
 
@@ -154,39 +156,13 @@ class ArrearProvider extends ChangeNotifier {
     }
   }
 
-  ///1, 获取所有楼号
+  ///1, 获取所有楼层
   List<String> get buildings {
-    final buildings = <String>{};
-    for (var record in _rawArrearData) {
-      if (record.containsKey('單位')) {
-        final unit = record['單位'].toString();
-        // 解析楼号和单元，例如 "22樓  A" -> 楼号:"22", 单元:"A"
-        // 先尝试两个空格分割
-        List<String> parts = unit.split('  '); // 注意是两个空格
-        // 如果没有找到两个空格，尝试一个空格
-        if (parts.length < 2) {
-          parts = unit.split(' ');
-        }
-
-        if (parts.length >= 2) {
-          // 提取楼号（去除"樓"字）
-          final building = parts[0].replaceAll(RegExp(r'[樓楼]'), '').trim();
-          if (building.isNotEmpty) {
-            buildings.add(building);
-          }
-        }
-      }
-    }
-    return buildings.toList()..sort();
-  }
-
-  ///2, 获取指定楼号的所有单元号（楼层）
-  List<String> getFloors(String building) {
     final floors = <String>{};
     for (var record in _rawArrearData) {
       if (record.containsKey('單位')) {
         final unit = record['單位'].toString();
-        // 解析楼号和单元，例如 "22樓  A" -> 楼号:"22", 单元:"A"
+        // 解析楼层和单位，例如 "22樓  A" -> 楼层:"22樓", 单位:"A"
         // 先尝试两个空格分割
         List<String> parts = unit.split('  '); // 注意是两个空格
         // 如果没有找到两个空格，尝试一个空格
@@ -195,14 +171,10 @@ class ArrearProvider extends ChangeNotifier {
         }
 
         if (parts.length >= 2) {
-          // 提取楼号（去除"樓"字）
-          final floor = parts[0].replaceAll(RegExp(r'[樓楼]'), '').trim();
-          // 提取单元号（去除多余空格）
-          final unitName = parts[1].trim();
-
-          // 检查是否匹配指定的楼号
-          if (floor == building && unitName.isNotEmpty) {
-            floors.add(unitName);
+          // 提取楼层（保留"樓"字）
+          final floor = parts[0].trim();
+          if (floor.isNotEmpty) {
+            floors.add(floor);
           }
         }
       }
@@ -210,12 +182,43 @@ class ArrearProvider extends ChangeNotifier {
     return floors.toList()..sort();
   }
 
-  ///3, 获取指定单位的欠款记录
-  Map<String, dynamic>? getArrearageByUnit(String building, String unit) {
+  ///2, 获取指定楼层的所有单位
+  List<String> getFloors(String selectedFloor) {
+    final units = <String>{};
+    for (var record in _rawArrearData) {
+      if (record.containsKey('單位')) {
+        final unit = record['單位'].toString();
+        // 解析楼层和单位，例如 "22樓  A" -> 楼层:"22樓", 单位:"A"
+        // 先尝试两个空格分割
+        List<String> parts = unit.split('  '); // 注意是两个空格
+        // 如果没有找到两个空格，尝试一个空格
+        if (parts.length < 2) {
+          parts = unit.split(' ');
+        }
+
+        if (parts.length >= 2) {
+          // 提取楼层（保留"樓"字）
+          final floor = parts[0].trim();
+          // 提取单位（去除多余空格）
+          final unitName = parts[1].trim();
+
+          // 检查是否匹配指定的楼层
+          if (floor == selectedFloor && unitName.isNotEmpty) {
+            units.add(unitName);
+          }
+        }
+      }
+    }
+    return units.toList()..sort();
+  }
+
+  ///3, 获取指定楼层和单位的欠款记录
+  Map<String, dynamic>? getArrearageByUnit(
+      String selectedFloor, String selectedUnit) {
     for (var record in _rawArrearData) {
       if (record.containsKey('單位')) {
         final unitInfo = record['單位'].toString();
-        // 解析楼号和单元，例如 "22樓  A" -> 楼号:"22", 单元:"A"
+        // 解析楼层和单位，例如 "22樓  A" -> 楼层:"22樓", 单位:"A"
         // 先尝试两个空格分割
         List<String> parts = unitInfo.split('  '); // 注意是两个空格
         // 如果没有找到两个空格，尝试一个空格
@@ -224,13 +227,13 @@ class ArrearProvider extends ChangeNotifier {
         }
 
         if (parts.length >= 2) {
-          // 提取楼号（去除"樓"字）
-          final floor = parts[0].replaceAll(RegExp(r'[樓楼]'), '').trim();
-          // 提取单元号（去除多余空格）
+          // 提取楼层（保留"樓"字）
+          final floor = parts[0].trim();
+          // 提取单位（去除多余空格）
           final unitName = parts[1].trim();
 
-          // 检查是否匹配指定的楼号和单元号
-          if (floor == building && unitName == unit) {
+          // 检查是否匹配指定的楼层和单位
+          if (floor == selectedFloor && unitName == selectedUnit) {
             // 返回除了"單位"键之外的所有数据
             final data = Map<String, dynamic>.from(record);
             data.remove('單位');
@@ -244,8 +247,8 @@ class ArrearProvider extends ChangeNotifier {
 
   ///4, 获取当前选中单位的欠款记录
   Map<String, dynamic>? get currentArrearage {
-    if (_selectedBuildingId == null || _selectedUnit == null) return null;
-    return getArrearageByUnit(_selectedBuildingId!, _selectedUnit!);
+    if (_selectedFloor == null || _selectedUnit == null) return null;
+    return getArrearageByUnit(_selectedFloor!, _selectedUnit!);
   }
 
   ///5, 判断是否有数据
@@ -294,9 +297,9 @@ class ArrearProvider extends ChangeNotifier {
         return;
       }
 
-      _logger.i('调用API获取欠费数据，楼宇ID: $targetBuildingId');
+      _logger.i('调用API获取欠费数据，使用ismartId: $targetBuildingId');
       final response = await _apiClient.getArrearage(
-        buildingId: targetBuildingId,
+        buildingId: targetBuildingId, // 这里的buildingId实际上是ismartId
       );
 
       _logger.i('API响应类型: ${response.runtimeType}');
@@ -345,11 +348,11 @@ class ArrearProvider extends ChangeNotifier {
     await fetchArrears(reset: true);
   }
 
-  ///7, 设置选中的楼号
+  ///7, 设置选中的楼号 (实际设置的是ismartId)
   void setSelectedBuildingId(String? buildingId) {
-    _selectedBuildingId = buildingId;
+    _selectedBuildingId = buildingId; // 这里的buildingId实际上是ismartId
     _selectedUnit = null; // 重置单元选择
-    _logger.i('设置楼宇ID: $buildingId');
+    _logger.i('设置楼宇ismartId: $buildingId');
 
     // 自动选择第一个单元
     if (buildingId != null) {
@@ -363,33 +366,52 @@ class ArrearProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  ///8, 设置选中的单元
-  void setSelectedUnit(String? unit) {
-    _selectedUnit = unit;
-    _logger.i('设置单元: $unit');
-    notifyListeners();
-  }
+  ///8, 设置选中的楼层（用于UI显示和数据筛选）
+  void setSelectedFloor(String? floor) {
+    _selectedFloor = floor;
+    _selectedUnit = null; // 重置单元选择
+    _logger.i('设置显示楼层: $floor');
 
-  ///6, 设置欠费数据并自动选择第一个楼号
-  void setArrearage(List<Map<String, dynamic>> records) {
-    _rawArrearData = records;
-
-    // 如果有数据但没有选中的楼号，自动选择第一个
-    if (_rawArrearData.isNotEmpty && _selectedBuildingId == null) {
-      final firstBuilding = buildings.isNotEmpty ? buildings[0] : null;
-      if (firstBuilding != null) {
-        setSelectedBuildingId(firstBuilding);
+    // 自动选择第一个单位
+    if (floor != null) {
+      final units = getFloors(floor);
+      if (units.isNotEmpty) {
+        _selectedUnit = units[0];
+        _logger.i('自动选择第一个单位: ${units[0]}');
       }
     }
 
     notifyListeners();
   }
 
-  ///9, 清除欠费数据
+  ///9, 设置选中的单元
+  void setSelectedUnit(String? unit) {
+    _selectedUnit = unit;
+    _logger.i('设置单元: $unit');
+    notifyListeners();
+  }
+
+  ///6, 设置欠费数据
+  void setArrearage(List<Map<String, dynamic>> records) {
+    _rawArrearData = records;
+
+    // 如果有数据但没有选中的楼层，自动选择第一个（仅用于UI显示）
+    if (_rawArrearData.isNotEmpty && _selectedFloor == null) {
+      final firstFloor = buildings.isNotEmpty ? buildings[0] : null;
+      if (firstFloor != null) {
+        setSelectedFloor(firstFloor);
+      }
+    }
+
+    notifyListeners();
+  }
+
+  ///10, 清除欠费数据
   void clearArrearage() {
     _rawArrearData = [];
-    _selectedBuildingId = null;
+    _selectedFloor = null;
     _selectedUnit = null;
+    // 注意：不清除_selectedBuildingId，因为它存储的是ismartId，用于API调用
     notifyListeners();
   }
 

@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:iboard_app/providers/arrear_provider.dart';
-import 'package:iboard_app/widgets/debug_arrear_widget.dart';
+// import 'package:iboard_app/widgets/debug_arrear_widget.dart'; // 未使用的导入
 
 class ArrearDisplayWidget extends StatefulWidget {
   final VoidCallback? onHomeButtonPressed; // 添加主頁按鈕回調
@@ -22,6 +22,13 @@ class ArrearDisplayWidgetState extends State<ArrearDisplayWidget> {
   int _currentPage = 1;
   final int _itemsPerPage = 6;
 
+  ///1, 自动返回主页方法 - 用于全屏广告状态时调用
+  void autoReturnToHome() {
+    if (widget.onHomeButtonPressed != null) {
+      widget.onHomeButtonPressed!();
+    }
+  }
+
   @override
   void initState() {
     super.initState();
@@ -29,8 +36,14 @@ class ArrearDisplayWidgetState extends State<ArrearDisplayWidget> {
     // 优先从缓存加载数据，确保即使网络失败也能显示数据
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final provider = Provider.of<ArrearProvider>(context, listen: false);
+      print(
+          '🔍 [ArrearDisplayWidget] 初始化 - 当前原始数据记录数: ${provider.rawArrearData.length}');
+
       if (provider.rawArrearData.isEmpty) {
+        print('🔍 [ArrearDisplayWidget] 数据为空，从缓存加载');
         provider.loadFromCache();
+      } else {
+        print('🔍 [ArrearDisplayWidget] 使用现有数据，与欠费总览共享同一数据源');
       }
     });
   }
@@ -159,7 +172,7 @@ class ArrearDisplayWidgetState extends State<ArrearDisplayWidget> {
     );
   }
 
-  ///1, 构建选择器容器
+  ///2, 构建选择器容器
   Widget _buildSelectorContainer(ArrearProvider provider) {
     return Container(
       padding: const EdgeInsets.all(20),
@@ -188,7 +201,7 @@ class ArrearDisplayWidgetState extends State<ArrearDisplayWidget> {
     );
   }
 
-  ///2, 构建楼号选择器
+  ///3, 构建樓層选择器
   Widget _buildBuildingSelector(ArrearProvider provider) {
     final buildings = provider.buildings;
 
@@ -250,7 +263,7 @@ class ArrearDisplayWidgetState extends State<ArrearDisplayWidget> {
     );
   }
 
-  ///3, 构建楼层选择器
+  ///4, 构建楼层选择器
   Widget _buildFloorSelector(ArrearProvider provider) {
     final floors =
         _selectedBuilding != null ? provider.getFloors(_selectedBuilding!) : [];
@@ -312,7 +325,7 @@ class ArrearDisplayWidgetState extends State<ArrearDisplayWidget> {
     );
   }
 
-  ///4, 构建查询按钮
+  ///5, 构建查询按钮
   Widget _buildQueryButton() {
     final canQuery = _selectedBuilding != null && _selectedFloor != null;
 
@@ -341,7 +354,7 @@ class ArrearDisplayWidgetState extends State<ArrearDisplayWidget> {
     );
   }
 
-  ///5, 处理查询
+  ///6, 处理查询
   void _handleQuery() {
     if (_selectedBuilding != null && _selectedFloor != null) {
       setState(() {
@@ -351,7 +364,7 @@ class ArrearDisplayWidgetState extends State<ArrearDisplayWidget> {
     }
   }
 
-  ///6, 构建结果容器 - 静默使用缓存数据
+  ///7, 构建结果容器 - 静默使用缓存数据
   Widget _buildResultsContainer(ArrearProvider provider) {
     if (provider.isLoading) {
       return Container(
@@ -411,7 +424,7 @@ class ArrearDisplayWidgetState extends State<ArrearDisplayWidget> {
     );
   }
 
-  ///7, 构建数据内容
+  ///8, 构建数据内容
   Widget _buildDataContent(ArrearProvider provider) {
     return Container(
       padding: const EdgeInsets.all(20),
@@ -458,7 +471,7 @@ class ArrearDisplayWidgetState extends State<ArrearDisplayWidget> {
     );
   }
 
-  ///8, 构建欠费记录列表
+  ///9, 构建欠费记录列表
   Widget _buildArrearList(ArrearProvider provider) {
     final currentArrearage = provider.currentArrearage;
 
@@ -528,7 +541,7 @@ class ArrearDisplayWidgetState extends State<ArrearDisplayWidget> {
     return Colors.black87;
   }
 
-  ///9, 构建分页控制
+  ///10, 构建分页控制
   Widget _buildPagination(ArrearProvider provider) {
     final currentArrearage = provider.currentArrearage;
     if (currentArrearage == null) {

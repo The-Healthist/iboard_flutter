@@ -6,8 +6,13 @@ import 'package:provider/provider.dart';
 class MainScreenWidget extends StatefulWidget {
   final Function(AnnouncementModel? announcement)?
       onAnnouncementTap; // 修改回调函数支持null
+  final VoidCallback? onArrearTableTap; // 添加欠费总览回调
 
-  const MainScreenWidget({Key? key, this.onAnnouncementTap}) : super(key: key);
+  const MainScreenWidget({
+    Key? key,
+    this.onAnnouncementTap,
+    this.onArrearTableTap,
+  }) : super(key: key);
 
   @override
   MainScreenWidgetState createState() => MainScreenWidgetState();
@@ -47,6 +52,11 @@ class MainScreenWidgetState extends State<MainScreenWidget> {
                 // 确保立即进入手动操作状态并显示欠费查询界面
                 widget.onAnnouncementTap?.call(null); // 传递null表示显示欠费查询
                 print('🔵 [MainScreenWidget] 已调用 onAnnouncementTap(null)');
+              } else if (chineseTitle == '欠費總覽') {
+                print('🔵 [MainScreenWidget] 用户点击欠费总览按钮');
+                // 导航到欠费总览页面
+                widget.onArrearTableTap?.call();
+                print('🔵 [MainScreenWidget] 已调用 onArrearTableTap()');
               } else {
                 print('$chineseTitle pressed');
               }
@@ -164,12 +174,12 @@ class MainScreenWidgetState extends State<MainScreenWidget> {
                           children: [
                             _buildFunctionButton(
                                 '欠費查詢', 'Payment Inquiry', Icons.payment),
-                            _buildFunctionButton('自助繳款', 'Self Payment',
+                            _buildFunctionButton('欠費總覽', 'Self Payment',
                                 Icons.account_balance_wallet),
-                            _buildFunctionButton('便利服務', 'Convenience Services',
+                            _buildFunctionButton('自助繳款', 'Convenience Services',
                                 Icons.local_convenience_store),
                             _buildFunctionButton(
-                                '會員商店', 'Member Store', Icons.store),
+                                '便利服務', 'Member Store', Icons.store),
                           ],
                         ),
                       ),

@@ -728,7 +728,7 @@ class AppDataProvider extends ChangeNotifier {
         final buildingIsmartId =
             _settingsModel != null ? _settingsModel!.building.ismartId : null;
         if (buildingIsmartId != null && buildingIsmartId.isNotEmpty) {
-          _logger.i('AppDataProvider: 使用楼宇ID $buildingIsmartId 初始化欠费数据');
+          _logger.i('AppDataProvider: 使用楼宇ismartId $buildingIsmartId 初始化欠费数据');
           // 设置楼宇ID到ArrearProvider
           _arrearProvider!.setSelectedBuildingId(buildingIsmartId);
           // 获取欠费数据
