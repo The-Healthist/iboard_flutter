@@ -4,7 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:iboard_app/http/weather.dart';
 import 'package:iboard_app/models/weather_forecast_model.dart';
 import 'package:iboard_app/models/current_weather_model.dart'; // Added
-import 'package:iboard_app/models/weather_warning_model.dart'; // 恢复天气警告模型导入
+// 注释：WeatherWarningModel现在通过WeatherProvider使用，不需要直接导入
 import 'package:iboard_app/providers/app_data_provider.dart'; // 添加AppDataProvider导入
 import 'package:iboard_app/widgets/weather_icon_widget.dart';
 import 'package:iboard_app/widgets/debug_weather_data_widget.dart'; // 添加天气数据调试组件导入
@@ -36,7 +36,7 @@ class _WeatherWidgetState extends State<WeatherWidget> {
   final WeatherService _weatherService = WeatherService();
   Future<WeatherData?>? _forecastDataFuture;
   Future<CurrentWeatherDataModel?>? _currentWeatherDataFuture; // Added
-  Future<WeatherWarningModel?>? _weatherWarningFuture; // 恢复天气警告Future
+  // 注释：原_weatherWarningFuture已被WeatherProvider替代
   final Logger _logger = Logger();
   String _currentWeatherLocation = '香港天文台'; // 动态获取的location，默认为香港天文台
   Timer? _timeUpdateTimer; // Added timer for updating time
@@ -117,7 +117,7 @@ class _WeatherWidgetState extends State<WeatherWidget> {
         Provider.of<WeatherProvider>(context, listen: false);
 
     _logger.i(
-        '🌤️ 初始化天气数据 - CurrentData: ${weatherProvider.hasCurrentData}, ForecastData: ${weatherProvider.hasForecastData}');
+        '🌤️ 初始化天气数据 - CurrentData: ${weatherProvider.hasCurrentData}, ForecastData: ${weatherProvider.hasForecastData}, WarningData: ${weatherProvider.hasWarningData}');
 
     // 总是尝试获取最新数据，特别是当前天气数据
     if (!weatherProvider.hasCurrentData) {
@@ -142,6 +142,10 @@ class _WeatherWidgetState extends State<WeatherWidget> {
       _logger.i('📡 WeatherProvider中没有任何缓存数据，获取全部天气数据');
       weatherProvider.fetchAllWeatherData();
     }
+
+    // 强制获取天气警告数据以进行调试
+    _logger.i('🔍 强制获取天气警告数据进行调试');
+    weatherProvider.fetchWeatherWarnings();
   }
 
   ///3, 获取天气数据（保留原有方法用于兼容）
@@ -153,8 +157,7 @@ class _WeatherWidgetState extends State<WeatherWidget> {
       _forecastDataFuture = _weatherService.fetchWeatherData();
       _currentWeatherDataFuture =
           _weatherService.fetchCurrentWeatherData(); // Added
-      _weatherWarningFuture =
-          _weatherService.fetchWeatherWarnings(); // 恢复天气警告获取
+      // 注释：天气警告现在通过WeatherProvider管理，不再在这里直接获取
     });
     _logger.i('开始获取天气数据，当前位置: $_currentWeatherLocation');
   }
@@ -333,21 +336,25 @@ class _WeatherWidgetState extends State<WeatherWidget> {
                 crossAxisAlignment: CrossAxisAlignment.center,
                 children: [
                   // 天气警告区域
-                  FutureBuilder<WeatherWarningModel?>(
-                    future: _weatherWarningFuture,
-                    builder: (context, warningSnapshot) {
-                      // 判断警告条数，动态调整字号和图标
-                      final warningCount =
-                          warningSnapshot.data?.warnings.length ?? 0;
-                      final double fontSize = warningCount > 1 ? 14.0 : 12.0;
-                      final double iconSize = warningCount > 1 ? 16.0 : 12.0;
+                  Consumer<WeatherProvider>(
+                    builder: (context, weatherProvider, child) {
+                      final warningData = weatherProvider.weatherWarningData;
+                      // 判断警告条数，动态调整字号和图标（减小1px）
+                      final warningCount = warningData?.warnings.length ?? 0;
+                      final double fontSize = warningCount > 1 ? 13.0 : 11.0;
+                      final double iconSize = warningCount > 1 ? 15.0 : 11.0;
+
+                      _logger.d(
+                          '🌦️ 天气警告显示检查: warningData=${warningData != null}, 警告数=${warningCount}');
+
                       return WeatherWarningWidget(
-                        warningData: warningSnapshot.data,
+                        warningData: warningData,
                         fontSize: fontSize, // 多行时增大字号
                         textColor: const Color.fromARGB(255, 8, 12, 133),
                         iconSize: iconSize, // 多行时增大图标
                         verticalSpacing: 1.0,
-                        useSimulatedData: false,
+                        useSimulatedData:
+                            warningData == null, // 如果没有真实数据，使用模拟数据测试
                       );
                     },
                   ),
@@ -362,7 +369,7 @@ class _WeatherWidgetState extends State<WeatherWidget> {
                             Text(
                               buildingName,
                               style: TextStyle(
-                                  fontSize: 16,
+                                  fontSize: 15,
                                   fontWeight: FontWeight.bold,
                                   color: Colors.blueGrey[800]),
                               textAlign: TextAlign.center,
@@ -382,7 +389,7 @@ class _WeatherWidgetState extends State<WeatherWidget> {
                             ? tempLocationData.place
                             : '即時天氣'),
                     style: TextStyle(
-                        fontSize: 16,
+                        fontSize: 15,
                         fontWeight: FontWeight.bold,
                         color: Colors.blueGrey[800]),
                     textAlign: TextAlign.center,
@@ -577,26 +584,27 @@ class _WeatherWidgetState extends State<WeatherWidget> {
                     mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                     crossAxisAlignment: CrossAxisAlignment.center,
                     children: [
-                      FutureBuilder<WeatherWarningModel?>(
-                        future: _weatherWarningFuture,
-                        builder: (context, warningSnapshot) {
-                          if (warningSnapshot.hasData &&
-                              warningSnapshot.data != null &&
-                              warningSnapshot.data!.warnings.isNotEmpty) {
-                            final warnings = warningSnapshot.data!
-                                .getActiveWarningDescriptions();
-                            final warningText =
-                                warnings.isNotEmpty ? warnings.first : '';
-                            return Text(
-                              warningText,
-                              style: TextStyle(
-                                  fontSize: 11,
-                                  fontWeight: FontWeight.bold,
-                                  color: Colors.red[600]),
-                              textAlign: TextAlign.center,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                            );
+                      Consumer<WeatherProvider>(
+                        builder: (context, weatherProvider, child) {
+                          final warningData =
+                              weatherProvider.weatherWarningData;
+                          if (warningData != null &&
+                              warningData.warnings.isNotEmpty) {
+                            final warnings =
+                                warningData.getActiveWarningDescriptions();
+                            if (warnings.isNotEmpty) {
+                              final warningText = warnings.first;
+                              return Text(
+                                warningText,
+                                style: TextStyle(
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.bold,
+                                    color: Colors.red[600]),
+                                textAlign: TextAlign.center,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              );
+                            }
                           }
                           return const SizedBox.shrink();
                         },
@@ -606,7 +614,7 @@ class _WeatherWidgetState extends State<WeatherWidget> {
                             ? _currentWeatherLocation // 显示building location
                             : '天氣資料獲取中',
                         style: TextStyle(
-                            fontSize: 12,
+                            fontSize: 11,
                             fontWeight: FontWeight.bold,
                             color: Colors.blueGrey[800]),
                         textAlign: TextAlign.center,

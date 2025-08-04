@@ -107,8 +107,21 @@ class WeatherService {
       if (response.statusCode == 200) {
         final decodedBody = utf8.decode(response.bodyBytes);
         final jsonData = json.decode(decodedBody) as Map<String, dynamic>;
-        _logger.i('天气警告数据获取成功');
-        return WeatherWarningModel.fromJson(jsonData);
+        _logger.i('天气警告API响应成功，数据键: ${jsonData.keys.join(', ')}');
+        _logger.d('天气警告原始数据: $jsonData');
+
+        // 详细记录每个警告的actionCode
+        jsonData.forEach((key, value) {
+          if (value is Map<String, dynamic>) {
+            final actionCode = value['actionCode'] ?? 'UNKNOWN';
+            final name = value['name'] ?? key;
+            _logger.d('🌦️ 警告 $key ($name): actionCode=$actionCode');
+          }
+        });
+
+        final warningModel = WeatherWarningModel.fromJson(jsonData);
+        _logger.i('天气警告解析完成: ${warningModel.warnings.length}个警告');
+        return warningModel;
       } else {
         _logger.e(
             'Failed to load weather warnings. Status code: ${response.statusCode}');

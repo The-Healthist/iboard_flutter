@@ -38,14 +38,26 @@ class WeatherWarningModel {
     'WTS': '雷暴警告',
   };
 
-  // 获取当前有效的警告描述列表
-  List<String> getActiveWarningDescriptions() {
-    List<String> activeWarnings = [];
+  // 获取当前有效的警告（过滤掉已取消的警告）
+  Map<String, WeatherWarningInfo> getActiveWarnings() {
+    Map<String, WeatherWarningInfo> activeWarnings = {};
     warnings.forEach((code, info) {
-      String description = warningDescriptions[code] ?? code;
-      activeWarnings.add(description);
+      // 只包含未取消的警告
+      if (info.actionCode.toUpperCase() != 'CANCEL') {
+        activeWarnings[code] = info;
+      }
     });
     return activeWarnings;
+  }
+
+  // 获取所有警告描述列表（不过滤actionCode）
+  List<String> getActiveWarningDescriptions() {
+    List<String> allWarnings = [];
+    warnings.forEach((code, info) {
+      String description = warningDescriptions[code] ?? code;
+      allWarnings.add(description);
+    });
+    return allWarnings;
   }
 }
 
@@ -55,6 +67,8 @@ class WeatherWarningInfo {
   final String actionCode;
   final String issueTime;
   final String updateTime;
+  final String? type; // 添加type字段（如黃色、紅色等）
+  final String? expireTime; // 添加过期时间字段
 
   WeatherWarningInfo({
     required this.name,
@@ -62,6 +76,8 @@ class WeatherWarningInfo {
     required this.actionCode,
     required this.issueTime,
     required this.updateTime,
+    this.type,
+    this.expireTime,
   });
 
   factory WeatherWarningInfo.fromJson(Map<String, dynamic> json) {
@@ -71,16 +87,21 @@ class WeatherWarningInfo {
       actionCode: json['actionCode'] ?? '',
       issueTime: json['issueTime'] ?? '',
       updateTime: json['updateTime'] ?? '',
+      type: json['type'], // 可选字段
+      expireTime: json['expireTime'], // 可选字段
     );
   }
 
   Map<String, dynamic> toJson() {
-    return {
+    final Map<String, dynamic> result = {
       'name': name,
       'code': code,
       'actionCode': actionCode,
       'issueTime': issueTime,
       'updateTime': updateTime,
     };
+    if (type != null) result['type'] = type;
+    if (expireTime != null) result['expireTime'] = expireTime;
+    return result;
   }
 }

@@ -114,7 +114,7 @@ class WeatherWarningWidget extends StatelessWidget {
     // 如果没有警告数据，返回空组件
     if (dataToUse == null || dataToUse.warnings.isEmpty) {
       if (!useSimulatedData) {
-        _logger.d('🌤️ 没有天气警告数据');
+        _logger.d('🌤️ 没有天气警告数据，dataToUse=${dataToUse != null}');
       }
       return const SizedBox.shrink();
     }
@@ -124,6 +124,7 @@ class WeatherWarningWidget extends StatelessWidget {
 
     _logger.i(
         '🌦️ 显示 $warningCount 个天气警告 ${useSimulatedData ? '(模拟数据)' : '(真实数据)'}');
+    _logger.d('🌦️ 警告详情: ${warnings.keys.join(', ')}');
 
     // 始终使用垂直列表显示所有警告，有多少显示多少
     return _buildAllWarnings(warnings);

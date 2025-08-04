@@ -247,8 +247,10 @@ class WeatherProvider extends ChangeNotifier {
 
       if (warningData != null) {
         _weatherWarningData = warningData;
+        _logger.i('天气警告数据获取成功: ${warningData.warnings.length}个警告');
+        _logger.d('天气警告详情: ${warningData.warnings.keys.join(', ')}');
         await _saveWeatherDataToCache(); // 成功时保存到缓存
-        _logger.i('天气警告数据获取成功并已缓存');
+        _logger.i('天气警告数据已缓存');
       } else {
         _warningError = '获取天气警告数据失败';
         _logger.w('天气警告数据获取失败，保持原有缓存数据');
