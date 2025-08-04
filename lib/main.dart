@@ -219,6 +219,10 @@ class _HomePageState extends State<HomePage> {
             appDataProvider.startPeriodicLogin();
             print('定时登录任务已启动');
 
+            // 启动健康检查定时任务（30分钟一次）
+            appDataProvider.startPeriodicHealthCheck();
+            print('健康检查定时任务已启动');
+
             // 启动广告定时更新
             print(
                 '准备启动广告定时更新，设备设置: ${appDataProvider.deviceSettings?.advertisementUpdateDuration ?? '未设置'}');

@@ -41,6 +41,13 @@ class AppDataProvider extends ChangeNotifier {
   bool _isPeriodicLoginActive = false; // 是否正在进行定期登录
   static const int _loginIntervalHours = 12; // 12小时登录一次
 
+  // 健康检查定时任务相关
+  Timer? _healthCheckTimer; // 健康检查定时器
+  bool _isPeriodicHealthCheckActive = false; // 是否正在进行定期健康检查
+  static const int _healthCheckIntervalMinutes = 30; // 30分钟健康检查一次
+  DateTime? _lastHealthCheckTime; // 最后一次健康检查时间
+  String? _lastHealthCheckResult; // 最后一次健康检查结果
+
   // Getters
   SettingsModel? get settingsModel => _settingsModel;
   ArrearProvider? get arrearProvider =>
@@ -60,6 +67,11 @@ class AppDataProvider extends ChangeNotifier {
 
   // 定时登录状态getter
   bool get isPeriodicLoginActive => _isPeriodicLoginActive;
+
+  // 健康检查状态getter
+  bool get isPeriodicHealthCheckActive => _isPeriodicHealthCheckActive;
+  DateTime? get lastHealthCheckTime => _lastHealthCheckTime;
+  String? get lastHealthCheckResult => _lastHealthCheckResult;
 
   static const String _deviceIdKey = 'deviceId';
 
@@ -1200,6 +1212,85 @@ class AppDataProvider extends ChangeNotifier {
     _logger.i('Periodic login stopped.');
   }
 
+  ///15，开始健康检查定时任务
+  void startPeriodicHealthCheck() {
+    if (_isPeriodicHealthCheckActive) {
+      _logger.i('Periodic health check is already active.');
+      return;
+    }
+
+    _logger.i(
+        'Starting periodic health check with interval: $_healthCheckIntervalMinutes minutes');
+    _isPeriodicHealthCheckActive = true;
+
+    // 设置定时器进行周期性健康检查
+    _healthCheckTimer = Timer.periodic(
+        Duration(minutes: _healthCheckIntervalMinutes), (timer) async {
+      if (_isPeriodicHealthCheckActive && isLoggedIn) {
+        _logger.i('Performing periodic health check...');
+        await performHealthCheck();
+      } else {
+        if (!isLoggedIn) {
+          _logger.w('Device not logged in, skipping health check');
+        }
+        if (!_isPeriodicHealthCheckActive) {
+          timer.cancel();
+        }
+      }
+    });
+
+    // 立即执行一次健康检查
+    if (isLoggedIn) {
+      performHealthCheck();
+    }
+  }
+
+  ///16，停止健康检查定时任务
+  void stopPeriodicHealthCheck() {
+    if (_healthCheckTimer != null) {
+      _healthCheckTimer!.cancel();
+      _healthCheckTimer = null;
+    }
+    _isPeriodicHealthCheckActive = false;
+    _logger.i('Periodic health check stopped.');
+  }
+
+  ///17，执行健康检查
+  Future<void> performHealthCheck() async {
+    if (!isLoggedIn) {
+      _logger.w('Device not logged in, cannot perform health check');
+      _lastHealthCheckResult = '设备未登录，无法执行健康检查';
+      _lastHealthCheckTime = DateTime.now();
+      notifyListeners();
+      return;
+    }
+
+    try {
+      _logger.i('🏥 [健康检查] 开始执行健康检查');
+      final startTime = DateTime.now();
+
+      final result = await _apiClient.healthTest();
+
+      final endTime = DateTime.now();
+      final duration = endTime.difference(startTime);
+
+      _lastHealthCheckTime = endTime;
+      _lastHealthCheckResult = '✅ 健康检查成功 (${duration.inMilliseconds}ms)';
+
+      _logger.i('🏥 [健康检查] 健康检查成功，耗时: ${duration.inMilliseconds}ms');
+      _logger.d('🏥 [健康检查] 响应数据: $result');
+
+      notifyListeners();
+    } catch (e) {
+      final endTime = DateTime.now();
+      _lastHealthCheckTime = endTime;
+      _lastHealthCheckResult = '❌ 健康检查失败: $e';
+
+      _logger.e('🏥 [健康检查] 健康检查失败', error: e);
+      notifyListeners();
+    }
+  }
+
   /// 强制重新生成设备ID并尝试登录
   Future<void> forceRegenerateDeviceIdAndLogin() async {
     _logger.i('强制重新生成设备ID并尝试登录');
@@ -1242,6 +1333,7 @@ class AppDataProvider extends ChangeNotifier {
   @override
   void dispose() {
     stopPeriodicLogin();
+    stopPeriodicHealthCheck();
     super.dispose();
   }
 }

@@ -5,6 +5,7 @@ import 'package:iboard_app/models/announcement_model.dart';
 import 'package:iboard_app/widgets/carousel_widget.dart' as custom_carousel;
 import 'package:iboard_app/widgets/mainscreen/main_display/announcement_reader_widget.dart';
 import 'package:iboard_app/widgets/mainscreen/main_display/mainscreen_widget.dart';
+import 'package:iboard_app/widgets/mainscreen/main_display/arrear_table_widget.dart';
 import 'package:logger/logger.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:convert';
@@ -258,14 +259,19 @@ class AnnouncementCarouselProvider extends ChangeNotifier {
       ));
     }).toList();
 
+    // 创建欠费总览轮播widget
+    Widget arrearTableCarouselWidget =
+        _createArrearTableCarouselWidget(onHomeButtonPressed);
+
     final midWidgets = [
       mainScreenWidget,
       ...announcementWidgets,
+      arrearTableCarouselWidget, // 在轮播末尾添加欠费总览
     ];
     _midCarouselController.setCarouselArray(midWidgets);
 
     _logger.i(
-        '🎬 [初始化] 中部轮播初始化完成: 主屏幕 + ${this.carouselAnnouncements.length} 个轮播通告 (只包含緊急和一般通告)');
+        '🎬 [初始化] 中部轮播初始化完成: 主屏幕 + ${this.carouselAnnouncements.length} 个轮播通告 + 1个欠费总览 (只包含緊急和一般通告)');
     // _logger.i('📋 [配置] 使用API配置的通告停留时间: ${apiNoticeStayDuration}秒');
 
     _midTimer?.cancel();
@@ -708,6 +714,24 @@ class AnnouncementCarouselProvider extends ChangeNotifier {
         // 显示欠费总览界面
         showArrearTableWidget(onHomeButtonPressed);
       },
+    );
+  }
+
+  ///16，创建欠费总览轮播Widget（新增方法）
+  Widget _createArrearTableCarouselWidget(VoidCallback onHomeButtonPressed) {
+    _logger.i('📊 [创建欠费总览] 创建欠费总览轮播widget');
+
+    return Container(
+      width: double.infinity,
+      height: double.infinity,
+      color: Colors.grey.shade50,
+      child: ArrearTableWidget(
+        onHomeButtonPressed: () {
+          // 点击主页按钮时，跳转回主屏幕（索引0）
+          _logger.i('🏠 [欠费总览轮播] 用户点击主页按钮，返回主屏幕');
+          jumpToAnnouncementIndex(0);
+        },
+      ),
     );
   }
 

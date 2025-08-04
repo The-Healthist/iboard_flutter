@@ -79,7 +79,19 @@ class _TimerDebugWidgetState extends State<TimerDebugWidget> {
         'Token状态: ${appDataProvider.token != null ? '有效' : '无效'}',
         '定时登录状态: ${appDataProvider.isPeriodicLoginActive ? '✅ 运行中' : '❌ 已停止'}',
         '定时登录间隔: 12小时',
+        '健康检查状态: ${appDataProvider.isPeriodicHealthCheckActive ? '✅ 运行中' : '❌ 已停止'}',
+        '健康检查间隔: 30分钟',
       ];
+
+      // 添加最后一次健康检查信息
+      if (appDataProvider.lastHealthCheckTime != null) {
+        basicContent.addAll([
+          '',
+          '--- 最近一次健康检查结果 ---',
+          '结果: ${appDataProvider.lastHealthCheckResult ?? '未知'}',
+          '时间: ${appDataProvider.lastHealthCheckTime.toString().substring(11, 19)}',
+        ]);
+      }
 
       // 如果有全部更新的结果，添加到基本信息中
       final allUpdateResult = _manualUpdateResults['all_updates'];
@@ -100,8 +112,14 @@ class _TimerDebugWidgetState extends State<TimerDebugWidget> {
       _debugInfo.add({
         'title': '📊 定时更新基本信息',
         'content': basicContent,
-        'manualUpdateButton':
+        'manualUpdateButton': Column(
+          children: [
             _buildManualUpdateButton('all_updates', '所有数据', _manualUpdateAll),
+            SizedBox(height: 8),
+            _buildManualUpdateButton(
+                'health_check', '健康检查', _manualHealthCheck),
+          ],
+        ),
       });
 
       // 广告定时更新状态
@@ -630,7 +648,57 @@ class _TimerDebugWidgetState extends State<TimerDebugWidget> {
     }
   }
 
-  ///15，构建手动更新按钮
+  ///15，手动执行健康检查
+  Future<void> _manualHealthCheck() async {
+    if (_updatingTasks.contains('health_check')) return;
+
+    setState(() {
+      _updatingTasks.add('health_check');
+    });
+
+    _logger.i('🏥 [手动健康检查] 开始手动执行健康检查');
+    final startTime = DateTime.now();
+
+    try {
+      final appDataProvider = context.read<AppDataProvider>();
+      await appDataProvider.performHealthCheck();
+
+      final endTime = DateTime.now();
+      final duration = endTime.difference(startTime);
+
+      _manualUpdateResults['health_check'] = {
+        'success': true,
+        'message': '健康检查执行成功',
+        'duration': duration.inMilliseconds,
+        'timestamp': endTime,
+        'data': {
+          '检查结果': appDataProvider.lastHealthCheckResult ?? '未知',
+        }
+      };
+
+      _logger.i('🏥 [手动健康检查] 健康检查执行成功，耗时: ${duration.inMilliseconds}ms');
+    } catch (e) {
+      final endTime = DateTime.now();
+      final duration = endTime.difference(startTime);
+
+      _manualUpdateResults['health_check'] = {
+        'success': false,
+        'message': '健康检查执行失败: $e',
+        'duration': duration.inMilliseconds,
+        'timestamp': endTime,
+        'error': e.toString(),
+      };
+
+      _logger.e('🏥 [手动健康检查] 健康检查执行失败', error: e);
+    } finally {
+      setState(() {
+        _updatingTasks.remove('health_check');
+      });
+      _generateDebugInfo();
+    }
+  }
+
+  ///16，构建手动更新按钮
   Widget _buildManualUpdateButton(
       String taskKey, String label, VoidCallback onPressed) {
     final isUpdating = _updatingTasks.contains(taskKey);
