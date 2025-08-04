@@ -93,19 +93,19 @@ class _TimerDebugWidgetState extends State<TimerDebugWidget> {
         ]);
       }
 
-      // 如果有全部更新的结果，添加到基本信息中
-      final allUpdateResult = _manualUpdateResults['all_updates'];
-      if (allUpdateResult != null) {
+      // 如果有手动登录的结果，添加到基本信息中
+      final manualLoginResult = _manualUpdateResults['manual_login'];
+      if (manualLoginResult != null) {
         basicContent.addAll([
           '',
-          '--- 最近一次全部更新结果 ---',
-          '状态: ${allUpdateResult['success'] ? '✅ 成功' : '❌ 失败'}',
-          '信息: ${allUpdateResult['message']}',
-          '耗时: ${allUpdateResult['duration']}ms',
-          '时间: ${allUpdateResult['timestamp'].toString().substring(11, 19)}',
+          '--- 最近一次手动登录结果 ---',
+          '状态: ${manualLoginResult['success'] ? '✅ 成功' : '❌ 失败'}',
+          '信息: ${manualLoginResult['message']}',
+          '耗时: ${manualLoginResult['duration']}ms',
+          '时间: ${manualLoginResult['timestamp'].toString().substring(11, 19)}',
         ]);
-        if (allUpdateResult['error'] != null) {
-          basicContent.add('错误: ${allUpdateResult['error']}');
+        if (manualLoginResult['error'] != null) {
+          basicContent.add('错误: ${manualLoginResult['error']}');
         }
       }
 
@@ -114,7 +114,7 @@ class _TimerDebugWidgetState extends State<TimerDebugWidget> {
         'content': basicContent,
         'manualUpdateButton': Column(
           children: [
-            _buildManualUpdateButton('all_updates', '所有数据', _manualUpdateAll),
+            _buildManualUpdateButton('manual_login', '手动登录', _manualLogin),
             SizedBox(height: 8),
             _buildManualUpdateButton(
                 'health_check', '健康检查', _manualHealthCheck),
@@ -595,54 +595,62 @@ class _TimerDebugWidgetState extends State<TimerDebugWidget> {
     }
   }
 
-  ///14，手动更新所有数据
-  Future<void> _manualUpdateAll() async {
-    if (_updatingTasks.contains('all_updates')) return;
+  ///14，手动登录
+  Future<void> _manualLogin() async {
+    if (_updatingTasks.contains('manual_login')) return;
 
     setState(() {
-      _updatingTasks.add('all_updates');
+      _updatingTasks.add('manual_login');
     });
 
-    _logger.i('🔄 [手动更新] 开始手动更新所有数据');
+    _logger.i('🔑 [手动登录] 开始手动登录');
     final startTime = DateTime.now();
 
     try {
-      // 并行执行所有更新任务
-      await Future.wait([
-        _manualUpdateAdvertisements(),
-        _manualUpdateAnnouncements(),
-        _manualUpdateWeather(),
-        _manualUpdateArrears(),
-        _manualUpdateDeviceSettings(),
-      ]);
+      final appDataProvider = context.read<AppDataProvider>();
+
+      // 调用定时登录使用的方法进行手动登录
+      await appDataProvider.initializeAndLogin(
+          deviceIdToSet: appDataProvider.deviceId);
 
       final endTime = DateTime.now();
       final duration = endTime.difference(startTime);
 
-      _manualUpdateResults['all_updates'] = {
+      _manualUpdateResults['manual_login'] = {
         'success': true,
-        'message': '所有数据更新完成',
+        'message': '手动登录成功',
         'duration': duration.inMilliseconds,
         'timestamp': endTime,
+        'data': {
+          '登录状态': appDataProvider.isLoggedIn ? '✅ 已登录' : '❌ 未登录',
+          'Token状态': appDataProvider.token != null ? '✅ 有效' : '❌ 无效',
+          '设备设置': appDataProvider.deviceSettings != null ? '✅ 已加载' : '❌ 未加载',
+          '设备ID': appDataProvider.deviceId ?? '未获取',
+        }
       };
 
-      _logger.i('🔄 [手动更新] 所有数据更新完成，总耗时: ${duration.inMilliseconds}ms');
+      _logger.i('🔑 [手动登录] 手动登录成功，耗时: ${duration.inMilliseconds}ms');
     } catch (e) {
       final endTime = DateTime.now();
       final duration = endTime.difference(startTime);
 
-      _manualUpdateResults['all_updates'] = {
+      final appDataProvider = context.read<AppDataProvider>();
+      _manualUpdateResults['manual_login'] = {
         'success': false,
-        'message': '批量更新失败: $e',
+        'message': '手动登录失败: $e',
         'duration': duration.inMilliseconds,
         'timestamp': endTime,
         'error': e.toString(),
+        'data': {
+          '登录状态': appDataProvider.isLoggedIn ? '✅ 已登录' : '❌ 未登录',
+          'Token状态': appDataProvider.token != null ? '✅ 有效' : '❌ 无效',
+        }
       };
 
-      _logger.e('🔄 [手动更新] 批量更新失败', error: e);
+      _logger.e('🔑 [手动登录] 手动登录失败', error: e);
     } finally {
       setState(() {
-        _updatingTasks.remove('all_updates');
+        _updatingTasks.remove('manual_login');
       });
       _generateDebugInfo();
     }
@@ -824,7 +832,7 @@ class _TimerDebugWidgetState extends State<TimerDebugWidget> {
             tooltip: '手动启动定时更新',
           ),
           IconButton(
-            icon: _updatingTasks.contains('all_updates')
+            icon: _updatingTasks.contains('manual_login')
                 ? const SizedBox(
                     width: 20,
                     height: 20,
@@ -833,11 +841,10 @@ class _TimerDebugWidgetState extends State<TimerDebugWidget> {
                       color: Colors.white,
                     ),
                   )
-                : const Icon(Icons.update),
-            onPressed: _updatingTasks.contains('all_updates')
-                ? null
-                : _manualUpdateAll,
-            tooltip: '手动更新所有数据',
+                : const Icon(Icons.login),
+            onPressed:
+                _updatingTasks.contains('manual_login') ? null : _manualLogin,
+            tooltip: '手动登录',
           ),
         ],
       ),

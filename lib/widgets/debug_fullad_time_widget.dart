@@ -168,10 +168,10 @@ class _DebugFullAdTimeWidgetState extends State<DebugFullAdTimeWidget> {
 
   @override
   Widget build(BuildContext context) {
-    // 强制显示调试widget（包括Release模式）
-    // if (!kDebugMode) {
-    //   return const SizedBox.shrink();
-    // }
+    // 只在Debug模式下显示调试widget
+    if (!kDebugMode) {
+      return const SizedBox.shrink();
+    }
 
     return Positioned(
       right: 10,

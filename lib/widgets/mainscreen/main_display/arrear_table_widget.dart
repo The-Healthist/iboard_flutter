@@ -155,7 +155,8 @@ class ArrearTableWidgetState extends State<ArrearTableWidget> {
             titleHeight -
             paginationHeight -
             headerHeight;
-        final int dynamicRows = ((availableHeight / rowHeight).floor() - 1).clamp(8, 50); // 行數減1防止溢出
+        final int dynamicRows = ((availableHeight / rowHeight).floor() - 1)
+            .clamp(8, 50); // 行數減1防止溢出
         _itemsPerPage = dynamicRows;
         final headers = _getTableHeaders(rawData);
         final paginatedData = _getPaginatedData(rawData);

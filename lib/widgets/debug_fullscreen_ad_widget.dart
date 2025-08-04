@@ -7,6 +7,8 @@ import 'package:provider/provider.dart';
 import 'package:logger/logger.dart';
 import 'dart:io';
 
+import 'package:flutter/foundation.dart';
+
 class FullscreenAdDebugWidget extends StatefulWidget {
   const FullscreenAdDebugWidget({Key? key}) : super(key: key);
 
@@ -209,6 +211,10 @@ class _FullscreenAdDebugWidgetState extends State<FullscreenAdDebugWidget> {
 
   @override
   Widget build(BuildContext context) {
+    if (!kDebugMode) {
+      // 發行版不顯示
+      return const SizedBox.shrink();
+    }
     return Scaffold(
       appBar: AppBar(
         title: const Text('全屏广告调试信息'),
