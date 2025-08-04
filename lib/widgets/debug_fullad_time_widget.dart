@@ -118,6 +118,54 @@ class _DebugFullAdTimeWidgetState extends State<DebugFullAdTimeWidget> {
     return "$adTitle (${currentIndex + 1}/$totalAds)";
   }
 
+  ///5，获取轮播顺序列表
+  List<Widget> _buildCarouselList(FullscreenAdProvider fullscreenProvider) {
+    if (fullscreenProvider.fullscreenAds.isEmpty) {
+      return [
+        Text(
+          '📋 轮播列表: 无广告',
+          style: TextStyle(
+            color: Colors.yellow,
+            fontSize: 11,
+          ),
+        ),
+      ];
+    }
+
+    List<Widget> widgets = [
+      Text(
+        '📋 轮播顺序 (${fullscreenProvider.fullscreenAds.length}个):',
+        style: TextStyle(
+          color: Colors.yellow,
+          fontSize: 11,
+          fontWeight: FontWeight.bold,
+        ),
+      ),
+      const SizedBox(height: 2),
+    ];
+
+    for (int i = 0; i < fullscreenProvider.fullscreenAds.length; i++) {
+      final ad = fullscreenProvider.fullscreenAds[i];
+      final isCurrentAd = i == fullscreenProvider.currentAdIndex;
+      final adTitle =
+          ad.title.length > 8 ? '${ad.title.substring(0, 8)}...' : ad.title;
+      final duration = ad.durationObject.inSeconds;
+
+      widgets.add(
+        Text(
+          '${isCurrentAd ? "👉" : "  "}${i + 1}. $adTitle (${duration}s)',
+          style: TextStyle(
+            color: isCurrentAd ? Colors.orange : Colors.white70,
+            fontSize: 10,
+            fontWeight: isCurrentAd ? FontWeight.bold : FontWeight.normal,
+          ),
+        ),
+      );
+    }
+
+    return widgets;
+  }
+
   @override
   Widget build(BuildContext context) {
     // 强制显示调试widget（包括Release模式）
@@ -155,6 +203,10 @@ class _DebugFullAdTimeWidgetState extends State<DebugFullAdTimeWidget> {
                     fontWeight: FontWeight.bold,
                   ),
                 ),
+                const SizedBox(height: 8),
+
+                // 轮播顺序列表
+                ..._buildCarouselList(fullscreenProvider),
                 const SizedBox(height: 8),
 
                 // 当前广告信息

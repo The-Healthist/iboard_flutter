@@ -352,6 +352,28 @@ class _WeatherWidgetState extends State<WeatherWidget> {
                     },
                   ),
                   const SizedBox(height: 6),
+                  // 大厦名称 - 显示building name
+                  Consumer<AppDataProvider>(
+                    builder: (context, appDataProvider, child) {
+                      final buildingName = appDataProvider.buildingInfo?.name;
+                      if (buildingName != null && buildingName.isNotEmpty) {
+                        return Column(
+                          children: [
+                            Text(
+                              buildingName,
+                              style: TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.blueGrey[800]),
+                              textAlign: TextAlign.center,
+                            ),
+                            const SizedBox(height: 4),
+                          ],
+                        );
+                      }
+                      return const SizedBox.shrink(); // 如果没有大厦名称则不显示
+                    },
+                  ),
                   // 地区名称 - 显示building location，如果没有则显示API返回的place
                   Text(
                     _currentWeatherLocation != '香港天文台'
