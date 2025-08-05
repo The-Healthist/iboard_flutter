@@ -4,6 +4,7 @@ import 'package:iboard_app/models/ad_model.dart'; // Assuming AdModel exists
 import 'package:iboard_app/managers/file_manager.dart'; // Assuming FileManager exists
 import 'package:iboard_app/providers/state_provider.dart';
 import 'package:iboard_app/widgets/carousel_widget.dart'; // 导入通知类
+import 'package:iboard_app/utils/video_resource_manager.dart';
 import 'package:video_player/video_player.dart';
 import 'package:logger/logger.dart';
 import 'package:provider/provider.dart';
@@ -88,70 +89,91 @@ class _TopAdWidgetState extends State<TopAdWidget> {
     }
   }
 
-  //2，初始化视频播放器
-  void _initializeVideoPlayer() {
-    if (_localFilePath == null) return;
-    _videoController = VideoPlayerController.file(File(_localFilePath!))
-      ..initialize().then((_) {
-        setState(() {
-          _isLoading = false;
-        });
-        _videoController?.play();
-        _videoController?.setLooping(true); // Ads usually loop
-      }).catchError((error, stackTrace) {
-        _logger.e('Error initializing ad video player',
-            error: error, stackTrace: stackTrace);
-        setState(() {
-          _error = 'Could not play ad video.';
-          _isLoading = false;
-        });
-      });
-  }
+  //2，初始化视频播放器 - 使用视频资源管理器
+  Future<void> _initializeVideoPlayer() async {
+    if (_localFilePath == null || !mounted) return;
 
-  //3，暂停视频播放
-  void _pauseVideo() {
-    if (_videoController != null &&
-        _videoController!.value.isInitialized &&
-        _videoController!.value.isPlaying) {
-      _videoController!.pause();
-      _isManuallyPaused = true;
-      // _logger.i('📱 手动暂停顶部广告视频播放 - ${widget.ad.title}');
-    } else {
-      // _logger.i('📱 视频不需要暂停或已经暂停 - 状态: ${_videoController?.value.isPlaying}');
+    setState(() {
+      _isLoading = true;
+      _error = null;
+    });
+
+    // 先安全释放之前的控制器
+    if (_videoController != null) {
+      await _videoController!.safeDispose();
+      _videoController = null;
+    }
+
+    try {
+      _videoController = await VideoResourceManager.safeInitialize(
+        filePath: _localFilePath!,
+        isNetwork: false,
+        autoPlay: true,
+        looping: true,
+        onError: () {
+          if (mounted) {
+            setState(() {
+              _error = 'Video playback error occurred.';
+              _isLoading = false;
+            });
+          }
+        },
+      );
+
+      if (_videoController != null && mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+        _logger.i('✅ 顶部广告视频初始化成功');
+      } else if (mounted) {
+        setState(() {
+          _error = 'Could not initialize video player.';
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      _logger.e('Failed to initialize video controller', error: e);
+      if (mounted) {
+        setState(() {
+          _error = 'Could not create video player.';
+          _isLoading = false;
+        });
+      }
     }
   }
 
-  //4，恢复视频播放
-  void _resumeVideo() {
-    if (_videoController != null &&
-        _videoController!.value.isInitialized &&
-        !_videoController!.value.isPlaying &&
-        _isManuallyPaused) {
-      _videoController!.play();
-      _isManuallyPaused = false;
-      // _logger.i('📱 手动恢复顶部广告视频播放 - ${widget.ad.title}');
-    } else {
-      // _logger.i(
-      //     '📱 视频不需要恢复或已经播放 - 状态: ${_videoController?.value.isPlaying}, 手动暂停: $_isManuallyPaused');
+  //3，暂停视频播放 - 使用视频资源管理器
+  Future<void> _pauseVideo() async {
+    if (_videoController != null) {
+      final success = await _videoController!.safePause();
+      if (success) {
+        _isManuallyPaused = true;
+        // _logger.i('📱 手动暂停顶部广告视频播放 - ${widget.ad.title}');
+      } else {
+        _logger.w('⚠️ 暂停视频播放失败');
+      }
+    }
+  }
+
+  //4，恢复视频播放 - 使用视频资源管理器
+  Future<void> _resumeVideo() async {
+    if (_videoController != null && _isManuallyPaused) {
+      final success = await _videoController!.safePlay();
+      if (success) {
+        _isManuallyPaused = false;
+        // _logger.i('📱 手动恢复顶部广告视频播放 - ${widget.ad.title}');
+      } else {
+        _logger.w('⚠️ 恢复视频播放失败');
+      }
     }
   }
 
   @override
   void dispose() {
     if (_videoController != null) {
-      try {
-        // 暂停播放
-        if (_videoController!.value.isInitialized &&
-            _videoController!.value.isPlaying) {
-          _videoController!.pause();
-        }
-        // 释放资源
-        _videoController!.dispose();
-      } catch (e) {
-        _logger.w('⚠️ 释放顶部广告视频控制器时出错: $e');
-      } finally {
-        _videoController = null;
-      }
+      // 异步释放，但不等待完成以避免阻塞dispose
+      _videoController!.safeDispose();
+      _videoController = null;
     }
     super.dispose();
   }
@@ -163,15 +185,16 @@ class _TopAdWidgetState extends State<TopAdWidget> {
     final isMediaPaused =
         carouselStateProvider.isMediaPausedForArea(AreaType.topAd);
 
-    // 根据媒体状态控制视频播放
-    if (_videoController != null && _videoController!.value.isInitialized) {
-      if (isMediaPaused && _videoController!.value.isPlaying) {
-        _videoController!.pause();
+    // 根据媒体状态控制视频播放 - 使用视频资源管理器
+    if (_videoController != null) {
+      final state = _videoController!.safeState;
+      if (isMediaPaused && state == VideoControllerState.playing) {
+        _videoController!.safePause();
         // _logger.d('暂停顶部广告视频播放');
       } else if (!isMediaPaused &&
-          !_videoController!.value.isPlaying &&
+          state == VideoControllerState.paused &&
           !_isManuallyPaused) {
-        _videoController!.play();
+        _videoController!.safePlay();
         // _logger.d('恢复顶部广告视频播放');
       }
     }

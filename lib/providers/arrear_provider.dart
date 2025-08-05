@@ -26,6 +26,9 @@ class ArrearProvider extends ChangeNotifier {
   static const String _cacheKey = 'arrearage_data_cache';
   static const String _lastUpdateKey = 'arrearage_last_update';
 
+  // 固定备选ismartId（当无法获取正确ismartId时使用）
+  static const String _fallbackIsmartId = '0314100';
+
   ArrearProvider({
     required ApiClient apiClient,
     required AppDataProvider appDataProvider,
@@ -260,6 +263,22 @@ class ArrearProvider extends ChangeNotifier {
   ///5, 判断是否有数据
   bool get hasData => _rawArrearData.isNotEmpty;
 
+  ///6, 获取目标ismartId（优先使用正确的ismartId，否则使用固定备选值）
+  String _getTargetIsmartId() {
+    final correctIsmartId = _appDataProvider.settingsModel?.building.ismartId;
+    final targetId = (correctIsmartId != null && correctIsmartId.isNotEmpty)
+        ? correctIsmartId
+        : _fallbackIsmartId;
+
+    if (targetId == _fallbackIsmartId) {
+      _logger.w('使用固定备选ismartId: $targetId');
+    } else {
+      _logger.i('使用正确的ismartId: $targetId');
+    }
+
+    return targetId;
+  }
+
   /// 初始化获取欠费数据
   Future<void> initGetArrearData() async {
     _logger.i('开始初始化获取欠费数据');
@@ -267,13 +286,10 @@ class ArrearProvider extends ChangeNotifier {
     // 首先尝试从缓存加载数据
     await loadFromCache();
 
-    if (_selectedBuildingId == null || _selectedBuildingId!.isEmpty) {
-      _logger.w('楼宇ID未设置，无法初始化欠费数据');
-      return;
-    }
-
+    // 获取目标ismartId
+    final targetIsmartId = _getTargetIsmartId();
     // 然后尝试从网络获取最新数据（不重置缓存数据，如果失败则保持缓存数据）
-    await fetchArrears(reset: false, buildingId: _selectedBuildingId);
+    await fetchArrears(reset: false, buildingId: targetIsmartId);
   }
 
   /// 获取欠费列表
@@ -296,11 +312,16 @@ class ArrearProvider extends ChangeNotifier {
     notifyListeners();
 
     try {
-      // 确保我们有有效的楼宇ID
-      final targetBuildingId = buildingId ?? _selectedBuildingId;
-      if (targetBuildingId == null || targetBuildingId.isEmpty) {
-        _logger.w('无法获取欠费数据：楼宇ID为空');
-        return;
+      // 固定使用正确的ismartId，不使用用户选择的楼层
+      String targetBuildingId;
+
+      if (buildingId != null && buildingId.isNotEmpty) {
+        // 如果明确传入了buildingId参数，使用它
+        targetBuildingId = buildingId;
+        _logger.i('使用传入的buildingId: $targetBuildingId');
+      } else {
+        // 使用辅助方法获取目标ismartId
+        targetBuildingId = _getTargetIsmartId();
       }
 
       _logger.i('调用API获取欠费数据，使用ismartId: $targetBuildingId');
@@ -336,13 +357,22 @@ class ArrearProvider extends ChangeNotifier {
     } catch (e, stackTrace) {
       _logger.e('获取欠费数据时发生异常: $e', error: e, stackTrace: stackTrace);
 
-      // 网络请求失败时，静默处理，不清空现有数据，也不设置错误
-      if (_rawArrearData.isNotEmpty) {
-        _logger.i('网络请求失败，保持现有缓存数据，共 ${_rawArrearData.length} 条记录');
+      // 检查是否是Building ID格式错误或服务端验证错误
+      if (e.toString().contains('Building ID') ||
+          e.toString().contains('只能包含数字和英文字母') ||
+          e.toString().contains('格式无效')) {
+        // 对于格式错误，显示明确的错误信息
+        _error = '楼宇ID格式错误：只能包含数字和英文字母';
+        _logger.w('楼宇ID格式验证失败，显示错误提示');
       } else {
-        _logger.i('网络请求失败，且无缓存数据');
+        // 其他网络请求失败时，静默处理，不清空现有数据，也不设置错误
+        if (_rawArrearData.isNotEmpty) {
+          _logger.i('网络请求失败，保持现有缓存数据，共 ${_rawArrearData.length} 条记录');
+        } else {
+          _logger.i('网络请求失败，且无缓存数据');
+        }
+        // 不设置_error，保持静默
       }
-      // 不设置_error，保持静默
     } finally {
       _isLoading = false;
       notifyListeners();
@@ -354,7 +384,8 @@ class ArrearProvider extends ChangeNotifier {
     await fetchArrears(reset: true);
   }
 
-  ///7, 设置选中的楼号 (实际设置的是ismartId)
+  ///7, 设置楼宇ismartId (由AppDataProvider调用，用于API调用)
+  /// 注意：这个方法设置的是真正的ismartId，不是用户在UI中选择的楼层
   void setSelectedBuildingId(String? buildingId) {
     _selectedBuildingId = buildingId; // 这里的buildingId实际上是ismartId
     _selectedUnit = null; // 重置单元选择
@@ -436,16 +467,16 @@ class ArrearProvider extends ChangeNotifier {
 
     _isPeriodicUpdateActive = true;
 
-    // 立即执行一次更新
-    if (_selectedBuildingId != null) {
-      fetchArrears(reset: false, buildingId: _selectedBuildingId);
-    }
+    // 立即执行一次更新，使用目标ismartId
+    final targetIsmartId = _getTargetIsmartId();
+    fetchArrears(reset: false, buildingId: targetIsmartId);
 
     // 设置定时器进行周期性更新
     _updateTimer = Timer.periodic(Duration(seconds: intervalSeconds), (timer) {
-      if (_isPeriodicUpdateActive && _selectedBuildingId != null) {
+      if (_isPeriodicUpdateActive) {
         _logger.i('Performing periodic arrear update...');
-        fetchArrears(reset: false, buildingId: _selectedBuildingId);
+        final currentTargetId = _getTargetIsmartId();
+        fetchArrears(reset: false, buildingId: currentTargetId);
       } else {
         timer.cancel();
       }

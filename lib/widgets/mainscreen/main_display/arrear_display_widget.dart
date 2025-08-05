@@ -248,7 +248,7 @@ class ArrearDisplayWidgetState extends State<ArrearDisplayWidget> {
                   ),
                 ),
                 child: Text(
-                  '${building}樓',
+                  '${building}',
                   style: TextStyle(
                     fontSize: 14,
                     fontWeight: FontWeight.w500,
@@ -364,7 +364,7 @@ class ArrearDisplayWidgetState extends State<ArrearDisplayWidget> {
     }
   }
 
-  ///7, 构建结果容器 - 静默使用缓存数据
+  ///7, 构建结果容器 - 静默使用缓存数据，但显示格式错误
   Widget _buildResultsContainer(ArrearProvider provider) {
     if (provider.isLoading) {
       return Container(
@@ -373,6 +373,11 @@ class ArrearDisplayWidgetState extends State<ArrearDisplayWidget> {
           child: CircularProgressIndicator(),
         ),
       );
+    }
+
+    // 检查是否有错误需要显示
+    if (provider.error != null && provider.error!.isNotEmpty) {
+      return _buildErrorContainer(provider.error!);
     }
 
     final arrears = provider.arrears;
@@ -424,7 +429,64 @@ class ArrearDisplayWidgetState extends State<ArrearDisplayWidget> {
     );
   }
 
-  ///8, 构建数据内容
+  ///8, 构建错误容器
+  Widget _buildErrorContainer(String errorMessage) {
+    return Container(
+      padding: const EdgeInsets.all(40),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.06),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Center(
+        child: Column(
+          children: [
+            const Icon(Icons.error_outline, color: Colors.red, size: 60),
+            const SizedBox(height: 16),
+            const Text(
+              '數據獲取失敗',
+              style: TextStyle(
+                fontSize: 18,
+                color: Colors.red,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+            const SizedBox(height: 8),
+            SelectableText.rich(
+              TextSpan(
+                children: [
+                  TextSpan(
+                    text: errorMessage,
+                    style: const TextStyle(
+                      fontSize: 14,
+                      color: Colors.red,
+                    ),
+                  ),
+                ],
+              ),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 16),
+            const Text(
+              '請聯繫系統管理員檢查樓宇配置',
+              style: TextStyle(
+                fontSize: 12,
+                color: Colors.grey,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  ///9, 构建数据内容
   Widget _buildDataContent(ArrearProvider provider) {
     return Container(
       padding: const EdgeInsets.all(20),
@@ -447,7 +509,7 @@ class ArrearDisplayWidgetState extends State<ArrearDisplayWidget> {
               const Icon(Icons.receipt_long, color: Colors.blue, size: 24),
               const SizedBox(width: 8),
               Text(
-                '查詢結果 - ${_selectedBuilding}樓${_selectedFloor}單位',
+                '查詢結果 - ${_selectedBuilding}${_selectedFloor}單位',
                 style: const TextStyle(
                   fontSize: 18,
                   fontWeight: FontWeight.w600,

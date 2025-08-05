@@ -290,7 +290,7 @@ class FullscreenAdProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  ///10, 启动全屏广告计时器
+  ///10, 启动全屏广告计时器 - 添加视频切换延迟
   void startFullscreenAdTimer(int currentIndex) {
     // _logger.d(
     //     '🎬 开始全屏广告计时器: index=$currentIndex, ads=${this.fullscreenAds.length}, paused=$_isPaused');
@@ -350,7 +350,7 @@ class FullscreenAdProvider extends ChangeNotifier {
     }
   }
 
-  ///11, 切换到下一个广告（私有方法）
+  ///11, 切换到下一个广告（私有方法） - 添加视频切换延迟
   void _nextAd() {
     if (this.fullscreenAds.isEmpty || _isPaused || !_isActive) {
       _logger.w(
@@ -374,7 +374,13 @@ class FullscreenAdProvider extends ChangeNotifier {
     _currentAdPauseTime = null;
 
     notifyListeners();
-    startFullscreenAdTimer(_currentAdIndex);
+
+    // 添加小延迟，让前一个视频有时间完全释放资源
+    Future.delayed(Duration(milliseconds: 300), () {
+      if (_isActive && !_isPaused) {
+        startFullscreenAdTimer(_currentAdIndex);
+      }
+    });
   }
 
   ///25, 验证并修正广告索引

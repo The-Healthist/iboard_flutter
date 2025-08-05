@@ -91,6 +91,20 @@ class ApiClient {
       }
       try {
         final decoded = json.decode(decodedBody);
+
+        // 检查是否是服务端返回的错误响应
+        if (decoded is Map &&
+            decoded.containsKey('status') &&
+            decoded['status'] == 'error') {
+          final errorMessage = decoded['message'] ?? 'Unknown server error';
+          _logger.e('Server returned error for $apiName: $errorMessage');
+          throw ApiException(
+            statusCode: response.statusCode,
+            message: errorMessage,
+            errorData: decodedBody,
+          );
+        }
+
         if (decoded is List) {
           return decoded
               .map((item) => Map<String, dynamic>.from(item as Map))
@@ -557,6 +571,15 @@ class ApiClient {
   /// Endpoint: POST https://uqf0jqfm77.execute-api.ap-east-1.amazonaws.com/prod/v1/building_board/building-mf-table
   /// Body: {"blg_id": "string", "ptype": "mf"}
   Future<List<Map<String, dynamic>>> getArrearage({String? buildingId}) async {
+    // 验证Building ID格式
+    if (buildingId != null && !_isValidBuildingId(buildingId)) {
+      throw ApiException(
+        statusCode: 400,
+        message: 'Building ID 格式无效，只能包含数字和英文字母',
+        errorData: 'Invalid building ID: $buildingId',
+      );
+    }
+
     const String fullUrl =
         'https://uqf0jqfm77.execute-api.ap-east-1.amazonaws.com/prod/v1/building_board/building-mf-table';
     final Uri url = _buildUri(fullUrl, null);
@@ -568,10 +591,17 @@ class ApiClient {
     final Map<String, String> headers =
         _getHeaders(requiresAuth: true, contentType: 'application/json');
 
-    // _logger.i('获取欠费数据，楼宇ID: $buildingId');
+    _logger.i('获取欠费数据，楼宇ID: $buildingId');
     final http.Response response = await _sendRequest(
         () => http.post(url, headers: headers, body: requestBody),
         apiNameForLog: 'getArrearage');
     return _handleArrayResponse(response, 'getArrearage');
+  }
+
+  ///9, 验证Building ID格式
+  bool _isValidBuildingId(String buildingId) {
+    // Building ID只能包含数字和英文字母
+    final RegExp validPattern = RegExp(r'^[a-zA-Z0-9]+$');
+    return validPattern.hasMatch(buildingId) && buildingId.isNotEmpty;
   }
 }

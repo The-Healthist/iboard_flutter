@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:video_player/video_player.dart';
 import 'package:iboard_app/managers/file_manager.dart';
 import 'package:iboard_app/models/ad_model.dart';
+import 'package:iboard_app/utils/video_resource_manager.dart';
 import 'package:logger/logger.dart';
 import 'dart:io';
 
@@ -49,28 +50,22 @@ class _FullAdWidgetState extends State<FullAdWidget> {
 
     // 安全释放视频控制器
     if (_videoController != null) {
-      try {
-        // 移除监听器
-        _videoController!.removeListener(_onVideoProgressChanged);
+      // 移除监听器
+      _videoController!.removeListener(_onVideoProgressChanged);
 
-        // 暂停播放
-        if (_videoController!.value.isInitialized &&
-            _videoController!.value.isPlaying) {
-          _videoController!.pause();
-        }
-
-        // 释放资源
-        _videoController!.dispose();
-        // _logger.i('✅ 视频控制器已安全释放');
-      } catch (e) {
-        // _logger.w('⚠️ 释放视频控制器时出错: $e');
-      } finally {
-        _videoController = null;
+      // 异步释放，但不等待完成以避免阻塞dispose
+      _videoController!.safeDispose().then((success) {
         // 通知视频资源已释放
         if (widget.onVideoDisposed != null) {
           widget.onVideoDisposed!();
         }
-      }
+        if (success) {
+          // _logger.i('✅ 全屏广告视频控制器已安全释放');
+        } else {
+          _logger.w('⚠️ 全屏广告视频控制器释放可能不完整');
+        }
+      });
+      _videoController = null;
     }
 
     super.dispose();
@@ -94,7 +89,7 @@ class _FullAdWidgetState extends State<FullAdWidget> {
   }
 
   Future<void> _initializeVideo() async {
-    if (_isLoadingVideo) return;
+    if (_isLoadingVideo || !mounted) return;
 
     // _logger.i('🎥 开始初始化视频: ${widget.ad.file.url}');
 
@@ -104,39 +99,56 @@ class _FullAdWidgetState extends State<FullAdWidget> {
     });
 
     try {
-      // 释放之前的视频控制器
+      // 安全释放之前的视频控制器
       if (_videoController != null) {
-        try {
-          _videoController!.removeListener(_onVideoProgressChanged);
-          _videoController!.dispose();
-        } catch (e) {
-          // _logger.w('⚠️ 释放旧视频控制器时出错: $e');
-        }
+        _videoController!.removeListener(_onVideoProgressChanged);
+        await _videoController!.safeDispose();
         _videoController = null;
       }
 
       // 尝试从FileManager获取本地缓存的视频文件
       final File? localFile = await widget.fileManager.getFile(widget.ad.file);
 
+      String filePath;
+      bool isNetwork = false;
+
       if (localFile != null && await localFile.exists()) {
         // 使用本地文件
         // _logger.i('✅ 使用本地缓存视频文件: ${localFile.path}');
-        _videoController = VideoPlayerController.file(localFile);
+        filePath = localFile.path;
+        isNetwork = false;
       } else {
         // 使用网络URL
         // _logger.i('🌐 使用网络视频URL: ${widget.ad.file.url}');
-        _videoController = VideoPlayerController.networkUrl(
-          Uri.parse(widget.ad.file.url),
-        );
+        filePath = widget.ad.file.url;
+        isNetwork = true;
       }
 
-      // 初始化视频控制器
-      await _videoController!.initialize();
+      // 使用视频资源管理器初始化
+      _videoController = await VideoResourceManager.safeInitialize(
+        filePath: filePath,
+        isNetwork: isNetwork,
+        autoPlay: false, // 先不自动播放，等设置完成后再播放
+        looping: false,
+        onError: () {
+          if (mounted) {
+            setState(() {
+              _errorMessage = '视频播放出现错误';
+              _isLoadingVideo = false;
+              _isVideoInitialized = false;
+            });
+          }
+        },
+      );
+
+      if (_videoController == null) {
+        throw Exception('视频控制器初始化失败');
+      }
 
       // 检查widget是否仍然挂载
       if (!mounted) {
         // _logger.w('⚠️ Widget已卸载，停止视频初始化');
-        _videoController?.dispose();
+        await _videoController!.safeDispose();
         _videoController = null;
         return;
       }
@@ -158,18 +170,14 @@ class _FullAdWidgetState extends State<FullAdWidget> {
 
       // 自动播放视频（不循环，让Provider控制播放）
       _videoController!.setLooping(false);
-      await _videoController!.play();
+      await _videoController!.safePlay();
       // _logger.i('🎬 视频初始化成功并开始播放');
     } catch (e) {
       _logger.e('❌ 视频初始化失败: $e');
 
       // 清理资源
       if (_videoController != null) {
-        try {
-          _videoController!.dispose();
-        } catch (disposeError) {
-          // _logger.w('⚠️ 清理失败的视频控制器时出错: $disposeError');
-        }
+        await _videoController!.safeDispose();
         _videoController = null;
       }
 
