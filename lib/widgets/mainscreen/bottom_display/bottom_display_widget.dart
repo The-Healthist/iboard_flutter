@@ -18,7 +18,7 @@ class _BottomDisplayWidgetState extends State<BottomDisplayWidget> {
   @override
   void initState() {
     super.initState();
-    _logger.i('🌤️ BottomDisplayWidget初始化');
+    // _logger.i('🌤️ BottomDisplayWidget初始化');
   }
 
   ///1，构建底部显示组件 - 使用固定高度确保统一显示

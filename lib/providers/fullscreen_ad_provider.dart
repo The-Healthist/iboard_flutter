@@ -41,13 +41,11 @@ class FullscreenAdProvider extends ChangeNotifier {
   Duration _adDuration = Duration.zero;
 
   // App数据提供者相关
-  AppDataProvider? _appDataProvider;
+  final AppDataProvider _appDataProvider;
   static const int _defaultFullscreenAdDuration = 10; // 默认全屏广告播放时间（秒）
 
-  /// 设置AppDataProvider实例
-  void setAppDataProvider(AppDataProvider appDataProvider) {
-    _appDataProvider = appDataProvider;
-    _logger.i('AppDataProvider已设置');
+  FullscreenAdProvider(this._appDataProvider) {
+    _logger.i('FullscreenAdProvider initialized with AppDataProvider');
     _loadCustomOrder(); // 加载自定义顺序
   }
 
@@ -73,7 +71,7 @@ class FullscreenAdProvider extends ChangeNotifier {
 
   /// 获取全屏广告播放时间（秒）
   int get fullscreenAdDuration =>
-      _appDataProvider?.deviceSettings?.advertisementPlayDuration ??
+      _appDataProvider.deviceSettings?.advertisementPlayDuration ??
       _defaultFullscreenAdDuration;
 
   ///1，设置自定义轮播全屏广告顺序
@@ -505,12 +503,12 @@ class FullscreenAdProvider extends ChangeNotifier {
   void exitFullscreenMode() {
     if (!_isActive) return;
 
-    _logger.i('🚪 退出全屏广告模式');
+    // _logger.i('🚪 退出全屏广告模式');
 
     // 为下次进入准备下一个广告（但不触发切换逻辑）
     if (this.fullscreenAds.isNotEmpty) {
       _currentAdIndex = (_currentAdIndex + 1) % this.fullscreenAds.length;
-      _logger.i('🔄 广告索引更新为下一个: $_currentAdIndex');
+      // _logger.i('🔄 广告索引更新为下一个: $_currentAdIndex');
     }
 
     // 确保取消所有定时器
@@ -648,7 +646,11 @@ class FullscreenAdProvider extends ChangeNotifier {
   @override
   void dispose() {
     _fullscreenTimer?.cancel();
+    _fullscreenTimer = null;
+
     _debugTimer?.cancel();
+    _debugTimer = null;
+
     super.dispose();
   }
 }

@@ -47,10 +47,10 @@ class _TopAdWidgetState extends State<TopAdWidget> {
     if (widget.ad.file.localFilePath != null &&
         await File(widget.ad.file.localFilePath!).exists()) {
       _localFilePath = widget.ad.file.localFilePath;
-      _logger.i('Using pre-cached ad file: $_localFilePath');
+      // _logger.i('Using pre-cached ad file: $_localFilePath');
     } else {
-      _logger.i(
-          'Ad file not pre-cached or path is invalid, attempting to download...');
+      // _logger.i(
+      //     'Ad file not pre-cached or path is invalid, attempting to download...');
       // Assuming FileModel is compatible with fileManager.getFile
       final File? downloadedFile =
           await widget.fileManager.getFile(widget.ad.file);
@@ -117,7 +117,7 @@ class _TopAdWidgetState extends State<TopAdWidget> {
       _isManuallyPaused = true;
       // _logger.i('📱 手动暂停顶部广告视频播放 - ${widget.ad.title}');
     } else {
-      _logger.i('📱 视频不需要暂停或已经暂停 - 状态: ${_videoController?.value.isPlaying}');
+      // _logger.i('📱 视频不需要暂停或已经暂停 - 状态: ${_videoController?.value.isPlaying}');
     }
   }
 
@@ -131,14 +131,28 @@ class _TopAdWidgetState extends State<TopAdWidget> {
       _isManuallyPaused = false;
       // _logger.i('📱 手动恢复顶部广告视频播放 - ${widget.ad.title}');
     } else {
-      _logger.i(
-          '📱 视频不需要恢复或已经播放 - 状态: ${_videoController?.value.isPlaying}, 手动暂停: $_isManuallyPaused');
+      // _logger.i(
+      //     '📱 视频不需要恢复或已经播放 - 状态: ${_videoController?.value.isPlaying}, 手动暂停: $_isManuallyPaused');
     }
   }
 
   @override
   void dispose() {
-    _videoController?.dispose();
+    if (_videoController != null) {
+      try {
+        // 暂停播放
+        if (_videoController!.value.isInitialized &&
+            _videoController!.value.isPlaying) {
+          _videoController!.pause();
+        }
+        // 释放资源
+        _videoController!.dispose();
+      } catch (e) {
+        _logger.w('⚠️ 释放顶部广告视频控制器时出错: $e');
+      } finally {
+        _videoController = null;
+      }
+    }
     super.dispose();
   }
 
@@ -166,11 +180,11 @@ class _TopAdWidgetState extends State<TopAdWidget> {
     return NotificationListener<Notification>(
       onNotification: (notification) {
         if (notification is MediaPauseNotification) {
-          _logger.i('📱 收到媒体暂停通知 - ${widget.ad.title}');
+          // _logger.i('📱 收到媒体暂停通知 - ${widget.ad.title}');
           _pauseVideo();
           return true; // 阻止通知继续传递
         } else if (notification is MediaResumeNotification) {
-          _logger.i('📱 收到媒体恢复通知 - ${widget.ad.title}');
+          // _logger.i('📱 收到媒体恢复通知 - ${widget.ad.title}');
           _resumeVideo();
           return true; // 阻止通知继续传递
         }

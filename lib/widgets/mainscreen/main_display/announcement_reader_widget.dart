@@ -49,10 +49,10 @@ class AnnouncementReaderWidgetState extends State<AnnouncementReaderWidget> {
     if (widget.announcement.file.localFilePath != null &&
         await File(widget.announcement.file.localFilePath!).exists()) {
       _localFilePath = widget.announcement.file.localFilePath;
-      _logger.i('Using pre-cached file: $_localFilePath');
+      // _logger.i('Using pre-cached file: $_localFilePath');
     } else {
-      _logger.i(
-          'File not pre-cached or path is invalid, attempting to download...');
+      // _logger.i(
+      //     'File not pre-cached or path is invalid, attempting to download...');
       final File? downloadedFile =
           await widget.fileManager.getFile(widget.announcement.file);
       if (!mounted) return; // Added mounted check
@@ -150,8 +150,21 @@ class AnnouncementReaderWidgetState extends State<AnnouncementReaderWidget> {
 
   @override
   void dispose() {
-    _videoController?.dispose();
-    _videoController = null; // Explicitly nullify the controller
+    if (_videoController != null) {
+      try {
+        // 暂停播放
+        if (_videoController!.value.isInitialized &&
+            _videoController!.value.isPlaying) {
+          _videoController!.pause();
+        }
+        // 释放资源
+        _videoController!.dispose();
+      } catch (e) {
+        _logger.w('⚠️ 释放通告视频控制器时出错: $e');
+      } finally {
+        _videoController = null;
+      }
+    }
     super.dispose();
   }
 

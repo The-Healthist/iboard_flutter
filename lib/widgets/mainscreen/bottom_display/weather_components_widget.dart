@@ -31,8 +31,8 @@ class _WeatherComponentsWidgetState extends State<WeatherComponentsWidget> {
   void initState() {
     super.initState();
     _currentTime = DateTime.now();
-    _logger.i(
-        'WeatherComponentsWidget初始化时间: ${DateFormat('yyyy-MM-dd HH:mm:ss').format(_currentTime)}');
+    // _logger.i(
+    //     'WeatherComponentsWidget初始化时间: ${DateFormat('yyyy-MM-dd HH:mm:ss').format(_currentTime)}');
 
     initializeDateFormatting('zh_HK', null).then((_) async {
       _updateLocationFromProvider();
@@ -44,6 +44,7 @@ class _WeatherComponentsWidgetState extends State<WeatherComponentsWidget> {
   @override
   void dispose() {
     _timeUpdateTimer?.cancel();
+    _timeUpdateTimer = null;
     super.dispose();
   }
 
@@ -59,9 +60,9 @@ class _WeatherComponentsWidgetState extends State<WeatherComponentsWidget> {
     if (weatherProvider.hasForecastData ||
         weatherProvider.hasCurrentData ||
         weatherProvider.hasWarningData) {
-      _logger.i('使用缓存的天气数据');
+      // _logger.i('使用缓存的天气数据');
     } else {
-      _logger.i('缓存中缺少天气数据，开始获取...');
+      // _logger.i('缓存中缺少天气数据，开始获取...');
       weatherProvider.fetchAllWeatherData();
     }
   }
@@ -77,8 +78,8 @@ class _WeatherComponentsWidgetState extends State<WeatherComponentsWidget> {
           setState(() {
             _currentWeatherLocation = newLocation;
           });
-          _logger.i(
-              'WeatherComponentsWidget从Provider更新位置信息: $_currentWeatherLocation');
+          // _logger.i(
+          //     'WeatherComponentsWidget从Provider更新位置信息: $_currentWeatherLocation');
 
           // 位置更新后重新获取天气数据
           final weatherProvider =
@@ -95,7 +96,7 @@ class _WeatherComponentsWidgetState extends State<WeatherComponentsWidget> {
 
   ///3，启动时间更新定时器
   void _startTimeUpdateTimer() {
-    _logger.i('启动时间更新定时器，每秒更新一次');
+    // _logger.i('启动时间更新定时器，每秒更新一次');
     _timeUpdateTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
       if (mounted) {
         setState(() {
@@ -109,7 +110,7 @@ class _WeatherComponentsWidgetState extends State<WeatherComponentsWidget> {
 
   ///4，打开天气数据调试页面
   void _openWeatherDebugPage() {
-    _logger.i('🐛 打开天气数据调试页面');
+    // _logger.i('🐛 打开天气数据调试页面');
     Navigator.push(
       context,
       MaterialPageRoute(

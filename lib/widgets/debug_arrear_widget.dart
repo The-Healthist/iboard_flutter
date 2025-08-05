@@ -47,7 +47,7 @@ class _ArrearDebugWidgetState extends State<ArrearDebugWidget> {
       _isLoading = false;
     });
 
-    _logger.i('💰 欠费数据调试信息: $_debugInfo');
+    // _logger.i('💰 欠费数据调试信息: $_debugInfo');
   }
 
   ///2, 检查缓存状态
@@ -137,11 +137,11 @@ class _ArrearDebugWidgetState extends State<ArrearDebugWidget> {
   Future<void> _refreshData() async {
     final provider = Provider.of<ArrearProvider>(context, listen: false);
 
-    _logger.i('🔄 开始手动刷新欠费数据');
+    // _logger.i('🔄 开始手动刷新欠费数据');
 
     try {
       await provider.fetchArrears(reset: true);
-      _logger.i('✅ 欠费数据刷新成功');
+      // _logger.i('✅ 欠费数据刷新成功');
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -172,11 +172,11 @@ class _ArrearDebugWidgetState extends State<ArrearDebugWidget> {
   Future<void> _loadFromCache() async {
     final provider = Provider.of<ArrearProvider>(context, listen: false);
 
-    _logger.i('📂 从缓存加载欠费数据');
+    // _logger.i('📂 从缓存加载欠费数据');
 
     try {
       await provider.loadFromCache();
-      _logger.i('✅ 从缓存加载成功');
+      // _logger.i('✅ 从缓存加载成功');
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -207,11 +207,11 @@ class _ArrearDebugWidgetState extends State<ArrearDebugWidget> {
   Future<void> _clearCache() async {
     final provider = Provider.of<ArrearProvider>(context, listen: false);
 
-    _logger.i('🗑️ 清除欠费数据缓存');
+    // _logger.i('🗑️ 清除欠费数据缓存');
 
     try {
       await provider.clearCache();
-      _logger.i('✅ 缓存清除成功');
+      // _logger.i('✅ 缓存清除成功');
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(

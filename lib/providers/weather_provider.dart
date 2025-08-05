@@ -61,7 +61,7 @@ class WeatherProvider extends ChangeNotifier {
   bool get isInitialized => _isInitialized;
 
   WeatherProvider() {
-    _logger.i('WeatherProvider初始化');
+    // _logger.i('WeatherProvider初始化');
     _initializeProvider(); // 启动时初始化Provider
   }
 
@@ -69,7 +69,7 @@ class WeatherProvider extends ChangeNotifier {
   Future<void> _initializeProvider() async {
     await _loadWeatherDataFromCache(); // 从缓存加载数据
     _isInitialized = true;
-    _logger.i('WeatherProvider初始化完成');
+    // _logger.i('WeatherProvider初始化完成');
   }
 
   ///12，等待初始化完成
@@ -85,6 +85,7 @@ class WeatherProvider extends ChangeNotifier {
   @override
   void dispose() {
     _updateTimer?.cancel();
+    _updateTimer = null;
     super.dispose();
   }
 
@@ -99,9 +100,9 @@ class WeatherProvider extends ChangeNotifier {
         try {
           final forecastData = json.decode(forecastJson);
           _weatherForecastData = WeatherData.fromJson(forecastData);
-          _logger.i('从缓存加载天气预报数据成功');
+          // _logger.i('从缓存加载天气预报数据成功');
         } catch (e) {
-          _logger.w('解析缓存的天气预报数据失败: $e');
+          // _logger.w('解析缓存的天气预报数据失败: $e');
         }
       }
 
@@ -111,9 +112,9 @@ class WeatherProvider extends ChangeNotifier {
         try {
           final currentData = json.decode(currentJson);
           _currentWeatherData = CurrentWeatherDataModel.fromJson(currentData);
-          _logger.i('从缓存加载当前天气数据成功');
+          // _logger.i('从缓存加载当前天气数据成功');
         } catch (e) {
-          _logger.w('解析缓存的当前天气数据失败: $e');
+          // _logger.w('解析缓存的当前天气数据失败: $e');
         }
       }
 
@@ -123,9 +124,9 @@ class WeatherProvider extends ChangeNotifier {
         try {
           final warningData = json.decode(warningJson);
           _weatherWarningData = WeatherWarningModel.fromJson(warningData);
-          _logger.i('从缓存加载天气警告数据成功');
+          // _logger.i('从缓存加载天气警告数据成功');
         } catch (e) {
-          _logger.w('解析缓存的天气警告数据失败: $e');
+          // _logger.w('解析缓存的天气警告数据失败: $e');
         }
       }
 
@@ -144,27 +145,27 @@ class WeatherProvider extends ChangeNotifier {
       if (_weatherForecastData != null) {
         final forecastJson = json.encode(_weatherForecastData!.toJson());
         await prefs.setString(_forecastCacheKey, forecastJson);
-        _logger.i('天气预报数据已缓存');
+        // _logger.i('天气预报数据已缓存');
       }
 
       // 保存当前天气数据
       if (_currentWeatherData != null) {
         final currentJson = json.encode(_currentWeatherData!.toJson());
         await prefs.setString(_currentCacheKey, currentJson);
-        _logger.i('当前天气数据已缓存');
+        // _logger.i('当前天气数据已缓存');
       }
 
       // 保存天气警告数据
       if (_weatherWarningData != null) {
         final warningJson = json.encode(_weatherWarningData!.toJson());
         await prefs.setString(_warningCacheKey, warningJson);
-        _logger.i('天气警告数据已缓存');
+        // _logger.i('天气警告数据已缓存');
       }
 
       // 保存最后更新时间
       await prefs.setString(_lastUpdateKey, DateTime.now().toIso8601String());
 
-      _logger.i('天气数据已保存到缓存');
+      // _logger.i('天气数据已保存到缓存');
     } catch (e) {
       _logger.e('保存天气数据到缓存失败', error: e);
     }
@@ -179,21 +180,35 @@ class WeatherProvider extends ChangeNotifier {
       _forecastError = null;
     });
 
+    final stopwatch = Stopwatch()..start();
     try {
-      _logger.i('开始获取天气预报数据...');
+      // _logger.i('📊 开始获取天气预报数据... - ${DateTime.now().toIso8601String()}');
       final weatherData = await _weatherService.fetchWeatherData();
 
       if (weatherData != null) {
         _weatherForecastData = weatherData;
+        _forecastError = null; // 清除之前的错误状态
         await _saveWeatherDataToCache(); // 成功时保存到缓存
-        _logger.i('天气预报数据获取成功并已缓存');
+        stopwatch.stop();
+        // _logger.i('✅ 天气预报数据获取成功并已缓存，耗时: ${stopwatch.elapsedMilliseconds}ms');
       } else {
-        _forecastError = '获取天气预报数据失败';
-        _logger.w('天气预报数据获取失败，保持原有缓存数据');
+        // 如果有缓存数据，不设置错误状态，只记录警告
+        if (_weatherForecastData != null) {
+          stopwatch.stop();
+          // _logger.w(
+          //     '⚠️ 天气预报数据获取失败，但使用缓存数据，耗时: ${stopwatch.elapsedMilliseconds}ms');
+        } else {
+          _forecastError = '获取天气预报数据失败';
+          stopwatch.stop();
+          // _logger
+          //     .w('❌ 天气预报数据获取失败且无缓存数据，耗时: ${stopwatch.elapsedMilliseconds}ms');
+        }
       }
     } catch (e) {
       _forecastError = '获取天气预报数据异常: $e';
-      _logger.e('获取天气预报数据异常', error: e);
+      stopwatch.stop();
+      // _logger.e('❌ 获取天气预报数据异常，耗时: ${stopwatch.elapsedMilliseconds}ms',
+      //     error: e);
     } finally {
       setState(() {
         _isLoadingForecast = false;
@@ -210,21 +225,35 @@ class WeatherProvider extends ChangeNotifier {
       _currentError = null;
     });
 
+    final stopwatch = Stopwatch()..start();
     try {
-      _logger.i('开始获取当前天气数据...');
+      // _logger.i('🌡️ 开始获取当前天气数据... - ${DateTime.now().toIso8601String()}');
       final currentData = await _weatherService.fetchCurrentWeatherData();
 
       if (currentData != null) {
         _currentWeatherData = currentData;
+        _currentError = null; // 清除之前的错误状态
         await _saveWeatherDataToCache(); // 成功时保存到缓存
-        _logger.i('当前天气数据获取成功并已缓存');
+        stopwatch.stop();
+        // _logger.i('✅ 当前天气数据获取成功并已缓存，耗时: ${stopwatch.elapsedMilliseconds}ms');
       } else {
-        _currentError = '获取当前天气数据失败';
-        _logger.w('当前天气数据获取失败，保持原有缓存数据');
+        // 如果有缓存数据，不设置错误状态，只记录警告
+        if (_currentWeatherData != null) {
+          stopwatch.stop();
+          // _logger.w(
+          //     '⚠️ 当前天气数据获取失败，但使用缓存数据，耗时: ${stopwatch.elapsedMilliseconds}ms');
+        } else {
+          _currentError = '获取当前天气数据失败';
+          stopwatch.stop();
+          // _logger
+          //     .w('❌ 当前天气数据获取失败且无缓存数据，耗时: ${stopwatch.elapsedMilliseconds}ms');
+        }
       }
     } catch (e) {
       _currentError = '获取当前天气数据异常: $e';
-      _logger.e('获取当前天气数据异常', error: e);
+      stopwatch.stop();
+      // _logger.e('❌ 获取当前天气数据异常，耗时: ${stopwatch.elapsedMilliseconds}ms',
+      //     error: e);
     } finally {
       setState(() {
         _isLoadingCurrent = false;
@@ -241,23 +270,38 @@ class WeatherProvider extends ChangeNotifier {
       _warningError = null;
     });
 
+    final stopwatch = Stopwatch()..start();
     try {
-      _logger.i('开始获取天气警告数据...');
+      // _logger.i('⚠️ 开始获取天气警告数据... - ${DateTime.now().toIso8601String()}');
       final warningData = await _weatherService.fetchWeatherWarnings();
 
       if (warningData != null) {
         _weatherWarningData = warningData;
-        _logger.i('天气警告数据获取成功: ${warningData.warnings.length}个警告');
-        _logger.d('天气警告详情: ${warningData.warnings.keys.join(', ')}');
+        _warningError = null; // 清除之前的错误状态
+        stopwatch.stop();
+        // _logger.i(
+        //     '✅ 天气警告数据获取成功: ${warningData.warnings.length}个警告，耗时: ${stopwatch.elapsedMilliseconds}ms');
+        // _logger.d('📋 天气警告详情: ${warningData.warnings.keys.join(', ')}');
         await _saveWeatherDataToCache(); // 成功时保存到缓存
-        _logger.i('天气警告数据已缓存');
+        // _logger.i('💾 天气警告数据已缓存');
       } else {
-        _warningError = '获取天气警告数据失败';
-        _logger.w('天气警告数据获取失败，保持原有缓存数据');
+        // 如果有缓存数据，不设置错误状态，只记录警告
+        if (_weatherWarningData != null) {
+          stopwatch.stop();
+          // _logger.w(
+          //     '⚠️ 天气警告数据获取失败，但使用缓存数据，耗时: ${stopwatch.elapsedMilliseconds}ms');
+        } else {
+          _warningError = '获取天气警告数据失败';
+          stopwatch.stop();
+          // _logger
+          //     .w('❌ 天气警告数据获取失败且无缓存数据，耗时: ${stopwatch.elapsedMilliseconds}ms');
+        }
       }
     } catch (e) {
       _warningError = '获取天气警告数据异常: $e';
-      _logger.e('获取天气警告数据异常', error: e);
+      stopwatch.stop();
+      // _logger.e('❌ 获取天气警告数据异常，耗时: ${stopwatch.elapsedMilliseconds}ms',
+      //     error: e);
     } finally {
       setState(() {
         _isLoadingWarning = false;
@@ -267,7 +311,9 @@ class WeatherProvider extends ChangeNotifier {
 
   ///6，获取所有天气数据
   Future<void> fetchAllWeatherData() async {
-    _logger.i('开始获取所有天气数据...');
+    // _logger.i('🌍 开始获取所有天气数据... - ${DateTime.now().toIso8601String()}');
+
+    final stopwatch = Stopwatch()..start();
 
     // 并行获取所有天气数据
     await Future.wait([
@@ -276,21 +322,23 @@ class WeatherProvider extends ChangeNotifier {
       fetchWeatherWarnings(),
     ]);
 
-    _logger.i('所有天气数据获取完成');
+    stopwatch.stop();
+    // _logger.i('✅ 所有天气数据获取完成，耗时: ${stopwatch.elapsedMilliseconds}ms');
   }
 
   ///7，启动定时更新
   void startPeriodicUpdate({Duration interval = const Duration(hours: 2)}) {
     if (_isPeriodicUpdateActive) {
-      _logger.w('定时更新已在运行中');
+      // _logger.w('⏰ 天气定时更新已在运行中');
       return;
     }
 
-    _logger.i('启动天气数据定时更新，间隔: ${interval.inHours}小时');
+    // _logger.i(
+    //     '🌤️ 启动天气数据定时更新，间隔: ${interval.inMinutes}分钟 (${interval.inSeconds}秒)');
     _isPeriodicUpdateActive = true;
 
     _updateTimer = Timer.periodic(interval, (timer) {
-      _logger.i('定时更新天气数据...');
+      // _logger.i('⏰ 执行天气数据定时更新 - ${DateTime.now().toIso8601String()}');
       fetchAllWeatherData();
     });
 
@@ -300,11 +348,11 @@ class WeatherProvider extends ChangeNotifier {
   ///8，停止定时更新
   void stopPeriodicUpdate() {
     if (!_isPeriodicUpdateActive) {
-      _logger.w('定时更新未在运行');
+      // _logger.w('⏰ 天气定时更新未在运行');
       return;
     }
 
-    _logger.i('停止天气数据定时更新');
+    // _logger.i('⏹️ 停止天气数据定时更新');
     _updateTimer?.cancel();
     _updateTimer = null;
     _isPeriodicUpdateActive = false;
@@ -325,7 +373,7 @@ class WeatherProvider extends ChangeNotifier {
       _currentWeatherData = null;
       _weatherWarningData = null;
 
-      _logger.i('天气数据缓存已清除');
+      // _logger.i('天气数据缓存已清除');
       notifyListeners();
     } catch (e) {
       _logger.e('清除天气数据缓存失败', error: e);

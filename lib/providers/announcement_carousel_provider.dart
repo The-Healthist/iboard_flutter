@@ -359,8 +359,8 @@ class AnnouncementCarouselProvider extends ChangeNotifier {
         // 记录新通告开始时间
         _currentNoticeStartTime = DateTime.now();
 
-        _logger.i(
-            '📝 [无限轮播] 切换通告(API=${apiNoticeStayDuration}s) 索引: $_currentNoticeIndex/${_midCarouselController.widgetCount} (跳过主屏幕)');
+        // _logger.i(
+        //     '📝 [无限轮播] 切换通告(API=${apiNoticeStayDuration}s) 索引: $_currentNoticeIndex/${_midCarouselController.widgetCount} (跳过主屏幕)');
       } catch (e) {
         _logger.e('❌ [持续轮播] 切换失败: $e');
         // 发生错误时，尝试重新启动轮播
@@ -373,8 +373,8 @@ class AnnouncementCarouselProvider extends ChangeNotifier {
       }
     });
 
-    _logger.i(
-        '🚀 [启动] 无限循环通告轮播定时器 (${apiNoticeStayDuration}s间隔) - 通告数量: $announcementCount (跳过主屏幕)');
+    // _logger.i(
+    //     '🚀 [启动] 无限循环通告轮播定时器 (${apiNoticeStayDuration}s间隔) - 通告数量: $announcementCount (跳过主屏幕)');
   }
 
   ///3，暂停通告轮播
@@ -419,8 +419,8 @@ class AnnouncementCarouselProvider extends ChangeNotifier {
       _noticeDuration = Duration(seconds: apiNoticeStayDuration); // 更新当前时长配置
 
       final remainingNoticeTime = _noticeDuration - _noticeElapsedTime;
-      _logger.i(
-          '🔄 [恢复] 通告轮播 - API配置=${apiNoticeStayDuration}s, 剩余时间：${remainingNoticeTime.inSeconds}s (已播放: ${_noticeElapsedTime.inSeconds}s)');
+      // _logger.i(
+      //     '🔄 [恢复] 通告轮播 - API配置=${apiNoticeStayDuration}s, 剩余时间：${remainingNoticeTime.inSeconds}s (已播放: ${_noticeElapsedTime.inSeconds}s)');
 
       // 重置通告开始时间
       _currentNoticeStartTime = DateTime.now();
@@ -434,7 +434,7 @@ class AnnouncementCarouselProvider extends ChangeNotifier {
 
       if (remainingNoticeTime.inSeconds > 1) {
         // 剩余时间足够，先等待剩余时间再继续轮播
-        _logger.i('⏰ [恢复] 等待剩余时间后继续无限轮播');
+        // _logger.i('⏰ [恢复] 等待剩余时间后继续无限轮播');
         _midTimer = Timer(remainingNoticeTime, () {
           if (!_isMidCarouselPaused) {
             // 时间到，切换到下一个通告并启动无限轮播
@@ -480,13 +480,13 @@ class AnnouncementCarouselProvider extends ChangeNotifier {
 
   ///6，检查并恢复轮播状态（监控定时器使用）
   void checkAndRestoreMidCarousel(int apiNoticeStayDuration) {
-    _logger.i(
-        '🔍 检查通告轮播恢复条件: announcements=${_carouselAnnouncements.length}, paused=$_isMidCarouselPaused');
+    //  _logger.i(
+    // '🔍 检查通告轮播恢复条件: announcements=${_carouselAnnouncements.length}, paused=$_isMidCarouselPaused');
 
     if ((_midCarouselController.widgetCount - 1) > 0 && !_isMidCarouselPaused) {
       // 检查当前定时器是否活跃
       if (_midTimer == null || !_midTimer!.isActive) {
-        _logger.w('🔧 检测到通告轮播定时器已停止，尝试重新启动...');
+        // _logger.w('🔧 检测到通告轮播定时器已停止，尝试重新启动...');
 
         // 确保当前索引在通告范围内
         if (_currentNoticeIndex < 1) {
@@ -738,8 +738,14 @@ class AnnouncementCarouselProvider extends ChangeNotifier {
   @override
   void dispose() {
     _midTimer?.cancel();
+    _midTimer = null;
+
     _debugTimer?.cancel();
+    _debugTimer = null;
+
     _delayedNoticeTimer?.cancel();
+    _delayedNoticeTimer = null;
+
     super.dispose();
   }
 

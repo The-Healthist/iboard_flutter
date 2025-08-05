@@ -218,8 +218,11 @@ class BottomWeatherQrcodeCarouselProvider extends ChangeNotifier {
   @override
   void dispose() {
     _bottomTimer?.cancel();
+    _bottomTimer = null;
+
     _debugTimer?.cancel();
-    // _logger.i('🗑️ 底部天气二维码轮播Provider已释放');
+    _debugTimer = null;
+
     super.dispose();
   }
 }

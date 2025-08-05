@@ -27,10 +27,10 @@ class _WeatherDebugWidgetState extends State<WeatherDebugWidget> {
   Future<bool> _testAssetAvailability(String assetPath) async {
     try {
       await rootBundle.load(assetPath);
-      _logger.d('✅ 资源文件可用: $assetPath');
+      // _logger.d('✅ 资源文件可用: $assetPath');
       return true;
     } catch (e) {
-      _logger.w('❌ 资源文件不可用: $assetPath, 错误: $e');
+      // _logger.w('❌ 资源文件不可用: $assetPath, 错误: $e');
       return false;
     }
   }
@@ -150,7 +150,7 @@ class _WeatherDebugWidgetState extends State<WeatherDebugWidget> {
       _isLoading = false;
     });
 
-    _logger.i('🌤️ 天气图标调试信息: $_debugInfo');
+    // _logger.i('🌤️ 天气图标调试信息: $_debugInfo');
   }
 
   ///2，检查基本天气图标
@@ -168,10 +168,10 @@ class _WeatherDebugWidgetState extends State<WeatherDebugWidget> {
         await rootBundle.load(iconPath);
         isAvailable = true;
         availableCount++;
-        _logger.d('✅ 天气图标可用: $iconPath');
+        // _logger.d('✅ 天气图标可用: $iconPath');
       } catch (e) {
         errorMessage = e.toString();
-        _logger.w('❌ 天气图标不可用: $iconPath, 错误: $e');
+        // _logger.w('❌ 天气图标不可用: $iconPath, 错误: $e');
       }
 
       basicIconsInfo['pic$iconCode.png'] = {
@@ -338,7 +338,7 @@ class _WeatherDebugWidgetState extends State<WeatherDebugWidget> {
   ///8，清理图标缓存
   void _clearIconCache() {
     WeatherIconUtil.clearCache();
-    _logger.i('🗑️ 天气图标缓存已清理');
+    // _logger.i('🗑️ 天气图标缓存已清理');
 
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(
@@ -350,11 +350,11 @@ class _WeatherDebugWidgetState extends State<WeatherDebugWidget> {
 
   ///9，预加载常用图标
   Future<void> _preloadCommonIcons() async {
-    _logger.i('🔄 开始预加载常用天气图标');
+    // _logger.i('🔄 开始预加载常用天气图标');
 
     try {
       await WeatherIconUtil.preloadCommonIcons();
-      _logger.i('✅ 天气图标预加载完成');
+      // _logger.i('✅ 天气图标预加载完成');
 
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(

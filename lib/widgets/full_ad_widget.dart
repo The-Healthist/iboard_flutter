@@ -61,9 +61,9 @@ class _FullAdWidgetState extends State<FullAdWidget> {
 
         // 释放资源
         _videoController!.dispose();
-        _logger.i('✅ 视频控制器已安全释放');
+        // _logger.i('✅ 视频控制器已安全释放');
       } catch (e) {
-        _logger.w('⚠️ 释放视频控制器时出错: $e');
+        // _logger.w('⚠️ 释放视频控制器时出错: $e');
       } finally {
         _videoController = null;
         // 通知视频资源已释放
@@ -89,14 +89,14 @@ class _FullAdWidgetState extends State<FullAdWidget> {
         widget.onVideoProgressChanged!(widget.ad.id.toString(), position);
       }
     } catch (e) {
-      _logger.w('⚠️ 视频进度监听器出错: $e');
+      // _logger.w('⚠️ 视频进度监听器出错: $e');
     }
   }
 
   Future<void> _initializeVideo() async {
     if (_isLoadingVideo) return;
 
-    _logger.i('🎥 开始初始化视频: ${widget.ad.file.url}');
+    // _logger.i('🎥 开始初始化视频: ${widget.ad.file.url}');
 
     setState(() {
       _isLoadingVideo = true;
@@ -110,7 +110,7 @@ class _FullAdWidgetState extends State<FullAdWidget> {
           _videoController!.removeListener(_onVideoProgressChanged);
           _videoController!.dispose();
         } catch (e) {
-          _logger.w('⚠️ 释放旧视频控制器时出错: $e');
+          // _logger.w('⚠️ 释放旧视频控制器时出错: $e');
         }
         _videoController = null;
       }
@@ -120,11 +120,11 @@ class _FullAdWidgetState extends State<FullAdWidget> {
 
       if (localFile != null && await localFile.exists()) {
         // 使用本地文件
-        _logger.i('✅ 使用本地缓存视频文件: ${localFile.path}');
+        // _logger.i('✅ 使用本地缓存视频文件: ${localFile.path}');
         _videoController = VideoPlayerController.file(localFile);
       } else {
         // 使用网络URL
-        _logger.i('🌐 使用网络视频URL: ${widget.ad.file.url}');
+        // _logger.i('🌐 使用网络视频URL: ${widget.ad.file.url}');
         _videoController = VideoPlayerController.networkUrl(
           Uri.parse(widget.ad.file.url),
         );
@@ -135,7 +135,7 @@ class _FullAdWidgetState extends State<FullAdWidget> {
 
       // 检查widget是否仍然挂载
       if (!mounted) {
-        _logger.w('⚠️ Widget已卸载，停止视频初始化');
+        // _logger.w('⚠️ Widget已卸载，停止视频初始化');
         _videoController?.dispose();
         _videoController = null;
         return;
@@ -150,7 +150,7 @@ class _FullAdWidgetState extends State<FullAdWidget> {
       if (widget.initialVideoPosition != null &&
           widget.initialVideoPosition!.inMilliseconds > 0) {
         await _videoController!.seekTo(widget.initialVideoPosition!);
-        _logger.i('⏩ 视频跳转到指定位置: ${widget.initialVideoPosition!.inSeconds}秒');
+        // _logger.i('⏩ 视频跳转到指定位置: ${widget.initialVideoPosition!.inSeconds}秒');
       }
 
       // 添加进度监听器
@@ -168,7 +168,7 @@ class _FullAdWidgetState extends State<FullAdWidget> {
         try {
           _videoController!.dispose();
         } catch (disposeError) {
-          _logger.w('⚠️ 清理失败的视频控制器时出错: $disposeError');
+          // _logger.w('⚠️ 清理失败的视频控制器时出错: $disposeError');
         }
         _videoController = null;
       }
@@ -252,7 +252,7 @@ class _FullAdWidgetState extends State<FullAdWidget> {
         }
 
         // 如果本地文件不存在，使用网络图片
-        _logger.w('本地图片文件不存在，使用网络图片: ${widget.ad.file.url}');
+        // _logger.w('本地图片文件不存在，使用网络图片: ${widget.ad.file.url}');
         return _buildNetworkImage();
       },
     );

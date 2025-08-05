@@ -314,7 +314,7 @@ class QrCodeUtil {
     String data = 'https://example.com/test',
     int size = 88,
   }) async {
-    _logger.d('🧪 生成测试二维码: $data');
+    // _logger.d('🧪 生成测试二维码: $data');
     return generateQrCodeImageData(
       data: data,
       size: size,

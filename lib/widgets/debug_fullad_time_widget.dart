@@ -1,5 +1,5 @@
 import 'dart:async';
-import 'package:flutter/foundation.dart';
+// foundation.dart import removed as kDebugMode is no longer used
 import 'package:flutter/material.dart';
 import 'package:iboard_app/providers/fullscreen_ad_provider.dart';
 import 'package:iboard_app/providers/state_provider.dart';
@@ -26,6 +26,7 @@ class _DebugFullAdTimeWidgetState extends State<DebugFullAdTimeWidget> {
   @override
   void dispose() {
     _updateTimer?.cancel();
+    _updateTimer = null;
     super.dispose();
   }
 
@@ -168,11 +169,6 @@ class _DebugFullAdTimeWidgetState extends State<DebugFullAdTimeWidget> {
 
   @override
   Widget build(BuildContext context) {
-    // 只在Debug模式下显示调试widget
-    if (!kDebugMode) {
-      return const SizedBox.shrink();
-    }
-
     return Positioned(
       right: 10,
       bottom: 10,

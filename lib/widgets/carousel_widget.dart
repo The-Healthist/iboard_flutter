@@ -211,7 +211,7 @@ class _CarouselWidgetState extends State<CarouselWidget>
   /// Delete a widget at the specified index
   void delete(int index) {
     if (index < 0 || index >= _widgets.length) {
-      debugPrint('CarouselWidget: Invalid index $index for deletion');
+      // debugPrint('CarouselWidget: Invalid index $index for deletion');
       return;
     }
 
@@ -304,7 +304,7 @@ class _CarouselWidgetState extends State<CarouselWidget>
           _isAnimating = false;
         });
       }
-      debugPrint('CarouselWidget: Animation error - $error');
+      // debugPrint('CarouselWidget: Animation error - $error');
     });
   }
 
@@ -339,7 +339,7 @@ class _CarouselWidgetState extends State<CarouselWidget>
           _isAnimating = false;
         });
       }
-      debugPrint('CarouselWidget: Animation error - $error');
+      // debugPrint('CarouselWidget: Animation error - $error');
     });
   }
 
@@ -376,7 +376,7 @@ class _CarouselWidgetState extends State<CarouselWidget>
     if (context.mounted) {
       // 使用通知机制通知所有子组件
       MediaPauseNotification().dispatch(context);
-      debugPrint('CarouselWidget: Sent media pause notification');
+      // debugPrint('CarouselWidget: Sent media pause notification');
     }
   }
 
@@ -386,7 +386,7 @@ class _CarouselWidgetState extends State<CarouselWidget>
     if (context.mounted) {
       // 使用通知机制通知所有子组件
       MediaResumeNotification().dispatch(context);
-      debugPrint('CarouselWidget: Sent media resume notification');
+      // debugPrint('CarouselWidget: Sent media resume notification');
     }
   }
 

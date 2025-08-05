@@ -88,8 +88,8 @@ class _AnnouncementPageState extends State<AnnouncementPage> {
           break;
       }
 
-      _logger.i(
-          '🎛️ 轮播状态更新[${appState.name}]: Top=${!topAdProvider.isTopCarouselPaused ? "运行" : "暂停"}, Mid=${!announcementCarouselProvider.isMidCarouselPaused ? "运行" : "暂停"}, Bottom=${!bottomProvider.isBottomCarouselPaused ? "运行" : "暂停"}');
+      // _logger.i(
+      //     '🎛️ 轮播状态更新[${appState.name}]: Top=${!topAdProvider.isTopCarouselPaused ? "运行" : "暂停"}, Mid=${!announcementCarouselProvider.isMidCarouselPaused ? "运行" : "暂停"}, Bottom=${!bottomProvider.isBottomCarouselPaused ? "运行" : "暂停"}');
     });
   }
 
@@ -150,9 +150,17 @@ class _AnnouncementPageState extends State<AnnouncementPage> {
   ///3， 释放资源
   void dispose() {
     _bottomTimer?.cancel();
-    _debugTimer?.cancel(); // 取消调试定时器
-    _watchdogTimer?.cancel(); // 取消监控定时器
-    _clickResetTimer?.cancel(); // 取消点击重置定时器
+    _bottomTimer = null;
+
+    _debugTimer?.cancel();
+    _debugTimer = null;
+
+    _watchdogTimer?.cancel();
+    _watchdogTimer = null;
+
+    _clickResetTimer?.cancel();
+    _clickResetTimer = null;
+
     super.dispose();
   }
 
@@ -174,8 +182,8 @@ class _AnnouncementPageState extends State<AnnouncementPage> {
 
       // 只在应用状态变化时输出日志
       if (_lastLoggedAppState != currentAppState) {
-        _logger.i(
-            '🕐 [调试] 应用状态变化: ${_lastLoggedAppState?.name ?? "初始"} -> ${currentAppState.name}');
+        // _logger.i(
+        //     '🕐 [调试] 应用状态变化: ${_lastLoggedAppState?.name ?? "初始"} -> ${currentAppState.name}');
         _lastLoggedAppState = currentAppState;
       }
     });
@@ -210,7 +218,7 @@ class _AnnouncementPageState extends State<AnnouncementPage> {
 
   ///5.1，进入设置页面前暂停所有轮播和计时器
   void _pauseAllCarouselsForSettings() {
-    _logger.i('⚙️ 进入设置页面 - 暂停所有轮播和计时器');
+    // _logger.i('⚙️ 进入设置页面 - 暂停所有轮播和计时器');
 
     final topAdProvider = context.read<TopAdCarouselProvider>();
     final announcementCarouselProvider =
@@ -248,12 +256,12 @@ class _AnnouncementPageState extends State<AnnouncementPage> {
     final carouselStateProvider = context.read<CarouselStateProvider>();
     carouselStateProvider.enterManualOperation();
 
-    _logger.i('⚙️ 设置页面模式 - 所有轮播已暂停');
+    // _logger.i('⚙️ 设置页面模式 - 所有轮播已暂停');
   }
 
   ///5.2，从设置页面返回后恢复所有轮播和计时器
   void _resumeAllCarouselsFromSettings() {
-    _logger.i('↩️ 从设置页面返回 - 恢复所有轮播和计时器');
+    // _logger.i('↩️ 从设置页面返回 - 恢复所有轮播和计时器');
 
     final topAdProvider = context.read<TopAdCarouselProvider>();
     final announcementCarouselProvider =
@@ -292,7 +300,7 @@ class _AnnouncementPageState extends State<AnnouncementPage> {
     _startDebugTimer();
     _startCarouselWatchdog();
 
-    _logger.i('↩️ 设置页面返回 - 所有轮播已恢复');
+    // _logger.i('↩️ 设置页面返回 - 所有轮播已恢复');
   }
 
   ///6，正常退出全屏广告状态，恢复所有轮播
@@ -345,12 +353,12 @@ class _AnnouncementPageState extends State<AnnouncementPage> {
             .checkAndRestoreMidCarousel(apiNoticeStayDuration);
       }
     });
-    _logger.i('🔍 [启动] 轮播监控定时器 (30s间隔检查) - 确保轮播不中断');
+    // _logger.i('🔍 [启动] 轮播监控定时器 (30s间隔检查) - 确保轮播不中断');
   }
 
   ///6，进入手动操作模式
   void _handleManualOperationMode() {
-    _logger.i('🖱️ 进入手动操作模式 - 暂停通告轮播，恢复顶部和底部轮播');
+    // _logger.i('🖱️ 进入手动操作模式 - 暂停通告轮播，恢复顶部和底部轮播');
 
     final announcementCarouselProvider =
         context.read<AnnouncementCarouselProvider>();
@@ -382,13 +390,13 @@ class _AnnouncementPageState extends State<AnnouncementPage> {
 
     // 检查是否有欠费查询页面正在显示
     if (announcementCarouselProvider.isShowingArrearQuery) {
-      _logger.i('📺 [全屏广告] 检测到欠费查询页面正在显示，自动隐藏');
+      // _logger.i('📺 [全屏广告] 检测到欠费查询页面正在显示，自动隐藏');
       announcementCarouselProvider.hideArrearQueryWidget(() {}, 10, 10);
     }
 
     // 检查是否有欠费总览页面正在显示
     if (announcementCarouselProvider.isShowingArrearTable) {
-      _logger.i('📺 [全屏广告] 检测到欠费总览页面正在显示，自动隐藏');
+      // _logger.i('📺 [全屏广告] 检测到欠费总览页面正在显示，自动隐藏');
       announcementCarouselProvider.hideArrearTableWidget(() {}, 10, 10);
     }
   }
@@ -417,25 +425,25 @@ class _AnnouncementPageState extends State<AnnouncementPage> {
       onAnnouncementTap: (AnnouncementModel? announcement) {
         if (announcement == null) {
           // 显示欠费查询界面 - 立即进入手动操作状态
-          _logger.i('🔵 [MainScreenPage] 接收到欠费查询请求，从主页面跳转到欠费查询界面');
-          _logger.i(
-              '🔵 [MainScreenPage] 当前应用状态: ${carouselStateProvider.currentAppState}');
+          // _logger.i('🔵 [MainScreenPage] 接收到欠费查询请求，从主页面跳转到欠费查询界面');
+          // _logger.i(
+          //     '🔵 [MainScreenPage] 当前应用状态: ${carouselStateProvider.currentAppState}');
           // 触发手动操作状态
-          _logger.i('🔵 [MainScreenPage] 准备进入手动操作状态');
+          // _logger.i('🔵 [MainScreenPage] 准备进入手动操作状态');
           carouselStateProvider.enterManualOperation();
-          _logger.i(
-              '🔵 [MainScreenPage] 已进入手动操作状态: ${carouselStateProvider.currentAppState}');
+          // _logger.i(
+          //     '🔵 [MainScreenPage] 已进入手动操作状态: ${carouselStateProvider.currentAppState}');
           // 调用新的显示欠费查询方法
-          _logger.i('🔵 [MainScreenPage] 准备调用 showArrearQueryWidget');
+          // _logger.i('🔵 [MainScreenPage] 准备调用 showArrearQueryWidget');
           announcementCarouselProvider.showArrearQueryWidget(() {});
-          _logger.i('🔵 [MainScreenPage] showArrearQueryWidget 调用完成');
+          // _logger.i('🔵 [MainScreenPage] showArrearQueryWidget 调用完成');
         } else {
-          _logger.i(
-              '📰 [MainScreenPage] 接收到通告点击请求: ${announcement.title} (ID: ${announcement.id})');
+          // _logger.i(
+          //     '📰 [MainScreenPage] 接收到通告点击请求: ${announcement.title} (ID: ${announcement.id})');
 
           // 新逻辑：直接显示点击的通告，不依赖轮播列表查找
-          _logger.i(
-              '📰 [MainScreenPage] 直接显示点击的通告，根据文件MD5: ${announcement.file.md5}');
+          // _logger.i(
+          //     '📰 [MainScreenPage] 直接显示点击的通告，根据文件MD5: ${announcement.file.md5}');
 
           // 直接显示独立通告
           announcementCarouselProvider.showIndependentAnnouncement(announcement,
@@ -445,10 +453,10 @@ class _AnnouncementPageState extends State<AnnouncementPage> {
           });
 
           // 触发手动操作状态
-          _logger.i('📰 [MainScreenPage] 准备进入手动操作状态');
+          // _logger.i('📰 [MainScreenPage] 准备进入手动操作状态');
           carouselStateProvider.enterManualOperation();
-          _logger.i(
-              '📰 [MainScreenPage] 已进入手动操作状态: ${carouselStateProvider.currentAppState}');
+          // _logger.i(
+          //     '📰 [MainScreenPage] 已进入手动操作状态: ${carouselStateProvider.currentAppState}');
         }
       },
       onHomeButtonPressed: () {
@@ -482,14 +490,14 @@ class _AnnouncementPageState extends State<AnnouncementPage> {
   ///11，处理设备ID点击事件
   void _handleDeviceIdClick() {
     _deviceIdClickCount++;
-    _logger.i('📱 设备ID点击次数: $_deviceIdClickCount/8');
+    // _logger.i('📱 设备ID点击次数: $_deviceIdClickCount/8');
 
     // 取消之前的重置定时器
     _clickResetTimer?.cancel();
 
     if (_deviceIdClickCount >= 8) {
       // 达到8次点击，进入设置页面
-      _logger.i('🔧 连续点击8次，进入设置页面');
+      // _logger.i('🔧 连续点击8次，进入设置页面');
       _deviceIdClickCount = 0; // 重置计数
 
       // 进入设置页面前暂停所有轮播和计时器
@@ -503,7 +511,7 @@ class _AnnouncementPageState extends State<AnnouncementPage> {
       // 设置5秒后重置计数器
       _clickResetTimer = Timer(const Duration(seconds: 5), () {
         _deviceIdClickCount = 0;
-        _logger.i('⏰ 点击计数器已重置');
+        // _logger.i('⏰ 点击计数器已重置');
       });
     }
   }
@@ -531,8 +539,8 @@ class _AnnouncementPageState extends State<AnnouncementPage> {
 
     // Handle state changes for carousel and media control
     if (_previousAppState != currentAppState) {
-      _logger.i(
-          '🔄 应用状态变化: ${_previousAppState?.name ?? "初始"} -> ${currentAppState.name}');
+      // _logger.i(
+      //     '🔄 应用状态变化: ${_previousAppState?.name ?? "初始"} -> ${currentAppState.name}');
 
       // 更新轮播状态基于当前应用状态
       _updateCarouselStateBasedOnAppState(currentAppState);
@@ -546,10 +554,10 @@ class _AnnouncementPageState extends State<AnnouncementPage> {
           _pauseAllCarousels();
           _autoHideArrearPagesOnFullscreenAd(); // 自动隐藏欠费页面
         } else if (currentAppState == AppState.manualOperation) {
-          _logger.i('🖱️ 进入手动操作状态');
+          // _logger.i('🖱️ 进入手动操作状态');
           _handleManualOperationMode();
         } else if (currentAppState == AppState.defaultState) {
-          _logger.i('🏠 进入默认状态');
+          // _logger.i('🏠 进入默认状态');
           // 確保通告輪播在默認狀態下恢復
           _resumeAllCarousels();
         }
@@ -616,7 +624,7 @@ class _AnnouncementPageState extends State<AnnouncementPage> {
 
             _previousAdvertisementsForBuild =
                 List.from(currentAdvertisements); // Update the stored list
-            _logger.i('广告轮播更新成功: ${currentAdvertisements.length} 个广告');
+            // _logger.i('广告轮播更新成功: ${currentAdvertisements.length} 个广告');
           } catch (e) {
             _logger.e('初始化顶部轮播失败，保持现有状态', error: e);
             // 不更新 _previousAdvertisementsForBuild，保持现有状态
@@ -672,7 +680,7 @@ class _AnnouncementPageState extends State<AnnouncementPage> {
                     // 轮播内容 - 始终存在，不被销毁
                     Consumer<AnnouncementCarouselProvider>(
                       builder: (context, announcementCarouselProvider, child) {
-                        _logger.i('🎬 [MainScreenPage] 轮播组件构建中');
+                        // _logger.i('🎬 [MainScreenPage] 轮播组件构建中');
                         return custom_carousel.CarouselWidget(
                           controller: announcementCarouselProvider
                               .midCarouselController,
@@ -685,11 +693,11 @@ class _AnnouncementPageState extends State<AnnouncementPage> {
                     // 欠费查询覆盖层 - 按需显示
                     Consumer<AnnouncementCarouselProvider>(
                       builder: (context, announcementCarouselProvider, child) {
-                        _logger.i(
-                            '🔄 [MainScreenPage Overlay] 检查覆盖层 - isShowingArrearQuery: ${announcementCarouselProvider.isShowingArrearQuery}');
+                        // _logger.i(
+                        //     '🔄 [MainScreenPage Overlay] 检查覆盖层 - isShowingArrearQuery: ${announcementCarouselProvider.isShowingArrearQuery}');
 
                         if (announcementCarouselProvider.isShowingArrearQuery) {
-                          _logger.i('💰 [MainScreenPage Overlay] 显示欠费查询覆盖层');
+                          // _logger.i('💰 [MainScreenPage Overlay] 显示欠费查询覆盖层');
                           return Container(
                             width: double.infinity,
                             height: double.infinity,
@@ -704,7 +712,7 @@ class _AnnouncementPageState extends State<AnnouncementPage> {
                                   10, // 简化参数
                                   10,
                                 );
-                                _logger.i('🏠 [MainScreenPage Overlay] 覆盖层已隐藏');
+                                // _logger.i('🏠 [MainScreenPage Overlay] 覆盖层已隐藏');
                               },
                             ),
                           );
@@ -718,11 +726,11 @@ class _AnnouncementPageState extends State<AnnouncementPage> {
                     // 欠费总览覆盖层 - 按需显示
                     Consumer<AnnouncementCarouselProvider>(
                       builder: (context, announcementCarouselProvider, child) {
-                        _logger.i(
-                            '🔄 [MainScreenPage Overlay] 检查欠费总览覆盖层 - isShowingArrearTable: ${announcementCarouselProvider.isShowingArrearTable}');
+                        // _logger.i(
+                        //     '🔄 [MainScreenPage Overlay] 检查欠费总览覆盖层 - isShowingArrearTable: ${announcementCarouselProvider.isShowingArrearTable}');
 
                         if (announcementCarouselProvider.isShowingArrearTable) {
-                          _logger.i('📊 [MainScreenPage Overlay] 显示欠费总览覆盖层');
+                          // _logger.i('📊 [MainScreenPage Overlay] 显示欠费总览覆盖层');
                           return Container(
                             width: double.infinity,
                             height: double.infinity,
@@ -737,8 +745,8 @@ class _AnnouncementPageState extends State<AnnouncementPage> {
                                   10, // 简化参数
                                   10,
                                 );
-                                _logger.i(
-                                    '🏠 [MainScreenPage Overlay] 欠费总览覆盖层已隐藏');
+                                // _logger.i(
+                                //     '🏠 [MainScreenPage Overlay] 欠费总览覆盖层已隐藏');
                               },
                             ),
                           );

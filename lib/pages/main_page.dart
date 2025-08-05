@@ -1,6 +1,6 @@
 import 'dart:async'; // Added import for Timer
 
-import 'package:flutter/foundation.dart' show listEquals, kDebugMode;
+import 'package:flutter/foundation.dart' show listEquals;
 import 'package:flutter/material.dart';
 import 'package:iboard_app/models/announcement_model.dart';
 import 'package:iboard_app/pages/fullscreen_ads_page.dart';
@@ -96,9 +96,8 @@ class _MainPageState extends State<MainPage> {
       setState(() {
         _isAdsDialogOpen = false;
       });
-      if (kDebugMode) {
-        print('Fullscreen ad dialog closed');
-      }
+      // Fullscreen ad dialog closed log (always available)
+      // print('Fullscreen ad dialog closed');
     });
   }
 
@@ -137,10 +136,9 @@ class _MainPageState extends State<MainPage> {
                 WidgetsBinding.instance.addPostFrameCallback((_) {
                   if (mounted) {
                     carouselState.onUserInteraction();
-                    if (kDebugMode) {
-                      print('User interaction detected');
-                      print(carouselState.getStateDescription());
-                    }
+                    // User interaction detected log (always available)
+                    // print('User interaction detected');
+                    // print(carouselState.getStateDescription());
                   }
                 });
               },

@@ -16,42 +16,42 @@ class DebugCacheUtil {
       final topAdOrder = prefs.getString('top_ad_carousel_order');
       if (topAdOrder != null) {
         final topAdData = json.decode(topAdOrder) as List;
-        _logger.i('📋 顶部广告轮播顺序缓存: ${topAdData.length}个配置');
+        // _logger.i('📋 顶部广告轮播顺序缓存: ${topAdData.length}个配置');
         for (int i = 0; i < topAdData.length; i++) {
           final item = topAdData[i];
-          _logger.i(
-              '  ${i + 1}. ID: ${item['id']}, 标题: ${item['title']}, 顺序: ${item['order']}');
+          // _logger.i(
+          // '  ${i + 1}. ID: ${item['id']}, 标题: ${item['title']}, 顺序: ${item['order']}');
         }
       } else {
-        _logger.w('❌ 顶部广告轮播顺序缓存为空');
+        // _logger.w('❌ 顶部广告轮播顺序缓存为空');
       }
 
       // 检查通告轮播顺序
       final announcementOrder = prefs.getString('announcement_carousel_order');
       if (announcementOrder != null) {
         final announcementData = json.decode(announcementOrder) as List;
-        _logger.i('📋 通告轮播顺序缓存: ${announcementData.length}个配置');
+        // _logger.i('📋 通告轮播顺序缓存: ${announcementData.length}个配置');
         for (int i = 0; i < announcementData.length; i++) {
           final item = announcementData[i];
-          _logger.i(
-              '  ${i + 1}. ID: ${item['id']}, 标题: ${item['title']}, 顺序: ${item['order']}');
+          // _logger.i(
+          // '  ${i + 1}. ID: ${item['id']}, 标题: ${item['title']}, 顺序: ${item['order']}');
         }
       } else {
-        _logger.w('❌ 通告轮播顺序缓存为空');
+        // _logger.w('❌ 通告轮播顺序缓存为空');
       }
 
       // 检查全屏广告轮播顺序
       final fullscreenAdOrder = prefs.getString('fullscreen_ad_carousel_order');
       if (fullscreenAdOrder != null) {
         final fullscreenAdData = json.decode(fullscreenAdOrder) as List;
-        _logger.i('📋 全屏广告轮播顺序缓存: ${fullscreenAdData.length}个配置');
+        // _logger.i('📋 全屏广告轮播顺序缓存: ${fullscreenAdData.length}个配置');
         for (int i = 0; i < fullscreenAdData.length; i++) {
           final item = fullscreenAdData[i];
-          _logger.i(
-              '  ${i + 1}. ID: ${item['id']}, 标题: ${item['title']}, 顺序: ${item['order']}');
+          // _logger.i(
+          // '  ${i + 1}. ID: ${item['id']}, 标题: ${item['title']}, 顺序: ${item['order']}');
         }
       } else {
-        _logger.w('❌ 全屏广告轮播顺序缓存为空');
+        // _logger.w('❌ 全屏广告轮播顺序缓存为空');
       }
     } catch (e) {
       _logger.e('检查轮播顺序缓存失败', error: e);
@@ -67,28 +67,28 @@ class DebugCacheUtil {
       final advertisementsData = prefs.getString('advertisements_data');
       if (advertisementsData != null) {
         final adsData = json.decode(advertisementsData) as List;
-        _logger.i('📋 广告数据缓存: ${adsData.length}个广告');
+        // _logger.i('📋 广告数据缓存: ${adsData.length}个广告');
         for (int i = 0; i < adsData.length; i++) {
           final ad = adsData[i];
-          _logger.i(
-              '  ${i + 1}. ID: ${ad['id']}, 标题: ${ad['title']}, 显示类型: ${ad['display']}');
+          // _logger.i(
+          // '  ${i + 1}. ID: ${ad['id']}, 标题: ${ad['title']}, 显示类型: ${ad['display']}');
         }
       } else {
-        _logger.w('❌ 广告数据缓存为空');
+        // _logger.w('❌ 广告数据缓存为空');
       }
 
       // 检查通告数据缓存
       final announcementsData = prefs.getString('announcements_data');
       if (announcementsData != null) {
         final announcementsList = json.decode(announcementsData) as List;
-        _logger.i('📋 通告数据缓存: ${announcementsList.length}个通告');
+        // _logger.i('📋 通告数据缓存: ${announcementsList.length}个通告');
         for (int i = 0; i < announcementsList.length; i++) {
           final announcement = announcementsList[i];
-          _logger.i(
-              '  ${i + 1}. ID: ${announcement['id']}, 标题: ${announcement['title']}, 类型: ${announcement['type']}');
+          // _logger.i(
+          // '  ${i + 1}. ID: ${announcement['id']}, 标题: ${announcement['title']}, 类型: ${announcement['type']}');
         }
       } else {
-        _logger.w('❌ 通告数据缓存为空');
+        // _logger.w('❌ 通告数据缓存为空');
       }
     } catch (e) {
       _logger.e('检查原始数据缓存失败', error: e);
@@ -102,7 +102,7 @@ class DebugCacheUtil {
       await prefs.remove('top_ad_carousel_order');
       await prefs.remove('announcement_carousel_order');
       await prefs.remove('fullscreen_ad_carousel_order');
-      _logger.i('🗑️ 已清除所有轮播顺序缓存');
+      // _logger.i('🗑️ 已清除所有轮播顺序缓存');
     } catch (e) {
       _logger.e('清除轮播顺序缓存失败', error: e);
     }
@@ -114,7 +114,7 @@ class DebugCacheUtil {
       final prefs = await SharedPreferences.getInstance();
       await prefs.remove('advertisements_data');
       await prefs.remove('announcements_data');
-      _logger.i('🗑️ 已清除所有数据缓存');
+      // _logger.i('🗑️ 已清除所有数据缓存');
     } catch (e) {
       _logger.e('清除数据缓存失败', error: e);
     }
@@ -125,13 +125,13 @@ class DebugCacheUtil {
     try {
       final prefs = await SharedPreferences.getInstance();
       final keys = prefs.getKeys();
-      _logger.i('📋 所有缓存键: ${keys.length}个');
+      // _logger.i('📋 所有缓存键: ${keys.length}个');
       for (final key in keys) {
         final value = prefs.get(key);
         if (value is String) {
-          _logger.i('  $key: ${value.length} 字符');
+          // _logger.i('  $key: ${value.length} 字符');
         } else {
-          _logger.i('  $key: $value');
+          // _logger.i('  $key: $value');
         }
       }
     } catch (e) {
@@ -153,13 +153,13 @@ class DebugCacheUtil {
 
       // 保存测试数据
       await prefs.setString('test_carousel_order', json.encode(testOrderData));
-      _logger.i('✅ 测试轮播顺序已保存');
+      // _logger.i('✅ 测试轮播顺序已保存');
 
       // 读取测试数据
       final savedData = prefs.getString('test_carousel_order');
       if (savedData != null) {
         final decodedData = json.decode(savedData) as List;
-        _logger.i('✅ 测试轮播顺序读取成功: ${decodedData.length}个配置');
+        // _logger.i('✅ 测试轮播顺序读取成功: ${decodedData.length}个配置');
 
         // 验证数据完整性
         bool isValid = true;
@@ -175,7 +175,7 @@ class DebugCacheUtil {
         }
 
         if (isValid) {
-          _logger.i('✅ 轮播顺序持久化功能正常');
+          // _logger.i('✅ 轮播顺序持久化功能正常');
         } else {
           _logger.e('❌ 轮播顺序持久化功能异常');
         }
@@ -185,7 +185,7 @@ class DebugCacheUtil {
 
       // 清理测试数据
       await prefs.remove('test_carousel_order');
-      _logger.i('🗑️ 测试数据已清理');
+      // _logger.i('🗑️ 测试数据已清理');
     } catch (e) {
       _logger.e('测试轮播顺序持久化功能失败', error: e);
     }

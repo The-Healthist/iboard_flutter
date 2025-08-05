@@ -43,9 +43,9 @@ class ApiClient {
   void setAuthToken(String? token) {
     _token = token;
     if (token != null && token.isNotEmpty) {
-      _logger.i('Auth token set in ApiClient.');
+      // _logger.i('Auth token set in ApiClient.');
     } else {
-      _logger.i('Auth token cleared in ApiClient.');
+      // _logger.i('Auth token cleared in ApiClient.');
     }
   }
 
@@ -85,7 +85,7 @@ class ApiClient {
     final String decodedBody = utf8.decode(response.bodyBytes);
 
     if (response.statusCode >= 200 && response.statusCode < 300) {
-      _logger.i('$apiName successful (Status: ${response.statusCode})');
+      // _logger.i('$apiName successful (Status: ${response.statusCode})');
       if (decodedBody.isEmpty) {
         return []; // Return empty list for empty successful response
       }
@@ -139,7 +139,7 @@ class ApiClient {
     final String decodedBody = utf8.decode(response.bodyBytes);
 
     if (response.statusCode >= 200 && response.statusCode < 300) {
-      _logger.i('$apiName successful (Status: ${response.statusCode})');
+      // _logger.i('$apiName successful (Status: ${response.statusCode})');
       if (decodedBody.isEmpty) {
         return {}; // Return empty map for empty successful response
       }
@@ -188,11 +188,11 @@ class ApiClient {
       final completer = Completer<String?>();
       _tokenRefreshFuture = completer.future;
 
-      _logger.i('Starting new token refresh process via onNeedsTokenRefresh.');
+      // _logger.i('Starting new token refresh process via onNeedsTokenRefresh.');
       onNeedsTokenRefresh!().then((newToken) {
         if (newToken != null && newToken.isNotEmpty) {
-          _logger.i(
-              'Token refresh process completed successfully with a new token.');
+          // _logger.i(
+          //     'Token refresh process completed successfully with a new token.');
           completer.complete(newToken);
         } else {
           _logger.w(
@@ -225,11 +225,11 @@ class ApiClient {
         !isHealthTestRequest &&
         _token != null &&
         _token!.isNotEmpty) {
-      _logger.i('Performing pre-request health check for $apiNameForLog.');
+      // _logger.i('Performing pre-request health check for $apiNameForLog.');
       try {
         // healthTest() itself calls _sendRequest with isHealthTestRequest = true
         await healthTest();
-        _logger.i('Pre-request health check successful for $apiNameForLog.');
+        // _logger.i('Pre-request health check successful for $apiNameForLog.');
       } on ApiException catch (e) {
         if (e.statusCode == 401) {
           _logger.w(
@@ -243,8 +243,8 @@ class ApiClient {
           try {
             final newToken = await _initiateAndGetTokenRefreshFuture();
             if (newToken != null && newToken.isNotEmpty) {
-              _logger.i(
-                  'Token refreshed successfully via health check for $apiNameForLog. Main request will proceed.');
+              // _logger.i(
+              //     'Token refreshed successfully via health check for $apiNameForLog. Main request will proceed.');
               // Optionally, re-run healthTest to confirm, but adds latency.
               // await healthTest();
             } else {
@@ -289,7 +289,7 @@ class ApiClient {
 
     for (int attempt = 1; attempt <= _maxRetryAttempts; attempt++) {
       try {
-        _logger.i('$apiNameForLog - 尝试第 $attempt/$_maxRetryAttempts 次请求');
+        // _logger.i('$apiNameForLog - 尝试第 $attempt/$_maxRetryAttempts 次请求');
 
         // 应用超时到请求函数
         response = await requestFunction().timeout(
@@ -301,8 +301,8 @@ class ApiClient {
         );
 
         // 如果请求成功，跳出重试循环
-        _logger.i(
-            '$apiNameForLog - 第 $attempt 次请求成功 (状态码: ${response.statusCode})');
+        // _logger.i(
+        //     '$apiNameForLog - 第 $attempt 次请求成功 (状态码: ${response.statusCode})');
         break;
       } catch (e, stackTrace) {
         lastException = e is Exception ? e : Exception(e.toString());
@@ -352,8 +352,8 @@ class ApiClient {
       try {
         final newToken = await _initiateAndGetTokenRefreshFuture();
         if (newToken != null && newToken.isNotEmpty) {
-          _logger.i(
-              'Token refreshed successfully for $apiNameForLog. Retrying original request.');
+          // _logger.i(
+          //     'Token refreshed successfully for $apiNameForLog. Retrying original request.');
           response =
               await requestFunction(); // Retry the original request function
         } else {
@@ -383,7 +383,7 @@ class ApiClient {
     final Map<String, String> headers =
         _getHeaders(requiresAuth: false, contentType: 'application/json');
 
-    _logger.i('Attempting login for deviceId: $deviceId');
+    // _logger.i('Attempting login for deviceId: $deviceId');
 
     final http.Response response = await _sendRequest(
         () => http.post(url, headers: headers, body: requestBody),
@@ -397,7 +397,7 @@ class ApiClient {
         responseData['token'] is String &&
         (responseData['token'] as String).isNotEmpty) {
       setAuthToken(responseData['token'] as String);
-      _logger.i('Login successful, token stored in ApiClient.');
+      // _logger.i('Login successful, token stored in ApiClient.');
     } else {
       _logger.w(
           'Login response did not contain a valid token. Clearing any existing token in ApiClient.');
@@ -414,7 +414,7 @@ class ApiClient {
     final Map<String, String> headers =
         _getHeaders(requiresAuth: true, contentType: 'application/json');
 
-    _logger.i('Fetching advertisements for building.');
+    // _logger.i('Fetching advertisements for building.');
     final http.Response response = await _sendRequest(
         () => http.get(url, headers: headers),
         apiNameForLog: 'getAdvertisementsBuilding');
@@ -429,7 +429,7 @@ class ApiClient {
     final Map<String, String> headers =
         _getHeaders(requiresAuth: true, contentType: 'application/json');
 
-    _logger.i('Fetching notices for building.');
+    // _logger.i('Fetching notices for building.');
     final http.Response response = await _sendRequest(
         () => http.get(url, headers: headers),
         apiNameForLog: 'getNoticesBuilding');
@@ -446,7 +446,7 @@ class ApiClient {
     final Map<String, String> headers =
         _getHeaders(requiresAuth: true, contentType: 'application/json');
 
-    _logger.i('Performing health test.');
+    // _logger.i('Performing health test.');
     final http.Response response = await _sendRequest(
         () => http.post(url, headers: headers, body: ""),
         apiNameForLog: 'healthTest',
@@ -468,7 +468,7 @@ class ApiClient {
     final Map<String, String> headers =
         _getHeaders(requiresAuth: true, contentType: 'application/json');
 
-    _logger.i('Fetching building notices for blgId: $blgId');
+    // _logger.i('Fetching building notices for blgId: $blgId');
     final http.Response response = await _sendRequest(
         () => http.post(url, headers: headers, body: requestBody),
         apiNameForLog: 'getBuildingNotices');
@@ -494,7 +494,7 @@ class ApiClient {
       'Content-Type': 'application/json',
     };
 
-    _logger.i('Attempting admin login for email: $email');
+    // _logger.i('Attempting admin login for email: $email');
     final http.Response response = await _sendRequest(
         () => http.post(url, headers: headers, body: requestBody),
         isLoginRequest: true,
@@ -503,7 +503,7 @@ class ApiClient {
     final Map<String, dynamic> responseData =
         await _handleResponse(response, 'adminLogin');
 
-    _logger.i('Admin login successful for email: $email');
+    // _logger.i('Admin login successful for email: $email');
     return responseData;
   }
 
@@ -541,7 +541,7 @@ class ApiClient {
       'Content-Type': 'application/json',
     };
 
-    _logger.i('Creating device with deviceId: $deviceId');
+    // _logger.i('Creating device with deviceId: $deviceId');
     final http.Response response = await _sendRequest(
         () => http.post(url, headers: headers, body: requestBody),
         apiNameForLog: 'createDevice');
@@ -549,7 +549,7 @@ class ApiClient {
     final Map<String, dynamic> responseData =
         await _handleResponse(response, 'createDevice');
 
-    _logger.i('Device created successfully: $deviceId');
+    // _logger.i('Device created successfully: $deviceId');
     return responseData;
   }
 
@@ -568,7 +568,7 @@ class ApiClient {
     final Map<String, String> headers =
         _getHeaders(requiresAuth: true, contentType: 'application/json');
 
-    _logger.i('获取欠费数据，楼宇ID: $buildingId');
+    // _logger.i('获取欠费数据，楼宇ID: $buildingId');
     final http.Response response = await _sendRequest(
         () => http.post(url, headers: headers, body: requestBody),
         apiNameForLog: 'getArrearage');

@@ -33,18 +33,12 @@ void main() {
           Provider<FileManager>(
             create: (context) => FileManager(),
           ),
-          ChangeNotifierProxyProvider2<AppDataProvider, FileManager,
-              AnnouncementProvider>(
-            create: (context) => AnnouncementProvider(
-              Provider.of<AppDataProvider>(context, listen: false).apiClient,
-              Provider.of<AppDataProvider>(context, listen: false),
-              Provider.of<FileManager>(context, listen: false),
-            ),
-            update: (context, appDataProvider, fileManager,
-                previousAnnouncementProvider) {
-              // 如果之前的Provider存在，先停止其定时更新
-              previousAnnouncementProvider?.stopPeriodicUpdate();
-              // 创建新的Provider
+          ChangeNotifierProvider<AnnouncementProvider>(
+            create: (context) {
+              final appDataProvider =
+                  Provider.of<AppDataProvider>(context, listen: false);
+              final fileManager =
+                  Provider.of<FileManager>(context, listen: false);
               return AnnouncementProvider(
                 appDataProvider.apiClient,
                 appDataProvider,
@@ -52,18 +46,12 @@ void main() {
               );
             },
           ),
-          ChangeNotifierProxyProvider2<AppDataProvider, FileManager,
-              AdvertisementProvider>(
-            create: (context) => AdvertisementProvider(
-              Provider.of<AppDataProvider>(context, listen: false).apiClient,
-              Provider.of<AppDataProvider>(context, listen: false),
-              Provider.of<FileManager>(context, listen: false),
-            ),
-            update: (context, appDataProvider, fileManager,
-                previousAdvertisementProvider) {
-              // 如果之前的Provider存在，先停止其定时更新
-              previousAdvertisementProvider?.stopPeriodicUpdate();
-              // 创建新的Provider
+          ChangeNotifierProvider<AdvertisementProvider>(
+            create: (context) {
+              final appDataProvider =
+                  Provider.of<AppDataProvider>(context, listen: false);
+              final fileManager =
+                  Provider.of<FileManager>(context, listen: false);
               return AdvertisementProvider(
                 appDataProvider.apiClient,
                 appDataProvider,
@@ -80,17 +68,25 @@ void main() {
           ChangeNotifierProvider(
               create: (_) =>
                   AnnouncementCarouselProvider()), // Add AnnouncementCarouselProvider here
-          ChangeNotifierProvider(
-              create: (_) =>
-                  FullscreenAdProvider()), // Add FullscreenAdProvider here
+          ChangeNotifierProvider<FullscreenAdProvider>(
+            create: (context) {
+              final appDataProvider =
+                  Provider.of<AppDataProvider>(context, listen: false);
+              return FullscreenAdProvider(appDataProvider);
+            },
+          ),
           ChangeNotifierProvider(
               create: (_) =>
                   BottomWeatherQrcodeCarouselProvider()), // Add BottomWeatherQrcodeCarouselProvider here
           ChangeNotifierProvider<ArrearProvider>(
-            create: (context) => ArrearProvider(
-              apiClient: Provider.of<AppDataProvider>(context, listen: false)
-                  .apiClient,
-            ),
+            create: (context) {
+              final appDataProvider =
+                  Provider.of<AppDataProvider>(context, listen: false);
+              return ArrearProvider(
+                apiClient: appDataProvider.apiClient,
+                appDataProvider: appDataProvider,
+              );
+            },
           ),
           ChangeNotifierProvider(
             create: (context) => WeatherProvider(),
@@ -162,14 +158,11 @@ class _HomePageState extends State<HomePage> {
               Provider.of<AdvertisementProvider>(context, listen: false);
           final announcementProvider =
               Provider.of<AnnouncementProvider>(context, listen: false);
-          final fullscreenAdProvider =
-              Provider.of<FullscreenAdProvider>(context, listen: false);
 
           // 设置Provider间的关联
           appDataProvider.setCarouselStateProvider(carouselStateProvider);
-          fullscreenAdProvider.setAppDataProvider(appDataProvider);
 
-          // 设置ArrearProvider引用
+          // 获取Provider引用（现在通过构造函数注入，无需手动设置）
           final arrearProvider =
               Provider.of<ArrearProvider>(context, listen: false);
           appDataProvider.setArrearProvider(arrearProvider);
@@ -197,8 +190,8 @@ class _HomePageState extends State<HomePage> {
             }
 
             weatherProvider.startPeriodicUpdate(
-                interval: const Duration(hours: 2));
-            print('天气数据初始化完成');
+                interval: const Duration(minutes: 1));
+            print('天气数据初始化完成 - 定时更新间隔设置为1分钟');
           } catch (e) {
             print('天气数据初始化失败: $e');
           }

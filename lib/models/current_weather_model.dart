@@ -216,7 +216,7 @@ class HumidityInfoModel {
 
 class UvIndexDataModel {
   final String place;
-  final int value;
+  final double value;
   final String desc;
 
   UvIndexDataModel({
@@ -225,10 +225,11 @@ class UvIndexDataModel {
     required this.desc,
   });
 
+  ///1, 从JSON数据创建UvIndexDataModel实例，支持double和int类型的value
   factory UvIndexDataModel.fromJson(Map<String, dynamic> json) {
     return UvIndexDataModel(
       place: json['place'] as String,
-      value: json['value'] as int,
+      value: (json['value'] as num).toDouble(),
       desc: json['desc'] as String,
     );
   }

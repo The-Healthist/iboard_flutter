@@ -42,7 +42,7 @@ class _WeatherDataDebugWidgetState extends State<WeatherDataDebugWidget> {
         _isLoading = false;
       });
 
-      _logger.i('天气数据缓存状态: $_cacheStatus');
+      // _logger.i('天气数据缓存状态: $_cacheStatus');
     } catch (e) {
       _logger.e('获取缓存状态失败', error: e);
       setState(() {

@@ -80,8 +80,8 @@ class AppDataProvider extends ChangeNotifier {
       baseUrl: _baseUrl,
       onNeedsTokenRefresh: _handleTokenRefresh,
     );
-    _logger.i(
-        'AppDataProvider initialized. ApiClient configured for token refresh.');
+    // _logger.i(
+    //     'AppDataProvider initialized. ApiClient configured for token refresh.');
   }
 
   ///1，保存登录设备数据到SharedPreferences缓存
@@ -90,7 +90,7 @@ class AppDataProvider extends ChangeNotifier {
       final prefs = await SharedPreferences.getInstance();
       final jsonString = json.encode(responseData);
       await prefs.setString(_loginDeviceDataKey, jsonString);
-      _logger.i('登录设备数据已保存到缓存');
+      // _logger.i('登录设备数据已保存到缓存');
     } catch (e) {
       _logger.e('保存登录设备数据到缓存失败', error: e);
     }
@@ -103,7 +103,7 @@ class AppDataProvider extends ChangeNotifier {
       final jsonString = prefs.getString(_loginDeviceDataKey);
       if (jsonString != null && jsonString.isNotEmpty) {
         final data = json.decode(jsonString) as Map<String, dynamic>;
-        _logger.i('从缓存加载登录设备数据成功');
+        // _logger.i('从缓存加载登录设备数据成功');
         return data;
       }
     } catch (e) {
@@ -117,7 +117,7 @@ class AppDataProvider extends ChangeNotifier {
     try {
       final prefs = await SharedPreferences.getInstance();
       await prefs.remove(_loginDeviceDataKey);
-      _logger.i('登录设备数据缓存已清除');
+      // _logger.i('登录设备数据缓存已清除');
     } catch (e) {
       _logger.e('清除登录设备数据缓存失败', error: e);
     }
@@ -145,12 +145,12 @@ class AppDataProvider extends ChangeNotifier {
         return;
       }
 
-      _logger.i('优先尝试登录（包含自动设备注册），如果失败则使用缓存数据，设备ID: $_deviceId');
+      // _logger.i('优先尝试登录（包含自动设备注册），如果失败则使用缓存数据，设备ID: $_deviceId');
 
       // 尝试登录（包含自动设备注册逻辑）
       try {
         await initializeAndLogin();
-        _logger.i('登录成功，已更新最新数据到缓存');
+        // _logger.i('登录成功，已更新最新数据到缓存');
       } catch (loginError) {
         _logger.w('登录失败，尝试使用缓存数据作为备用: $loginError');
 
@@ -175,12 +175,12 @@ class AppDataProvider extends ChangeNotifier {
       if (cachedData != null) {
         try {
           _settingsModel = SettingsModel.fromJson(cachedData);
-          _logger.i('从缓存成功加载备用数据');
+          // _logger.i('从缓存成功加载备用数据');
 
           // 设置API客户端的token
           if (_settingsModel?.token != null) {
             _apiClient.setAuthToken(_settingsModel!.token);
-            _logger.i('API客户端token已从缓存设置');
+            // _logger.i('API客户端token已从缓存设置');
           }
 
           // 更新CarouselStateProvider的时间配置
@@ -280,7 +280,7 @@ class AppDataProvider extends ChangeNotifier {
           // 设置API客户端的token
           if (_settingsModel?.token != null) {
             _apiClient.setAuthToken(_settingsModel!.token);
-            _logger.i('API客户端token已从缓存设置');
+            // _logger.i('API客户端token已从缓存设置');
           }
 
           // 更新CarouselStateProvider的时间配置

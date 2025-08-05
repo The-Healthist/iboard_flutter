@@ -444,7 +444,11 @@ class TopAdCarouselProvider extends ChangeNotifier {
   @override
   void dispose() {
     _topTimer?.cancel();
+    _topTimer = null;
+
     _debugTimer?.cancel();
+    _debugTimer = null;
+
     super.dispose();
   }
 }

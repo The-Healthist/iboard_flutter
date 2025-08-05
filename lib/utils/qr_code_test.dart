@@ -18,7 +18,7 @@ class _QrCodeTestPageState extends State<QrCodeTestPage> {
   @override
   void initState() {
     super.initState();
-    _logger.i('🧪 二维码测试页面初始化');
+    // _logger.i('🧪 二维码测试页面初始化');
   }
 
   @override

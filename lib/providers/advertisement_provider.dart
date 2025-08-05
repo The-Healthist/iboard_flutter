@@ -40,6 +40,7 @@ class AdvertisementProvider extends ChangeNotifier {
   bool get isLoading => _isLoading;
   String? get error => _error;
   bool get isPeriodicUpdateActive => _isPeriodicUpdateActive;
+  ApiClient get apiClient => _apiClient; // 添加apiClient getter用于比较
 
   AdvertisementProvider(
       this._apiClient, this._appDataProvider, this._fileManager) {
@@ -190,6 +191,25 @@ class AdvertisementProvider extends ChangeNotifier {
     }
     _isPeriodicUpdateActive = false;
     _logger.i('Periodic advertisement update stopped.');
+  }
+
+  /// 重新初始化Provider（当依赖变化时调用）
+  void reinitialize() {
+    _logger.i('AdvertisementProvider reinitializing...');
+
+    // 停止现有的定时更新
+    stopPeriodicUpdate();
+
+    // 重新加载缓存数据
+    _loadAdvertisementsFromCache();
+
+    // 如果AppDataProvider已登录，重新启动定时更新
+    Future.delayed(const Duration(milliseconds: 100), () {
+      if (_appDataProvider.isLoggedIn) {
+        _logger.i('重新初始化完成，重启广告定时更新');
+        startPeriodicUpdate();
+      }
+    });
   }
 
   /// 检查文件是否已缓存（使用 FileManager 检查）

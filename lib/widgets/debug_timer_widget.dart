@@ -36,6 +36,7 @@ class _TimerDebugWidgetState extends State<TimerDebugWidget> {
   @override
   void dispose() {
     _updateTimer?.cancel();
+    _updateTimer = null;
     super.dispose();
   }
 
@@ -342,7 +343,7 @@ class _TimerDebugWidgetState extends State<TimerDebugWidget> {
       _updatingTasks.add('advertisements');
     });
 
-    _logger.i('🎬 [手动更新] 开始手动更新广告数据');
+    // _logger.i('🎬 [手动更新] 开始手动更新广告数据');
     final startTime = DateTime.now();
 
     try {
@@ -364,7 +365,7 @@ class _TimerDebugWidgetState extends State<TimerDebugWidget> {
         }
       };
 
-      _logger.i('🎬 [手动更新] 广告数据更新成功，耗时: ${duration.inMilliseconds}ms');
+      // _logger.i('🎬 [手动更新] 广告数据更新成功，耗时: ${duration.inMilliseconds}ms');
     } catch (e) {
       final endTime = DateTime.now();
       final duration = endTime.difference(startTime);
@@ -394,7 +395,7 @@ class _TimerDebugWidgetState extends State<TimerDebugWidget> {
       _updatingTasks.add('announcements');
     });
 
-    _logger.i('📢 [手动更新] 开始手动更新通告数据');
+    // _logger.i('📢 [手动更新] 开始手动更新通告数据');
     final startTime = DateTime.now();
 
     try {
@@ -415,7 +416,7 @@ class _TimerDebugWidgetState extends State<TimerDebugWidget> {
         }
       };
 
-      _logger.i('📢 [手动更新] 通告数据更新成功，耗时: ${duration.inMilliseconds}ms');
+      // _logger.i('📢 [手动更新] 通告数据更新成功，耗时: ${duration.inMilliseconds}ms');
     } catch (e) {
       final endTime = DateTime.now();
       final duration = endTime.difference(startTime);
@@ -445,7 +446,7 @@ class _TimerDebugWidgetState extends State<TimerDebugWidget> {
       _updatingTasks.add('weather');
     });
 
-    _logger.i('🌤️ [手动更新] 开始手动更新天气数据');
+    // _logger.i('🌤️ [手动更新] 开始手动更新天气数据');
     final startTime = DateTime.now();
 
     try {
@@ -471,7 +472,7 @@ class _TimerDebugWidgetState extends State<TimerDebugWidget> {
         }
       };
 
-      _logger.i('🌤️ [手动更新] 天气数据更新成功，耗时: ${duration.inMilliseconds}ms');
+      // _logger.i('🌤️ [手动更新] 天气数据更新成功，耗时: ${duration.inMilliseconds}ms');
     } catch (e) {
       final endTime = DateTime.now();
       final duration = endTime.difference(startTime);
@@ -501,7 +502,7 @@ class _TimerDebugWidgetState extends State<TimerDebugWidget> {
       _updatingTasks.add('arrears');
     });
 
-    _logger.i('💰 [手动更新] 开始手动更新欠费数据');
+    // _logger.i('💰 [手动更新] 开始手动更新欠费数据');
     final startTime = DateTime.now();
 
     try {
@@ -522,7 +523,7 @@ class _TimerDebugWidgetState extends State<TimerDebugWidget> {
         }
       };
 
-      _logger.i('💰 [手动更新] 欠费数据更新成功，耗时: ${duration.inMilliseconds}ms');
+      // _logger.i('💰 [手动更新] 欠费数据更新成功，耗时: ${duration.inMilliseconds}ms');
     } catch (e) {
       final endTime = DateTime.now();
       final duration = endTime.difference(startTime);
@@ -552,7 +553,7 @@ class _TimerDebugWidgetState extends State<TimerDebugWidget> {
       _updatingTasks.add('device_settings');
     });
 
-    _logger.i('⚙️ [手动更新] 开始手动更新设备设置');
+    // _logger.i('⚙️ [手动更新] 开始手动更新设备设置');
     final startTime = DateTime.now();
 
     try {
@@ -573,7 +574,7 @@ class _TimerDebugWidgetState extends State<TimerDebugWidget> {
         }
       };
 
-      _logger.i('⚙️ [手动更新] 设备设置更新成功，耗时: ${duration.inMilliseconds}ms');
+      // _logger.i('⚙️ [手动更新] 设备设置更新成功，耗时: ${duration.inMilliseconds}ms');
     } catch (e) {
       final endTime = DateTime.now();
       final duration = endTime.difference(startTime);
@@ -603,7 +604,7 @@ class _TimerDebugWidgetState extends State<TimerDebugWidget> {
       _updatingTasks.add('manual_login');
     });
 
-    _logger.i('🔑 [手动登录] 开始手动登录');
+    // _logger.i('🔑 [手动登录] 开始手动登录');
     final startTime = DateTime.now();
 
     try {
@@ -629,7 +630,7 @@ class _TimerDebugWidgetState extends State<TimerDebugWidget> {
         }
       };
 
-      _logger.i('🔑 [手动登录] 手动登录成功，耗时: ${duration.inMilliseconds}ms');
+      // _logger.i('🔑 [手动登录] 手动登录成功，耗时: ${duration.inMilliseconds}ms');
     } catch (e) {
       final endTime = DateTime.now();
       final duration = endTime.difference(startTime);
@@ -664,7 +665,7 @@ class _TimerDebugWidgetState extends State<TimerDebugWidget> {
       _updatingTasks.add('health_check');
     });
 
-    _logger.i('🏥 [手动健康检查] 开始手动执行健康检查');
+    // _logger.i('🏥 [手动健康检查] 开始手动执行健康检查');
     final startTime = DateTime.now();
 
     try {
@@ -684,7 +685,7 @@ class _TimerDebugWidgetState extends State<TimerDebugWidget> {
         }
       };
 
-      _logger.i('🏥 [手动健康检查] 健康检查执行成功，耗时: ${duration.inMilliseconds}ms');
+      // _logger.i('🏥 [手动健康检查] 健康检查执行成功，耗时: ${duration.inMilliseconds}ms');
     } catch (e) {
       final endTime = DateTime.now();
       final duration = endTime.difference(startTime);

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:iboard_app/models/arrear_model.dart';
 import 'package:iboard_app/http/api_client.dart';
+import 'package:iboard_app/providers/app_data_provider.dart';
 import 'package:logger/logger.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:convert';
@@ -9,6 +10,7 @@ import 'dart:async';
 class ArrearProvider extends ChangeNotifier {
   final Logger _logger = Logger();
   final ApiClient _apiClient;
+  final AppDataProvider _appDataProvider;
 
   bool _isLoading = false;
   String? _error;
@@ -24,7 +26,11 @@ class ArrearProvider extends ChangeNotifier {
   static const String _cacheKey = 'arrearage_data_cache';
   static const String _lastUpdateKey = 'arrearage_last_update';
 
-  ArrearProvider({required ApiClient apiClient}) : _apiClient = apiClient;
+  ArrearProvider({
+    required ApiClient apiClient,
+    required AppDataProvider appDataProvider,
+  })  : _apiClient = apiClient,
+        _appDataProvider = appDataProvider;
 
   // 定时更新相关
   Timer? _updateTimer; // 定时更新定时器
@@ -426,7 +432,7 @@ class ArrearProvider extends ChangeNotifier {
     final intervalMinutes = updateIntervalMinutes ?? 1; // 默认1分钟
     final intervalSeconds = intervalMinutes * 60; // 转换为秒
     _logger.i(
-        'Starting periodic arrear update with interval: ${intervalMinutes} minutes (${intervalSeconds} seconds)');
+        'Starting periodic arrear update with interval: $intervalMinutes minutes ($intervalSeconds seconds)');
 
     _isPeriodicUpdateActive = true;
 
@@ -454,5 +460,28 @@ class ArrearProvider extends ChangeNotifier {
     }
     _isPeriodicUpdateActive = false;
     _logger.i('Periodic arrear update stopped.');
+  }
+
+  ///12，重新初始化Provider（当依赖变化时调用）
+  void reinitialize() {
+    _logger.i('ArrearProvider reinitializing...');
+
+    // 停止现有的定时更新
+    stopPeriodicUpdate();
+
+    // 重新加载缓存数据
+    loadFromCache();
+
+    // 如果AppDataProvider已登录，重新启动定时更新
+    Future.delayed(const Duration(milliseconds: 100), () {
+      if (_appDataProvider.isLoggedIn &&
+          _appDataProvider.buildingInfo?.ismartId != null) {
+        _logger.i('重新初始化完成，重启欠费数据定时更新');
+        final deviceSettings = _appDataProvider.deviceSettings;
+        final arrearUpdateInterval =
+            deviceSettings?.arrearageUpdateDuration ?? 1;
+        startPeriodicUpdate(updateIntervalMinutes: arrearUpdateInterval);
+      }
+    });
   }
 }
