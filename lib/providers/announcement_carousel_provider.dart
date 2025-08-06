@@ -838,8 +838,8 @@ class AnnouncementCarouselProvider extends ChangeNotifier {
 
   ///17，动态延长当前通告停留时间（欠费总览开始翻页时调用）
   void _extendCurrentNoticeStayTime(int totalPages) {
-    // 计算需要延长的时间：每页3秒翻页时间
-    final int extensionSeconds = totalPages * 3;
+    // 计算需要延长的时间：每页5秒翻页时间
+    final int extensionSeconds = totalPages * 5;
     _logger.i('⏰ [动态延长] 延长当前通告停留时间: ${extensionSeconds}秒（共${totalPages}页）');
 
     // 取消现有的定时器

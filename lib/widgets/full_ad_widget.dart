@@ -150,10 +150,17 @@ class _FullAdWidgetState extends State<FullAdWidget> {
         filePath = localFile.path;
         isNetwork = false;
       } else {
-        // 使用网络URL
-        // _logger.i('🌐 使用网络视频URL: ${widget.ad.file.url}');
-        filePath = widget.ad.file.url;
-        isNetwork = true;
+        // 本地文件不存在时，检查网络连接状态
+        // _logger.w('⚠️ 本地视频文件不存在: ${widget.ad.file.url}');
+        // 如果没有本地文件，显示错误而不是尝试网络加载（避免网络依赖）
+        if (mounted) {
+          setState(() {
+            _errorMessage = '视频文件未缓存，无法离线播放';
+            _isLoadingVideo = false;
+            _isVideoInitialized = false;
+          });
+        }
+        return;
       }
 
       // 记录当前文件信息
@@ -306,9 +313,9 @@ class _FullAdWidgetState extends State<FullAdWidget> {
           );
         }
 
-        // 如果本地文件不存在，使用网络图片
-        // _logger.w('本地图片文件不存在，使用网络图片: ${widget.ad.file.url}');
-        return _buildNetworkImage();
+        // 如果本地文件不存在，显示默认广告而不是尝试网络加载
+        // _logger.w('本地图片文件不存在，显示默认广告: ${widget.ad.file.url}');
+        return _buildDefaultAd();
       },
     );
   }

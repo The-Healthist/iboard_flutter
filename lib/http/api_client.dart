@@ -327,26 +327,26 @@ class ApiClient {
 
         if (e.toString().contains('Failed host lookup') ||
             e.toString().contains('No address associated with hostname')) {
-          errorType = 'DNS解析失败';
-          userFriendlyMessage = '🌐 无法连接到服务器，请检查网络连接或联系管理员';
+          errorType = 'DNS解析失敗';
+          userFriendlyMessage = '🌐 無法鏈接到服務器,請檢查網絡連接或聯繫管理員';
         } else if (e.toString().contains('SocketException')) {
-          errorType = 'Socket连接错误';
-          userFriendlyMessage = '🔌 网络连接异常，请检查您的网络设置';
+          errorType = 'Socket連接錯誤';
+          userFriendlyMessage = '🔌 網絡連接異常，請檢查您的網絡設置';
         } else if (e.toString().contains('TimeoutException') ||
-            e.toString().contains('请求超时')) {
-          errorType = '请求超时';
-          userFriendlyMessage = '⏱️ 服务器响应超时，请稍后重试';
+            e.toString().contains('請求超時')) {
+          errorType = '請求超時';
+          userFriendlyMessage = '⏱️ 服務器響應超時，請稍後重試';
         } else if (e.toString().contains('ClientException')) {
-          errorType = '客户端错误';
-          userFriendlyMessage = '📱 应用连接错误，请重启应用或检查网络';
+          errorType = '客戶端錯誤';
+          userFriendlyMessage = '📱 應用連接錯誤，請重啟應用或檢查網絡';
         } else {
-          userFriendlyMessage = '❌ 网络请求失败，请稍后重试';
+          userFriendlyMessage = '❌ 網絡請求失敗，請稍後重試';
         }
 
         if (attempt == _maxRetryAttempts) {
           // 最后一次尝试失败，抛出用户友好的异常
           _logger.e(
-              '$apiNameForLog - 所有 $_maxRetryAttempts 次请求尝试均失败 (最后错误类型: $errorType)',
+              '$apiNameForLog - 所有 $_maxRetryAttempts 次請求嘗試均失敗 (最後錯誤類型: $errorType)',
               error: e,
               stackTrace: stackTrace);
 
@@ -359,7 +359,7 @@ class ApiClient {
         } else {
           // 还有重试机会，记录警告并等待
           _logger.w(
-              '$apiNameForLog - 第 $attempt 次请求失败 ($errorType)，${_retryDelay.inSeconds}秒后重试');
+              '$apiNameForLog - 第 $attempt 次請求失敗 ($errorType)，${_retryDelay.inSeconds}秒後重試');
           await Future.delayed(_retryDelay);
         }
       }

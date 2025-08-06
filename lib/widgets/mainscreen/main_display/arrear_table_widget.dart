@@ -616,7 +616,7 @@ class ArrearTableWidgetState extends State<ArrearTableWidget> {
 
       if (_totalPages <= 1) {
         // 只有一页，直接通知完成
-        Future.delayed(Duration(seconds: 3), () {
+        Future.delayed(Duration(seconds: 5), () {
           if (widget.onPaginationComplete != null) {
             widget.onPaginationComplete!(_totalPages);
           }
@@ -639,7 +639,7 @@ class ArrearTableWidgetState extends State<ArrearTableWidget> {
     print('📄 [自动翻页] 启动实际自动翻页逻辑 - 总页数: $_totalPages, 当前页: $_currentPage');
 
     _autoPaginationTimer?.cancel();
-    _autoPaginationTimer = Timer.periodic(Duration(seconds: 3), (timer) {
+    _autoPaginationTimer = Timer.periodic(Duration(seconds: 5), (timer) {
       if (_isPaginationPaused) return; // 如果暂停，跳过这次执行
 
       if (_currentPage < _totalPages) {

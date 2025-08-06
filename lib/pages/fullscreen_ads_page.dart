@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:iboard_app/providers/advertisement_provider.dart';
 import 'package:iboard_app/providers/fullscreen_ad_provider.dart';
@@ -27,13 +28,20 @@ class _FullscreenAdsPageState extends State<FullscreenAdsPage> {
 
           // 检查是否有错误
           if (advertisementProvider.error != null) {
-            // 检查是否是网络错误，如果是网络错误且有缓存数据，则继续使用缓存数据
+            // 优化网络错误处理：优先使用缓存数据，只有在完全没有数据时才显示错误
             final error = advertisementProvider.error!;
-            if ((error.contains('网络连接失败') ||
-                    error.contains('请求超时') ||
-                    error.contains('使用缓存的')) &&
-                fullAds.isNotEmpty) {
-              // 继续使用缓存的数据，不显示错误界面
+            if (fullAds.isNotEmpty) {
+              // 有缓存数据时，无论什么错误都继续使用缓存数据
+              _logger.i('🎯 [网络错误] 检测到错误但有缓存数据，继续使用: ${fullAds.length}个全屏广告');
+            } else if (error.contains('网络连接失败') ||
+                error.contains('请求超时') ||
+                error.contains('无法连接到服务器') ||
+                error.contains('🌐') ||
+                error.contains('⏱️') ||
+                error.contains('🔌') ||
+                error.contains('📱')) {
+              // 网络错误且没有缓存数据时，显示友好的离线界面而不是错误界面
+              return _buildOfflineState();
             } else {
               return _buildErrorState(error);
             }
@@ -68,8 +76,8 @@ class _FullscreenAdsPageState extends State<FullscreenAdsPage> {
                     height: double.infinity,
                     child: currentAdWidget,
                   ),
-                  // 调试时间组件
-                  const DebugFullAdTimeWidget(),
+                  // 调试时间组件 - 只在debug模式下显示
+                  if (kDebugMode) const DebugFullAdTimeWidget(),
                 ],
               );
             }
@@ -85,8 +93,8 @@ class _FullscreenAdsPageState extends State<FullscreenAdsPage> {
                   height: double.infinity,
                   child: fullscreenAdProvider.adWidgets.first,
                 ),
-                // 调试时间组件
-                const DebugFullAdTimeWidget(),
+                // 调试时间组件 - 只在debug模式下显示
+                if (kDebugMode) const DebugFullAdTimeWidget(),
               ],
             );
           }
@@ -149,6 +157,55 @@ class _FullscreenAdsPageState extends State<FullscreenAdsPage> {
       color: Colors.black,
       child: Center(
         child: CircularProgressIndicator(color: Colors.white),
+      ),
+    );
+  }
+
+  ///2a，构建离线状态界面
+  Widget _buildOfflineState() {
+    return Container(
+      width: double.infinity,
+      height: double.infinity,
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            Colors.grey.shade800,
+            Colors.grey.shade600,
+            Colors.grey.shade700,
+          ],
+        ),
+      ),
+      child: Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              Icons.wifi_off,
+              size: 120,
+              color: Colors.white70,
+            ),
+            SizedBox(height: 30),
+            Text(
+              '离线模式',
+              style: TextStyle(
+                fontSize: 36,
+                fontWeight: FontWeight.bold,
+                color: Colors.white,
+              ),
+            ),
+            SizedBox(height: 20),
+            Text(
+              '網絡連接中斷，正在使用離線數據\n廣告將在網絡恢復後自動更新',
+              style: TextStyle(
+                fontSize: 18,
+                color: Colors.white70,
+              ),
+              textAlign: TextAlign.center,
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -217,8 +274,8 @@ class _FullscreenAdsPageState extends State<FullscreenAdsPage> {
               ],
             ),
           ),
-          // 调试时间组件
-          const DebugFullAdTimeWidget(),
+          // 调试时间组件 - 只在debug模式下显示
+          if (kDebugMode) const DebugFullAdTimeWidget(),
         ],
       ),
     );

@@ -610,9 +610,8 @@ class _TimerDebugWidgetState extends State<TimerDebugWidget> {
     try {
       final appDataProvider = context.read<AppDataProvider>();
 
-      // 调用定时登录使用的方法进行手动登录
-      await appDataProvider.initializeAndLogin(
-          deviceIdToSet: appDataProvider.deviceId);
+      // 使用新的manualLogin方法，不会清除现有缓存数据
+      await appDataProvider.manualLogin();
 
       final endTime = DateTime.now();
       final duration = endTime.difference(startTime);
@@ -645,6 +644,8 @@ class _TimerDebugWidgetState extends State<TimerDebugWidget> {
         'data': {
           '登录状态': appDataProvider.isLoggedIn ? '✅ 已登录' : '❌ 未登录',
           'Token状态': appDataProvider.token != null ? '✅ 有效' : '❌ 无效',
+          '设备设置': appDataProvider.deviceSettings != null ? '✅ 已加载' : '❌ 未加载',
+          '设备ID': appDataProvider.deviceId ?? '未获取',
         }
       };
 

@@ -29,11 +29,7 @@ void main() {
         providers: [
           ChangeNotifierProvider(
             create: (context) => AppDataProvider(
-              // 主服务器地址
-              baseUrl: 'http://test.iboard.skylinedances.com',
-              // 备用服务器地址（暂时设为null，需要实际IP时请替换）
-              fallbackUrl: null, // 如需备用服务器，请替换为: 'http://实际IP:端口'
-            ),
+                baseUrl: 'http://test.iboard.skylinedances.com'),
           ),
           Provider<FileManager>(
             create: (context) => FileManager(),
@@ -201,9 +197,16 @@ class _HomePageState extends State<HomePage> {
             print('天气数据初始化失败: $e');
           }
 
-          // 执行登录
+          // 执行登录前检查缓存状态
+          print('🚀 开始执行设备初始化和登录流程');
+          print('🔍 检查初始化前的缓存状态...');
+          await appDataProvider.debugSharedPreferencesKeys();
+          final hasCachedData = await appDataProvider.hasCachedLoginData();
+          print('🔍 初始化前缓存数据存在: $hasCachedData');
 
           await appDataProvider.initialize(deviceIdToSet: deviceId);
+          print('🚀 设备初始化流程完成');
+
           // 初始化完成后启动定时更新和初始化欠费数据（数据可能来自登录或缓存）
           print('初始化完成，登录状态: ${appDataProvider.isLoggedIn}');
           print('Token状态: ${appDataProvider.token != null ? '有效' : '无效'}');
@@ -255,15 +258,33 @@ class _HomePageState extends State<HomePage> {
             }
           } else {
             // 既没有登录成功也没有可用的缓存数据
-            setState(() {
-              _initializationError = appDataProvider.error ?? '无法获取设备配置数据';
-            });
+            final error = appDataProvider.error ?? '无法获取设备配置数据';
+
+            // 检查是否是网络错误
+            if (_isNetworkError(error)) {
+              setState(() {
+                _initializationError = '🌐 网络连接失败且无缓存数据可用\n\n请检查网络连接后重试，或联系管理员';
+              });
+            } else {
+              setState(() {
+                _initializationError = error;
+              });
+            }
           }
         } catch (e) {
           print('Auto login failed: $e');
-          setState(() {
-            _initializationError = '登录失败: $e';
-          });
+          final error = e.toString();
+
+          // 检查是否是网络错误
+          if (_isNetworkError(error)) {
+            setState(() {
+              _initializationError = '🌐 网络连接失败且无缓存数据可用\n\n请检查网络连接后重试，或联系管理员';
+            });
+          } else {
+            setState(() {
+              _initializationError = '登录失败: $e';
+            });
+          }
         }
       }
     } catch (e) {
@@ -283,6 +304,23 @@ class _HomePageState extends State<HomePage> {
     await _initializeDeviceId();
   }
 
+  ///1, 检查是否为网络错误
+  bool _isNetworkError(String error) {
+    final networkErrorKeywords = [
+      '无法连接到服务器',
+      '网络连接失败',
+      '请求超时',
+      'SocketException',
+      'ClientException',
+      'TimeoutException',
+      'Failed host lookup',
+      'No address associated with hostname',
+      '🌐', '⏱️', '🔌', '📱' // 用户友好的网络错误图标
+    ];
+
+    return networkErrorKeywords.any((keyword) => error.contains(keyword));
+  }
+
   @override
   Widget build(BuildContext context) {
     // 如果有初始化错误，显示错误页面
@@ -300,13 +338,21 @@ class _HomePageState extends State<HomePage> {
             child: Center(
               child: Consumer<AppDataProvider>(
                 builder: (context, appDataProvider, child) {
-                  // 如果AppDataProvider有错误且不在加载状态，显示错误页面
+                  // 如果AppDataProvider有错误且不在加载状态，检查是否有缓存数据可用
                   if (appDataProvider.error != null &&
                       !appDataProvider.isLoading) {
-                    return ErrorPage(
-                      errorMessage: appDataProvider.error!,
-                      onRetry: _retryInitialization,
-                    );
+                    // 如果是网络错误但有设备设置数据（缓存），不显示错误页面
+                    if (_isNetworkError(appDataProvider.error!) &&
+                        appDataProvider.deviceSettings != null) {
+                      // 有缓存数据，继续正常流程，不显示错误
+                      print('检测到网络错误但有缓存数据，继续使用缓存数据运行');
+                    } else {
+                      // 没有缓存数据或非网络错误，显示错误页面
+                      return ErrorPage(
+                        errorMessage: appDataProvider.error!,
+                        onRetry: _retryInitialization,
+                      );
+                    }
                   }
 
                   return Column(
@@ -355,18 +401,54 @@ class _HomePageState extends State<HomePage> {
                         Column(
                           children: [
                             Icon(
-                              Icons.check_circle,
+                              appDataProvider.isLoggedIn
+                                  ? Icons.check_circle
+                                  : (_isNetworkError(
+                                              appDataProvider.error ?? '') &&
+                                          appDataProvider.deviceSettings !=
+                                              null)
+                                      ? Icons.offline_bolt
+                                      : Icons.check_circle,
                               size: 60,
-                              color: Colors.green,
+                              color: appDataProvider.isLoggedIn
+                                  ? Colors.green
+                                  : (_isNetworkError(
+                                              appDataProvider.error ?? '') &&
+                                          appDataProvider.deviceSettings !=
+                                              null)
+                                      ? Colors.orange
+                                      : Colors.green,
                             ),
                             SizedBox(height: 16),
                             Text(
-                              '設備已登錄',
+                              appDataProvider.isLoggedIn
+                                  ? '設備已登錄'
+                                  : (_isNetworkError(
+                                              appDataProvider.error ?? '') &&
+                                          appDataProvider.deviceSettings !=
+                                              null)
+                                      ? '離線模式（使用緩存數據）'
+                                      : '設備已登錄',
                               style: TextStyle(
                                 fontSize: 18,
                                 fontWeight: FontWeight.bold,
                               ),
+                              textAlign: TextAlign.center,
                             ),
+                            if (!appDataProvider.isLoggedIn &&
+                                _isNetworkError(appDataProvider.error ?? '') &&
+                                appDataProvider.deviceSettings != null)
+                              Padding(
+                                padding: EdgeInsets.only(top: 8),
+                                child: Text(
+                                  '網絡連接中斷，正在使用緩存數據',
+                                  style: TextStyle(
+                                    fontSize: 14,
+                                    color: Colors.grey[600],
+                                  ),
+                                  textAlign: TextAlign.center,
+                                ),
+                              ),
                           ],
                         ),
                     ],

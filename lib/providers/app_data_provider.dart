@@ -107,27 +107,35 @@ class AppDataProvider extends ChangeNotifier {
   ///1，保存登录设备数据到SharedPreferences缓存
   Future<void> _saveLoginDeviceData(Map<String, dynamic> responseData) async {
     try {
+      _logger.i('💾 [缓存保存] 开始保存登录设备数据到缓存');
       final prefs = await SharedPreferences.getInstance();
       final jsonString = json.encode(responseData);
       await prefs.setString(_loginDeviceDataKey, jsonString);
-      // _logger.i('登录设备数据已保存到缓存');
+      _logger.i('💾 [缓存保存] 登录设备数据已保存到缓存，数据长度: ${jsonString.length} 字符');
+      _logger.d('💾 [缓存保存] 保存的数据键: ${responseData.keys.toList()}');
     } catch (e) {
-      _logger.e('保存登录设备数据到缓存失败', error: e);
+      _logger.e('💾 [缓存保存] 保存登录设备数据到缓存失败', error: e);
     }
   }
 
   ///2，从SharedPreferences缓存加载登录设备数据
   Future<Map<String, dynamic>?> _loadLoginDeviceData() async {
     try {
+      _logger.i('🔍 [缓存检查] 尝试从SharedPreferences加载登录设备数据');
       final prefs = await SharedPreferences.getInstance();
       final jsonString = prefs.getString(_loginDeviceDataKey);
+
       if (jsonString != null && jsonString.isNotEmpty) {
+        _logger.i('🔍 [缓存检查] 找到缓存数据，长度: ${jsonString.length} 字符');
         final data = json.decode(jsonString) as Map<String, dynamic>;
-        // _logger.i('从缓存加载登录设备数据成功');
+        _logger.i('🔍 [缓存检查] 缓存数据解析成功，包含的键: ${data.keys.toList()}');
         return data;
+      } else {
+        _logger
+            .w('🔍 [缓存检查] 缓存中未找到登录设备数据 (jsonString=${jsonString ?? 'null'})');
       }
     } catch (e) {
-      _logger.e('从缓存加载登录设备数据失败', error: e);
+      _logger.e('🔍 [缓存检查] 从缓存加载登录设备数据失败', error: e);
     }
     return null;
   }
@@ -145,6 +153,7 @@ class AppDataProvider extends ChangeNotifier {
 
   ///4，应用启动时的完整初始化方法 - 优先登录，失败时使用缓存数据作为备用
   Future<void> initialize({String? deviceIdToSet}) async {
+    _logger.i('🚀 [初始化] 开始应用初始化流程');
     _isLoading = true;
     _error = null;
     notifyListeners();
@@ -153,61 +162,79 @@ class AppDataProvider extends ChangeNotifier {
       // 如果有新设备ID，保存它
       if (deviceIdToSet != null) {
         await _saveDeviceId(deviceIdToSet);
+        _logger.i('🚀 [初始化] 新设备ID已保存: $deviceIdToSet');
       } else {
         await _loadDeviceId();
+        _logger.i('🚀 [初始化] 从缓存加载设备ID: $_deviceId');
       }
 
       if (_deviceId == null || _deviceId!.isEmpty) {
         _error = 'Device ID is not set. Cannot initialize.';
         _isLoading = false;
-        _logger.w(_error);
+        _logger.w('🚀 [初始化] 设备ID未设置，无法继续初始化');
         notifyListeners();
         return;
       }
 
-      // _logger.i('优先尝试登录（包含自动设备注册），如果失败则使用缓存数据，设备ID: $_deviceId');
+      _logger.i('🚀 [初始化] 优先尝试登录（包含自动设备注册），如果失败则使用缓存数据，设备ID: $_deviceId');
 
       // 尝试登录（包含自动设备注册逻辑）
       try {
-        await initializeAndLogin();
-        // _logger.i('登录成功，已更新最新数据到缓存');
+        _logger.i('🚀 [初始化] 开始尝试网络登录');
+        await initializeAndLogin(throwOnFailure: true);
+        _logger.i('🚀 [初始化] 网络登录成功，已更新最新数据到缓存');
       } catch (loginError) {
-        _logger.w('登录失败，尝试使用缓存数据作为备用: $loginError');
+        _logger.w('🚀 [初始化] 网络登录失败，尝试使用缓存数据作为备用: $loginError');
 
         // 登录失败，尝试从缓存加载数据
         await _loadFromCacheAsFallback();
       }
     } catch (e) {
-      _logger.e('应用初始化失败', error: e);
-      _error = 'Application initialization failed: $e';
+      _logger.e('🚀 [初始化] 应用初始化过程中发生异常', error: e);
+
+      // 即使发生异常，也尝试从缓存加载数据作为最后的备选方案
+      _logger.i('🚀 [初始化] 尝试最后的缓存数据备选方案');
+      try {
+        await _loadFromCacheAsFallback();
+        if (_settingsModel != null) {
+          _logger.i('🚀 [初始化] 缓存备选方案成功，已从缓存恢复数据');
+        } else {
+          _error = 'Application initialization failed: $e';
+        }
+      } catch (cacheError) {
+        _logger.e('🚀 [初始化] 缓存备选方案也失败', error: cacheError);
+        _error = 'Application initialization failed: $e';
+      }
     }
 
     _isLoading = false;
     notifyListeners();
     _logger.i(
-        'initialize方法完成，最终状态: isLoggedIn=${isLoggedIn}, token=${token != null ? '有效' : '无效'}, settingsModel=${_settingsModel != null ? '已设置' : '未设置'}');
+        '🚀 [初始化] initialize方法完成，最终状态: isLoggedIn=${isLoggedIn}, token=${token != null ? '有效' : '无效'}, settingsModel=${_settingsModel != null ? '已设置' : '未设置'}');
   }
 
   ///5，登录失败时的缓存数据备用加载方法
   Future<void> _loadFromCacheAsFallback() async {
+    _logger.i('🔄 [缓存回退] 开始从缓存加载备用数据');
     try {
       final cachedData = await _loadLoginDeviceData();
       if (cachedData != null) {
         try {
+          _logger.i('🔄 [缓存回退] 尝试解析缓存数据为SettingsModel');
           _settingsModel = SettingsModel.fromJson(cachedData);
-          // _logger.i('从缓存成功加载备用数据');
+          _logger.i('🔄 [缓存回退] SettingsModel解析成功');
 
           // 设置API客户端的token
           if (_settingsModel?.token != null) {
             _apiClient.setAuthToken(_settingsModel!.token);
-            // _logger.i('API客户端token已从缓存设置');
+            _logger.i('🔄 [缓存回退] API客户端token已从缓存设置');
           }
 
           // 更新CarouselStateProvider的时间配置
           if (_carouselStateProvider != null &&
               _settingsModel?.settings != null) {
             _carouselStateProvider!.updateSettings(_settingsModel!.settings);
-            _logger.i('CarouselStateProvider配置已从缓存更新');
+            _logger.i('🔄 [缓存回退] CarouselStateProvider配置已从缓存更新');
           }
 
           // 设置ArrearProvider的楼宇ID
@@ -215,6 +242,7 @@ class AppDataProvider extends ChangeNotifier {
             final buildingIsmartId = _settingsModel!.building.ismartId;
             if (buildingIsmartId.isNotEmpty) {
               setBuildingIdToArrearProvider(buildingIsmartId);
+              _logger.i('🔄 [缓存回退] ArrearProvider楼宇ID已设置: $buildingIsmartId');
               // 初始化二维码
               await initializeQrCodes();
             }
@@ -222,23 +250,23 @@ class AppDataProvider extends ChangeNotifier {
 
           // 清除登录错误，因为缓存数据可用
           _error = null;
-          _logger.i('使用缓存数据初始化完成');
+          _logger.i('🔄 [缓存回退] 使用缓存数据初始化完成');
           _logger.i(
-              '缓存数据状态: isLoggedIn=${isLoggedIn}, token=${token != null ? '有效' : '无效'}, settingsModel=${_settingsModel != null ? '已设置' : '未设置'}');
+              '🔄 [缓存回退] 缓存数据状态: isLoggedIn=${isLoggedIn}, token=${token != null ? '有效' : '无效'}, settingsModel=${_settingsModel != null ? '已设置' : '未设置'}');
         } catch (e) {
-          _logger.e('解析缓存数据失败', error: e);
+          _logger.e('🔄 [缓存回退] 解析缓存数据失败', error: e);
           // 清除损坏的缓存数据
           await _clearLoginDeviceData();
           _error = 'Login failed and cached data is corrupted: $e';
           _settingsModel = null;
         }
       } else {
-        _logger.w('没有可用的缓存数据作为备用');
+        _logger.w('🔄 [缓存回退] 没有可用的缓存数据作为备用');
         _error = 'Login failed and no cached data available';
         _settingsModel = null;
       }
     } catch (e) {
-      _logger.e('加载缓存备用数据时发生错误', error: e);
+      _logger.e('🔄 [缓存回退] 加载缓存备用数据时发生错误', error: e);
       _error = 'Failed to load cached data: $e';
       _settingsModel = null;
     }
@@ -283,31 +311,34 @@ class AppDataProvider extends ChangeNotifier {
 
   ///11，从缓存加载登录设备数据的方法（保留原有方法以供其他地方使用）
   Future<void> initializeFromCache() async {
+    _logger.i('📂 [缓存初始化] 开始从缓存初始化');
     _isLoading = true;
+    _error = null; // 清除之前的错误状态
     notifyListeners();
 
     try {
       // 先加载设备ID
       await _loadDeviceId();
+      _logger.i('📂 [缓存初始化] 设备ID已加载: $_deviceId');
 
       // 尝试从缓存加载登录设备数据
       final cachedData = await _loadLoginDeviceData();
       if (cachedData != null) {
         try {
           _settingsModel = SettingsModel.fromJson(cachedData);
-          _logger.i('从缓存成功初始化登录设备数据');
+          _logger.i('📂 [缓存初始化] 从缓存成功初始化登录设备数据');
 
           // 设置API客户端的token
           if (_settingsModel?.token != null) {
             _apiClient.setAuthToken(_settingsModel!.token);
-            // _logger.i('API客户端token已从缓存设置');
+            _logger.i('📂 [缓存初始化] API客户端token已从缓存设置');
           }
 
           // 更新CarouselStateProvider的时间配置
           if (_carouselStateProvider != null &&
               _settingsModel?.settings != null) {
             _carouselStateProvider!.updateSettings(_settingsModel!.settings);
-            _logger.i('CarouselStateProvider配置已从缓存更新');
+            _logger.i('📂 [缓存初始化] CarouselStateProvider配置已从缓存更新');
           }
 
           // 设置ArrearProvider的楼宇ID
@@ -315,24 +346,34 @@ class AppDataProvider extends ChangeNotifier {
             final buildingIsmartId = _settingsModel!.building.ismartId;
             if (buildingIsmartId.isNotEmpty) {
               setBuildingIdToArrearProvider(buildingIsmartId);
+              _logger.i('📂 [缓存初始化] ArrearProvider楼宇ID已设置: $buildingIsmartId');
               // 初始化二维码
               await initializeQrCodes();
             }
           }
+
+          // 缓存数据加载成功，清除错误状态
+          _error = null;
+          _logger.i('📂 [缓存初始化] 缓存数据加载成功，错误状态已清除');
         } catch (e) {
-          _logger.e('解析缓存的登录设备数据失败', error: e);
+          _logger.e('📂 [缓存初始化] 解析缓存的登录设备数据失败', error: e);
           // 清除损坏的缓存数据
           await _clearLoginDeviceData();
+          _error = 'Failed to parse cached data: $e';
         }
       } else {
-        _logger.i('缓存中未找到登录设备数据');
+        _logger.w('📂 [缓存初始化] 缓存中未找到登录设备数据');
+        _error = 'No cached data available';
       }
     } catch (e) {
-      _logger.e('从缓存初始化失败', error: e);
+      _logger.e('📂 [缓存初始化] 从缓存初始化失败', error: e);
+      _error = 'Failed to initialize from cache: $e';
     }
 
     _isLoading = false;
     notifyListeners();
+    _logger.i(
+        '📂 [缓存初始化] initializeFromCache完成，最终状态: isLoggedIn=${isLoggedIn}, token=${token != null ? '有效' : '无效'}, settingsModel=${_settingsModel != null ? '已设置' : '未设置'}, error=${_error ?? '无错误'}');
   }
 
   /// 设置CarouselStateProvider的引用，用于更新时间配置
@@ -389,7 +430,14 @@ class AppDataProvider extends ChangeNotifier {
 
   // Call this method when the app starts or when device ID is set
   Future<void> initializeAndLogin(
-      {String? deviceIdToSet, bool useFallbackUrl = true}) async {
+      {String? deviceIdToSet,
+      bool useFallbackUrl = true,
+      bool throwOnFailure = false}) async {
+    _logger.i('🔐 [initializeAndLogin] 开始初始化登录流程，启用缓存保护');
+
+    // 保存当前的设置模型，以便登录失败时可以恢复
+    final backupSettingsModel = _settingsModel;
+
     _isLoading = true;
     _error = null;
     notifyListeners();
@@ -520,11 +568,29 @@ class AppDataProvider extends ChangeNotifier {
               error: registrationError);
           _logger.e('Registration error details: $registrationError');
           _error = 'Device registration failed: $registrationError';
-          _settingsModel = null;
+          // 恢复备份的设置模型，而不是清空
+          _settingsModel = backupSettingsModel;
+          if (backupSettingsModel?.token != null) {
+            _apiClient.setAuthToken(backupSettingsModel!.token);
+            _logger.i('🔐 [initializeAndLogin] 已恢复备份的设置模型和token');
+          }
+          // 根据throwOnFailure参数决定是否抛出异常
+          if (throwOnFailure) {
+            rethrow;
+          }
         }
       } else {
         _error = 'Login failed: ${e.message}';
-        _settingsModel = null; // Clear data on login failure
+        // 恢复备份的设置模型，而不是清空
+        _settingsModel = backupSettingsModel;
+        if (backupSettingsModel?.token != null) {
+          _apiClient.setAuthToken(backupSettingsModel!.token);
+          _logger.i('🔐 [initializeAndLogin] 已恢复备份的设置模型和token');
+        }
+        // 根据throwOnFailure参数决定是否抛出异常
+        if (throwOnFailure) {
+          rethrow;
+        }
       }
     } catch (e, stackTrace) {
       _logger.e('An unexpected error occurred during initial login',
@@ -590,11 +656,29 @@ class AppDataProvider extends ChangeNotifier {
             );
           }
           _error = 'Login failed: $e';
-          _settingsModel = null;
+          // 恢复备份的设置模型，而不是清空
+          _settingsModel = backupSettingsModel;
+          if (backupSettingsModel?.token != null) {
+            _apiClient.setAuthToken(backupSettingsModel!.token);
+            _logger.i('🔐 [initializeAndLogin] 备用URL失败，已恢复备份的设置模型和token');
+          }
+          // 根据throwOnFailure参数决定是否抛出异常
+          if (throwOnFailure) {
+            rethrow;
+          }
         }
       } else {
         _error = 'An unexpected error occurred: $e';
-        _settingsModel = null;
+        // 恢复备份的设置模型，而不是清空
+        _settingsModel = backupSettingsModel;
+        if (backupSettingsModel?.token != null) {
+          _apiClient.setAuthToken(backupSettingsModel!.token);
+          _logger.i('🔐 [initializeAndLogin] 意外错误，已恢复备份的设置模型和token');
+        }
+        // 根据throwOnFailure参数决定是否抛出异常
+        if (throwOnFailure) {
+          rethrow;
+        }
       }
     } finally {
       _isLoading = false;
@@ -604,7 +688,11 @@ class AppDataProvider extends ChangeNotifier {
 
   // This method is called by ApiClient when a 401 is encountered
   Future<String?> _handleTokenRefresh() async {
-    _logger.i('Attempting token refresh due to 401.');
+    _logger.i('🔐 [Token刷新] 开始token刷新流程，启用缓存保护');
+
+    // 保存当前的设置模型，以便刷新失败时可以恢复
+    final backupSettingsModel = _settingsModel;
+
     if (_deviceId == null || _deviceId!.isEmpty) {
       _logger.e('Cannot refresh token: Device ID is null or empty.');
       // Potentially notify UI or trigger a full re-login/setup flow
@@ -647,17 +735,28 @@ class AppDataProvider extends ChangeNotifier {
       _logger.e('Token refresh failed (ApiException)',
           error: e, stackTrace: e.errorData is StackTrace ? e.errorData : null);
       _error = 'Token refresh failed: ${e.message}';
-      // If refresh fails, clear sensitive data or handle logout
-      _settingsModel = null;
-      _apiClient.setAuthToken(null); // Ensure ApiClient's token is also cleared
+      // 恢复备份的设置模型，而不是清空
+      _settingsModel = backupSettingsModel;
+      if (backupSettingsModel?.token != null) {
+        _apiClient.setAuthToken(backupSettingsModel!.token);
+        _logger.i('🔐 [Token刷新] Token刷新失败，已恢复原有token');
+      } else {
+        _apiClient.setAuthToken(null); // 如果没有备份token，则清空
+      }
       notifyListeners();
       return null; // Indicate refresh failure
     } catch (e, stackTrace) {
       _logger.e('An unexpected error occurred during token refresh',
           error: e, stackTrace: stackTrace);
       _error = 'An unexpected error during token refresh: $e';
-      _settingsModel = null;
-      _apiClient.setAuthToken(null);
+      // 恢复备份的设置模型，而不是清空
+      _settingsModel = backupSettingsModel;
+      if (backupSettingsModel?.token != null) {
+        _apiClient.setAuthToken(backupSettingsModel!.token);
+        _logger.i('🔐 [Token刷新] Token刷新意外错误，已恢复原有token');
+      } else {
+        _apiClient.setAuthToken(null); // 如果没有备份token，则清空
+      }
       notifyListeners();
       return null;
     } finally {
@@ -1206,15 +1305,11 @@ class AppDataProvider extends ChangeNotifier {
         Timer.periodic(Duration(hours: _loginIntervalHours), (timer) async {
       if (_isPeriodicLoginActive && _deviceId != null) {
         _logger.i('Performing periodic login...');
-        try {
-          await initializeAndLogin(deviceIdToSet: _deviceId);
-          if (isLoggedIn) {
-            _logger.i('Periodic login successful');
-          } else {
-            _logger.w('Periodic login failed');
-          }
-        } catch (e) {
-          _logger.e('Periodic login error', error: e);
+        final loginSuccess = await _safeLogin(context: '定时登录');
+        if (loginSuccess) {
+          _logger.i('Periodic login successful');
+        } else {
+          _logger.w('Periodic login failed, keeping existing cache data');
         }
       } else {
         timer.cancel();
@@ -1347,6 +1442,139 @@ class AppDataProvider extends ChangeNotifier {
     } catch (e) {
       _logger.e('设备注册测试失败', error: e);
       throw e;
+    }
+  }
+
+  ///18，检查缓存中是否存在登录数据
+  Future<bool> hasCachedLoginData() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final jsonString = prefs.getString(_loginDeviceDataKey);
+      final hasData = jsonString != null && jsonString.isNotEmpty;
+      _logger.i('🔍 [缓存检查] 缓存数据存在性检查结果: $hasData');
+      if (hasData) {
+        _logger.d('🔍 [缓存检查] 缓存数据长度: ${jsonString.length} 字符');
+      }
+      return hasData;
+    } catch (e) {
+      _logger.e('🔍 [缓存检查] 检查缓存数据失败', error: e);
+      return false;
+    }
+  }
+
+  ///19，获取所有SharedPreferences键
+  Future<void> debugSharedPreferencesKeys() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final keys = prefs.getKeys();
+      _logger.i('🔍 [调试] SharedPreferences中的所有键: ${keys.toList()}');
+
+      for (final key in keys) {
+        try {
+          final value = prefs.get(key);
+          final valueStr = value.toString();
+          final truncated = valueStr.length > 100
+              ? '${valueStr.substring(0, 100)}...'
+              : valueStr;
+          _logger
+              .d('🔍 [调试] 键: $key, 值类型: ${value.runtimeType}, 值预览: $truncated');
+        } catch (e) {
+          _logger.w('🔍 [调试] 无法读取键 $key 的值: $e');
+        }
+      }
+    } catch (e) {
+      _logger.e('🔍 [调试] 获取SharedPreferences键失败', error: e);
+    }
+  }
+
+  ///20，安全登录方法 - 成功才更新缓存，失败则保持现状
+  Future<bool> _safeLogin({
+    String? context = '登录',
+    bool throwOnFailure = false,
+  }) async {
+    _logger.i('🔐 [$context] 开始安全登录流程');
+
+    // 保存当前的设置模型，以便登录失败时可以恢复
+    final backupSettingsModel = _settingsModel;
+
+    try {
+      if (_deviceId == null || _deviceId!.isEmpty) {
+        throw Exception('设备ID未设置，无法执行登录');
+      }
+
+      _logger.i('🔐 [$context] 使用设备ID执行登录: $_deviceId');
+      final responseData = await _apiClient.login(deviceId: _deviceId!);
+
+      // 只有登录成功时才更新设置模型和缓存
+      _settingsModel = SettingsModel.fromJson(responseData);
+      _logger.i('🔐 [$context] 登录成功，SettingsModel已更新');
+
+      // 保存登录设备数据到缓存
+      await _saveLoginDeviceData(responseData);
+      _logger.i('🔐 [$context] 登录数据已保存到缓存');
+
+      // 更新CarouselStateProvider的时间配置
+      if (_carouselStateProvider != null && _settingsModel?.settings != null) {
+        _carouselStateProvider!.updateSettings(_settingsModel!.settings);
+        _logger.i('🔐 [$context] CarouselStateProvider配置已更新');
+      }
+
+      // 设置ArrearProvider的楼宇ID
+      if (_settingsModel != null) {
+        final buildingIsmartId = _settingsModel!.building.ismartId;
+        if (buildingIsmartId.isNotEmpty) {
+          setBuildingIdToArrearProvider(buildingIsmartId);
+          // 初始化二维码
+          await initializeQrCodes();
+          _logger.i('🔐 [$context] ArrearProvider楼宇ID已设置: $buildingIsmartId');
+        }
+      }
+
+      // 清除错误状态
+      _error = null;
+      _logger.i(
+          '🔐 [$context] 登录完成，状态: isLoggedIn=${isLoggedIn}, token=${token != null ? '有效' : '无效'}');
+      return true;
+    } catch (e) {
+      _logger.e('🔐 [$context] 登录失败，保持原有数据状态', error: e);
+
+      // 恢复原有的设置模型，不清除缓存数据
+      _settingsModel = backupSettingsModel;
+
+      // 如果有备份的设置模型，确保API客户端有正确的token
+      if (backupSettingsModel?.token != null) {
+        _apiClient.setAuthToken(backupSettingsModel!.token);
+        _logger.i('🔐 [$context] 已恢复原有token到API客户端');
+      }
+
+      // 只有在没有任何数据时才设置错误信息
+      if (backupSettingsModel == null) {
+        _error = '$context failed: $e';
+      } else {
+        // 有备份数据时，不设置全局错误，只记录登录失败
+        _logger.i('🔐 [$context] 登录失败但有备份数据，继续使用缓存数据');
+      }
+
+      _logger.i(
+          '🔐 [$context] 数据状态已恢复: isLoggedIn=${isLoggedIn}, settingsModel=${_settingsModel != null ? '已设置' : '未设置'}');
+
+      if (throwOnFailure) {
+        rethrow;
+      }
+      return false;
+    }
+  }
+
+  ///21，手动登录方法 - 使用安全登录机制
+  Future<void> manualLogin() async {
+    _isLoading = true;
+    notifyListeners();
+
+    try {
+      await _safeLogin(context: '手动登录', throwOnFailure: true);
+    } finally {
+      _isLoading = false;
+      notifyListeners();
     }
   }
 
