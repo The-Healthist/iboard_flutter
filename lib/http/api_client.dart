@@ -321,24 +321,41 @@ class ApiClient {
       } catch (e, stackTrace) {
         lastException = e is Exception ? e : Exception(e.toString());
 
-        // 详细记录网络错误类型
+        // 详细记录网络错误类型并生成用户友好消息
         String errorType = 'Unknown';
-        if (e.toString().contains('SocketException')) {
+        String userFriendlyMessage = '';
+
+        if (e.toString().contains('Failed host lookup') ||
+            e.toString().contains('No address associated with hostname')) {
+          errorType = 'DNS解析失败';
+          userFriendlyMessage = '🌐 无法连接到服务器，请检查网络连接或联系管理员';
+        } else if (e.toString().contains('SocketException')) {
           errorType = 'Socket连接错误';
+          userFriendlyMessage = '🔌 网络连接异常，请检查您的网络设置';
         } else if (e.toString().contains('TimeoutException') ||
             e.toString().contains('请求超时')) {
           errorType = '请求超时';
+          userFriendlyMessage = '⏱️ 服务器响应超时，请稍后重试';
         } else if (e.toString().contains('ClientException')) {
           errorType = '客户端错误';
+          userFriendlyMessage = '📱 应用连接错误，请重启应用或检查网络';
+        } else {
+          userFriendlyMessage = '❌ 网络请求失败，请稍后重试';
         }
 
         if (attempt == _maxRetryAttempts) {
-          // 最后一次尝试失败，抛出异常
+          // 最后一次尝试失败，抛出用户友好的异常
           _logger.e(
               '$apiNameForLog - 所有 $_maxRetryAttempts 次请求尝试均失败 (最后错误类型: $errorType)',
               error: e,
               stackTrace: stackTrace);
-          rethrow;
+
+          // 抛出包含用户友好消息的异常
+          throw ApiException(
+            message: userFriendlyMessage,
+            statusCode: null,
+            errorData: e.toString(),
+          );
         } else {
           // 还有重试机会，记录警告并等待
           _logger.w(

@@ -298,7 +298,7 @@ class AnnouncementCarouselProvider extends ChangeNotifier {
               '🚀 [延迟启动] 通告轮播开始: 开始时间=${_currentNoticeStartTime}, API配置时长=${apiNoticeStayDuration}s, 索引=${_currentNoticeIndex}');
 
           // 使用统一的持续轮播方法
-          _startContinuousNoticeCarousel(apiNoticeStayDuration);
+          _scheduleNextCarousel(apiNoticeStayDuration);
         }
       });
     } else {
@@ -331,50 +331,109 @@ class AnnouncementCarouselProvider extends ChangeNotifier {
       // _logger.i('🔄 [初始化] 跳转到第一个通告，索引: $_currentNoticeIndex');
     }
 
-    // 启动真正的无限循环定时器
-    _midTimer =
-        Timer.periodic(Duration(seconds: apiNoticeStayDuration), (timer) {
-      if (_isMidCarouselPaused) {
-        _logger.w('⚠️ [持续轮播] 定时器暂停: 轮播状态为暂停');
-        // 不取消定时器，只是跳过这次执行，等待恢复
-        return;
-      }
-
-      final currentAnnouncementCount = _midCarouselController.widgetCount - 1;
-      if (currentAnnouncementCount <= 0) {
-        _logger.w('⚠️ [持续轮播] 跳过执行: 通告数量不足');
-        return;
-      }
-
-      try {
-        // 计算下一个通告索引，跳过主屏幕（索引0）
-        _currentNoticeIndex++;
-        if (_currentNoticeIndex >= _midCarouselController.widgetCount) {
-          _currentNoticeIndex = 1; // 回到第一个通告，跳过主屏幕
-        }
-
-        // 跳转到下一个通告
-        _midCarouselController.jumpToIndex(_currentNoticeIndex);
-
-        // 记录新通告开始时间
-        _currentNoticeStartTime = DateTime.now();
-
-        // _logger.i(
-        //     '📝 [无限轮播] 切换通告(API=${apiNoticeStayDuration}s) 索引: $_currentNoticeIndex/${_midCarouselController.widgetCount} (跳过主屏幕)');
-      } catch (e) {
-        _logger.e('❌ [持续轮播] 切换失败: $e');
-        // 发生错误时，尝试重新启动轮播
-        Future.delayed(Duration(seconds: 1), () {
-          if (!_isMidCarouselPaused) {
-            // _logger.i('🔄 [恢复] 尝试重新启动通告轮播');
-            _startContinuousNoticeCarousel(apiNoticeStayDuration);
-          }
-        });
-      }
-    });
+    // 启动真正的无限循环定时器 - 使用单次定时器减少系统调用
+    _scheduleNextCarousel(apiNoticeStayDuration);
 
     // _logger.i(
     //     '🚀 [启动] 无限循环通告轮播定时器 (${apiNoticeStayDuration}s间隔) - 通告数量: $announcementCount (跳过主屏幕)');
+  }
+
+  ///2a，调度下一个轮播切换（智能定时器，自适应间隔减少系统调用）
+  void _scheduleNextCarousel(int apiNoticeStayDuration) {
+    _midTimer?.cancel();
+
+    if (_isMidCarouselPaused) {
+      // _logger.w('⚠️ [调度轮播] 轮播已暂停，停止调度');
+      return;
+    }
+
+    final currentAnnouncementCount = _midCarouselController.widgetCount - 1;
+    if (currentAnnouncementCount <= 0) {
+      _logger.w('⚠️ [调度轮播] 跳过调度: 通告数量不足');
+      return;
+    }
+
+    // 智能间隔策略：
+    // - 短间隔(<=5秒): 使用原始间隔
+    // - 中等间隔(6-10秒): 使用1秒检查间隔
+    // - 长间隔(>10秒): 使用2秒检查间隔
+    int checkInterval;
+    if (apiNoticeStayDuration <= 5) {
+      checkInterval = apiNoticeStayDuration;
+    } else if (apiNoticeStayDuration <= 10) {
+      checkInterval = 1;
+    } else {
+      checkInterval = 2;
+    }
+
+    // 使用检查间隔而不是实际停留时间，减少定时器创建频率
+    _midTimer = Timer(Duration(seconds: checkInterval), () {
+      _checkAndAdvanceCarousel(apiNoticeStayDuration);
+    });
+  }
+
+  ///2b，检查并推进轮播（减少定时器创建）
+  void _checkAndAdvanceCarousel(int apiNoticeStayDuration) {
+    if (_isMidCarouselPaused) {
+      // 暂停状态，稍后重新检查
+      _scheduleNextCarousel(apiNoticeStayDuration);
+      return;
+    }
+
+    // 检查是否到了切换时间
+    if (_currentNoticeStartTime != null) {
+      final elapsed = DateTime.now().difference(_currentNoticeStartTime!);
+      final shouldAdvance = elapsed.inSeconds >= apiNoticeStayDuration;
+
+      if (!shouldAdvance) {
+        // 还没到时间，继续等待
+        final remaining = apiNoticeStayDuration - elapsed.inSeconds;
+        final nextCheck = remaining > 2 ? 2 : remaining;
+        if (nextCheck > 0) {
+          _midTimer = Timer(Duration(seconds: nextCheck), () {
+            _checkAndAdvanceCarousel(apiNoticeStayDuration);
+          });
+        }
+        return;
+      }
+    }
+
+    // 时间到了，执行切换
+    try {
+      // 计算下一个通告索引，跳过主屏幕（索引0）
+      _currentNoticeIndex++;
+      if (_currentNoticeIndex >= _midCarouselController.widgetCount) {
+        _currentNoticeIndex = 1; // 回到第一个通告，跳过主屏幕
+      }
+
+      // 检查是否切换到欠费总览（最后一个索引）
+      final isArrearTable =
+          _currentNoticeIndex == (_midCarouselController.widgetCount - 1);
+
+      // 跳转到下一个通告或欠费总览
+      _midCarouselController.jumpToIndex(_currentNoticeIndex);
+
+      // 记录新通告开始时间
+      _currentNoticeStartTime = DateTime.now();
+
+      if (isArrearTable) {
+        _logger.i('📊 [轮播控制] 已切换到欠费总览，等待自动翻页完成');
+        // 欠费总览会通过回调继续轮播，这里不再调度下一次
+      } else {
+        // 继续调度下一次轮播
+        _scheduleNextCarousel(apiNoticeStayDuration);
+        // _logger.i(
+        //     '📝 [轮播切换] 切换通告(API=${apiNoticeStayDuration}s) 索引: $_currentNoticeIndex/${_midCarouselController.widgetCount}');
+      }
+    } catch (e) {
+      _logger.e('❌ [轮播执行] 切换失败: $e');
+      // 发生错误时，延迟重试
+      Future.delayed(Duration(seconds: 2), () {
+        if (!_isMidCarouselPaused) {
+          _scheduleNextCarousel(apiNoticeStayDuration);
+        }
+      });
+    }
   }
 
   ///3，暂停通告轮播
@@ -418,6 +477,8 @@ class AnnouncementCarouselProvider extends ChangeNotifier {
     if (_midCarouselController.widgetCount > 1 && !_isMidCarouselPaused) {
       _noticeDuration = Duration(seconds: apiNoticeStayDuration); // 更新当前时长配置
 
+      // 移除特殊处理，现在通过动态延长时间来处理欠费总览
+
       final remainingNoticeTime = _noticeDuration - _noticeElapsedTime;
       // _logger.i(
       //     '🔄 [恢复] 通告轮播 - API配置=${apiNoticeStayDuration}s, 剩余时间：${remainingNoticeTime.inSeconds}s (已播放: ${_noticeElapsedTime.inSeconds}s)');
@@ -437,34 +498,62 @@ class AnnouncementCarouselProvider extends ChangeNotifier {
         // _logger.i('⏰ [恢复] 等待剩余时间后继续无限轮播');
         _midTimer = Timer(remainingNoticeTime, () {
           if (!_isMidCarouselPaused) {
-            // 时间到，切换到下一个通告并启动无限轮播
+            // 检查当前是否在欠费总览页面
+            final isCurrentlyOnArrearTable =
+                _currentNoticeIndex == (_midCarouselController.widgetCount - 1);
+
+            if (isCurrentlyOnArrearTable) {
+              // 如果当前在欠费总览页面，不直接切换，让自动翻页完成
+              _logger.i('📊 [定时切换] 当前在欠费总览页面，等待自动翻页完成');
+              // 重置开始时间，等待欠费总览翻页完成
+              _currentNoticeStartTime = DateTime.now();
+            } else {
+              // 不是欠费总览，正常切换到下一个通告
+              _currentNoticeIndex++;
+              if (_currentNoticeIndex >= _midCarouselController.widgetCount) {
+                _currentNoticeIndex = 1; // 回到第一个通告
+              }
+              _midCarouselController.jumpToIndex(_currentNoticeIndex);
+              _scheduleNextCarousel(apiNoticeStayDuration);
+            }
+          }
+        });
+      } else {
+        // 剩余时间不足的特殊处理
+        _logger.i('⚡ [恢复] 剩余时间不足，检查是否为欠费总览');
+
+        // 检查当前是否在欠费总览页面（最后一个索引）
+        final isCurrentlyOnArrearTable =
+            _currentNoticeIndex == (_midCarouselController.widgetCount - 1);
+
+        if (isCurrentlyOnArrearTable) {
+          // 如果当前在欠费总览页面，不直接切换，继续展示欠费总览
+          _logger.i('📊 [恢复] 当前在欠费总览页面，继续展示并恢复自动翻页');
+
+          // 重置开始时间，给欠费总览足够时间完成翻页
+          _currentNoticeStartTime = DateTime.now();
+
+          // 不调用 _scheduleNextCarousel，让欠费总览的翻页完成回调来处理切换
+          _logger.i('📊 [恢复] 等待欠费总览自动翻页完成后再切换通告');
+        } else {
+          // 不是欠费总览，正常处理：直接启动下一个通告并开始无限轮播
+          _logger.i('⚡ [恢复] 非欠费总览页面，直接切换并启动无限轮播');
+
+          // 如果当前不在通告上，跳转到第一个通告
+          if (_currentNoticeIndex < 1) {
+            _currentNoticeIndex = 1;
+            _midCarouselController.jumpToIndex(_currentNoticeIndex);
+          } else {
+            // 切换到下一个通告
             _currentNoticeIndex++;
             if (_currentNoticeIndex >= _midCarouselController.widgetCount) {
               _currentNoticeIndex = 1; // 回到第一个通告
             }
             _midCarouselController.jumpToIndex(_currentNoticeIndex);
-
-            _startContinuousNoticeCarousel(apiNoticeStayDuration);
           }
-        });
-      } else {
-        // 剩余时间不足，直接启动下一个通告并开始无限轮播
-        _logger.i('⚡ [恢复] 剩余时间不足，直接切换并启动无限轮播');
 
-        // 如果当前不在通告上，跳转到第一个通告
-        if (_currentNoticeIndex < 1) {
-          _currentNoticeIndex = 1;
-          _midCarouselController.jumpToIndex(_currentNoticeIndex);
-        } else {
-          // 切换到下一个通告
-          _currentNoticeIndex++;
-          if (_currentNoticeIndex >= _midCarouselController.widgetCount) {
-            _currentNoticeIndex = 1; // 回到第一个通告
-          }
-          _midCarouselController.jumpToIndex(_currentNoticeIndex);
+          _scheduleNextCarousel(apiNoticeStayDuration);
         }
-
-        _startContinuousNoticeCarousel(apiNoticeStayDuration);
       }
     }
 
@@ -495,7 +584,7 @@ class AnnouncementCarouselProvider extends ChangeNotifier {
         }
 
         // _logger.i('🔄 恢复通告轮播，当前索引: $_currentNoticeIndex');
-        _startContinuousNoticeCarousel(apiNoticeStayDuration);
+        _scheduleNextCarousel(apiNoticeStayDuration);
       }
     } else {
       _logger.w(
@@ -506,7 +595,7 @@ class AnnouncementCarouselProvider extends ChangeNotifier {
   ///7，启动调试定时器 - 每秒输出通告轮播的实时状态
   void startDebugTimer(int apiNoticeStayDuration, {bool enableLogging = true}) {
     _debugTimer?.cancel();
-    // 禁用通告轮播调试定时器以减少日志输出
+    // 完全禁用调试定时器以减少系统资源占用和日志输出
     return;
 
     // _debugTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
@@ -575,7 +664,7 @@ class AnnouncementCarouselProvider extends ChangeNotifier {
         _midCarouselController.jumpToIndex(_currentNoticeIndex);
       }
 
-      _startContinuousNoticeCarousel(apiNoticeStayDuration);
+      _scheduleNextCarousel(apiNoticeStayDuration);
     }
 
     // 重新启动调试定时器
@@ -627,15 +716,16 @@ class AnnouncementCarouselProvider extends ChangeNotifier {
     _logger.i('🏠 [hideArrearQueryWidget] 覆盖层已隐藏，底层轮播内容保持不变');
   }
 
-  ///13a，显示欠费总览界面
+  ///13a，显示欠费总览界面（手动操作模式 - 不启用自动翻页）
   void showArrearTableWidget(VoidCallback onHomeButtonPressed) {
-    _logger.i('📊 [showArrearTableWidget] 开始显示欠费总览界面');
+    _logger.i('📊 [showArrearTableWidget] 开始显示欠费总览界面（手动操作模式）');
     _logger.i(
         '📊 [showArrearTableWidget] 当前状态 - isShowingArrearTable: $_isShowingArrearTable');
 
     // 设置显示欠费总览状态
     _isShowingArrearTable = true;
-    _logger.i('📊 [showArrearTableWidget] 已设置 isShowingArrearTable = true');
+    _logger.i(
+        '📊 [showArrearTableWidget] 已设置 isShowingArrearTable = true（手动模式，无自动翻页）');
 
     _logger.i('📊 [showArrearTableWidget] 准备调用 notifyListeners()');
     notifyListeners();
@@ -726,13 +816,75 @@ class AnnouncementCarouselProvider extends ChangeNotifier {
       height: double.infinity,
       color: Colors.grey.shade50,
       child: ArrearTableWidget(
+        isInCarouselMode: true, // 标记为轮播模式
         onHomeButtonPressed: () {
           // 点击主页按钮时，跳转回主屏幕（索引0）
           _logger.i('🏠 [欠费总览轮播] 用户点击主页按钮，返回主屏幕');
           jumpToAnnouncementIndex(0);
         },
+        onPaginationComplete: (int totalPages) {
+          // 欠费总览翻页完成，切换到下一个通告
+          _logger.i('📄 [欠费总览轮播] 翻页完成（共$totalPages页），切换到下一个通告');
+          _goToNextCarouselItem();
+        },
+        onPaginationStart: (int totalPages) {
+          // 欠费总览开始翻页，动态延长当前通告停留时间
+          _logger.i('📄 [欠费总览轮播] 开始翻页（共$totalPages页），动态延长停留时间');
+          _extendCurrentNoticeStayTime(totalPages);
+        },
       ),
     );
+  }
+
+  ///17，动态延长当前通告停留时间（欠费总览开始翻页时调用）
+  void _extendCurrentNoticeStayTime(int totalPages) {
+    // 计算需要延长的时间：每页3秒翻页时间
+    final int extensionSeconds = totalPages * 3;
+    _logger.i('⏰ [动态延长] 延长当前通告停留时间: ${extensionSeconds}秒（共${totalPages}页）');
+
+    // 取消现有的定时器
+    _midTimer?.cancel();
+
+    // 重新设置开始时间，相当于重新开始计时
+    _currentNoticeStartTime = DateTime.now();
+
+    // 使用延长后的时间重新调度轮播
+    final extendedDuration = _noticeDuration.inSeconds + extensionSeconds;
+    _logger.i(
+        '⏰ [动态延长] 原始时长: ${_noticeDuration.inSeconds}秒, 延长后: ${extendedDuration}秒');
+
+    // 使用延长后的时间调度下一次轮播
+    _scheduleNextCarousel(extendedDuration);
+  }
+
+  ///18，切换到下一个轮播项（欠费总览翻页完成后调用）
+  void _goToNextCarouselItem() {
+    if (_isMidCarouselPaused) {
+      _logger.w('⚠️ [切换轮播] 轮播已暂停，跳过切换');
+      return;
+    }
+
+    try {
+      // 计算下一个通告索引，跳过主屏幕（索引0）
+      _currentNoticeIndex++;
+      if (_currentNoticeIndex >= _midCarouselController.widgetCount) {
+        _currentNoticeIndex = 1; // 回到第一个通告，跳过主屏幕
+      }
+
+      // 跳转到下一个通告
+      _midCarouselController.jumpToIndex(_currentNoticeIndex);
+
+      // 记录新通告开始时间
+      _currentNoticeStartTime = DateTime.now();
+
+      _logger.i(
+          '🔄 [欠费总览完成] 切换到下一个轮播项，索引: $_currentNoticeIndex/${_midCarouselController.widgetCount}');
+
+      // 重新启动轮播定时器，使用当前API配置的停留时间
+      _scheduleNextCarousel(_noticeDuration.inSeconds);
+    } catch (e) {
+      _logger.e('❌ [切换轮播] 切换失败: $e');
+    }
   }
 
   @override

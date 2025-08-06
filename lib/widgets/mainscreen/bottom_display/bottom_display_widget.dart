@@ -13,12 +13,13 @@ class BottomDisplayWidget extends StatefulWidget {
 }
 
 class _BottomDisplayWidgetState extends State<BottomDisplayWidget> {
-  final Logger _logger = Logger();
+  // 预创建widget实例用于复用，避免每次切换时重新创建
+  Widget? _weatherForecastWidget;
+  Widget? _qrcodeWidget;
 
   @override
   void initState() {
     super.initState();
-    // _logger.i('🌤️ BottomDisplayWidget初始化');
   }
 
   ///1，构建底部显示组件 - 使用固定高度确保统一显示
@@ -29,6 +30,17 @@ class _BottomDisplayWidgetState extends State<BottomDisplayWidget> {
         // 获取屏幕尺寸，计算固定高度
         final screenSize = MediaQuery.of(context).size;
         final fixedHeight = screenSize.height * (4 / 24); // 根据布局比例 4/24 计算固定高度
+
+        // 懒加载创建widget实例，只在首次需要时创建，后续复用
+        _weatherForecastWidget ??= Container(
+          key: const ValueKey('weather_forecast'),
+          child: _WeatherForecastOnlyWidget(containerHeight: fixedHeight),
+        );
+
+        _qrcodeWidget ??= Container(
+          key: const ValueKey('qrcode'),
+          child: QrcodeWidget(containerHeight: fixedHeight),
+        );
 
         return Container(
           padding: const EdgeInsets.fromLTRB(8.0, 0, 8.0, 6.0),
@@ -54,15 +66,8 @@ class _BottomDisplayWidgetState extends State<BottomDisplayWidget> {
                     );
                   },
                   child: bottomProvider.showWeather
-                      ? Container(
-                          key: const ValueKey('weather_forecast'),
-                          child: _WeatherForecastOnlyWidget(
-                              containerHeight: fixedHeight),
-                        )
-                      : Container(
-                          key: const ValueKey('qrcode'),
-                          child: QrcodeWidget(containerHeight: fixedHeight),
-                        ),
+                      ? _weatherForecastWidget!
+                      : _qrcodeWidget!,
                 ),
               ),
             ],

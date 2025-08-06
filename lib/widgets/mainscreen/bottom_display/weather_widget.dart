@@ -43,6 +43,10 @@ class _WeatherWidgetState extends State<WeatherWidget> {
   Timer? _weatherUpdateTimer; // 添加天气数据定时更新器
   DateTime _currentTime = DateTime.now(); // Added to track current time
 
+  // 日志缓存，避免重复日志输出
+  String? _lastLoggedLocation;
+  DateTime? _lastLogTime;
+
   @override
   void initState() {
     super.initState();
@@ -283,11 +287,24 @@ class _WeatherWidgetState extends State<WeatherWidget> {
         //     '天气卡片将显示的地区名称: ${_currentWeatherLocation != '香港天文台' ? _currentWeatherLocation : tempLocationData.place}');
       } catch (e) {
         // 如果找不到匹配的位置，尝试查找"香港天文台"作为备选
-        _logger.w('❌ 未找到位置 $_currentWeatherLocation 的匹配数据，尝试香港天文台作为备选');
+        // 使用日志缓存机制，避免重复输出相同日志
+        final now = DateTime.now();
+        final shouldLog = _lastLoggedLocation != _currentWeatherLocation ||
+            _lastLogTime == null ||
+            now.difference(_lastLogTime!).inMinutes > 5; // 5分钟内不重复日志
+
+        if (shouldLog) {
+          _logger.w('❌ 未找到位置 $_currentWeatherLocation 的匹配数据，尝试香港天文台作为备选');
+          _lastLoggedLocation = _currentWeatherLocation;
+          _lastLogTime = now;
+        }
+
         try {
           tempLocationData = currentWeatherData.temperature!.data
               .firstWhere((t) => t.place == '香港天文台');
-          _logger.w('🔄 使用香港天文台数据: ${tempLocationData.value}°C');
+          if (shouldLog) {
+            _logger.w('🔄 使用香港天文台数据: ${tempLocationData.value}°C');
+          }
         } catch (e2) {
           // 如果连"香港天文台"都找不到，使用第一个可用数据作为最后备选
           if (currentWeatherData.temperature!.data.isNotEmpty) {

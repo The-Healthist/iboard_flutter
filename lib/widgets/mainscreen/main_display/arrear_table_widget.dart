@@ -1,13 +1,21 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:iboard_app/providers/arrear_provider.dart';
+import 'package:iboard_app/providers/state_provider.dart';
 
 class ArrearTableWidget extends StatefulWidget {
   final VoidCallback? onHomeButtonPressed; // 添加主頁按鈕回調
+  final bool isInCarouselMode; // 是否在轮播模式中
+  final Function(int totalPages)? onPaginationComplete; // 轮播模式下翻页完成回调
+  final Function(int totalPages)? onPaginationStart; // 轮播模式下翻页开始回调
 
   const ArrearTableWidget({
     Key? key,
     this.onHomeButtonPressed,
+    this.isInCarouselMode = false, // 默认不在轮播模式
+    this.onPaginationComplete,
+    this.onPaginationStart,
   }) : super(key: key);
 
   @override
@@ -17,6 +25,9 @@ class ArrearTableWidget extends StatefulWidget {
 class ArrearTableWidgetState extends State<ArrearTableWidget> {
   int _currentPage = 1;
   int _itemsPerPage = 20; // 增加初始每页项数以减少空白
+  Timer? _autoPaginationTimer; // 自动翻页定时器
+  bool _isPaginationPaused = false; // 翻页是否暂停
+  int _totalPages = 0; // 总页数
 
   ///1, 自动返回主页方法 - 用于全屏广告状态时调用
   void autoReturnToHome() {
@@ -40,6 +51,11 @@ class ArrearTableWidgetState extends State<ArrearTableWidget> {
       } else {
         print('📊 [ArrearTableWidget] 使用现有数据，与欠费查询共享同一数据源');
       }
+
+      // 如果在轮播模式下，启动自动翻页
+      if (widget.isInCarouselMode && provider.rawArrearData.isNotEmpty) {
+        _startAutoPagination(provider.rawArrearData);
+      }
     });
   }
 
@@ -47,6 +63,29 @@ class ArrearTableWidgetState extends State<ArrearTableWidget> {
   Widget build(BuildContext context) {
     return Consumer<ArrearProvider>(
       builder: (context, provider, child) {
+        // 监听媒体暂停状态 - 仅在轮播模式下生效
+        if (widget.isInCarouselMode) {
+          final carouselStateProvider = context.watch<CarouselStateProvider>();
+          final currentAppState = carouselStateProvider.currentAppState;
+
+          // 检查中部通告轮播是否应该暂停（全屏广告或手动操作状态）
+          final shouldPauseCarousel =
+              currentAppState == AppState.fullscreenAd ||
+                  currentAppState == AppState.manualOperation;
+
+          print(
+              '🎬 [轮播状态同步] 当前应用状态: ${currentAppState.name}, 通告轮播应暂停: $shouldPauseCarousel, 自动翻页状态: ${_isPaginationPaused ? "已暂停" : "运行中"}');
+
+          // 自动翻页与通告轮播状态同步
+          if (shouldPauseCarousel && !_isPaginationPaused) {
+            print('🛑 [轮播状态同步] 通告轮播暂停，同步暂停自动翻页');
+            _pauseAutoPagination();
+          } else if (!shouldPauseCarousel && _isPaginationPaused) {
+            print('▶️ [轮播状态同步] 通告轮播恢复，同步恢复自动翻页');
+            _resumeAutoPagination();
+          }
+        }
+
         return Stack(
           children: [
             // 主要内容
@@ -157,7 +196,21 @@ class ArrearTableWidgetState extends State<ArrearTableWidget> {
             headerHeight;
         final int dynamicRows = ((availableHeight / rowHeight).floor() - 1)
             .clamp(8, 50); // 行數減1防止溢出
-        _itemsPerPage = dynamicRows;
+
+        // 如果每页项数发生变化，更新状态以确保分页控件显示正确
+        if (_itemsPerPage != dynamicRows) {
+          _itemsPerPage = dynamicRows;
+          print('📊 [表格内容] 更新每页项数: $_itemsPerPage');
+          // 使用 WidgetsBinding.instance.addPostFrameCallback 来确保在渲染完成后更新状态
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (mounted) {
+              setState(() {
+                // 触发重新构建以更新分页控件
+              });
+            }
+          });
+        }
+
         final headers = _getTableHeaders(rawData);
         final paginatedData = _getPaginatedData(rawData);
 
@@ -427,7 +480,33 @@ class ArrearTableWidgetState extends State<ArrearTableWidget> {
   ///11, 构建分页控件
   Widget _buildPagination(List<Map<String, dynamic>> rawData) {
     final totalItems = rawData.length;
-    final totalPages = (totalItems / _itemsPerPage).ceil();
+
+    // 确保使用正确计算的每页项数
+    int actualItemsPerPage = _itemsPerPage;
+
+    // 如果还是初始值（20），重新计算正确的每页项数
+    if (_itemsPerPage == 20) {
+      final double screenHeight = MediaQuery.of(context).size.height;
+      final double mainAreaHeight = screenHeight * 14 / 24;
+      final double outerPadding = 16 * 2;
+      final double titleHeight = 56;
+      final double paginationHeight = 56;
+      final double rowHeight = 40;
+      final double headerHeight = 44;
+      final double availableHeight = mainAreaHeight -
+          outerPadding -
+          titleHeight -
+          paginationHeight -
+          headerHeight;
+      actualItemsPerPage =
+          ((availableHeight / rowHeight).floor() - 1).clamp(8, 50);
+
+      print('📊 [分页控件] 重新计算每页项数: 从$_itemsPerPage调整为$actualItemsPerPage');
+    }
+
+    final totalPages = (totalItems / actualItemsPerPage).ceil();
+    print(
+        '📄 [分页控件] 计算总页数: 数据总数=$totalItems, 每页=$actualItemsPerPage, 总页数=$totalPages');
 
     if (totalPages <= 1) return const SizedBox.shrink();
 
@@ -505,7 +584,112 @@ class ArrearTableWidgetState extends State<ArrearTableWidget> {
     );
   }
 
-  ///12, 构建空状态
+  ///12, 启动自动翻页 - 仅在轮播模式下使用
+  void _startAutoPagination(List<Map<String, dynamic>> rawData) {
+    if (!widget.isInCarouselMode || rawData.isEmpty) return;
+
+    // 确保在启动自动翻页前先计算正确的每页项数
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      // 重新计算每页项数，确保总页数准确
+      final context = this.context;
+      final screenHeight = MediaQuery.of(context).size.height;
+      final double mainAreaHeight = screenHeight * 14 / 24;
+      final double outerPadding = 16 * 2;
+      final double titleHeight = 56;
+      final double paginationHeight = 56;
+      final double rowHeight = 40;
+      final double headerHeight = 44;
+      final double availableHeight = mainAreaHeight -
+          outerPadding -
+          titleHeight -
+          paginationHeight -
+          headerHeight;
+      final int dynamicRows =
+          ((availableHeight / rowHeight).floor() - 1).clamp(8, 50);
+
+      _itemsPerPage = dynamicRows;
+      print('📊 [自动翻页] 重新计算每页项数: $_itemsPerPage');
+
+      _totalPages = (rawData.length / _itemsPerPage).ceil();
+      print(
+          '📄 [自动翻页] 启动自动翻页 - 数据总数: ${rawData.length}, 每页: $_itemsPerPage, 总页数: $_totalPages, 当前页: $_currentPage');
+
+      if (_totalPages <= 1) {
+        // 只有一页，直接通知完成
+        Future.delayed(Duration(seconds: 3), () {
+          if (widget.onPaginationComplete != null) {
+            widget.onPaginationComplete!(_totalPages);
+          }
+        });
+        return;
+      }
+
+      // 通知轮播提供者开始翻页（用于动态延长停留时间）
+      if (widget.onPaginationStart != null) {
+        widget.onPaginationStart!(_totalPages);
+      }
+
+      // 启动实际的自动翻页逻辑
+      _startActualAutoPagination();
+    });
+  }
+
+  ///12a, 启动实际的自动翻页逻辑
+  void _startActualAutoPagination() {
+    print('📄 [自动翻页] 启动实际自动翻页逻辑 - 总页数: $_totalPages, 当前页: $_currentPage');
+
+    _autoPaginationTimer?.cancel();
+    _autoPaginationTimer = Timer.periodic(Duration(seconds: 3), (timer) {
+      if (_isPaginationPaused) return; // 如果暂停，跳过这次执行
+
+      if (_currentPage < _totalPages) {
+        setState(() {
+          _currentPage++;
+        });
+        print('📄 [自动翻页] 切换到第 $_currentPage 页 / $_totalPages 页');
+      } else {
+        // 已经是最后一页，通知完成并停止定时器
+        timer.cancel();
+        print('📄 [自动翻页] 已到最后一页，通知轮播切换到下一个通告');
+        if (widget.onPaginationComplete != null) {
+          widget.onPaginationComplete!(_totalPages);
+        }
+      }
+    });
+  }
+
+  ///13, 暂停自动翻页
+  void _pauseAutoPagination() {
+    if (!_isPaginationPaused) {
+      _isPaginationPaused = true;
+      print('⏸️ [自动翻页] 暂停自动翻页');
+    }
+  }
+
+  ///14, 恢复自动翻页
+  void _resumeAutoPagination() {
+    if (_isPaginationPaused) {
+      _isPaginationPaused = false;
+      print('▶️ [自动翻页] 恢复自动翻页');
+
+      // 如果定时器不活跃且还有页面需要翻页，重新启动翻页
+      if ((_autoPaginationTimer == null || !_autoPaginationTimer!.isActive) &&
+          _currentPage < _totalPages) {
+        print('🔄 [自动翻页] 检测到翻页定时器已停止，重新启动翻页');
+        _startActualAutoPagination();
+      }
+    }
+  }
+
+  ///15, 停止自动翻页
+  void _stopAutoPagination() {
+    _autoPaginationTimer?.cancel();
+    _autoPaginationTimer = null;
+    _isPaginationPaused = false;
+    print('🛑 [自动翻页] 停止自动翻页');
+  }
+
+  ///16, 构建空状态
   Widget _buildEmptyState() {
     return Container(
       margin: const EdgeInsets.all(16),
@@ -547,5 +731,11 @@ class ArrearTableWidgetState extends State<ArrearTableWidget> {
         ),
       ),
     );
+  }
+
+  @override
+  void dispose() {
+    _stopAutoPagination(); // 清理自动翻页定时器
+    super.dispose();
   }
 }

@@ -266,14 +266,38 @@ class ArrearProvider extends ChangeNotifier {
   ///6, 获取目标ismartId（优先使用正确的ismartId，否则使用固定备选值）
   String _getTargetIsmartId() {
     final correctIsmartId = _appDataProvider.settingsModel?.building.ismartId;
+
+    // 详细调试日志
+    _logger.i('🔍 [调试ismartId获取]');
+    _logger.i('  - AppDataProvider已登录: ${_appDataProvider.isLoggedIn}');
+    _logger.i('  - SettingsModel存在: ${_appDataProvider.settingsModel != null}');
+    _logger.i(
+        '  - Building信息存在: ${_appDataProvider.settingsModel?.building != null}');
+    _logger.i('  - ismartId值: $correctIsmartId');
+    _logger.i('  - ismartId长度: ${correctIsmartId?.length ?? 0}');
+    _logger.i('  - ismartId非空: ${correctIsmartId?.isNotEmpty ?? false}');
+
     final targetId = (correctIsmartId != null && correctIsmartId.isNotEmpty)
         ? correctIsmartId
         : _fallbackIsmartId;
 
     if (targetId == _fallbackIsmartId) {
-      _logger.w('使用固定备选ismartId: $targetId');
+      _logger.w('⚠️ 使用固定备选ismartId: $targetId');
+      _logger.w(
+          '   原因: ${correctIsmartId == null ? 'ismartId为null' : correctIsmartId.isEmpty ? 'ismartId为空字符串' : '未知原因'}');
+      _logger.w('   详细诊断:');
+      _logger.w('     - AppDataProvider实例: ${_appDataProvider.runtimeType}');
+      _logger.w('     - 是否已登录: ${_appDataProvider.isLoggedIn}');
+      _logger.w(
+          '     - SettingsModel: ${_appDataProvider.settingsModel?.runtimeType}');
+      _logger.w(
+          '     - Building: ${_appDataProvider.settingsModel!.building.runtimeType}');
+      _logger.w(
+          '     - Building name: ${_appDataProvider.settingsModel!.building.name}');
+      _logger.w(
+          '     - Building ismartId原始值: "${_appDataProvider.settingsModel!.building.ismartId}"');
     } else {
-      _logger.i('使用正确的ismartId: $targetId');
+      _logger.i('✅ 使用正确的ismartId: $targetId');
     }
 
     return targetId;
@@ -281,15 +305,13 @@ class ArrearProvider extends ChangeNotifier {
 
   /// 初始化获取欠费数据
   Future<void> initGetArrearData() async {
-    _logger.i('开始初始化获取欠费数据');
+    _logger.i('🚀 开始初始化获取欠费数据');
 
     // 首先尝试从缓存加载数据
     await loadFromCache();
 
-    // 获取目标ismartId
-    final targetIsmartId = _getTargetIsmartId();
-    // 然后尝试从网络获取最新数据（不重置缓存数据，如果失败则保持缓存数据）
-    await fetchArrears(reset: false, buildingId: targetIsmartId);
+    // 使用强制刷新方法确保获取正确的ismartId
+    await forceRefreshWithCorrectIsmartId();
   }
 
   /// 获取欠费列表
@@ -452,6 +474,89 @@ class ArrearProvider extends ChangeNotifier {
     notifyListeners();
   }
 
+  ///13, 强制刷新并使用正确的ismartId
+  Future<void> forceRefreshWithCorrectIsmartId() async {
+    _logger.i('🔄 强制刷新欠费数据，使用正确的ismartId');
+
+    // 首先测试AppDataProvider连接状态
+    testAppDataProviderConnection();
+
+    // 等待AppDataProvider完全初始化
+    int attempts = 0;
+    const maxAttempts = 10;
+
+    while (attempts < maxAttempts) {
+      final correctIsmartId = _appDataProvider.settingsModel?.building.ismartId;
+
+      if (correctIsmartId != null && correctIsmartId.isNotEmpty) {
+        _logger.i('✅ 获得有效ismartId: $correctIsmartId，开始刷新数据');
+        await fetchArrears(reset: true, buildingId: correctIsmartId);
+        return;
+      }
+
+      attempts++;
+      _logger.w('⏳ 等待有效ismartId... 尝试 $attempts/$maxAttempts');
+      await Future.delayed(const Duration(milliseconds: 500));
+    }
+
+    _logger.e('❌ 无法获得有效ismartId，使用备选ID');
+    await fetchArrears(reset: true, buildingId: _fallbackIsmartId);
+  }
+
+  ///14, 获取当前ismartId调试信息
+  Map<String, dynamic> getIsmartIdDebugInfo() {
+    final correctIsmartId = _appDataProvider.settingsModel?.building.ismartId;
+    final currentTargetId = _getTargetIsmartId();
+
+    return {
+      'appDataProvider_isLoggedIn': _appDataProvider.isLoggedIn,
+      'settingsModel_exists': _appDataProvider.settingsModel != null,
+      'building_exists': _appDataProvider.settingsModel != null,
+      'building_name': _appDataProvider.settingsModel?.building.name,
+      'ismartId_from_settings': correctIsmartId,
+      'ismartId_length': correctIsmartId?.length ?? 0,
+      'ismartId_isEmpty': correctIsmartId?.isEmpty ?? true,
+      'current_target_id': currentTargetId,
+      'using_fallback': currentTargetId == _fallbackIsmartId,
+      'fallback_id': _fallbackIsmartId,
+      'periodic_update_active': _isPeriodicUpdateActive,
+    };
+  }
+
+  ///15, 测试AppDataProvider连接状态
+  void testAppDataProviderConnection() {
+    _logger.i('🔍 [测试AppDataProvider连接状态]');
+    _logger.i('  AppDataProvider类型: ${_appDataProvider.runtimeType}');
+    _logger.i('  AppDataProvider哈希: ${_appDataProvider.hashCode}');
+    _logger.i('  是否已登录: ${_appDataProvider.isLoggedIn}');
+
+    try {
+      final settingsModel = _appDataProvider.settingsModel;
+      _logger.i('  SettingsModel: ${settingsModel != null ? '存在' : '不存在'}');
+
+      if (settingsModel != null) {
+        _logger.i('    - deviceId: ${settingsModel.deviceId}');
+        _logger.i('    - buildingId: ${settingsModel.buildingId}');
+        _logger.i('    - status: ${settingsModel.status}');
+
+        final building = settingsModel.building;
+        _logger.i('    - Building: 存在');
+
+        {
+          _logger.i('      - id: ${building.id}');
+          _logger.i('      - name: "${building.name}"');
+          _logger.i('      - ismartId: "${building.ismartId}"');
+          _logger.i('      - location: "${building.location}"');
+          _logger.i('      - ismartId长度: ${building.ismartId.length}');
+          _logger.i('      - ismartId是否为空: ${building.ismartId.isEmpty}');
+        }
+      }
+    } catch (e, stackTrace) {
+      _logger.e('❌ 测试AppDataProvider连接时出错: $e',
+          error: e, stackTrace: stackTrace);
+    }
+  }
+
   ///10，开始定期更新欠费数据
   void startPeriodicUpdate({int? updateIntervalMinutes}) {
     if (_isPeriodicUpdateActive) {
@@ -467,16 +572,23 @@ class ArrearProvider extends ChangeNotifier {
 
     _isPeriodicUpdateActive = true;
 
-    // 立即执行一次更新，使用目标ismartId
-    final targetIsmartId = _getTargetIsmartId();
-    fetchArrears(reset: false, buildingId: targetIsmartId);
+    // 立即执行一次强制刷新，确保使用正确的ismartId
+    forceRefreshWithCorrectIsmartId();
 
     // 设置定时器进行周期性更新
     _updateTimer = Timer.periodic(Duration(seconds: intervalSeconds), (timer) {
       if (_isPeriodicUpdateActive) {
-        _logger.i('Performing periodic arrear update...');
+        _logger.i('🔄 执行定期欠费数据更新...');
         final currentTargetId = _getTargetIsmartId();
-        fetchArrears(reset: false, buildingId: currentTargetId);
+
+        // 检查是否使用了备选ID，如果是则尝试强制刷新
+        if (currentTargetId == _fallbackIsmartId) {
+          _logger.w('⚠️ 检测到使用备选ID，尝试强制刷新获取正确ismartId');
+          // 使用异步方式避免阻塞定时器
+          Future.microtask(() => forceRefreshWithCorrectIsmartId());
+        } else {
+          fetchArrears(reset: false, buildingId: currentTargetId);
+        }
       } else {
         timer.cancel();
       }
@@ -495,7 +607,7 @@ class ArrearProvider extends ChangeNotifier {
 
   ///12，重新初始化Provider（当依赖变化时调用）
   void reinitialize() {
-    _logger.i('ArrearProvider reinitializing...');
+    _logger.i('🔄 ArrearProvider重新初始化...');
 
     // 停止现有的定时更新
     stopPeriodicUpdate();
@@ -505,13 +617,14 @@ class ArrearProvider extends ChangeNotifier {
 
     // 如果AppDataProvider已登录，重新启动定时更新
     Future.delayed(const Duration(milliseconds: 100), () {
-      if (_appDataProvider.isLoggedIn &&
-          _appDataProvider.buildingInfo?.ismartId != null) {
-        _logger.i('重新初始化完成，重启欠费数据定时更新');
+      if (_appDataProvider.isLoggedIn) {
+        _logger.i('✅ 重新初始化完成，重启欠费数据定时更新');
         final deviceSettings = _appDataProvider.deviceSettings;
         final arrearUpdateInterval =
             deviceSettings?.arrearageUpdateDuration ?? 1;
         startPeriodicUpdate(updateIntervalMinutes: arrearUpdateInterval);
+      } else {
+        _logger.w('⚠️ AppDataProvider未登录，跳过定时更新');
       }
     });
   }

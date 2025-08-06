@@ -21,6 +21,7 @@ class AppDataProvider extends ChangeNotifier {
   SettingsModel? _settingsModel;
   String? _deviceId;
   String _baseUrl; // Should be initialized, e.g., from a config
+  String? _fallbackUrl; // 备用服务器地址
   CarouselStateProvider? _carouselStateProvider; // 添加对CarouselStateProvider的引用
   ArrearProvider? _arrearProvider; // 添加对ArrearProvider的引用
 
@@ -75,13 +76,32 @@ class AppDataProvider extends ChangeNotifier {
 
   static const String _deviceIdKey = 'deviceId';
 
-  AppDataProvider({required String baseUrl}) : _baseUrl = baseUrl {
+  AppDataProvider({
+    required String baseUrl,
+    String? fallbackUrl,
+  })  : _baseUrl = baseUrl,
+        _fallbackUrl = fallbackUrl {
     _apiClient = ApiClient(
       baseUrl: _baseUrl,
       onNeedsTokenRefresh: _handleTokenRefresh,
     );
     // _logger.i(
     //     'AppDataProvider initialized. ApiClient configured for token refresh.');
+  }
+
+  ///1, 切换到备用服务器
+  void _switchToFallbackServer() {
+    if (_fallbackUrl != null && _fallbackUrl!.isNotEmpty) {
+      _logger.w('主服务器连接失败，切换到备用服务器: $_fallbackUrl');
+      _baseUrl = _fallbackUrl!;
+      _apiClient = ApiClient(
+        baseUrl: _baseUrl,
+        onNeedsTokenRefresh: _handleTokenRefresh,
+      );
+      notifyListeners();
+    } else {
+      _logger.e('没有配置备用服务器地址');
+    }
   }
 
   ///1，保存登录设备数据到SharedPreferences缓存

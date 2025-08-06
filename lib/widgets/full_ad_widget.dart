@@ -3,6 +3,9 @@ import 'package:video_player/video_player.dart';
 import 'package:iboard_app/managers/file_manager.dart';
 import 'package:iboard_app/models/ad_model.dart';
 import 'package:iboard_app/utils/video_resource_manager.dart';
+import 'package:iboard_app/utils/enhanced_video_pool_manager.dart';
+import 'package:iboard_app/providers/advertisement_provider.dart';
+import 'package:provider/provider.dart';
 import 'package:logger/logger.dart';
 import 'dart:io';
 
@@ -33,6 +36,11 @@ class _FullAdWidgetState extends State<FullAdWidget> {
   bool _isVideoInitialized = false;
   bool _isLoadingVideo = false;
   String? _errorMessage;
+  String? _currentFilePath; // 当前视频文件路径
+  bool _isNetworkVideo = false; // 是否为网络视频
+
+  // 保存AdvertisementProvider引用，避免dispose时context访问问题
+  AdvertisementProvider? _advertisementProvider;
 
   @override
   void initState() {
@@ -45,26 +53,44 @@ class _FullAdWidgetState extends State<FullAdWidget> {
   }
 
   @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // 在组件依赖变化时保存Provider引用，确保dispose时可以安全使用
+    _advertisementProvider ??= context.read<AdvertisementProvider>();
+  }
+
+  @override
   void dispose() {
     // _logger.i('🔄 开始释放全屏广告Widget资源');
 
-    // 安全释放视频控制器
-    if (_videoController != null) {
+    // 释放视频控制器到池中
+    if (_videoController != null && _currentFilePath != null) {
       // 移除监听器
       _videoController!.removeListener(_onVideoProgressChanged);
 
-      // 异步释放，但不等待完成以避免阻塞dispose
-      _videoController!.safeDispose().then((success) {
-        // 通知视频资源已释放
-        if (widget.onVideoDisposed != null) {
-          widget.onVideoDisposed!();
-        }
-        if (success) {
-          // _logger.i('✅ 全屏广告视频控制器已安全释放');
+      // 释放到增强池中，避免阻塞dispose
+      try {
+        // 使用保存的Provider引用，避免context访问问题
+        if (_advertisementProvider != null) {
+          _advertisementProvider!.videoPoolManager
+              .releaseController(
+            filePath: _currentFilePath!,
+            videoType: VideoType.fullAd,
+            isNetwork: _isNetworkVideo,
+          )
+              .then((_) {
+            // 通知视频资源已释放
+            if (widget.onVideoDisposed != null) {
+              widget.onVideoDisposed!();
+            }
+            // _logger.i('✅ 全屏广告视频控制器已释放到增强池中');
+          });
         } else {
-          _logger.w('⚠️ 全屏广告视频控制器释放可能不完整');
+          _logger.w('⚠️ AdvertisementProvider引用为空，无法释放视频控制器');
         }
-      });
+      } catch (e) {
+        _logger.w('⚠️ 释放全屏视频控制器时出错: $e');
+      }
       _videoController = null;
     }
 
@@ -99,10 +125,16 @@ class _FullAdWidgetState extends State<FullAdWidget> {
     });
 
     try {
-      // 安全释放之前的视频控制器
-      if (_videoController != null) {
+      // 释放之前的视频控制器到增强池中
+      if (_videoController != null && _currentFilePath != null) {
         _videoController!.removeListener(_onVideoProgressChanged);
-        await _videoController!.safeDispose();
+        // 确保Provider引用可用
+        _advertisementProvider ??= context.read<AdvertisementProvider>();
+        await _advertisementProvider!.videoPoolManager.releaseController(
+          filePath: _currentFilePath!,
+          videoType: VideoType.fullAd,
+          isNetwork: _isNetworkVideo,
+        );
         _videoController = null;
       }
 
@@ -124,9 +156,16 @@ class _FullAdWidgetState extends State<FullAdWidget> {
         isNetwork = true;
       }
 
-      // 使用视频资源管理器初始化
-      _videoController = await VideoResourceManager.safeInitialize(
+      // 记录当前文件信息
+      _currentFilePath = filePath;
+      _isNetworkVideo = isNetwork;
+
+      // 使用增强视频池管理器初始化
+      _advertisementProvider ??= context.read<AdvertisementProvider>();
+      _videoController =
+          await _advertisementProvider!.videoPoolManager.getController(
         filePath: filePath,
+        videoType: VideoType.fullAd,
         isNetwork: isNetwork,
         autoPlay: false, // 先不自动播放，等设置完成后再播放
         looping: false,
@@ -148,7 +187,11 @@ class _FullAdWidgetState extends State<FullAdWidget> {
       // 检查widget是否仍然挂载
       if (!mounted) {
         // _logger.w('⚠️ Widget已卸载，停止视频初始化');
-        await _videoController!.safeDispose();
+        await _advertisementProvider!.videoPoolManager.releaseController(
+          filePath: _currentFilePath!,
+          videoType: VideoType.fullAd,
+          isNetwork: _isNetworkVideo,
+        );
         _videoController = null;
         return;
       }
@@ -176,8 +219,12 @@ class _FullAdWidgetState extends State<FullAdWidget> {
       _logger.e('❌ 视频初始化失败: $e');
 
       // 清理资源
-      if (_videoController != null) {
-        await _videoController!.safeDispose();
+      if (_videoController != null && _currentFilePath != null) {
+        await _advertisementProvider!.videoPoolManager.releaseController(
+          filePath: _currentFilePath!,
+          videoType: VideoType.fullAd,
+          isNetwork: _isNetworkVideo,
+        );
         _videoController = null;
       }
 

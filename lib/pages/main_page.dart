@@ -7,6 +7,7 @@ import 'package:iboard_app/pages/fullscreen_ads_page.dart';
 import 'package:iboard_app/pages/mainscreen_page.dart';
 import 'package:iboard_app/providers/announcement_provider.dart';
 import 'package:iboard_app/providers/state_provider.dart'; // Added import for CarouselStateProvider
+
 import 'package:provider/provider.dart';
 
 class MainPage extends StatefulWidget {

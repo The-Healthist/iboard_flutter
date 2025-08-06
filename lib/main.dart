@@ -10,6 +10,7 @@ import 'package:iboard_app/providers/fullscreen_ad_provider.dart';
 import 'package:iboard_app/providers/bottom_weather_qrcode_carousel_provider.dart';
 import 'package:iboard_app/managers/file_manager.dart';
 import 'package:iboard_app/utils/device_id_util.dart';
+
 import 'package:provider/provider.dart';
 import 'pages/mainscreen_page.dart';
 import 'pages/fullscreen_ads_page.dart';
@@ -28,7 +29,11 @@ void main() {
         providers: [
           ChangeNotifierProvider(
             create: (context) => AppDataProvider(
-                baseUrl: 'http://test.iboard.skylinedances.com'),
+              // 主服务器地址
+              baseUrl: 'http://test.iboard.skylinedances.com',
+              // 备用服务器地址（暂时设为null，需要实际IP时请替换）
+              fallbackUrl: null, // 如需备用服务器，请替换为: 'http://实际IP:端口'
+            ),
           ),
           Provider<FileManager>(
             create: (context) => FileManager(),

@@ -29,6 +29,24 @@ class ArrearDisplayWidgetState extends State<ArrearDisplayWidget> {
     }
   }
 
+    ///2, 强制刷新欠费数据（使用正确的ismartId）
+  Future<void> _forceRefreshData() async {
+    final provider = Provider.of<ArrearProvider>(context, listen: false);
+    
+    // 显示当前调试信息
+    final debugInfo = provider.getIsmartIdDebugInfo();
+    print('🔍 [ArrearDisplayWidget] ismartId调试信息:');
+    debugInfo.forEach((key, value) {
+      print('  $key: $value');
+    });
+    
+    // 测试AppDataProvider连接
+    provider.testAppDataProviderConnection();
+    
+    print('🔄 [ArrearDisplayWidget] 手动触发强制刷新');
+    await provider.forceRefreshWithCorrectIsmartId();
+  }
+
   @override
   void initState() {
     super.initState();
@@ -135,37 +153,30 @@ class ArrearDisplayWidgetState extends State<ArrearDisplayWidget> {
                 ),
               ),
 
-            // 调试按钮 - 位于左上角（已注释）
-            // Positioned(
-            //   top: 16,
-            //   left: 16,
-            //   child: Material(
-            //     color: Colors.transparent,
-            //     child: InkWell(
-            //       onTap: () {
-            //         Navigator.push(
-            //           context,
-            //           MaterialPageRoute(
-            //             builder: (context) => const ArrearDebugWidget(),
-            //           ),
-            //         );
-            //       },
-            //       borderRadius: BorderRadius.circular(20),
-            //       child: Container(
-            //         padding: const EdgeInsets.all(8),
-            //         decoration: BoxDecoration(
-            //           color: Colors.green.withOpacity(0.8),
-            //           borderRadius: BorderRadius.circular(20),
-            //         ),
-            //         child: const Icon(
-            //           Icons.bug_report,
-            //           color: Colors.white,
-            //           size: 24,
-            //         ),
-            //       ),
-            //     ),
-            //   ),
-            // ),
+            // 调试按钮 - 位于左上角（强制刷新ismartId）
+            Positioned(
+              top: 16,
+              left: 16,
+              child: Material(
+                color: Colors.transparent,
+                child: InkWell(
+                  onTap: _forceRefreshData,
+                  borderRadius: BorderRadius.circular(20),
+                  child: Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: Colors.blue.withOpacity(0.8),
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    child: const Icon(
+                      Icons.refresh,
+                      color: Colors.white,
+                      size: 24,
+                    ),
+                  ),
+                ),
+              ),
+            ),
           ],
         );
       },

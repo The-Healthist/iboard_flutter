@@ -5,6 +5,8 @@ import 'package:iboard_app/managers/file_manager.dart'; // Assuming FileManager 
 import 'package:iboard_app/providers/state_provider.dart';
 import 'package:iboard_app/widgets/carousel_widget.dart'; // 导入通知类
 import 'package:iboard_app/utils/video_resource_manager.dart';
+import 'package:iboard_app/utils/enhanced_video_pool_manager.dart';
+import 'package:iboard_app/providers/advertisement_provider.dart';
 import 'package:video_player/video_player.dart';
 import 'package:logger/logger.dart';
 import 'package:provider/provider.dart';
@@ -31,10 +33,20 @@ class _TopAdWidgetState extends State<TopAdWidget> {
   String? _error;
   bool _isManuallyPaused = false; // 添加手动暂停标记
 
+  // 保存AdvertisementProvider引用，避免dispose时context访问问题
+  AdvertisementProvider? _advertisementProvider;
+
   @override
   void initState() {
     super.initState();
     _loadFile();
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // 在组件依赖变化时保存Provider引用，确保dispose时可以安全使用
+    _advertisementProvider ??= context.read<AdvertisementProvider>();
   }
 
   //1，加载广告文件
@@ -89,7 +101,7 @@ class _TopAdWidgetState extends State<TopAdWidget> {
     }
   }
 
-  //2，初始化视频播放器 - 使用视频资源管理器
+  //2，初始化视频播放器 - 使用视频池管理器
   Future<void> _initializeVideoPlayer() async {
     if (_localFilePath == null || !mounted) return;
 
@@ -98,15 +110,24 @@ class _TopAdWidgetState extends State<TopAdWidget> {
       _error = null;
     });
 
-    // 先安全释放之前的控制器
+    // 先释放之前的控制器到增强池中
     if (_videoController != null) {
-      await _videoController!.safeDispose();
+      // 确保Provider引用可用
+      _advertisementProvider ??= context.read<AdvertisementProvider>();
+      await _advertisementProvider!.videoPoolManager.releaseController(
+        filePath: _localFilePath!,
+        videoType: VideoType.topAd,
+        isNetwork: false,
+      );
       _videoController = null;
     }
 
     try {
-      _videoController = await VideoResourceManager.safeInitialize(
+      _advertisementProvider ??= context.read<AdvertisementProvider>();
+      _videoController =
+          await _advertisementProvider!.videoPoolManager.getController(
         filePath: _localFilePath!,
+        videoType: VideoType.topAd,
         isNetwork: false,
         autoPlay: true,
         looping: true,
@@ -124,7 +145,7 @@ class _TopAdWidgetState extends State<TopAdWidget> {
         setState(() {
           _isLoading = false;
         });
-        _logger.i('✅ 顶部广告视频初始化成功');
+        _logger.i('✅ 顶部广告视频初始化成功（使用增强视频池）');
       } else if (mounted) {
         setState(() {
           _error = 'Could not initialize video player.';
@@ -170,9 +191,22 @@ class _TopAdWidgetState extends State<TopAdWidget> {
 
   @override
   void dispose() {
-    if (_videoController != null) {
-      // 异步释放，但不等待完成以避免阻塞dispose
-      _videoController!.safeDispose();
+    if (_videoController != null && _localFilePath != null) {
+      // 释放控制器到增强池中，避免阻塞dispose
+      try {
+        // 使用保存的Provider引用，避免context访问问题
+        if (_advertisementProvider != null) {
+          _advertisementProvider!.videoPoolManager.releaseController(
+            filePath: _localFilePath!,
+            videoType: VideoType.topAd,
+            isNetwork: false,
+          );
+        } else {
+          _logger.w('⚠️ AdvertisementProvider引用为空，无法释放视频控制器');
+        }
+      } catch (e) {
+        _logger.w('⚠️ 释放视频控制器时出错: $e');
+      }
       _videoController = null;
     }
     super.dispose();
@@ -185,17 +219,32 @@ class _TopAdWidgetState extends State<TopAdWidget> {
     final isMediaPaused =
         carouselStateProvider.isMediaPausedForArea(AreaType.topAd);
 
-    // 根据媒体状态控制视频播放 - 使用视频资源管理器
+    // 根据媒体状态控制视频播放 - 使用防抖动控制避免频繁调用
     if (_videoController != null) {
       final state = _videoController!.safeState;
       if (isMediaPaused && state == VideoControllerState.playing) {
-        _videoController!.safePause();
-        // _logger.d('暂停顶部广告视频播放');
+        // 延迟100ms执行，避免频繁调用
+        Future.delayed(Duration(milliseconds: 100), () {
+          if (mounted &&
+              _videoController != null &&
+              _videoController!.safeState == VideoControllerState.playing) {
+            _videoController!.safePause();
+            // _logger.d('防抖动暂停顶部广告视频播放');
+          }
+        });
       } else if (!isMediaPaused &&
           state == VideoControllerState.paused &&
           !_isManuallyPaused) {
-        _videoController!.safePlay();
-        // _logger.d('恢复顶部广告视频播放');
+        // 延迟100ms执行，避免频繁调用
+        Future.delayed(Duration(milliseconds: 100), () {
+          if (mounted &&
+              _videoController != null &&
+              _videoController!.safeState == VideoControllerState.paused &&
+              !_isManuallyPaused) {
+            _videoController!.safePlay();
+            // _logger.d('防抖动恢复顶部广告视频播放');
+          }
+        });
       }
     }
 
@@ -203,12 +252,27 @@ class _TopAdWidgetState extends State<TopAdWidget> {
     return NotificationListener<Notification>(
       onNotification: (notification) {
         if (notification is MediaPauseNotification) {
-          // _logger.i('📱 收到媒体暂停通知 - ${widget.ad.title}');
-          _pauseVideo();
+          // 防抖动执行，避免重复调用
+          Future.delayed(Duration(milliseconds: 50), () {
+            if (mounted &&
+                _videoController != null &&
+                _videoController!.safeState == VideoControllerState.playing) {
+              _pauseVideo();
+              // _logger.i('📱 防抖动暂停视频 - ${widget.ad.title}');
+            }
+          });
           return true; // 阻止通知继续传递
         } else if (notification is MediaResumeNotification) {
-          // _logger.i('📱 收到媒体恢复通知 - ${widget.ad.title}');
-          _resumeVideo();
+          // 防抖动执行，避免重复调用
+          Future.delayed(Duration(milliseconds: 50), () {
+            if (mounted &&
+                _videoController != null &&
+                _videoController!.safeState == VideoControllerState.paused &&
+                !_isManuallyPaused) {
+              _resumeVideo();
+              // _logger.i('📱 防抖动恢复视频 - ${widget.ad.title}');
+            }
+          });
           return true; // 阻止通知继续传递
         }
         return false; // 其他通知继续传递
