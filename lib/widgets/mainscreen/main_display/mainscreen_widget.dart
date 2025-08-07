@@ -52,9 +52,9 @@ class MainScreenWidgetState extends State<MainScreenWidget> {
                 // 确保立即进入手动操作状态并显示欠费查询界面
                 widget.onAnnouncementTap?.call(null); // 传递null表示显示欠费查询
                 print('🔵 [MainScreenWidget] 已调用 onAnnouncementTap(null)');
-              } else if (chineseTitle == '欠費總覽') {
-                print('🔵 [MainScreenWidget] 用户点击欠费总览按钮');
-                // 导航到欠费总览页面
+              } else if (chineseTitle == '繳費表單') {
+                print('🔵 [MainScreenWidget] 用户点击繳費表單按钮');
+                // 导航到繳費表單页面
                 widget.onArrearTableTap?.call();
                 print('🔵 [MainScreenWidget] 已调用 onArrearTableTap()');
               } else {
@@ -173,13 +173,13 @@ class MainScreenWidgetState extends State<MainScreenWidget> {
                         child: Column(
                           children: [
                             _buildFunctionButton(
-                                '欠費查詢', 'Payment Inquiry', Icons.payment),
-                            _buildFunctionButton('欠費總覽', 'Self Payment',
+                                '欠費查詢', 'Payment Query', Icons.payment),
+                            _buildFunctionButton('繳費表單', 'Payment Form',
                                 Icons.account_balance_wallet),
-                            _buildFunctionButton('自助繳款', 'Convenience Services',
+                            _buildFunctionButton('自助繳款', 'Self-Service Payment',
                                 Icons.local_convenience_store),
                             _buildFunctionButton(
-                                '便利服務', 'Member Store', Icons.store),
+                                '便利服務', 'convenient services', Icons.store),
                           ],
                         ),
                       ),

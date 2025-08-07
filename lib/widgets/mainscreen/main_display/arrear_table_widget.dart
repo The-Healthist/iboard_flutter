@@ -113,7 +113,7 @@ class ArrearTableWidgetState extends State<ArrearTableWidget> {
                       ],
                     ),
                     child: const Text(
-                      '欠費總覽',
+                      '繳費表單',
                       style: TextStyle(
                         fontSize: 22,
                         fontWeight: FontWeight.bold,
