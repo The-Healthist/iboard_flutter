@@ -15,13 +15,15 @@ import 'package:iboard_app/providers/fullscreen_ad_provider.dart';
 import 'package:iboard_app/providers/bottom_weather_qrcode_carousel_provider.dart';
 import 'package:iboard_app/widgets/carousel_widget.dart' as custom_carousel;
 import 'package:iboard_app/widgets/mainscreen/bottom_display/bottom_display_widget.dart';
-import 'package:iboard_app/widgets/mainscreen/main_display/arrear_display_widget.dart';
+// import 'package:iboard_app/widgets/mainscreen/main_display/arrear_display_widget.dart'; // 已註釋，功能整合到MainScreenWidget
 import 'package:iboard_app/widgets/mainscreen/main_display/arrear_table_widget.dart';
 import 'package:iboard_app/pages/settings_page.dart';
 import 'package:logger/logger.dart';
 import 'package:provider/provider.dart';
 
 class AnnouncementPage extends StatefulWidget {
+  const AnnouncementPage({Key? key}) : super(key: key);
+
   @override
   _AnnouncementPageState createState() => _AnnouncementPageState();
 }
@@ -47,8 +49,8 @@ class _AnnouncementPageState extends State<AnnouncementPage> {
   Timer? _clickResetTimer; // 点击重置定时器
 
   // 欠费组件的GlobalKey，用于调用组件方法
-  final GlobalKey<ArrearDisplayWidgetState> _arrearDisplayKey =
-      GlobalKey<ArrearDisplayWidgetState>();
+  // final GlobalKey<ArrearDisplayWidgetState> _arrearDisplayKey =
+  //     GlobalKey<ArrearDisplayWidgetState>(); // 已註釋，功能整合到MainScreenWidget
   final GlobalKey<ArrearTableWidgetState> _arrearTableKey =
       GlobalKey<ArrearTableWidgetState>();
 
@@ -701,20 +703,16 @@ class _AnnouncementPageState extends State<AnnouncementPage> {
                           return Container(
                             width: double.infinity,
                             height: double.infinity,
-                            child: ArrearDisplayWidget(
-                              key: _arrearDisplayKey,
-                              onHomeButtonPressed: () {
-                                _logger.i(
-                                    '🏠 [MainScreenPage Overlay] 返回按钮被点击，隐藏覆盖层');
-                                announcementCarouselProvider
-                                    .hideArrearQueryWidget(
-                                  () {},
-                                  10, // 简化参数
-                                  10,
-                                );
-                                // _logger.i('🏠 [MainScreenPage Overlay] 覆盖层已隐藏');
-                              },
-                            ),
+                            // 已註釋：功能整合到MainScreenWidget的右側展示
+                            child:
+                                const SizedBox.shrink(), // ArrearDisplayWidget(
+                            // key: _arrearDisplayKey,
+                            // onHomeButtonPressed: () {
+                            //   _logger.i('🏠 [MainScreenPage Overlay] 返回按钮被点击，隐藏覆盖层');
+                            //   announcementCarouselProvider.hideArrearQueryWidget(() {}, 10, 10,);
+                            //   // _logger.i('🏠 [MainScreenPage Overlay] 覆盖层已隐藏');
+                            // },
+                            // ),
                           );
                         }
 

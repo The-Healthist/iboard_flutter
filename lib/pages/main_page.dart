@@ -143,7 +143,7 @@ class _MainPageState extends State<MainPage> {
                   }
                 });
               },
-              child: AnnouncementPage(),
+              child: const AnnouncementPage(),
             ),
           ),
         );

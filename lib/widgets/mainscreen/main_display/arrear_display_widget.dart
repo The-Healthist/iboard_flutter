@@ -1,3 +1,8 @@
+// 注释：此文件已被MainScreenWidget的右侧显示功能替代
+// 原来的欠费查询覆盖层功能现在集成到MainScreenWidget中
+// 保留此文件作为参考，但不再使用
+
+/*
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:iboard_app/providers/arrear_provider.dart';
@@ -689,3 +694,4 @@ class ArrearDisplayWidgetState extends State<ArrearDisplayWidget> {
     );
   }
 }
+*/
