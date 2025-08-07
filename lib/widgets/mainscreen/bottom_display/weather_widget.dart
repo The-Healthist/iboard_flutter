@@ -60,6 +60,7 @@ class _WeatherWidgetState extends State<WeatherWidget> {
       // _logger.i('🚀 WeatherWidget初始化开始');
       _updateLocationFromProvider(); // 获取location
       _initializeWeatherData(); // 初始化天气数据
+      _startTimeUpdateTimer(); // 启动时间更新定时器（每分钟）
       _startWeatherUpdateTimer(); // 启动天气数据定时更新器（每2小时）
       // _logger.i('📍 初始化完成，当前位置: $_currentWeatherLocation');
     });
@@ -76,39 +77,36 @@ class _WeatherWidgetState extends State<WeatherWidget> {
     super.dispose();
   }
 
-  ///1, 开始时间更新定时器 - 注释掉整个时间更新功能
-  /*
+  ///1, 启动时间更新定时器 - 每分钟同步一次系统时间
   void _startTimeUpdateTimer() {
-    // Update time immediately
+    // 立即更新时间
     setState(() {
       _currentTime = DateTime.now();
     });
     // _logger.i(
     //     '启动时间更新定时器，当前时间: ${DateFormat('yyyy-MM-dd HH:mm:ss').format(_currentTime)}');
 
-    // Calculate delay to next minute
+    // 计算到下一分钟的延迟时间
     final now = DateTime.now();
     final nextMinute =
         DateTime(now.year, now.month, now.day, now.hour, now.minute + 1);
     final delayToNextMinute = nextMinute.difference(now);
 
-    // First update at the next minute
+    // 在下一个整分钟开始第一次更新
     Timer(delayToNextMinute, () {
       if (mounted) {
         setState(() {
           _currentTime = DateTime.now();
         });
-        _logger
-            .i('时间更新: ${DateFormat('yyyy-MM-dd HH:mm').format(_currentTime)}');
+        // _logger.i('时间更新: ${DateFormat('yyyy-MM-dd HH:mm').format(_currentTime)}');
 
-        // Then update every minute
+        // 然后每分钟更新一次
         _timeUpdateTimer = Timer.periodic(const Duration(minutes: 1), (timer) {
           if (mounted) {
             setState(() {
               _currentTime = DateTime.now();
             });
-            _logger.i(
-                '定时时间更新: ${DateFormat('yyyy-MM-dd HH:mm').format(_currentTime)}');
+            // _logger.i('定时时间更新: ${DateFormat('yyyy-MM-dd HH:mm').format(_currentTime)}');
           } else {
             timer.cancel();
           }
@@ -116,7 +114,6 @@ class _WeatherWidgetState extends State<WeatherWidget> {
       }
     });
   }
-  */
 
   ///2, 初始化天气数据
   void _initializeWeatherData() {
@@ -356,6 +353,16 @@ class _WeatherWidgetState extends State<WeatherWidget> {
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.center,
                 children: [
+                  // 实时时间显示
+                  Text(
+                    DateFormat('HH:mm').format(_currentTime),
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.blueGrey[800],
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
                   // 天气警告区域
                   Consumer<WeatherProvider>(
                     builder: (context, weatherProvider, child) {
@@ -592,7 +599,7 @@ class _WeatherWidgetState extends State<WeatherWidget> {
               children: [
                 Padding(
                   padding:
-                      const EdgeInsets.only(left: 4.0, top: 0, bottom: 4.0),
+                      const EdgeInsets.only(left: 4.0, top: 0, bottom: 0.0),
                   child: Text(
                     DateFormat('yyyy-MM-dd (EEEE)', 'zh_HK')
                         .format(_currentTime),
@@ -605,6 +612,16 @@ class _WeatherWidgetState extends State<WeatherWidget> {
                     mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                     crossAxisAlignment: CrossAxisAlignment.center,
                     children: [
+                      // 实时时间显示（无数据状态）
+                      Text(
+                        DateFormat('HH:mm').format(_currentTime),
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.blueGrey[800],
+                        ),
+                        textAlign: TextAlign.center,
+                      ),
                       Consumer<WeatherProvider>(
                         builder: (context, weatherProvider, child) {
                           final warningData =
@@ -736,6 +753,17 @@ class _WeatherWidgetState extends State<WeatherWidget> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
+            // 实时时间显示（错误状态）
+            Text(
+              DateFormat('HH:mm').format(_currentTime),
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
+                color: Colors.blueGrey[800],
+              ),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 8),
             const Icon(Icons.cloud_off, size: 40, color: Colors.grey),
             const SizedBox(height: 8),
             const Text('當前天氣暫時無法取得',
