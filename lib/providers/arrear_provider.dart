@@ -22,6 +22,13 @@ class ArrearProvider extends ChangeNotifier {
   // 存储API返回的原始数据
   List<Map<String, dynamic>> _rawArrearData = [];
 
+  // 缓存楼层、单位和明细数据，避免重复计算
+  Map<String, List<String>> _cachedFloorUnits = {};
+  List<String> _cachedBuildings = [];
+  // floor -> unit -> record data
+  Map<String, Map<String, Map<String, dynamic>>> _cachedArrearMap = {};
+  bool _isCacheValid = false;
+
   // 缓存键
   static const String _cacheKey = 'arrearage_data_cache';
   static const String _lastUpdateKey = 'arrearage_last_update';
@@ -75,6 +82,7 @@ class ArrearProvider extends ChangeNotifier {
             decodedData.map((item) => Map<String, dynamic>.from(item)).toList();
 
         _rawArrearData = records;
+        _isCacheValid = false; // 数据加载后重置缓存
         _arrears = records.map((item) => ArrearModel.fromJson(item)).toList();
 
         _logger.i('✅ 从缓存加载欠费数据成功，共 ${records.length} 条记录');
@@ -165,99 +173,95 @@ class ArrearProvider extends ChangeNotifier {
     }
   }
 
-  ///1, 获取所有楼层
+  ///1, 获取所有楼层（缓存）
   List<String> get buildings {
-    final floors = <String>{};
-    for (var record in _rawArrearData) {
-      if (record.containsKey('單位')) {
-        final unit = record['單位'].toString();
-        // 解析楼层和单位，例如 "22樓  A" -> 楼层:"22樓", 单位:"A"
-        // 先尝试两个空格分割
-        List<String> parts = unit.split('  '); // 注意是两个空格
-        // 如果没有找到两个空格，尝试一个空格
-        if (parts.length < 2) {
-          parts = unit.split(' ');
-        }
-
-        if (parts.length >= 2) {
-          // 提取楼层（保留"樓"字）
-          final floor = parts[0].trim();
-          if (floor.isNotEmpty) {
-            floors.add(floor);
-          }
-        }
-      }
-    }
-    return floors.toList()..sort();
+    if (!_isCacheValid) _buildCache();
+    return _cachedBuildings;
   }
 
-  ///2, 获取指定楼层的所有单位
+  ///2, 获取指定楼层的所有单位（缓存）
   List<String> getFloors(String selectedFloor) {
-    final units = <String>{};
-    for (var record in _rawArrearData) {
-      if (record.containsKey('單位')) {
-        final unit = record['單位'].toString();
-        // 解析楼层和单位，例如 "22樓  A" -> 楼层:"22樓", 单位:"A"
-        // 先尝试两个空格分割
-        List<String> parts = unit.split('  '); // 注意是两个空格
-        // 如果没有找到两个空格，尝试一个空格
-        if (parts.length < 2) {
-          parts = unit.split(' ');
-        }
-
-        if (parts.length >= 2) {
-          // 提取楼层（保留"樓"字）
-          final floor = parts[0].trim();
-          // 提取单位（去除多余空格）
-          final unitName = parts[1].trim();
-
-          // 检查是否匹配指定的楼层
-          if (floor == selectedFloor && unitName.isNotEmpty) {
-            units.add(unitName);
-          }
-        }
-      }
-    }
-    return units.toList()..sort();
+    if (!_isCacheValid) _buildCache();
+    return _cachedFloorUnits[selectedFloor] ?? [];
   }
 
-  ///3, 获取指定楼层和单位的欠款记录
+  ///3, 获取指定楼层和单位的欠款记录（缓存）
   Map<String, dynamic>? getArrearageByUnit(
       String selectedFloor, String selectedUnit) {
-    for (var record in _rawArrearData) {
-      if (record.containsKey('單位')) {
-        final unitInfo = record['單位'].toString();
-        // 解析楼层和单位，例如 "22樓  A" -> 楼层:"22樓", 单位:"A"
-        // 先尝试两个空格分割
-        List<String> parts = unitInfo.split('  '); // 注意是两个空格
-        // 如果没有找到两个空格，尝试一个空格
-        if (parts.length < 2) {
-          parts = unitInfo.split(' ');
-        }
-
-        if (parts.length >= 2) {
-          // 提取楼层（保留"樓"字）
-          final floor = parts[0].trim();
-          // 提取单位（去除多余空格）
-          final unitName = parts[1].trim();
-
-          // 检查是否匹配指定的楼层和单位
-          if (floor == selectedFloor && unitName == selectedUnit) {
-            // 返回除了"單位"键之外的所有数据
-            final data = Map<String, dynamic>.from(record);
-            data.remove('單位');
-            return data;
-          }
-        }
-      }
-    }
-    return null;
+    if (!_isCacheValid) _buildCache();
+    return _cachedArrearMap[selectedFloor]?[selectedUnit];
   }
 
   ///4, 获取当前选中单位的欠款记录
   Map<String, dynamic>? get currentArrearage {
-    if (_selectedFloor == null || _selectedUnit == null) return null;
+    _logger.i(
+        '🔍 [currentArrearage] 当前状态 - 楼层: "$_selectedFloor", 单位: "$_selectedUnit"');
+
+    if (_selectedFloor == null || _selectedUnit == null) {
+      _logger.w('⚠️ [currentArrearage] 楼层或单位未选择，返回null');
+      return null;
+    }
+
+    _logger.i(
+        '🔍 [currentArrearage] 开始查找楼层 "$_selectedFloor" 单位 "$_selectedUnit" 的记录');
     return getArrearageByUnit(_selectedFloor!, _selectedUnit!);
+  }
+
+  ///4a, 健壮的楼层和单位解析方法
+  Map<String, String> _parseFloorAndUnit(String unitString) {
+    _logger.i('🔍 [解析楼层单位] 开始解析: "$unitString"');
+
+    // 尝试多种分割方式
+    List<String> parts = [];
+
+    // 方式1: 两个空格分割 (例如: "02樓  B")
+    if (unitString.contains('  ')) {
+      parts = unitString.split('  ');
+      _logger.i('🔍 [解析楼层单位] 使用两个空格分割: $parts');
+    }
+    // 方式2: 一个空格分割 (例如: "G楼 01")
+    else if (unitString.contains(' ')) {
+      parts = unitString.split(' ');
+      _logger.i('🔍 [解析楼层单位] 使用一个空格分割: $parts');
+    }
+    // 方式3: 查找"樓"字作为分隔符 (例如: "G楼01")
+    else if (unitString.contains('樓')) {
+      final floorIndex = unitString.indexOf('樓');
+      if (floorIndex != -1) {
+        final floor = unitString.substring(0, floorIndex + 1);
+        final unit = unitString.substring(floorIndex + 1);
+        parts = [floor, unit];
+        _logger.i('🔍 [解析楼层单位] 使用"樓"字分割: $parts');
+      }
+    }
+    // 方式4: 查找数字作为分隔符 (例如: "G楼01")
+    else {
+      // 查找第一个数字的位置
+      int? firstDigitIndex;
+      for (int i = 0; i < unitString.length; i++) {
+        if (unitString[i].contains(RegExp(r'[0-9]'))) {
+          firstDigitIndex = i;
+          break;
+        }
+      }
+
+      if (firstDigitIndex != null) {
+        final floor = unitString.substring(0, firstDigitIndex);
+        final unit = unitString.substring(firstDigitIndex);
+        parts = [floor, unit];
+        _logger.i('🔍 [解析楼层单位] 使用数字分割: $parts');
+      }
+    }
+
+    if (parts.length >= 2) {
+      final floor = parts[0].trim();
+      final unit = parts[1].trim();
+      _logger.i('🔍 [解析楼层单位] 解析结果 - 楼层: "$floor", 单位: "$unit"');
+      return {'floor': floor, 'unit': unit};
+    } else {
+      _logger.w('⚠️ [解析楼层单位] 无法解析: "$unitString", 分割结果: $parts');
+      return {'floor': '', 'unit': ''};
+    }
   }
 
   ///5, 判断是否有数据
@@ -429,14 +433,18 @@ class ArrearProvider extends ChangeNotifier {
   void setSelectedFloor(String? floor) {
     _selectedFloor = floor;
     _selectedUnit = null; // 重置单元选择
-    _logger.i('设置显示楼层: $floor');
+    _logger.i('🔍 [setSelectedFloor] 设置显示楼层: "$floor"');
 
     // 自动选择第一个单位
     if (floor != null) {
       final units = getFloors(floor);
+      _logger.i('🔍 [setSelectedFloor] 楼层 "$floor" 的所有单位: $units');
+
       if (units.isNotEmpty) {
         _selectedUnit = units[0];
-        _logger.i('自动选择第一个单位: ${units[0]}');
+        _logger.i('🔍 [setSelectedFloor] 自动选择第一个单位: "${units[0]}"');
+      } else {
+        _logger.w('⚠️ [setSelectedFloor] 楼层 "$floor" 没有找到任何单位');
       }
     }
 
@@ -446,13 +454,14 @@ class ArrearProvider extends ChangeNotifier {
   ///9, 设置选中的单元
   void setSelectedUnit(String? unit) {
     _selectedUnit = unit;
-    _logger.i('设置单元: $unit');
+    _logger.i('🔍 [setSelectedUnit] 设置单元: "$unit"');
     notifyListeners();
   }
 
   ///6, 设置欠费数据
   void setArrearage(List<Map<String, dynamic>> records) {
     _rawArrearData = records;
+    _isCacheValid = false; // 新数据后重置缓存
 
     // 如果有数据但没有选中的楼层，自动选择第一个（仅用于UI显示）
     if (_rawArrearData.isNotEmpty && _selectedFloor == null) {
@@ -463,6 +472,33 @@ class ArrearProvider extends ChangeNotifier {
     }
 
     notifyListeners();
+  }
+
+  /// 构建并缓存楼层、单位及记录映射，避免重复解析
+  void _buildCache() {
+    _cachedBuildings.clear();
+    _cachedFloorUnits.clear();
+    _cachedArrearMap.clear();
+    final floorSet = <String>{};
+    final floorUnitsMap = <String, Set<String>>{};
+    for (var record in _rawArrearData) {
+      final unitString = record['單位']?.toString() ?? '';
+      final parsed = _parseFloorAndUnit(unitString);
+      final floor = parsed['floor'] ?? '';
+      final unit = parsed['unit'] ?? '';
+      if (floor.isNotEmpty && unit.isNotEmpty) {
+        floorSet.add(floor);
+        floorUnitsMap.putIfAbsent(floor, () => <String>{}).add(unit);
+        _cachedArrearMap.putIfAbsent(floor, () => {})[unit] = Map.from(record)
+          ..remove('單位');
+      }
+    }
+    _cachedBuildings = floorSet.toList()..sort();
+    for (var floor in _cachedBuildings) {
+      final units = (floorUnitsMap[floor] ?? {}).toList()..sort();
+      _cachedFloorUnits[floor] = units;
+    }
+    _isCacheValid = true;
   }
 
   ///10, 清除欠费数据
