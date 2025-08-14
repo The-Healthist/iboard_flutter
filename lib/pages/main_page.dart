@@ -7,6 +7,7 @@ import 'package:iboard_app/pages/fullscreen_ads_page.dart';
 import 'package:iboard_app/pages/mainscreen_page.dart';
 import 'package:iboard_app/providers/announcement_provider.dart';
 import 'package:iboard_app/providers/state_provider.dart'; // Added import for CarouselStateProvider
+import 'package:iboard_app/providers/announcement_carousel_provider.dart'; // Added import for AnnouncementCarouselProvider
 
 import 'package:provider/provider.dart';
 
@@ -107,6 +108,11 @@ class _MainPageState extends State<MainPage> {
           if (carouselProvider.currentAppState == AppState.fullscreenAd) {
             print('🔄 全屏廣告彈窗關閉，自動切換到手動操作狀態');
             carouselProvider.enterManualOperation();
+
+            // 通知通告轮播提供者回到主屏幕
+            final announcementCarouselProvider =
+                context.read<AnnouncementCarouselProvider>();
+            announcementCarouselProvider.jumpToAnnouncementIndex(0);
           }
         }
       });
@@ -132,6 +138,11 @@ class _MainPageState extends State<MainPage> {
           if (mounted) {
             print('🔄 通過closeAdsDialog關閉全屏廣告，自動切換到手動操作狀態');
             carouselProvider.enterManualOperation();
+
+            // 通知通告轮播提供者回到主屏幕
+            final announcementCarouselProvider =
+                context.read<AnnouncementCarouselProvider>();
+            announcementCarouselProvider.jumpToAnnouncementIndex(0);
           }
         });
       }

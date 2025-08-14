@@ -292,14 +292,14 @@ class AnnouncementCarouselProvider extends ChangeNotifier {
     _midTimer?.cancel();
     _delayedNoticeTimer?.cancel(); // 取消之前的延迟定时器
 
-    // 应用启动时先停留在主屏幕，等待 spareDuration 时间后才开始通告轮播
+    // 应用启动时先停留在主屏幕，等待 normalToAnnouncementCarouselDuration 时间后才开始通告轮播
     _currentNoticeIndex = 0; // 初始停留在主屏幕
     _midCarouselController.jumpToIndex(0); // 确保显示主屏幕
 
     if (announcementWidgets.length > 0 && !_isMidCarouselPaused) {
       // _logger.i('⏳ [启动延迟] 应用启动，在主屏幕停留 ${delayBeforeNotice}秒后开始无限通告轮播');
 
-      // 启动延迟定时器，等待 spareDuration 时间后开始通告轮播
+      // 启动延迟定时器，等待 normalToAnnouncementCarouselDuration 时间后开始通告轮播
       _delayedNoticeTimer = Timer(Duration(seconds: delayBeforeNotice), () {
         if (announcementWidgets.length > 0 && !_isMidCarouselPaused) {
           // 记录通告开始时间，从第一个通告开始（索引1）
@@ -479,7 +479,8 @@ class AnnouncementCarouselProvider extends ChangeNotifier {
   }
 
   ///4，恢复通告轮播
-  void resumeMidCarousel(int apiNoticeStayDuration) {
+  void resumeMidCarousel(int apiNoticeStayDuration,
+      {bool forceJumpToIndex = false}) {
     // _logger.i('▶️ 恢复通告轮播 - 退出全屏广告状态');
 
     // 设置轮播为运行状态
@@ -501,8 +502,8 @@ class AnnouncementCarouselProvider extends ChangeNotifier {
       // 重置通告开始时间
       _currentNoticeStartTime = DateTime.now();
 
-      // 确保当前索引在通告范围内
-      if (_currentNoticeIndex < 1) {
+      // 只有在强制跳转时才确保当前索引在通告范围内
+      if (forceJumpToIndex && _currentNoticeIndex < 1) {
         _currentNoticeIndex = 1; // 从第一个通告开始
         _midCarouselController.jumpToIndex(_currentNoticeIndex);
         // _logger.i('🔄 [恢复] 设置索引到第一个通告: $_currentNoticeIndex');

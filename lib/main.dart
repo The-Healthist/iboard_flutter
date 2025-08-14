@@ -29,7 +29,8 @@ void main() {
         providers: [
           ChangeNotifierProvider(
             create: (context) => AppDataProvider(
-                baseUrl: 'http://test.iboard.skylinedances.com'),
+                // baseUrl: 'http://test.iboard.skylinedances.com'),
+                baseUrl: 'http://117.72.193.54:10031'),
           ),
           Provider<FileManager>(
             create: (context) => FileManager(),
@@ -366,14 +367,16 @@ class _HomePageState extends State<HomePage> {
                   if (appDataProvider.error != null &&
                       !appDataProvider.isLoading) {
                     // 如果是网络错误但有设备设置数据（缓存），不显示错误页面
-                    if ((_isNetworkError(appDataProvider.error!) || _isDataParseError(appDataProvider.error!)) &&
+                    if ((_isNetworkError(appDataProvider.error!) ||
+                            _isDataParseError(appDataProvider.error!)) &&
                         appDataProvider.deviceSettings != null) {
                       // 有缓存数据，继续正常流程，不显示错误
                       print('检测到网络错误或数据解析错误但有缓存数据，继续使用缓存数据运行');
                     } else {
                       // 没有缓存数据或非网络错误，显示错误页面
                       return ErrorPage(
-                        errorMessage: _getUserFriendlyError(appDataProvider.error!),
+                        errorMessage:
+                            _getUserFriendlyError(appDataProvider.error!),
                         onRetry: _retryInitialization,
                       );
                     }
@@ -427,15 +430,25 @@ class _HomePageState extends State<HomePage> {
                             Icon(
                               appDataProvider.isLoggedIn
                                   ? Icons.check_circle
-                                  : ((_isNetworkError(appDataProvider.error ?? '') || _isDataParseError(appDataProvider.error ?? '')) &&
-                                          appDataProvider.deviceSettings != null)
+                                  : ((_isNetworkError(appDataProvider.error ??
+                                                  '') ||
+                                              _isDataParseError(
+                                                  appDataProvider.error ??
+                                                      '')) &&
+                                          appDataProvider.deviceSettings !=
+                                              null)
                                       ? Icons.offline_bolt
                                       : Icons.check_circle,
                               size: 60,
                               color: appDataProvider.isLoggedIn
                                   ? Colors.green
-                                  : ((_isNetworkError(appDataProvider.error ?? '') || _isDataParseError(appDataProvider.error ?? '')) &&
-                                          appDataProvider.deviceSettings != null)
+                                  : ((_isNetworkError(appDataProvider.error ??
+                                                  '') ||
+                                              _isDataParseError(
+                                                  appDataProvider.error ??
+                                                      '')) &&
+                                          appDataProvider.deviceSettings !=
+                                              null)
                                       ? Colors.orange
                                       : Colors.green,
                             ),
@@ -443,8 +456,13 @@ class _HomePageState extends State<HomePage> {
                             Text(
                               appDataProvider.isLoggedIn
                                   ? '設備已登錄'
-                                  : ((_isNetworkError(appDataProvider.error ?? '') || _isDataParseError(appDataProvider.error ?? '')) &&
-                                          appDataProvider.deviceSettings != null)
+                                  : ((_isNetworkError(appDataProvider.error ??
+                                                  '') ||
+                                              _isDataParseError(
+                                                  appDataProvider.error ??
+                                                      '')) &&
+                                          appDataProvider.deviceSettings !=
+                                              null)
                                       ? '離線模式（使用緩存數據）'
                                       : '設備已登錄',
                               style: TextStyle(
@@ -454,7 +472,9 @@ class _HomePageState extends State<HomePage> {
                               textAlign: TextAlign.center,
                             ),
                             if (!appDataProvider.isLoggedIn &&
-                                (_isNetworkError(appDataProvider.error ?? '') || _isDataParseError(appDataProvider.error ?? '')) &&
+                                (_isNetworkError(appDataProvider.error ?? '') ||
+                                    _isDataParseError(
+                                        appDataProvider.error ?? '')) &&
                                 appDataProvider.deviceSettings != null)
                               Padding(
                                 padding: EdgeInsets.only(top: 8),

@@ -66,6 +66,16 @@ class _AnnouncementPageState extends State<AnnouncementPage> {
       final bottomProvider =
           context.read<BottomWeatherQrcodeCarouselProvider>();
 
+      // 检查状态是否发生变化
+      if (_previousAppState != appState) {
+        _previousAppState = appState;
+
+        // 如果从全屏广告状态切换到手动操作状态，确保回到主屏幕
+        if (appState == AppState.manualOperation) {
+          announcementCarouselProvider.jumpToAnnouncementIndex(0);
+        }
+      }
+
       switch (appState) {
         case AppState.defaultState:
           // 默认状态：所有轮播都正常播放
@@ -285,8 +295,9 @@ class _AnnouncementPageState extends State<AnnouncementPage> {
       topAdCarouselProvider.resumeTopCarousel();
 
       // 恢复通告轮播
-      announcementCarouselProvider
-          .resumeMidCarousel(stateProvider.noticeStayDuration);
+      announcementCarouselProvider.resumeMidCarousel(
+          stateProvider.noticeStayDuration,
+          forceJumpToIndex: true);
 
       // 设置日志输出标志 - 默认状态下只显示顶部广告和通告轮播的日志
       fullAdCarouselProvider.startDebugTimer();
@@ -361,8 +372,9 @@ class _AnnouncementPageState extends State<AnnouncementPage> {
     topAdCarouselProvider.resumeTopCarousel();
 
     // 恢复通告轮播
-    announcementCarouselProvider
-        .resumeMidCarousel(stateProvider.noticeStayDuration);
+    announcementCarouselProvider.resumeMidCarousel(
+        stateProvider.noticeStayDuration,
+        forceJumpToIndex: true);
 
     // 设置日志输出标志 - 默认状态下只显示顶部广告和通告轮播的日志
     fullAdCarouselProvider.startDebugTimer();

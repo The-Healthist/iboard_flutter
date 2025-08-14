@@ -557,8 +557,10 @@ class ApiClient {
       "advertisementUpdateDuration": 15,
       "advertisementPlayDuration": 30,
       "noticePlayDuration": 30,
-      "spareDuration": 5,
-      "noticeStayDuration": 10
+      "spareDuration": 10,
+      "noticeStayDuration": 10,
+      "normalToAnnouncementCarouselDuration": 10,
+      "announcementCarouselToFullAdsCarouselDuration": 10
     };
 
     final String requestBody = json.encode({

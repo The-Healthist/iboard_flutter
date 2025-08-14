@@ -20,7 +20,7 @@ enum AppState {
 /// 區域類型枚舉
 enum AreaType {
   topAd, // 頂部廣告
-  middleNotice, // 中間公告
+  middleNotice, // 中間通告
   bottomArea, // 底部區域
   fullscreenAd, // 全屏廣告
 }
@@ -248,6 +248,14 @@ class CarouselStateProvider extends ChangeNotifier {
     return duration;
   }
 
+  /// 獲取通告輪播到全屏廣告輪播轉換時間（秒）
+  int get announcementCarouselToFullAdsCarouselDuration =>
+      _settings?.announcementCarouselToFullAdsCarouselDuration ?? 10;
+
+  /// 獲取正常到通告輪播轉換時間（秒）
+  int get normalToAnnouncementCarouselDuration =>
+      _settings?.normalToAnnouncementCarouselDuration ?? 10;
+
   /// 設置全屏廣告顯示回調
   void setFullscreenAdCallback(VoidCallback? callback) {
     _onShowFullscreenAd = callback;
@@ -339,7 +347,8 @@ class CarouselStateProvider extends ChangeNotifier {
         _isTopMediaPaused = false; // 顶部广告继续播放
         _isMiddleMediaPaused = true; // 中部通告暂停
         _isBottomMediaPaused = false; // 底部天气二维码轮播继续播放
-        print('//// 2 2 2 2 2✅ 進入手動操作狀態，啟動動態計時器: ${manualOperationTimeout}秒');
+        print(
+            '//// 2 2 2 2 2✅ 進入手動操作狀態，啟動動態計時器: ${normalToAnnouncementCarouselDuration}秒');
         break;
     }
 
@@ -414,7 +423,7 @@ class CarouselStateProvider extends ChangeNotifier {
       _currentState = _currentState.toManualOperation();
       _lastUserInteractionTime = DateTime.now();
 
-      // print('//// 1 1 1 1 1✅ 進入手動操作狀態，啟動動態計時器: ${manualOperationTimeout}秒');
+      // print('//// 1 1 1 1 1✅ 進入手動操作狀態，啟動動態計時器: ${normalToAnnouncementCarouselDuration}秒');
 
       // 如果是从全屏广告状态切换过来，需要暂停全屏广告轮播
       if (wasInFullscreenAd) {
@@ -477,6 +486,40 @@ class CarouselStateProvider extends ChangeNotifier {
     }
   }
 
+  ///6a， 進入通告輪播模式（從手動操作狀態恢復）
+  void _enterAnnouncementCarouselMode() {
+    _clearAllTimers();
+
+    // 手动操作状态不能直接转换到默认状态，所以我们需要特殊处理
+    // 直接更新媒体状态，让通告轮播恢复
+    _isTopMediaPaused = false;
+    _isMiddleMediaPaused = false;
+    _isBottomMediaPaused = false;
+
+    // 通知通告轮播提供者恢复轮播（恢复之前暂停的状态，不跳转索引）
+    if (_announcementCarouselProvider != null) {
+      _announcementCarouselProvider!.updateCarouselPauseState(false);
+
+      // 重要：不跳转索引，而是恢复之前暂停的通告轮播状态
+      // 这样通告轮播会从之前暂停的地方继续，就像从默认状态进入通告轮播一样
+      _announcementCarouselProvider!
+          .resumeMidCarousel(noticeStayDuration, forceJumpToIndex: false);
+    }
+
+    // 启动通告轮播到全屏广告的计时器
+    _startAnnouncementCarouselToFullscreenAdTimer();
+
+    // 重要：更新应用状态为默认状态，这样UI才能正确显示通告轮播
+    // 因为通告轮播模式在UI上对应的是默认状态
+    _currentState = DefaultCarouselState();
+
+    notifyListeners();
+
+    // 记录日志
+    print(
+        '🔄 从手动操作状态恢复通告轮播模式，启动通告轮播计时器: ${announcementCarouselToFullAdsCarouselDuration}秒');
+  }
+
   ///7， 用戶交互更新（重置手動操作計時器）
   void onUserInteraction() {
     final now = DateTime.now();
@@ -517,12 +560,12 @@ class CarouselStateProvider extends ChangeNotifier {
   ///9， 啟動手動操作計時器（使用配置的手動操作超時時間）
   void _startManualOperationTimer() {
     _manualOperationTimer?.cancel();
-    final duration = Duration(seconds: manualOperationTimeout);
+    final duration = Duration(seconds: normalToAnnouncementCarouselDuration);
     _manualOperationTimer = Timer(duration, () {
       if (_currentState.currentAppState == AppState.manualOperation) {
         // Manual operation timer expired log (always available)
-        // print('⏰ 手動操作動態計時器到期 (${manualOperationTimeout}秒)，切換到全屏廣告');
-        enterFullscreenAd();
+        // print('⏰ 手動操作動態計時器到期 (${normalToAnnouncementCarouselDuration}秒)，進入通告輪播模式');
+        _enterAnnouncementCarouselMode();
       }
     });
   }
@@ -543,6 +586,23 @@ class CarouselStateProvider extends ChangeNotifier {
       if (_currentState.currentAppState == AppState.defaultState) {
         // Default state timer expired log (always available)
         // print('⏰ 默認狀態動態計時器到期 (${noActivityTimeout}秒)，切換到全屏廣告');
+        enterFullscreenAd();
+      }
+    });
+  }
+
+  ///11a， 啟動通告輪播到全屏廣告的計時器
+  void _startAnnouncementCarouselToFullscreenAdTimer() {
+    _defaultStateTimer?.cancel();
+    final duration =
+        Duration(seconds: announcementCarouselToFullAdsCarouselDuration);
+
+    _defaultStateTimer = Timer(duration, () {
+      // 通告轮播模式对应默认状态，所以检查默认状态
+      if (_currentState.currentAppState == AppState.defaultState) {
+        // Announcement carousel timer expired log
+        print(
+            '⏰ 通告輪播計時器到期 (${announcementCarouselToFullAdsCarouselDuration}秒)，切換到全屏廣告');
         enterFullscreenAd();
       }
     });
