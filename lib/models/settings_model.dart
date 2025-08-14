@@ -95,19 +95,29 @@ class Settings {
   final int arrearageUpdateDuration; // 欠費更新時間(先不管)
   final int noticeUpdateDuration; // 通知更新時間(分鐘)
   final int advertisementUpdateDuration; // 廣告更新時間(分鐘)
+  final int appUpdateDuration; // 應用更新時間(秒)
   final int advertisementPlayDuration; // 全屏廣告播放時間(秒)
   final int noticePlayDuration; // 通告輪播總時間（先不管）
   final int spareDuration; // 手動操作超時時間/無操作進入全屏廣告時間(秒)
   final int noticeStayDuration; // 通知停留時間
+  final int bottomCarouselDuration; // 底部輪播時間(秒)
+  final int paymentTableOnePageDuration; // 付款表格一頁顯示時間(秒)
+  final int normalToAnnouncementCarouselDuration; // 正常到通告輪播轉換時間(秒)
+  final int announcementCarouselToFullAdsCarouselDuration; // 通告輪播到全屏廣告輪播轉換時間(秒)
 
   Settings({
     required this.arrearageUpdateDuration,
     required this.noticeUpdateDuration,
     required this.advertisementUpdateDuration,
+    required this.appUpdateDuration,
     required this.advertisementPlayDuration,
     required this.noticePlayDuration,
     required this.spareDuration,
     required this.noticeStayDuration,
+    required this.bottomCarouselDuration,
+    required this.paymentTableOnePageDuration,
+    required this.normalToAnnouncementCarouselDuration,
+    required this.announcementCarouselToFullAdsCarouselDuration,
   });
 
   factory Settings.fromJson(Map<String, dynamic> json) {
@@ -115,10 +125,15 @@ class Settings {
       arrearageUpdateDuration: json['arrearageUpdateDuration'],
       noticeUpdateDuration: json['noticeUpdateDuration'],
       advertisementUpdateDuration: json['advertisementUpdateDuration'],
+      appUpdateDuration: json['appUpdateDuration'],
       advertisementPlayDuration: json['advertisementPlayDuration'],
       noticePlayDuration: json['noticePlayDuration'],
       spareDuration: json['spareDuration'],
       noticeStayDuration: json['noticeStayDuration'],
+      bottomCarouselDuration: json['bottomCarouselDuration'],
+      paymentTableOnePageDuration: json['paymentTableOnePageDuration'],
+      normalToAnnouncementCarouselDuration: json['normalToAnnouncementCarouselDuration'],
+      announcementCarouselToFullAdsCarouselDuration: json['announcementCarouselToFullAdsCarouselDuration'],
     );
   }
 }

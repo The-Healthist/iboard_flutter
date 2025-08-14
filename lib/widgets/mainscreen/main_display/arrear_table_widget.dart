@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:iboard_app/providers/arrear_provider.dart';
 import 'package:iboard_app/providers/state_provider.dart';
+import 'package:iboard_app/providers/app_data_provider.dart';
 
 class ArrearTableWidget extends StatefulWidget {
   final VoidCallback? onHomeButtonPressed; // 添加主頁按鈕回調
@@ -638,8 +639,15 @@ class ArrearTableWidgetState extends State<ArrearTableWidget> {
   void _startActualAutoPagination() {
     print('📄 [自动翻页] 启动实际自动翻页逻辑 - 总页数: $_totalPages, 当前页: $_currentPage');
 
+    // 获取设置中的翻页时间，默认为5秒
+    final appDataProvider = Provider.of<AppDataProvider>(context, listen: false);
+    final deviceSettings = appDataProvider.deviceSettings;
+    final paginationDuration = deviceSettings?.paymentTableOnePageDuration ?? 5;
+    
+    print('📄 [自动翻页] 使用翻页时间: ${paginationDuration}秒');
+
     _autoPaginationTimer?.cancel();
-    _autoPaginationTimer = Timer.periodic(Duration(seconds: 5), (timer) {
+    _autoPaginationTimer = Timer.periodic(Duration(seconds: paginationDuration), (timer) {
       if (_isPaginationPaused) return; // 如果暂停，跳过这次执行
 
       if (_currentPage < _totalPages) {

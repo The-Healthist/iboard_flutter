@@ -375,7 +375,15 @@ class _AnnouncementPageState extends State<AnnouncementPage> {
     // 恢复底部轮播（如果被暂停了）
     if (_bottomCarouselController.widgetCount > 1 && !_isBottomCarouselPaused) {
       _bottomTimer?.cancel();
-      _bottomTimer = Timer.periodic(const Duration(seconds: 10), (timer) {
+
+      // 从设置中获取底部轮播时间，默认为10秒
+      final appDataProvider = context.read<AppDataProvider>();
+      final deviceSettings = appDataProvider.deviceSettings;
+      final bottomCarouselDuration =
+          deviceSettings?.bottomCarouselDuration ?? 10;
+
+      _bottomTimer =
+          Timer.periodic(Duration(seconds: bottomCarouselDuration), (timer) {
         if (mounted &&
             _bottomCarouselController.widgetCount > 1 &&
             !_isBottomCarouselPaused) {

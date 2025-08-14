@@ -12,6 +12,9 @@ import 'dart:convert';
 
 class AnnouncementProvider extends ChangeNotifier {
   final Logger _logger = Logger();
+  // 原始通告数据缓存key
+  static const String _announcementsDataKey = 'announcements_data';
+
   final ApiClient _apiClient;
   final AppDataProvider
       _appDataProvider; // To access token and deviceId if needed
@@ -23,9 +26,6 @@ class AnnouncementProvider extends ChangeNotifier {
   String? _error;
   Timer? _updateTimer; // 定时更新定时器
   bool _isPeriodicUpdateActive = false; // 是否正在进行定期更新
-
-  static const String _announcementsDataKey =
-      'announcements_data'; // 原始通告数据缓存key
 
   // Getters
   List<AnnouncementModel> get announcements => _announcements;

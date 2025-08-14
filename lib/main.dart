@@ -66,9 +66,15 @@ void main() {
           ChangeNotifierProvider(
               create: (_) =>
                   TopAdCarouselProvider()), // Add TopAdCarouselProvider here
-          ChangeNotifierProvider(
-              create: (_) =>
-                  AnnouncementCarouselProvider()), // Add AnnouncementCarouselProvider here
+          ChangeNotifierProvider<AnnouncementCarouselProvider>(
+            create: (context) {
+              final announcementProvider = AnnouncementCarouselProvider();
+              final appDataProvider =
+                  Provider.of<AppDataProvider>(context, listen: false);
+              announcementProvider.setAppDataProvider(appDataProvider);
+              return announcementProvider;
+            },
+          ),
           ChangeNotifierProvider<FullscreenAdProvider>(
             create: (context) {
               final appDataProvider =
@@ -76,9 +82,15 @@ void main() {
               return FullscreenAdProvider(appDataProvider);
             },
           ),
-          ChangeNotifierProvider(
-              create: (_) =>
-                  BottomWeatherQrcodeCarouselProvider()), // Add BottomWeatherQrcodeCarouselProvider here
+          ChangeNotifierProvider<BottomWeatherQrcodeCarouselProvider>(
+            create: (context) {
+              final bottomProvider = BottomWeatherQrcodeCarouselProvider();
+              final appDataProvider =
+                  Provider.of<AppDataProvider>(context, listen: false);
+              bottomProvider.setAppDataProvider(appDataProvider);
+              return bottomProvider;
+            },
+          ),
           ChangeNotifierProvider<ArrearProvider>(
             create: (context) {
               final appDataProvider =

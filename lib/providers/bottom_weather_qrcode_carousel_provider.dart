@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:logger/logger.dart';
+import 'package:iboard_app/providers/app_data_provider.dart';
 
 /// 底部天气和二维码轮播Provider
 /// 负责管理底部右侧天气预报和二维码的轮播逻辑、暂停恢复、定时器管理等
@@ -11,19 +12,22 @@ class BottomWeatherQrcodeCarouselProvider extends ChangeNotifier {
   Timer? _bottomTimer;
   Timer? _debugTimer;
 
+  // AppDataProvider引用 - 用于获取动态设置
+  AppDataProvider? _appDataProvider;
+
   // 状态管理
   bool _isBottomCarouselPaused = false;
   bool _showWeather = true; // true显示天气，false显示二维码
 
-  // 轮播间隔时间（秒）
-  static const int _carouselInterval = 5;
+  // 轮播间隔时间（秒）- 将从设置中获取，默认为5秒
+  static const int _defaultCarouselInterval = 5;
 
   // 时间记录相关 - 用于全屏广告暂停恢复
   DateTime? _currentBottomStartTime; // 当前底部轮播开始时间
   DateTime? _currentBottomPauseTime; // 当前底部轮播暂停时间
   Duration _bottomElapsedTime = Duration.zero; // 底部轮播已播放时间
   Duration _bottomDuration =
-      const Duration(seconds: _carouselInterval); // 底部轮播总时长
+      const Duration(seconds: _defaultCarouselInterval); // 底部轮播总时长
 
   // Getters
   bool get isBottomCarouselPaused => _isBottomCarouselPaused;
@@ -34,6 +38,23 @@ class BottomWeatherQrcodeCarouselProvider extends ChangeNotifier {
 
   BottomWeatherQrcodeCarouselProvider() {
     // _logger.i('🌤️ 底部天气二维码轮播Provider初始化');
+  }
+
+  /// 设置AppDataProvider引用
+  void setAppDataProvider(AppDataProvider appDataProvider) {
+    _appDataProvider = appDataProvider;
+  }
+
+  /// 获取动态轮播间隔时间（秒）
+  int _getCarouselInterval() {
+    if (_appDataProvider?.deviceSettings != null) {
+      final interval = _appDataProvider!.deviceSettings!.bottomCarouselDuration;
+      _logger.i('🌤️ [动态设置] 底部轮播间隔时间: ${interval}秒');
+      return interval;
+    }
+    // 如果无法获取设置，使用默认值
+    _logger.w('🌤️ [动态设置] 无法获取设置，使用默认轮播间隔: $_defaultCarouselInterval秒');
+    return _defaultCarouselInterval;
   }
 
   ///1，初始化底部轮播
@@ -55,7 +76,7 @@ class BottomWeatherQrcodeCarouselProvider extends ChangeNotifier {
 
     // 记录当前轮播开始时间
     _currentBottomStartTime = DateTime.now();
-    _bottomDuration = const Duration(seconds: _carouselInterval);
+    _bottomDuration = Duration(seconds: _getCarouselInterval());
 
     // 只有当切换到新状态时才重置已播放时间
     _bottomElapsedTime = Duration.zero;

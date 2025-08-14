@@ -13,6 +13,8 @@ import 'package:iboard_app/utils/enhanced_video_pool_manager.dart';
 
 class AdvertisementProvider extends ChangeNotifier {
   final Logger _logger = Logger();
+  // 原始广告数据缓存key
+  static const String _advertisementsDataKey = 'advertisements_data';
   final ApiClient _apiClient;
   final AppDataProvider _appDataProvider;
   final FileManager _fileManager;
@@ -23,9 +25,6 @@ class AdvertisementProvider extends ChangeNotifier {
   String? _error;
   Timer? _updateTimer; // 定时更新定时器
   bool _isPeriodicUpdateActive = false; // 是否正在进行定期更新
-
-  static const String _advertisementsDataKey =
-      'advertisements_data'; // 原始广告数据缓存key
 
   // Getters
   List<AdModel> get advertisements => _advertisements;

@@ -9,11 +9,13 @@ import 'package:iboard_app/widgets/mainscreen/main_display/arrear_table_widget.d
 import 'package:logger/logger.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:convert';
+import 'package:iboard_app/providers/app_data_provider.dart';
 
-/// 通告轮播Provider
-/// 负责管理通告轮播的逻辑、暂停恢复、定时器管理等
 class AnnouncementCarouselProvider extends ChangeNotifier {
   final Logger _logger = Logger();
+  // 通告轮播自定义顺序缓存key
+  static const String _announcementsCarouselOrderKey =
+      'announcements_carousel_order';
 
   // 轮播控制器
   late custom_carousel.CarouselController _midCarouselController;
@@ -40,6 +42,9 @@ class AnnouncementCarouselProvider extends ChangeNotifier {
   Duration _noticeDuration = const Duration(seconds: 5); // 通告总时长
   int _currentNoticeIndex = 0; // 当前通告索引
 
+  // AppDataProvider引用 - 用于获取动态设置
+  AppDataProvider? _appDataProvider;
+
   // Getters
   custom_carousel.CarouselController get midCarouselController =>
       _midCarouselController;
@@ -65,6 +70,16 @@ class AnnouncementCarouselProvider extends ChangeNotifier {
     });
   }
 
+  /// 设置AppDataProvider引用
+  void setAppDataProvider(AppDataProvider appDataProvider) {
+    _appDataProvider = appDataProvider;
+  }
+
+  /// 获取AppDataProvider引用
+  AppDataProvider? _getAppDataProvider() {
+    return _appDataProvider;
+  }
+
   ///1，设置自定义轮播通告顺序
   Future<void> setCarouselList(List<AnnouncementModel> customOrderList) async {
     _customOrderCarouselAnnouncements = List.from(customOrderList);
@@ -87,7 +102,7 @@ class AnnouncementCarouselProvider extends ChangeNotifier {
               })
           .toList();
       await prefs.setString(
-          'announcement_carousel_order', json.encode(orderData));
+          _announcementsCarouselOrderKey, json.encode(orderData));
       // _logger.i('💾 通告轮播自定义顺序已保存到缓存');
     } catch (e) {
       _logger.e('保存通告轮播顺序失败', error: e);
@@ -98,7 +113,7 @@ class AnnouncementCarouselProvider extends ChangeNotifier {
   Future<void> _loadCustomOrder() async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      final orderString = prefs.getString('announcement_carousel_order');
+      final orderString = prefs.getString('announcem  ent_carousel_order');
       if (orderString != null) {
         final orderData = json.decode(orderString) as List;
         // 保存顺序配置，等待API数据到达后再应用
@@ -838,9 +853,14 @@ class AnnouncementCarouselProvider extends ChangeNotifier {
 
   ///17，动态延长当前通告停留时间（欠费总览开始翻页时调用）
   void _extendCurrentNoticeStayTime(int totalPages) {
-    // 计算需要延长的时间：每页5秒翻页时间
-    final int extensionSeconds = totalPages * 5;
-    _logger.i('⏰ [动态延长] 延长当前通告停留时间: ${extensionSeconds}秒（共${totalPages}页）');
+    // 计算需要延长的时间：从设置中获取每页翻页时间，默认为5秒
+    final appDataProvider = _getAppDataProvider();
+    final deviceSettings = appDataProvider?.deviceSettings;
+    final paginationDuration = deviceSettings?.paymentTableOnePageDuration ?? 5;
+
+    final int extensionSeconds = totalPages * paginationDuration.toInt();
+    _logger.i(
+        '⏰ [动态延长] 延长当前通告停留时间: ${extensionSeconds}秒（共${totalPages}页，每页${paginationDuration}秒）');
 
     // 取消现有的定时器
     _midTimer?.cancel();

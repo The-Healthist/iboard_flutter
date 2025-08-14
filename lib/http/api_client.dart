@@ -14,7 +14,7 @@ class ApiException implements Exception {
   @override
   String toString() {
     return 'ApiException: $message (Status Code: $statusCode)'
-        '${errorData != null ? "\\nError Data: $errorData" : ""}';
+        '${errorData != null ? "\nError Data: $errorData" : ""}';
   }
 }
 
@@ -620,5 +620,85 @@ class ApiClient {
     // Building ID只能包含数字和英文字母
     final RegExp validPattern = RegExp(r'^[a-zA-Z0-9]+$');
     return validPattern.hasMatch(buildingId) && buildingId.isNotEmpty;
+  }
+
+  ///10. 获取全屏广告列表
+  Future<List<Map<String, dynamic>>> getFullAdvertisementsBuilding() async {
+    const String endpointPath = '/api/device/client/full_advertisements';
+    final Uri url = _buildUri(endpointPath, null);
+    final Map<String, String> headers =
+        _getHeaders(requiresAuth: true, contentType: 'application/json');
+
+    final http.Response response = await _sendRequest(
+        () => http.get(url, headers: headers),
+        apiNameForLog: 'getFullAdvertisementsBuilding');
+    return _handleArrayResponse(response, 'getFullAdvertisementsBuilding');
+  }
+
+  ///11. 获取顶端广告列表
+  Future<List<Map<String, dynamic>>> getTopAdvertisementsBuilding() async {
+    const String endpointPath = '/api/device/client/top_advertisements';
+    final Uri url = _buildUri(endpointPath, null);
+    final Map<String, String> headers =
+        _getHeaders(requiresAuth: true, contentType: 'application/json');
+
+    final http.Response response = await _sendRequest(
+        () => http.get(url, headers: headers),
+        apiNameForLog: 'getTopAdvertisementsBuilding');
+    return _handleArrayResponse(response, 'getTopAdvertisementsBuilding');
+  }
+
+  ///12. 轮播顶端广告顺序
+  Future<List<Map<String, dynamic>>> getCarouselTopAdvertisements() async {
+    const String endpointPath =
+        '/api/device/client/carousel/top_advertisements';
+    final Uri url = _buildUri(endpointPath, null);
+    final Map<String, String> headers =
+        _getHeaders(requiresAuth: true, contentType: 'application/json');
+
+    final http.Response response = await _sendRequest(
+        () => http.get(url, headers: headers),
+        apiNameForLog: 'getCarouselTopAdvertisements');
+    return _handleArrayResponse(response, 'getCarouselTopAdvertisements');
+  }
+
+  ///13. 轮播完整广告列表
+  Future<List<Map<String, dynamic>>> getCarouselFullAdvertisements() async {
+    const String endpointPath =
+        '/api/device/client/carousel/full_advertisements';
+    final Uri url = _buildUri(endpointPath, null);
+    final Map<String, String> headers =
+        _getHeaders(requiresAuth: true, contentType: 'application/json');
+
+    final http.Response response = await _sendRequest(
+        () => http.get(url, headers: headers),
+        apiNameForLog: 'getCarouselFullAdvertisements');
+    return _handleArrayResponse(response, 'getCarouselFullAdvertisements');
+  }
+
+  ///14. 轮播通知列表
+  Future<List<Map<String, dynamic>>> getCarouselNotices() async {
+    const String endpointPath = '/api/device/client/carousel/notices';
+    final Uri url = _buildUri(endpointPath, null);
+    final Map<String, String> headers =
+        _getHeaders(requiresAuth: true, contentType: 'application/json');
+
+    final http.Response response = await _sendRequest(
+        () => http.get(url, headers: headers),
+        apiNameForLog: 'getCarouselNotices');
+    return _handleArrayResponse(response, 'getCarouselNotices');
+  }
+
+  ///15. 获取应用版本信息
+  Future<Map<String, dynamic>> getAppVersion() async {
+    const String endpointPath = '/api/app/version';
+    final Uri url = _buildUri(endpointPath, null);
+    final Map<String, String> headers =
+        _getHeaders(requiresAuth: false, contentType: 'application/json');
+
+    final http.Response response = await _sendRequest(
+        () => http.get(url, headers: headers),
+        apiNameForLog: 'getAppVersion');
+    return _handleResponse(response, 'getAppVersion');
   }
 }

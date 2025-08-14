@@ -208,7 +208,7 @@ class _SettingsPageState extends State<SettingsPage> {
                     child: Column(
                       children: [
                         SizedBox(height: 40),
-                        // 設置項目占位符
+                        // 設置項目顯示區域
                         Container(
                           width: double.infinity,
                           padding: EdgeInsets.all(24),
@@ -225,30 +225,32 @@ class _SettingsPageState extends State<SettingsPage> {
                             ],
                           ),
                           child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Icon(
-                                Icons.tune,
-                                size: 80,
-                                color: Colors.blue.shade400,
+                              Row(
+                                children: [
+                                  Icon(
+                                    Icons.tune,
+                                    size: 32,
+                                    color: Colors.blue.shade400,
+                                  ),
+                                  SizedBox(width: 16),
+                                  Text(
+                                    '系統設置參數',
+                                    style: TextStyle(
+                                      fontSize: 20,
+                                      fontWeight: FontWeight.w600,
+                                      color: Colors.grey.shade700,
+                                    ),
+                                  ),
+                                ],
                               ),
                               SizedBox(height: 20),
-                              Text(
-                                '設置內容區域',
-                                style: TextStyle(
-                                  fontSize: 24,
-                                  fontWeight: FontWeight.w600,
-                                  color: Colors.grey.shade700,
-                                ),
-                              ),
-                              SizedBox(height: 16),
-                              Text(
-                                '這裡將顯示各種設置選項',
-                                style: TextStyle(
-                                  fontSize: 16,
-                                  color: Colors.grey.shade600,
-                                ),
-                                textAlign: TextAlign.center,
-                              ),
+                              _buildSettingRow('底部輪播時間', '10秒'),
+                              _buildSettingRow('付款表格一頁顯示時間', '5秒'),
+                              _buildSettingRow('正常到通告輪播轉換時間', '10秒'),
+                              _buildSettingRow('通告輪播到全屏廣告轉換時間', '10秒'),
+                              _buildSettingRow('應用更新時間', '600秒'),
                             ],
                           ),
                         ),
@@ -283,6 +285,41 @@ class _SettingsPageState extends State<SettingsPage> {
             ),
           ),
         ),
+      ),
+    );
+  }
+
+  Widget _buildSettingRow(String label, String value) {
+    return Padding(
+      padding: EdgeInsets.symmetric(vertical: 8),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 16,
+              color: Colors.grey.shade700,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+          Container(
+            padding: EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+            decoration: BoxDecoration(
+              color: Colors.blue.shade50,
+              borderRadius: BorderRadius.circular(6),
+              border: Border.all(color: Colors.blue.shade200),
+            ),
+            child: Text(
+              value,
+              style: TextStyle(
+                fontSize: 14,
+                color: Colors.blue.shade700,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
