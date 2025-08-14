@@ -336,10 +336,10 @@ class CarouselStateProvider extends ChangeNotifier {
         _isBottomMediaPaused = true;
         break;
       case AppState.manualOperation:
-        // 手動操作狀態：頂部廣告和底部繼續播放，只暫停中部通告
         _isTopMediaPaused = false; // 顶部广告继续播放
         _isMiddleMediaPaused = true; // 中部通告暂停
         _isBottomMediaPaused = false; // 底部天气二维码轮播继续播放
+        print('//// 2 2 2 2 2✅ 進入手動操作狀態，啟動動態計時器: ${manualOperationTimeout}秒');
         break;
     }
 
@@ -406,17 +406,28 @@ class CarouselStateProvider extends ChangeNotifier {
   ///5， 切換到手動操作狀態
   void enterManualOperation() {
     if (_currentState.canTransitionTo(AppState.manualOperation)) {
+      // 在状态切换前记录之前的状态
+      bool wasInFullscreenAd =
+          _currentState.currentAppState == AppState.fullscreenAd;
+
       _clearAllTimers();
       _currentState = _currentState.toManualOperation();
       _lastUserInteractionTime = DateTime.now();
+
+      // print('//// 1 1 1 1 1✅ 進入手動操作狀態，啟動動態計時器: ${manualOperationTimeout}秒');
+
+      // 如果是从全屏广告状态切换过来，需要暂停全屏广告轮播
+      if (wasInFullscreenAd) {
+        print('🔄 从全屏广告状态切换到手动操作状态，暂停全屏广告轮播');
+        // 通知FullAdvertisementCarouselProvider退出全屏广告模式
+        _onExitFullscreenAdMode?.call();
+      }
 
       // 更新媒體狀態
       _updateMediaStateBasedOnCurrentState();
 
       _startManualOperationTimer();
       notifyListeners();
-      // Enter manual operation log (always available)
-      // print('✅ 進入手動操作狀態，啟動動態計時器: ${manualOperationTimeout}秒');
     }
   }
 
@@ -432,6 +443,12 @@ class CarouselStateProvider extends ChangeNotifier {
 
       if (wasInFullscreenAd) {
         _lastFullscreenAdEndTime = DateTime.now();
+
+        // 立即更新媒体状态，确保顶部广告组件能立即响应状态变化
+        _updateMediaStateBasedOnCurrentState();
+
+        // 记录日志
+        // print('🎵 [STATE] 从全屏广告状态退出，立即更新媒体状态');
       }
 
       // 通知FullAdvertisementCarouselProvider退出全屏广告模式

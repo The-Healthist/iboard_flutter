@@ -308,29 +308,57 @@ class TopAdCarouselProvider extends ChangeNotifier {
     _topCarouselController.resumeAllMedia();
 
     // 计算剩余播放时间并恢复定时器
-    if (_topAds.isNotEmpty && _currentTopAdStartTime != null) {
-      final remainingTopTime = _topAdDuration - _topAdElapsedTime;
-      // _logger.i(
-      //     '🔄 [恢复] 顶部广告 - 继续播放剩余时间：${remainingTopTime.inSeconds}s (已播放: ${_topAdElapsedTime.inSeconds}s)');
+    if (_topAds.isNotEmpty) {
+      // 如果 _currentTopAdStartTime 为空，说明需要重新初始化
+      if (_currentTopAdStartTime == null) {
+        // 重新初始化当前广告的开始时间和时长
+        final currentIndex = _topCarouselController.currentIndex;
+        if (currentIndex < _topAds.length) {
+          _currentTopAdStartTime = DateTime.now();
+          _topAdDuration = _topAds[currentIndex].durationObject;
+          _currentTopAdIndex = currentIndex;
+          _topAdElapsedTime = Duration.zero;
 
-      if (remainingTopTime.inSeconds > 0) {
-        // 更新当前广告开始时间，使其能正确计算剩余时间
-        _currentTopAdStartTime = DateTime.now();
-        // 保持 _topAdElapsedTime 不变，这样调试定时器能正确显示从暂停位置继续的时间
+          // 启动新的定时器
+          _topTimer = Timer(_topAdDuration, () {
+            if (!_isTopCarouselPaused) {
+              // _logger.i('⏰ [定时] 顶部广告时间到，切换到下一个');
+              _topCarouselController.playNext();
+              // Note: onPageChanged will handle calling startTopAdTimer for the new page
+            }
+          });
 
-        // 继续播放剩余时间
-        _topTimer = Timer(remainingTopTime, () {
-          if (!_isTopCarouselPaused) {
-            // _logger.i('⏰ [定时] 顶部广告时间到，切换到下一个');
-            _topCarouselController.playNext();
-            // Note: onPageChanged will handle calling startTopAdTimer for the new page
-          }
-        });
+          _logger.i('✅ 顶部广告轮播已恢复：重新初始化定时器，当前索引: $currentIndex');
+        }
       } else {
-        // 时间已到，直接切换到下一个
-        // _logger.i('⚡ [跳过] 顶部广告剩余时间为0，直接切换到下一个');
-        _topCarouselController.playNext();
-        // Note: onPageChanged will handle calling startTopAdTimer for the new page
+        // 原有的恢复逻辑
+        final remainingTopTime = _topAdDuration - _topAdElapsedTime;
+        // _logger.i(
+        //     '🔄 [恢复] 顶部广告 - 继续播放剩余时间：${remainingTopTime.inSeconds}s (已播放: ${_topAdElapsedTime.inSeconds}s)');
+
+        if (remainingTopTime.inSeconds > 0) {
+          // 更新当前广告开始时间，使其能正确计算剩余时间
+          _currentTopAdStartTime = DateTime.now();
+          // 保持 _topAdElapsedTime 不变，这样调试定时器能正确显示从暂停位置继续的时间
+
+          // 继续播放剩余时间
+          _topTimer = Timer(remainingTopTime, () {
+            if (!_isTopCarouselPaused) {
+              // _logger.i('⏰ [定时] 顶部广告时间到，切换到下一个');
+              _topCarouselController.playNext();
+              // Note: onPageChanged will handle calling startTopAdTimer for the new page
+            }
+          });
+
+          _logger.i('✅ 顶部广告轮播已恢复：继续播放剩余时间 ${remainingTopTime.inSeconds}s');
+        } else {
+          // 时间已到，直接切换到下一个
+          // _logger.i('⚡ [跳过] 顶部广告剩余时间为0，直接切换到下一个');
+          _topCarouselController.playNext();
+          // Note: onPageChanged will handle calling startTopAdTimer for the new page
+
+          _logger.i('✅ 顶部广告轮播已恢复：时间已到，切换到下一个广告');
+        }
       }
     }
 
@@ -355,7 +383,13 @@ class TopAdCarouselProvider extends ChangeNotifier {
         final currentIndex = _topCarouselController.currentIndex;
         // _logger.i('🔄 恢复顶部广告轮播，当前索引: $currentIndex');
 
+        // 恢复视频播放
+        _topCarouselController.resumeAllMedia();
+
+        // 恢复定时器
         startTopAdTimer(currentIndex);
+
+        _logger.i('✅ 顶部广告轮播已恢复：视频播放 + 定时器');
       }
     } else {
       _logger.w(

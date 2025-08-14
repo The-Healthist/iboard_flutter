@@ -27,19 +27,21 @@ class SettingsModel {
 
   factory SettingsModel.fromJson(Map<String, dynamic> json) {
     return SettingsModel(
-      id: json['data']['id'],
-      createdAt: DateTime.parse(json['data']['createdAt']),
-      updatedAt: DateTime.parse(json['data']['updatedAt']),
-      deletedAt: json['data']['deletedAt'] == null
+      id: json['data']?['id'] ?? 0,
+      createdAt: DateTime.parse(
+          json['data']?['createdAt'] ?? DateTime.now().toIso8601String()),
+      updatedAt: DateTime.parse(
+          json['data']?['updatedAt'] ?? DateTime.now().toIso8601String()),
+      deletedAt: json['data']?['deletedAt'] == null
           ? null
           : DateTime.parse(json['data']['deletedAt']),
-      deviceId: json['data']['deviceId'],
-      building: Building.fromJson(json['data']['building']),
-      buildingId: json['data']['buildingId'],
-      settings: Settings.fromJson(json['data']['settings']),
-      status: json['data']['status'],
-      message: json['message'],
-      token: json['token'],
+      deviceId: json['data']?['deviceId'] ?? '',
+      building: Building.fromJson(json['data']?['building'] ?? {}),
+      buildingId: json['data']?['buildingId'] ?? 0,
+      settings: Settings.fromJson(json['data']?['settings'] ?? {}),
+      status: json['data']?['status'] ?? '',
+      message: json['message'] ?? '',
+      token: json['token'] ?? '',
     );
   }
 }
@@ -75,15 +77,19 @@ class Building {
 
   factory Building.fromJson(Map<String, dynamic> json) {
     return Building(
-      id: json['id'],
-      createdAt: DateTime.parse(json['createdAt']),
-      updatedAt: DateTime.parse(json['updatedAt']),
+      id: json['id'] ?? 0,
+      createdAt: json['createdAt'] != null
+          ? DateTime.parse(json['createdAt'])
+          : DateTime.now(),
+      updatedAt: json['updatedAt'] != null
+          ? DateTime.parse(json['updatedAt'])
+          : DateTime.now(),
       deletedAt:
           json['deletedAt'] == null ? null : DateTime.parse(json['deletedAt']),
-      name: json['name'],
-      ismartId: json['ismartId'],
-      remark: json['remark'],
-      location: json['location'],
+      name: json['name'] ?? '',
+      ismartId: json['ismartId'] ?? '',
+      remark: json['remark'] ?? '',
+      location: json['location'] ?? '',
       devices: json['devices'],
       notices: json['notices'],
       advertisements: json['advertisements'],
@@ -122,18 +128,20 @@ class Settings {
 
   factory Settings.fromJson(Map<String, dynamic> json) {
     return Settings(
-      arrearageUpdateDuration: json['arrearageUpdateDuration'],
-      noticeUpdateDuration: json['noticeUpdateDuration'],
-      advertisementUpdateDuration: json['advertisementUpdateDuration'],
-      appUpdateDuration: json['appUpdateDuration'],
-      advertisementPlayDuration: json['advertisementPlayDuration'],
-      noticePlayDuration: json['noticePlayDuration'],
-      spareDuration: json['spareDuration'],
-      noticeStayDuration: json['noticeStayDuration'],
-      bottomCarouselDuration: json['bottomCarouselDuration'],
-      paymentTableOnePageDuration: json['paymentTableOnePageDuration'],
-      normalToAnnouncementCarouselDuration: json['normalToAnnouncementCarouselDuration'],
-      announcementCarouselToFullAdsCarouselDuration: json['announcementCarouselToFullAdsCarouselDuration'],
+      arrearageUpdateDuration: json['arrearageUpdateDuration'] ?? 30,
+      noticeUpdateDuration: json['noticeUpdateDuration'] ?? 5,
+      advertisementUpdateDuration: json['advertisementUpdateDuration'] ?? 10,
+      appUpdateDuration: json['appUpdateDuration'] ?? 60,
+      advertisementPlayDuration: json['advertisementPlayDuration'] ?? 10,
+      noticePlayDuration: json['noticePlayDuration'] ?? 15,
+      spareDuration: json['spareDuration'] ?? 30,
+      noticeStayDuration: json['noticeStayDuration'] ?? 5,
+      bottomCarouselDuration: json['bottomCarouselDuration'] ?? 10,
+      paymentTableOnePageDuration: json['paymentTableOnePageDuration'] ?? 10,
+      normalToAnnouncementCarouselDuration:
+          json['normalToAnnouncementCarouselDuration'] ?? 5,
+      announcementCarouselToFullAdsCarouselDuration:
+          json['announcementCarouselToFullAdsCarouselDuration'] ?? 5,
     );
   }
 }

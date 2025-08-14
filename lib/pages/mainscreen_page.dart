@@ -261,7 +261,45 @@ class _AnnouncementPageState extends State<AnnouncementPage> {
     // _logger.i('⚙️ 设置页面模式 - 所有轮播已暂停');
   }
 
-  ///5.2，从设置页面返回后恢复所有轮播和计时器
+  ///5.2，从全屏广告状态退出，恢复所有轮播
+  void _exitFullscreenAdMode() {
+    final fullAdCarouselProvider =
+        Provider.of<FullscreenAdProvider>(context, listen: false);
+    final topAdCarouselProvider =
+        Provider.of<TopAdCarouselProvider>(context, listen: false);
+    final announcementCarouselProvider =
+        Provider.of<AnnouncementCarouselProvider>(context, listen: false);
+    final stateProvider =
+        Provider.of<CarouselStateProvider>(context, listen: false);
+
+    // 记录退出前的状态
+    final wasInFullscreenAd =
+        stateProvider.currentAppState == AppState.fullscreenAd;
+
+    // 退出全屏广告模式
+    fullAdCarouselProvider.exitFullscreenMode();
+
+    if (wasInFullscreenAd) {
+      // 立即恢复顶部广告轮播（不等待状态变化）
+      // 确保顶部广告能够立即恢复视频播放和轮播
+      topAdCarouselProvider.resumeTopCarousel();
+
+      // 恢复通告轮播
+      announcementCarouselProvider
+          .resumeMidCarousel(stateProvider.noticeStayDuration);
+
+      // 设置日志输出标志 - 默认状态下只显示顶部广告和通告轮播的日志
+      fullAdCarouselProvider.startDebugTimer();
+      announcementCarouselProvider.startDebugTimer(
+          stateProvider.noticeStayDuration,
+          enableLogging: true);
+
+      // 记录恢复完成的日志
+      // _logger.i('✅ 全屏广告状态退出完成：顶部广告、通告轮播已恢复');
+    }
+  }
+
+  ///5.3，从设置页面返回后恢复所有轮播和计时器
   void _resumeAllCarouselsFromSettings() {
     // _logger.i('↩️ 从设置页面返回 - 恢复所有轮播和计时器');
 
@@ -370,7 +408,12 @@ class _AnnouncementPageState extends State<AnnouncementPage> {
 
     // 恢复顶部广告轮播（如果被暂停了）
     final topAdProvider = context.read<TopAdCarouselProvider>();
-    topAdProvider.checkAndRestoreTopCarousel();
+    // 确保顶部广告能够立即恢复视频播放和轮播
+    if (topAdProvider.isTopCarouselPaused) {
+      topAdProvider.resumeTopCarousel();
+    } else {
+      topAdProvider.checkAndRestoreTopCarousel();
+    }
 
     // 恢复底部轮播（如果被暂停了）
     if (_bottomCarouselController.widgetCount > 1 && !_isBottomCarouselPaused) {

@@ -213,7 +213,7 @@ class MainScreenWidgetState extends State<MainScreenWidget> {
                     ),
                     SizedBox(height: 8),
                     Text(
-                      '功能開發中...',
+                      '該大廈尚未開通此功能',
                       style: TextStyle(
                         fontSize: 14,
                         color: Colors.grey,
@@ -701,7 +701,7 @@ class MainScreenWidgetState extends State<MainScreenWidget> {
                     ),
                     SizedBox(height: 8),
                     Text(
-                      '功能開發中...',
+                      '該大廈尚未開通此功能',
                       style: TextStyle(
                         fontSize: 14,
                         color: Colors.grey,

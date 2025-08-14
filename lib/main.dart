@@ -272,31 +272,17 @@ class _HomePageState extends State<HomePage> {
             // 既没有登录成功也没有可用的缓存数据
             final error = appDataProvider.error ?? '无法获取设备配置数据';
 
-            // 检查是否是网络错误
-            if (_isNetworkError(error)) {
-              setState(() {
-                _initializationError = '🌐 网络连接失败且无缓存数据可用\n\n请检查网络连接后重试，或联系管理员';
-              });
-            } else {
-              setState(() {
-                _initializationError = error;
-              });
-            }
+            setState(() {
+              _initializationError = _getUserFriendlyError(error);
+            });
           }
         } catch (e) {
           print('Auto login failed: $e');
           final error = e.toString();
 
-          // 检查是否是网络错误
-          if (_isNetworkError(error)) {
-            setState(() {
-              _initializationError = '🌐 网络连接失败且无缓存数据可用\n\n请检查网络连接后重试，或联系管理员';
-            });
-          } else {
-            setState(() {
-              _initializationError = '登录失败: $e';
-            });
-          }
+          setState(() {
+            _initializationError = _getUserFriendlyError(error);
+          });
         }
       }
     } catch (e) {
@@ -333,6 +319,32 @@ class _HomePageState extends State<HomePage> {
     return networkErrorKeywords.any((keyword) => error.contains(keyword));
   }
 
+  ///2, 检查是否为数据解析错误
+  bool _isDataParseError(String error) {
+    final parseErrorKeywords = [
+      'type \'Null\' is not a subtype of type',
+      'Failed to parse',
+      'JSON decode error',
+      'Invalid JSON',
+      'Parse error',
+      '数据解析失败',
+      '服务器响应格式错误'
+    ];
+
+    return parseErrorKeywords.any((keyword) => error.contains(keyword));
+  }
+
+  ///3, 获取用户友好的错误信息
+  String _getUserFriendlyError(String error) {
+    if (_isNetworkError(error)) {
+      return '🌐 网络连接失败\n\n请检查网络连接后重试，或联系管理员';
+    } else if (_isDataParseError(error)) {
+      return '📊 服务器数据格式错误\n\n请联系管理员检查服务器配置';
+    } else {
+      return '❌ 初始化失败\n\n错误信息: $error\n\n请联系管理员';
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     // 如果有初始化错误，显示错误页面
@@ -354,14 +366,14 @@ class _HomePageState extends State<HomePage> {
                   if (appDataProvider.error != null &&
                       !appDataProvider.isLoading) {
                     // 如果是网络错误但有设备设置数据（缓存），不显示错误页面
-                    if (_isNetworkError(appDataProvider.error!) &&
+                    if ((_isNetworkError(appDataProvider.error!) || _isDataParseError(appDataProvider.error!)) &&
                         appDataProvider.deviceSettings != null) {
                       // 有缓存数据，继续正常流程，不显示错误
-                      print('检测到网络错误但有缓存数据，继续使用缓存数据运行');
+                      print('检测到网络错误或数据解析错误但有缓存数据，继续使用缓存数据运行');
                     } else {
                       // 没有缓存数据或非网络错误，显示错误页面
                       return ErrorPage(
-                        errorMessage: appDataProvider.error!,
+                        errorMessage: _getUserFriendlyError(appDataProvider.error!),
                         onRetry: _retryInitialization,
                       );
                     }
@@ -415,19 +427,15 @@ class _HomePageState extends State<HomePage> {
                             Icon(
                               appDataProvider.isLoggedIn
                                   ? Icons.check_circle
-                                  : (_isNetworkError(
-                                              appDataProvider.error ?? '') &&
-                                          appDataProvider.deviceSettings !=
-                                              null)
+                                  : ((_isNetworkError(appDataProvider.error ?? '') || _isDataParseError(appDataProvider.error ?? '')) &&
+                                          appDataProvider.deviceSettings != null)
                                       ? Icons.offline_bolt
                                       : Icons.check_circle,
                               size: 60,
                               color: appDataProvider.isLoggedIn
                                   ? Colors.green
-                                  : (_isNetworkError(
-                                              appDataProvider.error ?? '') &&
-                                          appDataProvider.deviceSettings !=
-                                              null)
+                                  : ((_isNetworkError(appDataProvider.error ?? '') || _isDataParseError(appDataProvider.error ?? '')) &&
+                                          appDataProvider.deviceSettings != null)
                                       ? Colors.orange
                                       : Colors.green,
                             ),
@@ -435,10 +443,8 @@ class _HomePageState extends State<HomePage> {
                             Text(
                               appDataProvider.isLoggedIn
                                   ? '設備已登錄'
-                                  : (_isNetworkError(
-                                              appDataProvider.error ?? '') &&
-                                          appDataProvider.deviceSettings !=
-                                              null)
+                                  : ((_isNetworkError(appDataProvider.error ?? '') || _isDataParseError(appDataProvider.error ?? '')) &&
+                                          appDataProvider.deviceSettings != null)
                                       ? '離線模式（使用緩存數據）'
                                       : '設備已登錄',
                               style: TextStyle(
@@ -448,12 +454,12 @@ class _HomePageState extends State<HomePage> {
                               textAlign: TextAlign.center,
                             ),
                             if (!appDataProvider.isLoggedIn &&
-                                _isNetworkError(appDataProvider.error ?? '') &&
+                                (_isNetworkError(appDataProvider.error ?? '') || _isDataParseError(appDataProvider.error ?? '')) &&
                                 appDataProvider.deviceSettings != null)
                               Padding(
                                 padding: EdgeInsets.only(top: 8),
                                 child: Text(
-                                  '網絡連接中斷，正在使用緩存數據',
+                                  '網絡連接中斷或數據格式錯誤，正在使用緩存數據',
                                   style: TextStyle(
                                     fontSize: 14,
                                     color: Colors.grey[600],

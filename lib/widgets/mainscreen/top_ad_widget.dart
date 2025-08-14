@@ -178,13 +178,16 @@ class _TopAdWidgetState extends State<TopAdWidget> {
 
   //4，恢复视频播放 - 使用视频资源管理器
   Future<void> _resumeVideo() async {
-    if (_videoController != null && _isManuallyPaused) {
-      final success = await _videoController!.safePlay();
-      if (success) {
-        _isManuallyPaused = false;
-        // _logger.i('📱 手动恢复顶部广告视频播放 - ${widget.ad.title}');
-      } else {
-        _logger.w('⚠️ 恢复视频播放失败');
+    if (_videoController != null) {
+      // 检查视频是否处于暂停状态，无论是什么原因暂停的
+      if (_videoController!.safeState == VideoControllerState.paused) {
+        final success = await _videoController!.safePlay();
+        if (success) {
+          _isManuallyPaused = false;
+          // _logger.i('📱 恢复顶部广告视频播放 - ${widget.ad.title}');
+        } else {
+          _logger.w('⚠️ 恢复视频播放失败');
+        }
       }
     }
   }
@@ -232,15 +235,12 @@ class _TopAdWidgetState extends State<TopAdWidget> {
             // _logger.d('防抖动暂停顶部广告视频播放');
           }
         });
-      } else if (!isMediaPaused &&
-          state == VideoControllerState.paused &&
-          !_isManuallyPaused) {
+      } else if (!isMediaPaused && state == VideoControllerState.paused) {
         // 延迟100ms执行，避免频繁调用
         Future.delayed(Duration(milliseconds: 100), () {
           if (mounted &&
               _videoController != null &&
-              _videoController!.safeState == VideoControllerState.paused &&
-              !_isManuallyPaused) {
+              _videoController!.safeState == VideoControllerState.paused) {
             _videoController!.safePlay();
             // _logger.d('防抖动恢复顶部广告视频播放');
           }
@@ -267,8 +267,7 @@ class _TopAdWidgetState extends State<TopAdWidget> {
           Future.delayed(Duration(milliseconds: 50), () {
             if (mounted &&
                 _videoController != null &&
-                _videoController!.safeState == VideoControllerState.paused &&
-                !_isManuallyPaused) {
+                _videoController!.safeState == VideoControllerState.paused) {
               _resumeVideo();
               // _logger.i('📱 防抖动恢复视频 - ${widget.ad.title}');
             }

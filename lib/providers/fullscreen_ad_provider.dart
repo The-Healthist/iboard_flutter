@@ -514,7 +514,7 @@ class FullscreenAdProvider extends ChangeNotifier {
     // 为下次进入准备下一个广告（但不触发切换逻辑）
     if (this.fullscreenAds.isNotEmpty) {
       _currentAdIndex = (_currentAdIndex + 1) % this.fullscreenAds.length;
-      // _logger.i('🔄 广告索引更新为下一个: $_currentAdIndex');
+      _logger.i(' 3 3   33 3 🔄 广告索引更新为下一个: $_currentAdIndex');
     }
 
     // 确保取消所有定时器

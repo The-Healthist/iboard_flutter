@@ -55,14 +55,13 @@ class _WeatherWidgetState extends State<WeatherWidget> {
     // _logger.i(
     //     'WeatherWidget初始化时间: ${DateFormat('yyyy-MM-dd HH:mm:ss').format(_currentTime)}');
 
+    // 启动时间更新定时器 - 每分钟同步系统时间
+    _startTimeUpdateTimer();
+    // 国际化加载完成后继续其他初始化
     initializeDateFormatting('zh_HK', null).then((_) {
-      // Added initialization
-      // _logger.i('🚀 WeatherWidget初始化开始');
       _updateLocationFromProvider(); // 获取location
       _initializeWeatherData(); // 初始化天气数据
-      _startTimeUpdateTimer(); // 启动时间更新定时器（每分钟）
-      _startWeatherUpdateTimer(); // 启动天气数据定时更新器（每2小时）
-      // _logger.i('📍 初始化完成，当前位置: $_currentWeatherLocation');
+      _startWeatherUpdateTimer(); // 天气数据定时更新（每2小时）
     });
   }
 

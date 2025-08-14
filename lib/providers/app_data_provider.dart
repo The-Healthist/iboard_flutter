@@ -462,10 +462,22 @@ class AppDataProvider extends ChangeNotifier {
     try {
       _logger.i('Attempting initial login with deviceId: $_deviceId');
       final responseData = await _apiClient.login(deviceId: _deviceId!);
-      _settingsModel = SettingsModel.fromJson(responseData);
+      
+      try {
+        _settingsModel = SettingsModel.fromJson(responseData);
+        _logger.i('Initial login successful. SettingsModel updated.');
+      } catch (parseError) {
+        _logger.e('Failed to parse login response data', error: parseError);
+        _logger.e('Response data: $responseData');
+        throw ApiException(
+          statusCode: 500,
+          message: 'Failed to parse server response: $parseError',
+          errorData: responseData,
+        );
+      }
+      
       // ApiClient's internal token is already set by its login method.
       // We also update the AppDataProvider's token via settingsModel.
-      _logger.i('Initial login successful. SettingsModel updated.');
 
       ///5，登录成功后保存登录设备数据到缓存
       await _saveLoginDeviceData(responseData);
@@ -535,8 +547,19 @@ class AppDataProvider extends ChangeNotifier {
           // 重新尝试登录
           final retryResponseData =
               await _apiClient.login(deviceId: _deviceId!);
-          _settingsModel = SettingsModel.fromJson(retryResponseData);
-          _logger.i('Login successful after device registration.');
+          
+          try {
+            _settingsModel = SettingsModel.fromJson(retryResponseData);
+            _logger.i('Login successful after device registration.');
+          } catch (parseError) {
+            _logger.e('Failed to parse retry login response data', error: parseError);
+            _logger.e('Retry response data: $retryResponseData');
+            throw ApiException(
+              statusCode: 500,
+              message: 'Failed to parse server response after device registration: $parseError',
+              errorData: retryResponseData,
+            );
+          }
 
           ///6，设备注册后登录成功也要保存登录设备数据到缓存
           await _saveLoginDeviceData(retryResponseData);
@@ -615,8 +638,19 @@ class AppDataProvider extends ChangeNotifier {
           _logger.i(
               'Attempting fallback login with IP address and deviceId: $_deviceId');
           final responseData = await _apiClient.login(deviceId: _deviceId!);
-          _settingsModel = SettingsModel.fromJson(responseData);
-          _logger.i('Fallback login successful. SettingsModel updated.');
+          
+          try {
+            _settingsModel = SettingsModel.fromJson(responseData);
+            _logger.i('Fallback login successful. SettingsModel updated.');
+          } catch (parseError) {
+            _logger.e('Failed to parse fallback login response data', error: parseError);
+            _logger.e('Fallback response data: $responseData');
+            throw ApiException(
+              statusCode: 500,
+              message: 'Failed to parse server response during fallback login: $parseError',
+              errorData: responseData,
+            );
+          }
 
           ///7，备用URL登录成功也要保存登录设备数据到缓存
           await _saveLoginDeviceData(responseData);

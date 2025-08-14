@@ -72,7 +72,7 @@ class _MainPageState extends State<MainPage> {
 
     showDialog(
       context: context,
-      barrierDismissible: true,
+      barrierDismissible: true, //点击区域之外就关闭窗口，但不会触发状态转换
       builder: (BuildContext context) {
         return Listener(
             onPointerDown: (event) => {},
@@ -93,10 +93,24 @@ class _MainPageState extends State<MainPage> {
             ));
       },
     ).then((_) {
-      // Dialog closed - 重置狀態但不觸發狀態轉換（由計時器或回調處理）
+      // Dialog closed - 重置狀態並觸發狀態轉換到手動操作狀態
       setState(() {
         _isAdsDialogOpen = false;
+        print('11111111111111 我关闭了全屏广告弹窗哦');
       });
+
+      // 關閉全屏廣告彈窗後，自動切換到手動操作狀態
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) {
+          final carouselProvider = context.read<CarouselStateProvider>();
+          // 檢查當前是否在全屏廣告狀態，如果是則切換到手動操作狀態
+          if (carouselProvider.currentAppState == AppState.fullscreenAd) {
+            print('🔄 全屏廣告彈窗關閉，自動切換到手動操作狀態');
+            carouselProvider.enterManualOperation();
+          }
+        }
+      });
+
       // Fullscreen ad dialog closed log (always available)
       // print('Fullscreen ad dialog closed');
     });
@@ -105,7 +119,22 @@ class _MainPageState extends State<MainPage> {
   //3， Method to close the ads dialog
   void closeAdsDialog() {
     if (_isAdsDialogOpen && Navigator.canPop(context)) {
+      // 關閉彈窗前先記錄當前狀態
+      final carouselProvider = context.read<CarouselStateProvider>();
+      final wasInFullscreenAd =
+          carouselProvider.currentAppState == AppState.fullscreenAd;
+
       Navigator.of(context).pop();
+
+      // 如果之前在全屏廣告狀態，關閉後自動切換到手動操作狀態
+      if (wasInFullscreenAd) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted) {
+            print('🔄 通過closeAdsDialog關閉全屏廣告，自動切換到手動操作狀態');
+            carouselProvider.enterManualOperation();
+          }
+        });
+      }
     }
   }
 
