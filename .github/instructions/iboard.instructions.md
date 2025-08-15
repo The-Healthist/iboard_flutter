@@ -92,9 +92,10 @@ Refer to Flutter, Riverpod, and Supabase documentation for Widgets, State Manage
 when you create a new file, add the Number for each method.for example:
 
 ```dart
-  ///1, 启动调试定时器 - 每秒输出顶部广告的实时状态
+  ///1, open timer
   void startDebugTimer() {}
 ```
 
-always replay in chinese.
+always reply in chinese.
 agent can fix or create new file.
+每次可以根据需求修改需要修改的文件代码.
