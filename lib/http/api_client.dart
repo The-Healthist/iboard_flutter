@@ -1,7 +1,12 @@
-import 'dart:async'; // Added for Completer
+import 'dart:async';
 import 'dart:convert';
+import 'dart:io';
+import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:logger/logger.dart';
+import 'package:iboard_app/models/models.dart';
+import 'package:iboard_app/utils/device_id_util.dart';
+import 'package:iboard_app/utils/debug_cache_util.dart';
 
 // Custom exception class for API-related errors
 class ApiException implements Exception {
@@ -233,6 +238,8 @@ class ApiClient {
     required String apiNameForLog,
     bool isLoginRequest = false,
     bool isHealthTestRequest = false, // New flag for healthTest itself
+    int maxRetries = 0, // 0 means no retry
+    Duration retryDelay = const Duration(seconds: 0),
   }) async {
     // Section 1: Pre-flight health check (if applicable)
     if (!isLoginRequest &&
@@ -702,5 +709,153 @@ class ApiClient {
         () => http.get(url, headers: headers),
         apiNameForLog: 'getAppVersion');
     return _handleResponse(response, 'getAppVersion');
+  }
+
+  ///16. 获取香港特区政府新闻公报RSS
+  /// Endpoint: GET http://www.info.gov.hk/gia/rss/general_zh.xml
+  Future<List<Map<String, dynamic>>> getNewsAnnouncements() async {
+    const String fullUrl = 'http://www.info.gov.hk/gia/rss/general_zh.xml';
+    final Uri url = _buildUri(fullUrl, null);
+
+    // RSS接口不需要认证，使用基本headers
+    final Map<String, String> headers = {
+      'Content-Type': 'application/xml; charset=utf-8',
+      'User-Agent': 'iBoard_Flutter/1.0',
+    };
+
+    _logger.i('获取香港特区政府新闻公报RSS数据');
+
+    try {
+      final http.Response response = await _sendRequest(
+          () => http.get(url, headers: headers),
+          apiNameForLog: 'getNewsAnnouncements');
+
+      // 处理XML响应
+      return _handleRssXmlResponse(response, 'getNewsAnnouncements');
+    } catch (e) {
+      _logger.e('获取新闻公报失败: $e');
+      rethrow;
+    }
+  }
+
+  ///16.1. 获取香港电台财经新闻RSS
+  /// Endpoint: GET https://rthk9.rthk.hk/rthk/news/rss/c_expressnews_cfinance.xml
+  Future<List<Map<String, dynamic>>> getRthkNews() async {
+    const String fullUrl =
+        'https://rthk9.rthk.hk/rthk/news/rss/c_expressnews_cfinance.xml';
+    final Uri url = _buildUri(fullUrl, null);
+
+    // RSS接口不需要认证，使用基本headers
+    final Map<String, String> headers = {
+      'Content-Type': 'application/xml; charset=utf-8',
+      'User-Agent': 'iBoard_Flutter/1.0',
+      'Accept': 'application/xml, text/xml, */*',
+      'Cache-Control': 'no-cache',
+    };
+
+    _logger.i('🌐 开始获取香港电台财经新闻RSS数据');
+
+    try {
+      // 增加超时时间到60秒
+      final http.Response response = await _sendRequest(
+        () => http.get(url, headers: headers).timeout(
+          const Duration(seconds: 60), // 增加到60秒
+          onTimeout: () {
+            throw Exception('RTHK新闻RSS请求超时 (60秒)');
+          },
+        ),
+        apiNameForLog: 'getRthkNews',
+      );
+
+      // 处理XML响应
+      return _handleRssXmlResponse(response, 'getRthkNews');
+    } catch (e) {
+      _logger.e('❌ 获取RTHK新闻失败: $e');
+
+      // 如果是超时错误，提供更友好的错误信息
+      if (e.toString().contains('超时')) {
+        throw ApiException(
+          statusCode: null,
+          message: '❌ RTHK新闻RSS请求超时，请检查网络连接或稍后重试',
+          errorData: 'TimeoutException: ${e.toString()}',
+        );
+      }
+
+      rethrow;
+    }
+  }
+
+  ///17. 处理RSS XML响应
+  Future<List<Map<String, dynamic>>> _handleRssXmlResponse(
+      http.Response response, String apiName) async {
+    final String decodedBody = utf8.decode(response.bodyBytes);
+
+    if (response.statusCode >= 200 && response.statusCode < 300) {
+      _logger.i('$apiName 成功 (状态码: ${response.statusCode})');
+
+      if (decodedBody.isEmpty) {
+        return [];
+      }
+
+      try {
+        // 简单的XML解析，提取item元素
+        final List<Map<String, dynamic>> items = [];
+
+        // 使用正则表达式提取item标签内容
+        final RegExp itemRegex = RegExp(
+          r'<item>(.*?)</item>',
+          dotAll: true,
+          multiLine: true,
+        );
+
+        final RegExp titleRegex = RegExp(r'<title>(.*?)</title>', dotAll: true);
+        final RegExp guidRegex = RegExp(r'<guid>(.*?)</guid>', dotAll: true);
+        final RegExp linkRegex = RegExp(r'<link>(.*?)</link>', dotAll: true);
+        final RegExp pubDateRegex =
+            RegExp(r'<pubDate>(.*?)</pubDate>', dotAll: true);
+        final RegExp descriptionRegex =
+            RegExp(r'<description>(.*?)</description>', dotAll: true);
+
+        final matches = itemRegex.allMatches(decodedBody);
+
+        for (final match in matches) {
+          final itemContent = match.group(1)!;
+
+          final title = titleRegex.firstMatch(itemContent)?.group(1) ?? '';
+          final guid = guidRegex.firstMatch(itemContent)?.group(1) ?? '';
+          final link = linkRegex.firstMatch(itemContent)?.group(1) ?? '';
+          final pubDate = pubDateRegex.firstMatch(itemContent)?.group(1) ?? '';
+          final description =
+              descriptionRegex.firstMatch(itemContent)?.group(1) ?? '';
+
+          if (title.isNotEmpty && guid.isNotEmpty) {
+            items.add({
+              'title': title,
+              'guid': guid,
+              'link': link,
+              'pubDate': pubDate,
+              'description': description,
+            });
+          }
+        }
+
+        _logger.i('成功解析 ${items.length} 条新闻公报');
+        return items;
+      } catch (e, stackTrace) {
+        _logger.e('解析RSS XML失败: $e', error: e, stackTrace: stackTrace);
+        throw ApiException(
+          statusCode: response.statusCode,
+          message: '成功接收响应，但解析RSS XML失败',
+          errorData: decodedBody,
+        );
+      }
+    } else {
+      _logger.w('$apiName 失败 (状态码: ${response.statusCode}), 响应体: $decodedBody');
+      throw ApiException(
+        statusCode: response.statusCode,
+        message: '$apiName 失败',
+        errorData: decodedBody,
+      );
+    }
   }
 }

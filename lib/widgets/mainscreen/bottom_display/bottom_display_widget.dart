@@ -53,7 +53,7 @@ class _BottomDisplayWidgetState extends State<BottomDisplayWidget> {
                 child: WeatherWidget(
                     showOnlyLeft: true, containerHeight: fixedHeight),
               ),
-              // 右侧部分：轮播区域 - 天气预报/二维码轮播
+              // 右侧部分：轮播区域 - 天气预报/二维码/新闻公报轮播
               Expanded(
                 flex: 6,
                 child: AnimatedSwitcher(
@@ -65,9 +65,7 @@ class _BottomDisplayWidgetState extends State<BottomDisplayWidget> {
                       child: child,
                     );
                   },
-                  child: bottomProvider.showWeather
-                      ? _weatherForecastWidget!
-                      : _qrcodeWidget!,
+                  child: _buildCurrentWidget(bottomProvider, fixedHeight),
                 ),
               ),
             ],
@@ -76,9 +74,22 @@ class _BottomDisplayWidgetState extends State<BottomDisplayWidget> {
       },
     );
   }
+
+  ///2，构建当前显示的组件
+  Widget _buildCurrentWidget(
+      BottomWeatherQrcodeCarouselProvider provider, double height) {
+    if (provider.showWeather) {
+      return _weatherForecastWidget!;
+    } else if (provider.showQrcode) {
+      return _qrcodeWidget!;
+    } else {
+      // 默认显示天气
+      return _weatherForecastWidget!;
+    }
+  }
 }
 
-///2，只显示天气预报的组件
+///3，只显示天气预报的组件
 class _WeatherForecastOnlyWidget extends StatelessWidget {
   final double containerHeight;
 

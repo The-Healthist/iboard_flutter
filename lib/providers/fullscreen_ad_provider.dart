@@ -11,6 +11,7 @@ import 'dart:convert';
 
 /// 简化版全屏广告Provider
 /// 参考顶部广告轮播逻辑实现
+/// 轮播顺序由后台管理，此Provider不再处理自定义顺序
 class FullscreenAdProvider extends ChangeNotifier {
   final Logger _logger = Logger();
 
@@ -18,11 +19,9 @@ class FullscreenAdProvider extends ChangeNotifier {
   Timer? _fullscreenTimer;
   Timer? _debugTimer;
 
-  // 广告数据
+  // 广告数据 - 使用AdvertisementProvider的轮播数据
   List<AdModel> _fullscreenAds = [];
-  List<AdModel> _customOrderFullscreenAds = []; // 自定义顺序的全屏广告
   List<Widget> _adWidgets = [];
-  List<dynamic>? _cachedOrderData; // 缓存的顺序配置数据
 
   // 状态管理
   bool _isPaused = false;
@@ -45,17 +44,15 @@ class FullscreenAdProvider extends ChangeNotifier {
   static const int _defaultFullscreenAdDuration = 10; // 默认全屏广告播放时间（秒）
 
   FullscreenAdProvider(this._appDataProvider) {
-    _logger.i('FullscreenAdProvider initialized with AppDataProvider');
-    _loadCustomOrder(); // 加载自定义顺序
+    _logger
+        .i('FullscreenAdProvider initialized with AppDataProvider, 轮播顺序由后台管理');
   }
 
   // 视频播放进度记录
   Map<String, Duration> _videoProgressMap = {};
 
   // Getters
-  List<AdModel> get fullscreenAds => _customOrderFullscreenAds.isNotEmpty
-      ? _customOrderFullscreenAds
-      : _fullscreenAds;
+  List<AdModel> get fullscreenAds => _fullscreenAds;
   List<Widget> get adWidgets => _adWidgets;
   bool get isPaused => _isPaused;
   bool get isActive => _isActive;
@@ -74,157 +71,56 @@ class FullscreenAdProvider extends ChangeNotifier {
       _appDataProvider.deviceSettings?.advertisementPlayDuration ??
       _defaultFullscreenAdDuration;
 
-  ///1，设置自定义轮播全屏广告顺序
-  Future<void> setCarouselList(List<AdModel> customOrderList) async {
-    _customOrderFullscreenAds = List.from(customOrderList);
-    await _saveCustomOrder();
-    // _logger.i('🔄 设置自定义全屏广告轮播顺序: ${_customOrderFullscreenAds.length} 个广告');
+  ///1，更新轮播广告列表（由AdvertisementProvider调用）
+  void updateCarouselList(List<AdModel> newFullscreenAds) {
+    // 检查数据是否真的发生了变化
+    if (_areAdsListsEqual(_fullscreenAds, newFullscreenAds)) {
+      _logger.d('🔄 全屏广告轮播列表没有变化，跳过更新');
+      return;
+    }
+
+    _fullscreenAds = List<AdModel>.from(newFullscreenAds);
+    _logger.i('🔄 更新全屏广告轮播列表: ${_fullscreenAds.length} 个广告');
 
     // 重新创建广告Widget
     _createAdWidgets();
     notifyListeners();
   }
 
-  ///2，保存自定义顺序到缓存
-  Future<void> _saveCustomOrder() async {
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      final orderData = _customOrderFullscreenAds
-          .map((ad) => {
-                'id': ad.id,
-                'title': ad.title,
-                'order': _customOrderFullscreenAds.indexOf(ad),
-              })
-          .toList();
-      await prefs.setString(
-          'fullscreen_ad_carousel_order', json.encode(orderData));
-      // _logger.i('💾 全屏广告轮播自定义顺序已保存到缓存');
-    } catch (e) {
-      _logger.e('保存全屏广告轮播顺序失败', error: e);
-    }
-  }
-
-  ///3，从缓存加载自定义顺序
-  Future<void> _loadCustomOrder() async {
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      final orderString = prefs.getString('fullscreen_ad_carousel_order');
-      if (orderString != null) {
-        final orderData = json.decode(orderString) as List;
-        // 保存顺序配置，等待API数据到达后再应用
-        _cachedOrderData = orderData;
-        _logger.i('📂 从缓存加载全屏广告轮播自定义顺序: ${orderData.length} 个配置');
-      }
-    } catch (e) {
-      _logger.e('加载全屏广告轮播顺序失败', error: e);
-    }
-  }
-
-  ///4，根据API数据更新自定义顺序（保持用户自定义的顺序）
-  void updateFullscreenAdsWithCustomOrder(List<AdModel> newAds) {
-    // 检查数据是否真的发生了变化，避免不必要的更新
-    if (_areAdsListsEqual(_fullscreenAds, newAds)) {
-      // _logger.d('📋 全屏广告数据未变化，跳过更新');
-      return;
-    }
-
-    _fullscreenAds = newAds;
-
-    // 如果有缓存的顺序配置且自定义顺序为空，应用缓存的顺序
-    if (_customOrderFullscreenAds.isEmpty && _cachedOrderData != null) {
-      _applyCachedOrder(newAds);
-    } else if (_customOrderFullscreenAds.isEmpty) {
-      // 如果没有自定义顺序，使用默认顺序
-      _customOrderFullscreenAds = List.from(newAds);
-    } else {
-      // 有自定义顺序，需要智能更新
-      _updateCustomOrderWithNewData(newAds);
-    }
-
-    _createAdWidgets();
-
-    if (this.fullscreenAds.isNotEmpty &&
-        _currentAdIndex >= this.fullscreenAds.length) {
-      _currentAdIndex = 0;
-    }
-
-    _logger.i(
-        '🔄 更新全屏广告轮播数据: 原始${newAds.length}个，自定义顺序${_customOrderFullscreenAds.length}个');
+  ///2，清空轮播广告列表
+  void clearCarouselList() {
+    _fullscreenAds.clear();
+    _adWidgets.clear();
+    _logger.i('🗑️ 清空全屏广告轮播列表');
     notifyListeners();
-  }
-
-  ///5，智能更新自定义顺序列表
-  void _updateCustomOrderWithNewData(List<AdModel> newAds) {
-    // 创建新数据的ID映射
-    final newAdsMap = {for (var item in newAds) item.id: item};
-
-    // 移除已删除的广告
-    _customOrderFullscreenAds
-        .removeWhere((item) => !newAdsMap.containsKey(item.id));
-
-    // 更新现有广告的数据
-    for (int i = 0; i < _customOrderFullscreenAds.length; i++) {
-      final currentId = _customOrderFullscreenAds[i].id;
-      if (newAdsMap.containsKey(currentId)) {
-        _customOrderFullscreenAds[i] = newAdsMap[currentId]!;
-      }
-    }
-
-    // 添加新增的广告到末尾
-    final existingIds =
-        _customOrderFullscreenAds.map((item) => item.id).toSet();
-    final newItems =
-        newAds.where((item) => !existingIds.contains(item.id)).toList();
-    _customOrderFullscreenAds.addAll(newItems);
-
-    // 保存更新后的顺序
-    _saveCustomOrder();
-
-    _logger.i(
-        '📝 智能更新自定义顺序: 移除${newAds.length - newAdsMap.length}个, 新增${newItems.length}个');
-  }
-
-  ///6，应用缓存的顺序配置
-  void _applyCachedOrder(List<AdModel> newAds) {
-    try {
-      if (_cachedOrderData == null) return;
-
-      // 创建API数据的ID映射
-      final Map<int, AdModel> newAdsMap = {
-        for (AdModel ad in newAds) ad.id: ad
-      };
-
-      // 按照缓存的顺序重新排列
-      final List<AdModel> orderedAds = [];
-
-      // 首先添加缓存顺序中存在的广告
-      for (final orderItem in _cachedOrderData!) {
-        final id = orderItem['id'] as int;
-        if (newAdsMap.containsKey(id)) {
-          orderedAds.add(newAdsMap[id]!);
-          newAdsMap.remove(id); // 移除已处理的广告
-        }
-      }
-
-      // 然后添加新增的广告（不在缓存顺序中的）
-      orderedAds.addAll(newAdsMap.values);
-
-      _customOrderFullscreenAds = orderedAds;
-
-      // 保存更新后的顺序
-      _saveCustomOrder();
-
-      _logger.i('📋 应用缓存的全屏广告顺序: ${orderedAds.length}个广告');
-    } catch (e) {
-      _logger.e('应用缓存顺序失败，使用默认顺序', error: e);
-      _customOrderFullscreenAds = List.from(newAds);
-    }
   }
 
   ///6, 更新全屏广告数据
   void updateFullscreenAds(List<AdModel> newAds) {
-    // 使用自定义顺序更新方法
-    updateFullscreenAdsWithCustomOrder(newAds);
+    // 检查数据是否真的发生了变化
+    if (_areAdsListsEqual(_fullscreenAds, newAds)) {
+      _logger.d('🔄 全屏广告数据没有变化，跳过更新');
+      return;
+    }
+
+    // 直接更新广告列表（不再使用自定义顺序）
+    _fullscreenAds = List<AdModel>.from(newAds);
+    _logger.i('🔄 更新全屏广告数据: ${_fullscreenAds.length}个广告');
+
+    // 重新创建广告Widget
+    _createAdWidgets();
+    notifyListeners();
+  }
+
+  ///7, 检查两个广告列表是否相等
+  bool _areAdsListsEqual(List<AdModel> list1, List<AdModel> list2) {
+    if (list1.length != list2.length) return false;
+
+    for (int i = 0; i < list1.length; i++) {
+      if (list1[i].id != list2[i].id) return false;
+    }
+
+    return true;
   }
 
   ///7, 创建广告Widget组件列表
@@ -633,20 +529,6 @@ class FullscreenAdProvider extends ChangeNotifier {
   Widget? getCurrentWidget() {
     if (_currentAdIndex >= _adWidgets.length) return null;
     return _adWidgets[_currentAdIndex];
-  }
-
-  ///26，比较两个广告列表是否相等
-  bool _areAdsListsEqual(List<AdModel> list1, List<AdModel> list2) {
-    if (list1.length != list2.length) return false;
-
-    for (int i = 0; i < list1.length; i++) {
-      if (list1[i].id != list2[i].id ||
-          list1[i].title != list2[i].title ||
-          list1[i].updatedAt != list2[i].updatedAt) {
-        return false;
-      }
-    }
-    return true;
   }
 
   @override

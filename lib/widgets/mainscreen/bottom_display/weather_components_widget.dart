@@ -7,6 +7,7 @@ import 'package:iboard_app/models/weather_warning_model.dart';
 import 'package:iboard_app/providers/app_data_provider.dart';
 import 'package:iboard_app/widgets/weather_icon_widget.dart';
 import 'package:iboard_app/widgets/debug_weather_data_widget.dart'; // 添加天气数据调试组件导入
+import 'package:iboard_app/widgets/mainscreen/bottom_display/weather_warning_widget.dart'; // 添加天气警告组件导入
 import 'package:intl/intl.dart';
 import 'package:intl/date_symbol_data_local.dart';
 import 'package:logger/logger.dart';
@@ -216,6 +217,7 @@ class _WeatherComponentsWidgetState extends State<WeatherComponentsWidget> {
   // 构建当前天气显示区域的函数
   Widget _buildCurrentWeatherSection(WeatherProvider weatherProvider) {
     final currentData = weatherProvider.currentWeatherData;
+    final warningData = weatherProvider.weatherWarningData;
 
     // 检查是否有当前天气数据
     if (currentData == null) {
@@ -238,9 +240,61 @@ class _WeatherComponentsWidgetState extends State<WeatherComponentsWidget> {
     final currentIcon =
         currentData.icon?.isNotEmpty == true ? currentData.icon!.first : null;
 
+    // 检查是否有天气警告数据
+    final hasWarnings = warningData != null && warningData.warnings.isNotEmpty;
+
+    // 如果没有天气警告，只显示第一页
+    if (!hasWarnings) {
+      return _buildFirstPage(currentData, tempLocationData, currentIcon);
+    }
+
+    // 如果有天气警告，使用PageView进行轮播
+    return PageView(
+      children: [
+        // 第一页：保持原有样式
+        _buildFirstPage(currentData, tempLocationData, currentIcon),
+        // 第二页：显示天气警告和温度
+        _buildSecondPage(warningData!, tempLocationData),
+      ],
+    );
+  }
+
+  ///5，构建第一页：当前天气信息（保持原有样式）
+  Widget _buildFirstPage(
+    CurrentWeatherDataModel currentData,
+    CurrentTemperatureDataModel? tempLocationData,
+    int? currentIcon,
+  ) {
     return Column(
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
+        // 时间信息
+        Text(
+          DateFormat('yyyy-MM-dd').format(_currentTime),
+          style: TextStyle(
+            fontSize: 10,
+            color: Colors.grey[600],
+            fontWeight: FontWeight.w500,
+          ),
+        ),
+        Text(
+          '星期${DateFormat('E', 'zh_HK').format(_currentTime)}',
+          style: TextStyle(
+            fontSize: 10,
+            color: Colors.grey[600],
+            fontWeight: FontWeight.w500,
+          ),
+        ),
+        Text(
+          DateFormat('HH:mm').format(_currentTime),
+          style: TextStyle(
+            fontSize: 16,
+            fontWeight: FontWeight.bold,
+            color: Colors.blue[800],
+          ),
+        ),
+        const SizedBox(height: 8),
+        // 位置和天气信息
         Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
@@ -275,6 +329,40 @@ class _WeatherComponentsWidgetState extends State<WeatherComponentsWidget> {
                   color: Colors.blue[800]),
             )
           ],
+        ),
+      ],
+    );
+  }
+
+  ///6，构建第二页：天气警告信息和温度
+  Widget _buildSecondPage(
+    WeatherWarningModel warningData,
+    CurrentTemperatureDataModel? tempLocationData,
+  ) {
+    return Column(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        // 温度显示
+        Text(
+          tempLocationData != null
+              ? '${tempLocationData.value}°${tempLocationData.unit}'
+              : '--°C',
+          style: TextStyle(
+            fontSize: 20,
+            fontWeight: FontWeight.bold,
+            color: Colors.blue[800],
+          ),
+        ),
+        const SizedBox(height: 8),
+        // 天气警告信息
+        Expanded(
+          child: WeatherWarningWidget(
+            warningData: warningData,
+            fontSize: 12.0,
+            textColor: const Color.fromARGB(255, 8, 12, 133),
+            iconSize: 14.0,
+            verticalSpacing: 4.0,
+          ),
         ),
       ],
     );

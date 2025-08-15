@@ -64,8 +64,8 @@ class EnhancedVideoPoolManager {
 
         // 验证控制器状态
         if (_isControllerValid(controller)) {
-          _logger.i(
-              '🔄 [增强视频池] 复用现有控制器: ${_getDisplayKey(videoType, filePath)} (池大小: ${_controllerPool.length}/${_maxPoolSize})');
+          // _logger.i(
+          //     '🔄 [增强视频池] 复用现有控制器: ${_getDisplayKey(videoType, filePath)} (池大小: ${_controllerPool.length}/${_maxPoolSize})');
           _isInUse[key] = true;
           _lastUsed[key] = DateTime.now();
 
@@ -74,8 +74,8 @@ class EnhancedVideoPoolManager {
           return controller;
         } else {
           // 控制器无效，重新创建
-          _logger.w(
-              '⚠️ [增强视频池] 控制器无效，重新创建: ${_getDisplayKey(videoType, filePath)}');
+          // _logger.w(
+          //     '⚠️ [增强视频池] 控制器无效，重新创建: ${_getDisplayKey(videoType, filePath)}');
           await _removeFromPool(key);
         }
       }
@@ -98,8 +98,8 @@ class EnhancedVideoPoolManager {
         _controllerPool[key] = controller;
         _isInUse[key] = true;
         _lastUsed[key] = DateTime.now();
-        _logger.i(
-            '✅ [增强视频池] 创建新控制器: ${_getDisplayKey(videoType, filePath)} (池大小: ${_controllerPool.length}/${_maxPoolSize})');
+        // _logger.i(
+        //     '✅ [增强视频池] 创建新控制器: ${_getDisplayKey(videoType, filePath)} (池大小: ${_controllerPool.length}/${_maxPoolSize})');
 
         // 定期打印池状态（每5个控制器打印一次）
         if (_controllerPool.length % 5 == 0) {
@@ -109,7 +109,7 @@ class EnhancedVideoPoolManager {
 
       return controller;
     } catch (e) {
-      _logger.e('❌ [增强视频池] 获取控制器失败: $e');
+      // _logger.e('❌ [增强视频池] 获取控制器失败: $e');
       return null;
     }
   }
@@ -126,8 +126,8 @@ class EnhancedVideoPoolManager {
       _isInUse[key] = false;
       _lastUsed[key] = DateTime.now();
 
-      _logger.d(
-          '📤 [增强视频池] 释放控制器: ${_getDisplayKey(videoType, filePath)} (保留在池中)');
+      // _logger.d(
+      //     '📤 [增强视频池] 释放控制器: ${_getDisplayKey(videoType, filePath)} (保留在池中)');
 
       // 暂停播放但保留控制器
       final controller = _controllerPool[key];
@@ -137,7 +137,7 @@ class EnhancedVideoPoolManager {
             await controller.pause();
           }
         } catch (e) {
-          _logger.w('⚠️ [增强视频池] 暂停控制器失败: $e');
+          // _logger.w('⚠️ [增强视频池] 暂停控制器失败: $e');
         }
       }
     }
@@ -149,8 +149,8 @@ class EnhancedVideoPoolManager {
     required List<String> fullAdVideos,
     bool isNetwork = false,
   }) async {
-    _logger.i(
-        '🔄 [增强视频池] 更新视频列表: 顶部${topAdVideos.length}个, 全屏${fullAdVideos.length}个');
+    // _logger.i(
+    //     '🔄 [增强视频池] 更新视频列表: 顶部${topAdVideos.length}个, 全屏${fullAdVideos.length}个');
 
     // 构建需要的控制器键集合
     final neededKeys = <String>{};
@@ -175,10 +175,10 @@ class EnhancedVideoPoolManager {
 
     for (final key in keysToRemove) {
       await _removeFromPool(key);
-      _logger.i('🗑️ [增强视频池] 移除不需要的控制器: $key');
+      // _logger.i('🗑️ [增强视频池] 移除不需要的控制器: $key');
     }
 
-    _logger.i('✅ [增强视频池] 列表更新完成，当前池大小: ${_controllerPool.length}');
+    // _logger.i('✅ [增强视频池] 列表更新完成，当前池大小: ${_controllerPool.length}');
   }
 
   ///5，创建新的视频控制器
@@ -201,7 +201,7 @@ class EnhancedVideoPoolManager {
       // 添加错误监听
       controller.addListener(() {
         if (controller.value.hasError) {
-          _logger.e('🔴 [增强视频池] 播放错误: ${controller.value.errorDescription}');
+          // _logger.e('🔴 [增强视频池] 播放错误: ${controller.value.errorDescription}');
           onError?.call();
         }
       });
@@ -218,7 +218,7 @@ class EnhancedVideoPoolManager {
 
       return controller;
     } catch (e) {
-      _logger.e('❌ [增强视频池] 创建控制器失败: $e');
+      // _logger.e('❌ [增强视频池] 创建控制器失败: $e');
       onError?.call();
       return null;
     }
@@ -236,8 +236,8 @@ class EnhancedVideoPoolManager {
         final wasPlaying = controller.value.isPlaying;
         final position = controller.value.position;
 
-        _logger.d(
-            '🔧 [增强视频池] 重置控制器 - 之前状态: 播放中=$wasPlaying, 位置=${position.inSeconds}s');
+        // _logger.d(
+        //     '🔧 [增强视频池] 重置控制器 - 之前状态: 播放中=$wasPlaying, 位置=${position.inSeconds}s');
 
         // 重置到开头
         await controller.seekTo(Duration.zero);
@@ -248,16 +248,16 @@ class EnhancedVideoPoolManager {
         // 根据需要播放或暂停
         if (autoPlay && !controller.value.isPlaying) {
           await controller.play();
-          _logger.d('🎬 [增强视频池] 开始播放复用的控制器');
+          // _logger.d('🎬 [增强视频池] 开始播放复用的控制器');
         } else if (!autoPlay && controller.value.isPlaying) {
           await controller.pause();
-          _logger.d('⏸️ [增强视频池] 暂停复用的控制器');
+          // _logger.d('⏸️ [增强视频池] 暂停复用的控制器');
         }
       } else {
-        _logger.w('⚠️ [增强视频池] 控制器未初始化，无法重置设置');
+        // _logger.w('⚠️ [增强视频池] 控制器未初始化，无法重置设置');
       }
     } catch (e) {
-      _logger.w('⚠️ [增强视频池] 重置控制器设置失败: $e');
+      // _logger.w('⚠️ [增强视频池] 重置控制器设置失败: $e');
     }
   }
 
@@ -270,13 +270,13 @@ class EnhancedVideoPoolManager {
           controller.value.isInitialized && !controller.value.hasError;
 
       if (!isValid) {
-        _logger.w(
-            '⚠️ [增强视频池] 控制器验证失败 - 已初始化: ${controller.value.isInitialized}, 有错误: ${controller.value.hasError}');
+        // _logger.w(
+        //     '⚠️ [增强视频池] 控制器验证失败 - 已初始化: ${controller.value.isInitialized}, 有错误: ${controller.value.hasError}');
       }
 
       return isValid;
     } catch (e) {
-      _logger.w('⚠️ [增强视频池] 控制器验证异常: $e');
+      // _logger.w('⚠️ [增强视频池] 控制器验证异常: $e');
       return false;
     }
   }
@@ -305,13 +305,13 @@ class EnhancedVideoPoolManager {
       }
     }
 
-    _logger
-        .d('🔧 [增强视频池] 维护检查: 总数${_controllerPool.length}, 未使用${unusedCount}');
+    // _logger
+    //     .d('🔧 [增强视频池] 维护检查: 总数${_controllerPool.length}, 未使用${unusedCount}');
 
     // 只有在池满且有很多未使用的控制器时才考虑清理
     if (_controllerPool.length >= _maxPoolSize &&
         unusedCount > _maxPoolSize ~/ 2) {
-      _logger.i('💡 [增强视频池] 池接近满载，可能需要清理一些长期未使用的控制器');
+      // _logger.i('💡 [增强视频池] 池接近满载，可能需要清理一些长期未使用的控制器');
     }
   }
 
@@ -332,7 +332,7 @@ class EnhancedVideoPoolManager {
     }
 
     if (oldestKey != null) {
-      _logger.i('🗑️ [增强视频池] 池满，淘汰最老的未使用控制器: $oldestKey');
+      // _logger.i('🗑️ [增强视频池] 池满，淘汰最老的未使用控制器: $oldestKey');
       await _removeFromPool(oldestKey);
     }
   }
@@ -355,9 +355,9 @@ class EnhancedVideoPoolManager {
 
         // 释放资源
         controller.dispose();
-        _logger.d('🗑️ [增强视频池] 控制器已释放: $key');
+        // _logger.d('🗑️ [增强视频池] 控制器已释放: $key');
       } catch (e) {
-        _logger.e('❌ [增强视频池] 释放控制器失败: $e');
+        // _logger.e('❌ [增强视频池] 释放控制器失败: $e');
       }
     }
   }
@@ -385,21 +385,21 @@ class EnhancedVideoPoolManager {
   }) async {
     final key = _generateKey(filePath, videoType, isNetwork);
     if (_controllerPool.containsKey(key)) {
-      _logger.i('🗑️ [增强视频池] 强制移除控制器: ${_getDisplayKey(videoType, filePath)}');
+      // _logger.i('🗑️ [增强视频池] 强制移除控制器: ${_getDisplayKey(videoType, filePath)}');
       await _removeFromPool(key);
     }
   }
 
   ///15，清空整个池
   Future<void> clearPool() async {
-    _logger.i('🧹 [增强视频池] 开始清空整个控制器池');
+    // _logger.i('🧹 [增强视频池] 开始清空整个控制器池');
 
     final keys = List.from(_controllerPool.keys);
     for (final key in keys) {
       await _removeFromPool(key);
     }
 
-    _logger.i('✅ [增强视频池] 控制器池已完全清空');
+    // _logger.i('✅ [增强视频池] 控制器池已完全清空');
   }
 
   ///16，销毁管理器
@@ -407,12 +407,12 @@ class EnhancedVideoPoolManager {
     _cleanupTimer?.cancel();
     await clearPool();
     _instance = null;
-    _logger.i('🗑️ [增强视频池] 管理器已销毁');
+    // _logger.i('🗑️ [增强视频池] 管理器已销毁');
   }
 
   ///17，打印当前池的详细状态（调试用）
   void debugPrintPoolStatus() {
-    _logger.i('🔍 [增强视频池] 当前池状态:');
+    // _logger.i('🔍 [增强视频池] 当前池状态:');
     _logger.i('📊 池大小: ${_controllerPool.length}/${_maxPoolSize}');
 
     if (_controllerPool.isEmpty) {

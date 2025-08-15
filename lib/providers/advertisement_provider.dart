@@ -10,17 +10,32 @@ import 'package:path_provider/path_provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:convert';
 import 'package:iboard_app/utils/enhanced_video_pool_manager.dart';
+import 'package:iboard_app/providers/top_ad_carousel_provider.dart';
+import 'package:iboard_app/providers/fullscreen_ad_provider.dart';
 
 class AdvertisementProvider extends ChangeNotifier {
   final Logger _logger = Logger();
   // 原始广告数据缓存key
   static const String _advertisementsDataKey = 'advertisements_data';
+  // 顶部广告轮播数据缓存key
+  static const String _topCarouselAdvertisementsKey =
+      'top_carousel_advertisements';
+  // 全屏广告轮播数据缓存key
+  static const String _fullCarouselAdvertisementsKey =
+      'full_carousel_advertisements';
+
   final ApiClient _apiClient;
   final AppDataProvider _appDataProvider;
   final FileManager _fileManager;
   final EnhancedVideoPoolManager _videoPoolManager = EnhancedVideoPoolManager();
 
+  // 轮播Provider引用
+  TopAdCarouselProvider? _topAdCarouselProvider;
+  FullscreenAdProvider? _fullscreenAdProvider;
+
   List<AdModel> _advertisements = [];
+  List<AdModel> _topCarouselAdvertisements = []; // 顶部广告轮播列表（后台排序）
+  List<AdModel> _fullCarouselAdvertisements = []; // 全屏广告轮播列表（后台排序）
   bool _isLoading = false;
   String? _error;
   Timer? _updateTimer; // 定时更新定时器
@@ -38,6 +53,10 @@ class AdvertisementProvider extends ChangeNotifier {
           ad.display == AdDisplayType.full ||
           ad.display == AdDisplayType.topfull)
       .toList();
+  // 新增轮播广告获取器
+  List<AdModel> get topCarouselAdvertisements => _topCarouselAdvertisements;
+  List<AdModel> get fullCarouselAdvertisements => _fullCarouselAdvertisements;
+
   bool get isLoading => _isLoading;
   String? get error => _error;
   bool get isPeriodicUpdateActive => _isPeriodicUpdateActive;
@@ -47,6 +66,7 @@ class AdvertisementProvider extends ChangeNotifier {
       this._apiClient, this._appDataProvider, this._fileManager) {
     _logger.i('AdvertisementProvider initialized.');
     _loadAdvertisementsFromCache(); // 启动时从缓存加载数据
+    _loadCarouselAdvertisementsFromCache(); // 加载轮播广告数据
 
     // 延迟检查AppDataProvider登录状态，确保初始化完成
     Future.delayed(const Duration(milliseconds: 100), () {
@@ -57,6 +77,16 @@ class AdvertisementProvider extends ChangeNotifier {
         _logger.w('AppDataProvider未登录，跳过自动启动广告定时更新');
       }
     });
+  }
+
+  ///11，设置轮播Provider引用
+  void setCarouselProviders({
+    required TopAdCarouselProvider topAdCarouselProvider,
+    required FullscreenAdProvider fullscreenAdProvider,
+  }) {
+    _topAdCarouselProvider = topAdCarouselProvider;
+    _fullscreenAdProvider = fullscreenAdProvider;
+    _logger.i('设置广告轮播Provider引用');
   }
 
   ///1，保存广告数据到SharedPreferences缓存
@@ -73,7 +103,37 @@ class AdvertisementProvider extends ChangeNotifier {
     }
   }
 
-  ///2，从SharedPreferences缓存加载广告数据
+  ///2，保存顶部广告轮播数据到缓存
+  Future<void> _saveTopCarouselAdvertisementsToCache(
+      List<AdModel> advertisements) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final List<Map<String, dynamic>> adsJson =
+          advertisements.map((ad) => ad.toJson()).toList();
+      final jsonString = json.encode(adsJson);
+      await prefs.setString(_topCarouselAdvertisementsKey, jsonString);
+      // _logger.i('💾 顶部广告轮播数据已保存到缓存: ${advertisements.length}个广告');
+    } catch (e) {
+      _logger.e('保存顶部广告轮播数据到缓存失败', error: e);
+    }
+  }
+
+  ///3，保存全屏广告轮播数据到缓存
+  Future<void> _saveFullCarouselAdvertisementsToCache(
+      List<AdModel> advertisements) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final List<Map<String, dynamic>> adsJson =
+          advertisements.map((ad) => ad.toJson()).toList();
+      final jsonString = json.encode(adsJson);
+      await prefs.setString(_fullCarouselAdvertisementsKey, jsonString);
+      _logger.i('💾 全屏广告轮播数据已保存到缓存: ${advertisements.length}个广告');
+    } catch (e) {
+      _logger.e('保存全屏广告轮播数据到缓存失败', error: e);
+    }
+  }
+
+  ///4，从SharedPreferences缓存加载广告数据
   Future<void> _loadAdvertisementsFromCache() async {
     try {
       final prefs = await SharedPreferences.getInstance();
@@ -95,11 +155,63 @@ class AdvertisementProvider extends ChangeNotifier {
     }
   }
 
-  ///3，清除广告数据缓存
+  ///5，从缓存加载顶部广告轮播数据
+  Future<void> _loadTopCarouselAdvertisementsFromCache() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final jsonString = prefs.getString(_topCarouselAdvertisementsKey);
+      if (jsonString != null && jsonString.isNotEmpty) {
+        final List<dynamic> adsJson = json.decode(jsonString) as List<dynamic>;
+        final List<AdModel> cachedAds = adsJson
+            .map((adJson) => AdModel.fromJson(adJson as Map<String, dynamic>))
+            .toList();
+
+        _topCarouselAdvertisements = cachedAds;
+        // _logger.i('📂 从缓存加载顶部广告轮播数据成功: ${cachedAds.length}个广告');
+        notifyListeners();
+      } else {
+        // _logger.w('缓存中没有找到顶部广告轮播数据');
+      }
+    } catch (e) {
+      // _logger.e('从缓存加载顶部广告轮播数据失败', error: e);
+    }
+  }
+
+  ///6，从缓存加载全屏广告轮播数据
+  Future<void> _loadFullCarouselAdvertisementsFromCache() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final jsonString = prefs.getString(_fullCarouselAdvertisementsKey);
+      if (jsonString != null && jsonString.isNotEmpty) {
+        final List<dynamic> adsJson = json.decode(jsonString) as List<dynamic>;
+        final List<AdModel> cachedAds = adsJson
+            .map((adJson) => AdModel.fromJson(adJson as Map<String, dynamic>))
+            .toList();
+
+        _fullCarouselAdvertisements = cachedAds;
+        _logger.i('📂 从缓存加载全屏广告轮播数据成功: ${cachedAds.length}个广告');
+        notifyListeners();
+      } else {
+        _logger.w('缓存中没有找到全屏广告轮播数据');
+      }
+    } catch (e) {
+      _logger.e('从缓存加载全屏广告轮播数据失败', error: e);
+    }
+  }
+
+  ///7，加载所有轮播广告数据
+  Future<void> _loadCarouselAdvertisementsFromCache() async {
+    await _loadTopCarouselAdvertisementsFromCache();
+    await _loadFullCarouselAdvertisementsFromCache();
+  }
+
+  ///8，清除广告数据缓存
   Future<void> _clearAdvertisementsCache() async {
     try {
       final prefs = await SharedPreferences.getInstance();
       await prefs.remove(_advertisementsDataKey);
+      await prefs.remove(_topCarouselAdvertisementsKey);
+      await prefs.remove(_fullCarouselAdvertisementsKey);
       _logger.i('广告数据缓存已清除');
     } catch (e) {
       _logger.e('清除广告数据缓存失败', error: e);
@@ -203,6 +315,7 @@ class AdvertisementProvider extends ChangeNotifier {
 
     // 重新加载缓存数据
     _loadAdvertisementsFromCache();
+    _loadCarouselAdvertisementsFromCache(); // 重新加载轮播广告
 
     // 如果AppDataProvider已登录，重新启动定时更新
     Future.delayed(const Duration(milliseconds: 100), () {
@@ -437,31 +550,71 @@ class AdvertisementProvider extends ChangeNotifier {
 
     try {
       _logger.i('Fetching advertisements from building...');
-      // Using getAdvertisementsBuilding as per httpapi.json for general advertisements
-      final responseData = await _apiClient.getAdvertisementsBuilding();
 
-      if (responseData.containsKey('data') && responseData['data'] is List) {
-        final List<dynamic> advertisementListJson = responseData['data'];
-        final List<AdModel> newAdvertisements = advertisementListJson
+      // 并行获取所有轮播数据
+      final List<Future> futures = [
+        _apiClient.getCarouselTopAdvertisements(),
+        _apiClient.getCarouselFullAdvertisements(),
+        _apiClient.getAdvertisementsBuilding(), // 保留原有的广告接口作为备用
+      ];
+
+      final List results = await Future.wait(futures);
+
+      // 处理顶部广告轮播数据
+      final List<Map<String, dynamic>> topCarouselData =
+          results[0] as List<Map<String, dynamic>>;
+      final List<AdModel> newTopCarouselAds = topCarouselData
+          .map((jsonItem) => AdModel.fromJson(jsonItem))
+          .toList();
+
+      // 处理全屏广告轮播数据
+      final List<Map<String, dynamic>> fullCarouselData =
+          results[1] as List<Map<String, dynamic>>;
+      final List<AdModel> newFullCarouselAds = fullCarouselData
+          .map((jsonItem) => AdModel.fromJson(jsonItem))
+          .toList();
+
+      // 处理原有广告数据（作为备用）
+      final Map<String, dynamic> advertisementData =
+          results[2] as Map<String, dynamic>;
+      final List<AdModel> newAdvertisements = [];
+      if (advertisementData.containsKey('data') &&
+          advertisementData['data'] is List) {
+        final List<dynamic> advertisementListJson =
+            advertisementData['data'] as List<dynamic>;
+        newAdvertisements.addAll(advertisementListJson
             .map((jsonItem) =>
                 AdModel.fromJson(jsonItem as Map<String, dynamic>))
-            .toList();
-
-        _logger.i(
-            'Successfully fetched ${newAdvertisements.length} advertisements from API.');
-
-        // 使用智能对比更新广告列表
-        await _smartUpdateAdvertisements(newAdvertisements);
-
-        _logger.i(
-            'Advertisement update completed. Total: ${_advertisements.length}, Top ads: ${topAdvertisements.length}, Full ads: ${fullAdvertisements.length}');
-        _error = null; // 成功时清除错误
-      } else {
-        _logger.w(
-            'Fetched advertisements data is not in the expected format: $responseData');
-        // 不清除现有数据，保持现状
-        _error = "Failed to parse advertisements data.";
+            .toList());
       }
+
+      _logger.i(
+          'Successfully fetched data: ${newTopCarouselAds.length} top carousel ads, ${newFullCarouselAds.length} full carousel ads, ${newAdvertisements.length} general ads');
+
+      // 更新轮播广告列表（后台已排序）
+      _topCarouselAdvertisements = List<AdModel>.from(newTopCarouselAds);
+      _fullCarouselAdvertisements = List<AdModel>.from(newFullCarouselAds);
+
+      // 保存轮播广告数据到缓存
+      await _saveTopCarouselAdvertisementsToCache(_topCarouselAdvertisements);
+      await _saveFullCarouselAdvertisementsToCache(_fullCarouselAdvertisements);
+
+      // 通知轮播Provider更新数据
+      if (_topAdCarouselProvider != null) {
+        _topAdCarouselProvider!.updateCarouselList(_topCarouselAdvertisements);
+      }
+      if (_fullscreenAdProvider != null) {
+        _fullscreenAdProvider!.updateCarouselList(_fullCarouselAdvertisements);
+      }
+
+      // 更新原有广告列表（保持兼容性）
+      if (newAdvertisements.isNotEmpty) {
+        await _smartUpdateAdvertisements(newAdvertisements);
+      }
+
+      _logger.i(
+          'Advertisement update completed. Top carousel: ${_topCarouselAdvertisements.length}, Full carousel: ${_fullCarouselAdvertisements.length}, General: ${_advertisements.length}');
+      _error = null; // 成功时清除错误
     } on ApiException catch (e) {
       _logger.e('Failed to fetch advertisements (ApiException)',
           error: e, stackTrace: e.errorData is StackTrace ? e.errorData : null);
@@ -528,7 +681,7 @@ class AdvertisementProvider extends ChangeNotifier {
 
       // 发生任何错误时都不清除现有数据，保持现状让轮播继续
       _logger.i(
-          '错误处理完成，保持现有广告数据: ${_advertisements.length}个广告，${topAdvertisements.length}个顶部广告，${fullAdvertisements.length}个全屏广告');
+          '错误处理完成，保持现有广告数据: ${_advertisements.length}个广告，${_topCarouselAdvertisements.length}个顶部轮播广告，${_fullCarouselAdvertisements.length}个全屏轮播广告');
     } finally {
       _isLoading = false;
       notifyListeners();

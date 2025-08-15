@@ -6,7 +6,9 @@ import 'package:iboard_app/providers/state_provider.dart';
 import 'package:iboard_app/providers/top_ad_carousel_provider.dart';
 import 'package:iboard_app/widgets/carousel_widget.dart';
 import 'package:iboard_app/widgets/debug_timer_widget.dart';
+import 'package:iboard_app/widgets/debug_update_time_widget.dart'; // 导入调试窗口
 import 'package:provider/provider.dart';
+import 'package:flutter/foundation.dart'; // 导入kDebugMode
 
 class TimeSettingsPage extends StatefulWidget {
   const TimeSettingsPage({Key? key}) : super(key: key);
@@ -269,6 +271,31 @@ class _TimeSettingsPageState extends State<TimeSettingsPage> {
                                       '通告停留时长',
                                       '${deviceSettings.noticeStayDuration}秒',
                                     ),
+                                    SizedBox(height: 12),
+                                    _buildTimeSettingRow(
+                                      '应用更新时间',
+                                      '${deviceSettings.appUpdateDuration}秒',
+                                    ),
+                                    SizedBox(height: 12),
+                                    _buildTimeSettingRow(
+                                      '底部轮播时间',
+                                      '${deviceSettings.bottomCarouselDuration}秒',
+                                    ),
+                                    SizedBox(height: 12),
+                                    _buildTimeSettingRow(
+                                      '付款表格一页显示时间',
+                                      '${deviceSettings.paymentTableOnePageDuration}秒',
+                                    ),
+                                    SizedBox(height: 12),
+                                    _buildTimeSettingRow(
+                                      '正常到通告轮播转换时间',
+                                      '${deviceSettings.normalToAnnouncementCarouselDuration}秒',
+                                    ),
+                                    SizedBox(height: 12),
+                                    _buildTimeSettingRow(
+                                      '通告轮播到全屏广告转换时间',
+                                      '${deviceSettings.announcementCarouselToFullAdsCarouselDuration}秒',
+                                    ),
                                   ],
                                 ),
                               ),
@@ -312,6 +339,46 @@ class _TimeSettingsPageState extends State<TimeSettingsPage> {
                         ),
                       ),
                     ),
+
+                    // 在debug模式下显示定时更新调试窗口
+                    if (kDebugMode) ...[
+                      SizedBox(height: 24),
+                      Container(
+                        width: double.infinity,
+                        padding: EdgeInsets.all(24),
+                        decoration: BoxDecoration(
+                          color: Colors.blue.shade50,
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(color: Colors.blue.shade200),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: [
+                                Icon(
+                                  Icons.bug_report,
+                                  color: Colors.blue.shade600,
+                                  size: 24,
+                                ),
+                                SizedBox(width: 16),
+                                Text(
+                                  '定时更新调试信息',
+                                  style: TextStyle(
+                                    fontSize: 18,
+                                    fontWeight: FontWeight.bold,
+                                    color: Colors.blue.shade700,
+                                  ),
+                                ),
+                              ],
+                            ),
+                            SizedBox(height: 16),
+                            // 调试窗口
+                            const DebugUpdateTimeWidget(),
+                          ],
+                        ),
+                      ),
+                    ],
                   ],
                 ),
               ),

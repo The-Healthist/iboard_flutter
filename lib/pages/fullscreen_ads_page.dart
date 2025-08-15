@@ -13,10 +13,67 @@ class FullscreenAdsPage extends StatefulWidget {
 
 class _FullscreenAdsPageState extends State<FullscreenAdsPage> {
   final Logger _logger = Logger();
+  bool _hasInitialized = false;
 
   @override
   void initState() {
     super.initState();
+    _logger.i('🎬 全屏广告页面初始化');
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+
+    // 只在第一次依赖变化时初始化，避免重复调用
+    if (!_hasInitialized) {
+      _hasInitialized = true;
+
+      // 延迟执行，确保所有Provider都已准备好
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) {
+          _initializeFullscreenAds();
+        }
+      });
+    }
+  }
+
+  ///1，初始化全屏广告数据
+  void _initializeFullscreenAds() {
+    try {
+      final advertisementProvider = context.read<AdvertisementProvider>();
+      final fullscreenAdProvider = context.read<FullscreenAdProvider>();
+
+      final fullAds = advertisementProvider.fullCarouselAdvertisements;
+
+      if (fullAds.isNotEmpty) {
+        _logger.i('🎬 初始化全屏广告数据: ${fullAds.length}个广告');
+        fullscreenAdProvider.updateFullscreenAds(fullAds);
+      } else {
+        _logger.w('⚠️ 没有可用的全屏广告数据');
+      }
+    } catch (e) {
+      _logger.e('❌ 初始化全屏广告失败: $e');
+    }
+  }
+
+  ///2，检查并更新全屏广告数据（当数据发生变化时）
+  void _checkAndUpdateFullscreenAds() {
+    try {
+      final advertisementProvider = context.read<AdvertisementProvider>();
+      final fullscreenAdProvider = context.read<FullscreenAdProvider>();
+
+      final fullAds = advertisementProvider.fullCarouselAdvertisements;
+
+      // 只有当数据真正发生变化时才更新
+      if (fullAds.isNotEmpty &&
+          fullAds.length != fullscreenAdProvider.fullscreenAds.length) {
+        _logger.i('🔄 检测到全屏广告数据变化，更新中: ${fullAds.length}个广告');
+        fullscreenAdProvider.updateFullscreenAds(fullAds);
+      }
+    } catch (e) {
+      _logger.e('❌ 检查全屏广告数据变化失败: $e');
+    }
   }
 
   @override
@@ -24,7 +81,9 @@ class _FullscreenAdsPageState extends State<FullscreenAdsPage> {
     return Scaffold(
       body: Consumer2<AdvertisementProvider, FullscreenAdProvider>(
         builder: (context, advertisementProvider, fullscreenAdProvider, child) {
-          final fullAds = advertisementProvider.fullAdvertisements;
+          final fullAds = advertisementProvider.fullCarouselAdvertisements;
+
+          // 数据变化监听已在Provider中处理，这里不需要重复检查
 
           // 检查是否有错误
           if (advertisementProvider.error != null) {
@@ -57,12 +116,7 @@ class _FullscreenAdsPageState extends State<FullscreenAdsPage> {
             return _buildDefaultFullscreenAd();
           }
 
-          // 确保Provider有最新的广告数据 - 延迟到构建完成后执行避免setState错误
-          WidgetsBinding.instance.addPostFrameCallback((_) {
-            if (mounted) {
-              fullscreenAdProvider.updateFullscreenAds(fullAds);
-            }
-          });
+          // 数据初始化已在didChangeDependencies中处理，这里不需要重复调用
 
           // 如果Provider处于活跃状态并且有当前广告Widget，显示它
           if (fullscreenAdProvider.isActive) {

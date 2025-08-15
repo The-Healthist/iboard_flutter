@@ -8,6 +8,9 @@ import 'package:iboard_app/pages/mainscreen_page.dart';
 import 'package:iboard_app/providers/announcement_provider.dart';
 import 'package:iboard_app/providers/state_provider.dart'; // Added import for CarouselStateProvider
 import 'package:iboard_app/providers/announcement_carousel_provider.dart'; // Added import for AnnouncementCarouselProvider
+import 'package:iboard_app/providers/advertisement_provider.dart'; // Added import for AdvertisementProvider
+import 'package:iboard_app/providers/top_ad_carousel_provider.dart'; // Added import for TopAdCarouselProvider
+import 'package:iboard_app/providers/fullscreen_ad_provider.dart'; // Added import for FullscreenAdProvider
 
 import 'package:provider/provider.dart';
 
@@ -52,15 +55,28 @@ class _MainPageState extends State<MainPage> {
       closeAdsDialog();
     });
 
-    // 設置通告轮播下一个回调 - 這個功能現在由mainscreen_page.dart處理
-    // carouselProvider.setNoticeCarouselNextCallback(() {
-    //   // 通告轮播下一个的逻辑会由mainscreen_page.dart处理
-    // });
-
-    // 啟動通告輪播系統（可選，如果需要集成state_provider的輪播）
-    // carouselProvider.startNoticeCarousel();
-
     carouselProvider.resetToDefault(); // 使用resetToDefault確保計時器正確啟動
+
+    // 设置Provider之间的引用关系
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        final announcementProvider = context.read<AnnouncementProvider>();
+        final advertisementProvider = context.read<AdvertisementProvider>();
+        final announcementCarouselProvider =
+            context.read<AnnouncementCarouselProvider>();
+        final topAdCarouselProvider = context.read<TopAdCarouselProvider>();
+        final fullscreenAdProvider = context.read<FullscreenAdProvider>();
+
+        // 设置通告轮播Provider引用
+        announcementProvider.setCarouselProvider(announcementCarouselProvider);
+
+        // 设置广告轮播Provider引用
+        advertisementProvider.setCarouselProviders(
+          topAdCarouselProvider: topAdCarouselProvider,
+          fullscreenAdProvider: fullscreenAdProvider,
+        );
+      }
+    });
   }
 
   //2， Method to show FullscreenAdsPage in a dialog
@@ -97,7 +113,6 @@ class _MainPageState extends State<MainPage> {
       // Dialog closed - 重置狀態並觸發狀態轉換到手動操作狀態
       setState(() {
         _isAdsDialogOpen = false;
-        print('11111111111111 我关闭了全屏广告弹窗哦');
       });
 
       // 關閉全屏廣告彈窗後，自動切換到手動操作狀態
@@ -106,7 +121,6 @@ class _MainPageState extends State<MainPage> {
           final carouselProvider = context.read<CarouselStateProvider>();
           // 檢查當前是否在全屏廣告狀態，如果是則切換到手動操作狀態
           if (carouselProvider.currentAppState == AppState.fullscreenAd) {
-            print('🔄 全屏廣告彈窗關閉，自動切換到手動操作狀態');
             carouselProvider.enterManualOperation();
 
             // 通知通告轮播提供者回到主屏幕
@@ -153,7 +167,8 @@ class _MainPageState extends State<MainPage> {
   Widget build(BuildContext context) {
     // Listen to AnnouncementProvider for changes
     final announcementProvider = context.watch<AnnouncementProvider>();
-    final currentAnnouncements = announcementProvider.announcements;
+    final currentAnnouncements =
+        announcementProvider.carouselAnnouncements; // 使用轮播通告数据
 
     // If announcements have changed, re-initialize the mid widgets
     if (_previousAnnouncementsForBuild == null ||

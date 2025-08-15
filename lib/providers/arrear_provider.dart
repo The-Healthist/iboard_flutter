@@ -209,20 +209,16 @@ class ArrearProvider extends ChangeNotifier {
 
   ///4a, 健壮的楼层和单位解析方法
   Map<String, String> _parseFloorAndUnit(String unitString) {
-    _logger.i('🔍 [解析楼层单位] 开始解析: "$unitString"');
-
     // 尝试多种分割方式
     List<String> parts = [];
 
     // 方式1: 两个空格分割 (例如: "02樓  B")
     if (unitString.contains('  ')) {
       parts = unitString.split('  ');
-      _logger.i('🔍 [解析楼层单位] 使用两个空格分割: $parts');
     }
     // 方式2: 一个空格分割 (例如: "G楼 01")
     else if (unitString.contains(' ')) {
       parts = unitString.split(' ');
-      _logger.i('🔍 [解析楼层单位] 使用一个空格分割: $parts');
     }
     // 方式3: 查找"樓"字作为分隔符 (例如: "G楼01")
     else if (unitString.contains('樓')) {
@@ -231,7 +227,6 @@ class ArrearProvider extends ChangeNotifier {
         final floor = unitString.substring(0, floorIndex + 1);
         final unit = unitString.substring(floorIndex + 1);
         parts = [floor, unit];
-        _logger.i('🔍 [解析楼层单位] 使用"樓"字分割: $parts');
       }
     }
     // 方式4: 查找数字作为分隔符 (例如: "G楼01")
@@ -249,17 +244,14 @@ class ArrearProvider extends ChangeNotifier {
         final floor = unitString.substring(0, firstDigitIndex);
         final unit = unitString.substring(firstDigitIndex);
         parts = [floor, unit];
-        _logger.i('🔍 [解析楼层单位] 使用数字分割: $parts');
       }
     }
 
     if (parts.length >= 2) {
       final floor = parts[0].trim();
       final unit = parts[1].trim();
-      _logger.i('🔍 [解析楼层单位] 解析结果 - 楼层: "$floor", 单位: "$unit"');
       return {'floor': floor, 'unit': unit};
     } else {
-      _logger.w('⚠️ [解析楼层单位] 无法解析: "$unitString", 分割结果: $parts');
       return {'floor': '', 'unit': ''};
     }
   }

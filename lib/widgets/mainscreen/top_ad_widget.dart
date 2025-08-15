@@ -145,7 +145,7 @@ class _TopAdWidgetState extends State<TopAdWidget> {
         setState(() {
           _isLoading = false;
         });
-        _logger.i('✅ 顶部广告视频初始化成功（使用增强视频池）');
+        // _logger.i('✅ 顶部广告视频初始化成功（使用增强视频池）');
       } else if (mounted) {
         setState(() {
           _error = 'Could not initialize video player.';
@@ -282,12 +282,12 @@ class _TopAdWidgetState extends State<TopAdWidget> {
 
   //5，构建内容部分
   Widget _buildContent() {
-    if (_isLoading) {
-      return const Center(child: CircularProgressIndicator());
-    }
+    Widget contentWidget;
 
-    if (_error != null) {
-      return Center(
+    if (_isLoading) {
+      contentWidget = const Center(child: CircularProgressIndicator());
+    } else if (_error != null) {
+      contentWidget = Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
@@ -301,60 +301,61 @@ class _TopAdWidgetState extends State<TopAdWidget> {
           ],
         ),
       );
-    }
-
-    if (_localFilePath == null) {
+    } else if (_localFilePath == null) {
       // This case should ideally be covered by _error, but as a fallback:
-      return const Center(child: Text('Ad file not available.'));
-    }
+      contentWidget = const Center(child: Text('Ad file not available.'));
+    } else {
+      final mimeType = widget.ad.file.mimeType.toLowerCase();
 
-    final mimeType = widget.ad.file.mimeType.toLowerCase();
-
-    if (mimeType == 'video/mp4') {
-      if (_videoController != null && _videoController!.value.isInitialized) {
-        return SizedBox.expand(
-          child: FittedBox(
-            fit: BoxFit.cover,
-            child: SizedBox(
-              width: _videoController!.value.size.width,
-              height: _videoController!.value.size.height,
-              child: VideoPlayer(_videoController!),
+      if (mimeType == 'video/mp4') {
+        if (_videoController != null && _videoController!.value.isInitialized) {
+          contentWidget = SizedBox.expand(
+            child: FittedBox(
+              fit: BoxFit.cover,
+              child: SizedBox(
+                width: _videoController!.value.size.width,
+                height: _videoController!.value.size.height,
+                child: VideoPlayer(_videoController!),
+              ),
             ),
-          ),
+          );
+        } else {
+          // Video is still initializing or failed (though _error should catch failure)
+          contentWidget = const Center(child: CircularProgressIndicator());
+        }
+      } else if (mimeType == 'image/jpeg' ||
+          mimeType == 'image/jpg' ||
+          mimeType == 'image/png' ||
+          mimeType == 'image/gif') {
+        contentWidget = Image.file(
+          File(_localFilePath!),
+          fit: BoxFit.cover, // 改为 cover 让图片填满容器
+          width: double.infinity,
+          height: double.infinity,
+          errorBuilder: (context, error, stackTrace) {
+            _logger.e('Error displaying ad image',
+                error: error, stackTrace: stackTrace);
+            // Attempt to show a more specific error if this happens after initial load
+            // This might be redundant if _loadFile already set an error.
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+              if (mounted && _error == null) {
+                // Check if an error isn't already displayed
+                setState(() {
+                  _error = 'Could not display ad image.';
+                });
+              }
+            });
+            return Center(child: Text('Could not display ad image.'));
+          },
         );
       } else {
-        // Video is still initializing or failed (though _error should catch failure)
-        return const Center(child: CircularProgressIndicator());
+        // This case should be caught by _loadFile and set _error.
+        // If somehow reached, display the unsupported message.
+        contentWidget =
+            Center(child: Text('Unsupported ad file type: $mimeType'));
       }
-    } else if (mimeType == 'image/jpeg' ||
-        mimeType == 'image/jpg' ||
-        mimeType == 'image/png' ||
-        mimeType == 'image/gif') {
-      return Image.file(
-        File(_localFilePath!),
-        fit: BoxFit.cover, // 改为 cover 让图片填满容器
-        width: double.infinity,
-        height: double.infinity,
-        errorBuilder: (context, error, stackTrace) {
-          _logger.e('Error displaying ad image',
-              error: error, stackTrace: stackTrace);
-          // Attempt to show a more specific error if this happens after initial load
-          // This might be redundant if _loadFile already set an error.
-          WidgetsBinding.instance.addPostFrameCallback((_) {
-            if (mounted && _error == null) {
-              // Check if an error isn't already displayed
-              setState(() {
-                _error = 'Could not display ad image.';
-              });
-            }
-          });
-          return Center(child: Text('Could not display ad image.'));
-        },
-      );
-    } else {
-      // This case should be caught by _loadFile and set _error.
-      // If somehow reached, display the unsupported message.
-      return Center(child: Text('Unsupported ad file type: $mimeType'));
     }
+
+    return contentWidget;
   }
 }

@@ -8,6 +8,7 @@ import 'package:iboard_app/providers/state_provider.dart'; // Added CarouselStat
 import 'package:iboard_app/providers/top_ad_carousel_provider.dart'; // Added TopAdCarouselProvider import
 import 'package:iboard_app/providers/fullscreen_ad_provider.dart';
 import 'package:iboard_app/providers/bottom_weather_qrcode_carousel_provider.dart';
+import 'package:iboard_app/providers/rthk_news_provider.dart';
 import 'package:iboard_app/managers/file_manager.dart';
 import 'package:iboard_app/utils/device_id_util.dart';
 
@@ -90,6 +91,13 @@ void main() {
                   Provider.of<AppDataProvider>(context, listen: false);
               bottomProvider.setAppDataProvider(appDataProvider);
               return bottomProvider;
+            },
+          ),
+          ChangeNotifierProvider<RthkNewsProvider>(
+            create: (context) {
+              final appDataProvider =
+                  Provider.of<AppDataProvider>(context, listen: false);
+              return RthkNewsProvider(appDataProvider.apiClient);
             },
           ),
           ChangeNotifierProvider<ArrearProvider>(

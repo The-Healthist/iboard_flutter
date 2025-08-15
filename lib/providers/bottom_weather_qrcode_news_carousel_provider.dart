@@ -2,13 +2,15 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:logger/logger.dart';
 import 'package:iboard_app/providers/app_data_provider.dart';
+import 'package:iboard_app/models/news_announcement_model.dart';
+import 'package:iboard_app/providers/news_announcement_provider.dart';
 
 /// 轮播状态枚举
-enum CarouselState { weather, qrcode }
+enum CarouselState { weather, qrcode, news }
 
-/// 底部天气和二维码轮播Provider
-/// 负责管理底部右侧天气预报和二维码的轮播逻辑
-class BottomWeatherQrcodeCarouselProvider extends ChangeNotifier {
+/// 底部天气、二维码和新闻公报轮播Provider
+/// 负责管理底部右侧天气预报、二维码和新闻公报的轮播逻辑
+class BottomWeatherQrcodeNewsCarouselProvider extends ChangeNotifier {
   final Logger _logger = Logger();
 
   // 定时器管理
@@ -17,6 +19,9 @@ class BottomWeatherQrcodeCarouselProvider extends ChangeNotifier {
 
   // AppDataProvider引用 - 用于获取动态设置
   AppDataProvider? _appDataProvider;
+
+  // NewsAnnouncementProvider引用 - 用于获取新闻数据
+  NewsAnnouncementProvider? _newsProvider;
 
   // 状态管理
   bool _isBottomCarouselPaused = false;
@@ -34,24 +39,34 @@ class BottomWeatherQrcodeCarouselProvider extends ChangeNotifier {
   Duration _bottomDuration =
       const Duration(seconds: _defaultCarouselInterval); // 底部轮播总时长
 
+  // 新闻轮播索引
+  int _currentNewsIndex = 0;
+
   // Getters
   bool get isBottomCarouselPaused => _isBottomCarouselPaused;
   CarouselState get currentState => _currentState;
   Duration get bottomDuration => _bottomDuration;
   DateTime? get currentBottomStartTime => _currentBottomStartTime;
   Duration get bottomElapsedTime => _bottomElapsedTime;
+  int get currentNewsIndex => _currentNewsIndex;
 
   // 便捷getter
   bool get showWeather => _currentState == CarouselState.weather;
   bool get showQrcode => _currentState == CarouselState.qrcode;
+  bool get showNews => _currentState == CarouselState.news;
 
-  BottomWeatherQrcodeCarouselProvider() {
-    _logger.i('🌤️ 底部天气二维码轮播Provider初始化');
+  BottomWeatherQrcodeNewsCarouselProvider() {
+    _logger.i('🌤️ 底部天气二维码新闻轮播Provider初始化');
   }
 
   /// 设置AppDataProvider引用
   void setAppDataProvider(AppDataProvider appDataProvider) {
     _appDataProvider = appDataProvider;
+  }
+
+  /// 设置NewsAnnouncementProvider引用
+  void setNewsProvider(NewsAnnouncementProvider newsProvider) {
+    _newsProvider = newsProvider;
   }
 
   /// 获取动态轮播间隔时间（秒）
@@ -68,7 +83,7 @@ class BottomWeatherQrcodeCarouselProvider extends ChangeNotifier {
 
   ///1，初始化底部轮播
   void initializeBottomCarousel() {
-    _logger.i('🌤️ [初始化] 底部天气二维码轮播初始化');
+    _logger.i('🌤️ [初始化] 底部天气二维码新闻轮播初始化');
     startBottomTimer();
     startDebugTimer();
   }
@@ -110,11 +125,25 @@ class BottomWeatherQrcodeCarouselProvider extends ChangeNotifier {
         _logger.i('🔄 底部轮播切换: 天气 -> 二维码');
         break;
       case CarouselState.qrcode:
+        // 检查是否有新闻数据
+        if (_newsProvider != null && _newsProvider!.newsList.isNotEmpty) {
+          _currentState = CarouselState.news;
+          _currentNewsIndex = 0; // 重置新闻索引
+          _logger.i('🔄 底部轮播切换: 二维码 -> 新闻公报');
+        } else {
+          // 如果没有新闻，直接回到天气
+          _currentState = CarouselState.weather;
+          _logger.i('🔄 底部轮播切换: 二维码 -> 天气 (无新闻数据)');
+        }
+        break;
+      case CarouselState.news:
+        // 新闻公报显示完毕后，回到天气
         _currentState = CarouselState.weather;
-        _logger.i('🔄 底部轮播切换: 二维码 -> 天气');
+        _currentNewsIndex = 0; // 重置新闻索引
+        _logger.i('🔄 底部轮播切换: 新闻公报 -> 天气');
         break;
     }
-
+    
     notifyListeners();
 
     // 启动下一个计时器
@@ -170,33 +199,60 @@ class BottomWeatherQrcodeCarouselProvider extends ChangeNotifier {
       _logger.i(
           '🔄 [恢复] 底部轮播 - 继续播放剩余时间：${remainingTime.inSeconds}s (已播放: ${_bottomElapsedTime.inSeconds}s)');
 
-      if (remainingTime > Duration.zero) {
-        // 如果还有剩余时间，启动剩余时间的定时器
+      if (remainingTime.inSeconds > 0) {
+        // 更新当前轮播开始时间
+        _currentBottomStartTime = DateTime.now();
+
+        // 继续播放剩余时间
         _bottomTimer = Timer(remainingTime, () {
           if (!_isBottomCarouselPaused) {
+            _logger.i('⏰ [定时] 底部轮播时间到，切换显示状态');
             _switchToNextState();
           }
         });
       } else {
-        // 如果没有剩余时间，立即切换到下一个状态
+        // 时间已到，直接切换
+        _logger.i('⚡ [跳过] 底部轮播剩余时间为0，直接切换显示状态');
         _switchToNextState();
       }
     } else {
-      // 如果没有开始时间记录，重新启动
+      // 如果没有记录开始时间，重新开始计时
+      startBottomTimer();
+    }
+
+    notifyListeners();
+  }
+
+  ///6，更新轮播暂停状态
+  void updateCarouselPauseState(bool isPaused) {
+    _isBottomCarouselPaused = isPaused;
+    _logger.i('🎛️ 底部轮播状态更新: ${!_isBottomCarouselPaused ? "运行" : "暂停"}');
+
+    if (isPaused) {
+      pauseBottomCarousel();
+    } else {
+      resumeBottomCarousel();
+    }
+  }
+
+  ///7，检查并恢复底部轮播（监控定时器使用）
+  void checkAndRestoreBottomCarousel() {
+    if (!_isBottomCarouselPaused && _bottomTimer == null) {
+      _logger.w('🔍 [监控] 检测到底部轮播定时器丢失，重新启动');
       startBottomTimer();
     }
   }
 
-  ///6，启动调试定时器
+  ///8，启动调试定时器
   void startDebugTimer() {
     _debugTimer?.cancel();
-
     _debugTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
+      if (_isBottomCarouselPaused) return;
+
       if (_currentBottomStartTime != null) {
-        final now = DateTime.now();
-        final elapsed = now.difference(_currentBottomStartTime!);
-        final totalElapsed = elapsed + _bottomElapsedTime;
-        final remaining = _bottomDuration - totalElapsed;
+        final elapsed = DateTime.now().difference(_currentBottomStartTime!) +
+            _bottomElapsedTime;
+        final remaining = _bottomDuration - elapsed;
         final remainingSeconds = remaining.isNegative ? 0 : remaining.inSeconds;
 
         String stateInfo = '';
@@ -207,6 +263,10 @@ class BottomWeatherQrcodeCarouselProvider extends ChangeNotifier {
           case CarouselState.qrcode:
             stateInfo = '二维码';
             break;
+          case CarouselState.news:
+            stateInfo =
+                '新闻公报 (${_currentNewsIndex + 1}/${_newsProvider?.newsList.length ?? 0})';
+            break;
         }
 
         _logger.i(
@@ -215,12 +275,12 @@ class BottomWeatherQrcodeCarouselProvider extends ChangeNotifier {
     });
   }
 
-  ///7，停止调试定时器
+  ///9，停止调试定时器
   void stopDebugTimer() {
     _debugTimer?.cancel();
   }
 
-  ///8，暂停所有定时器（用于设置页面）
+  ///10，暂停所有定时器（用于设置页面）
   void pauseAllTimersForSettings() {
     _logger.i('⚙️ 暂停底部轮播所有定时器 - 进入设置页面');
     _bottomTimer?.cancel();
@@ -228,7 +288,7 @@ class BottomWeatherQrcodeCarouselProvider extends ChangeNotifier {
     _isBottomCarouselPaused = true;
   }
 
-  ///9，恢复所有定时器（从设置页面返回）
+  ///11，恢复所有定时器（从设置页面返回）
   void resumeAllTimersFromSettings() {
     _logger.i('↩️ 恢复底部轮播所有定时器 - 从设置页面返回');
     _isBottomCarouselPaused = false;
@@ -236,12 +296,46 @@ class BottomWeatherQrcodeCarouselProvider extends ChangeNotifier {
     startDebugTimer();
   }
 
-  ///10，更新轮播暂停状态（兼容性方法）
-  void updateCarouselPauseState(bool isPaused) {
-    if (isPaused) {
-      pauseBottomCarousel();
-    } else {
-      resumeBottomCarousel();
+  ///12，获取当前新闻（如果当前状态是新闻）
+  NewsAnnouncementModel? getCurrentNews() {
+    if (_currentState == CarouselState.news && 
+        _newsProvider != null && 
+        _newsProvider!.newsList.isNotEmpty &&
+        _currentNewsIndex < _newsProvider!.newsList.length) {
+      return _newsProvider!.newsList[_currentNewsIndex];
+    }
+    return null;
+  }
+
+  ///13，获取下一条新闻（用于手动切换）
+  NewsAnnouncementModel? getNextNews() {
+    if (_newsProvider != null && 
+        _newsProvider!.newsList.isNotEmpty &&
+        _currentNewsIndex < _newsProvider!.newsList.length - 1) {
+      return _newsProvider!.newsList[_currentNewsIndex + 1];
+    }
+    return null;
+  }
+
+  ///14，手动切换到下一条新闻
+  void switchToNextNews() {
+    if (_currentState == CarouselState.news &&
+        _newsProvider != null && 
+        _newsProvider!.newsList.isNotEmpty &&
+        _currentNewsIndex < _newsProvider!.newsList.length - 1) {
+      _currentNewsIndex++;
+      _logger.i('🔄 手动切换新闻: ${_currentNewsIndex + 1}/${_newsProvider!.newsList.length}');
+      notifyListeners();
+    }
+  }
+
+  ///15，手动切换到上一条新闻
+  void switchToPreviousNews() {
+    if (_currentState == CarouselState.news &&
+        _currentNewsIndex > 0) {
+      _currentNewsIndex--;
+      _logger.i('🔄 手动切换新闻: ${_currentNewsIndex + 1}/${_newsProvider!.newsList.length}');
+      notifyListeners();
     }
   }
 

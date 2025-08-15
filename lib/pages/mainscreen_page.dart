@@ -13,8 +13,10 @@ import 'package:iboard_app/providers/state_provider.dart';
 import 'package:iboard_app/providers/top_ad_carousel_provider.dart';
 import 'package:iboard_app/providers/fullscreen_ad_provider.dart';
 import 'package:iboard_app/providers/bottom_weather_qrcode_carousel_provider.dart';
+import 'package:iboard_app/providers/rthk_news_provider.dart';
 import 'package:iboard_app/widgets/carousel_widget.dart' as custom_carousel;
 import 'package:iboard_app/widgets/mainscreen/bottom_display/bottom_display_widget.dart';
+import 'package:iboard_app/widgets/rthk_news_ticker_widget.dart';
 // import 'package:iboard_app/widgets/mainscreen/main_display/arrear_display_widget.dart'; // 已註釋，功能整合到MainScreenWidget
 import 'package:iboard_app/widgets/mainscreen/main_display/arrear_table_widget.dart';
 import 'package:iboard_app/pages/settings_page.dart';
@@ -119,6 +121,7 @@ class _AnnouncementPageState extends State<AnnouncementPage> {
       _initializeMidWidgets();
       _initializeTopWidgets();
       _initializeBottomWidgets();
+      _initializeNewsAnnouncements(); // 初始化新闻公报
       _startDebugTimer(); // 启动调试定时器
       _startCarouselWatchdog(); // 启动轮播监控
 
@@ -127,6 +130,16 @@ class _AnnouncementPageState extends State<AnnouncementPage> {
           Provider.of<AdvertisementProvider>(context, listen: false);
       advertisementProvider.fetchAdvertisements();
     });
+  }
+
+  ///2.1，初始化RTHK新闻
+  void _initializeNewsAnnouncements() {
+    final rthkNewsProvider = context.read<RthkNewsProvider>();
+
+    // 启动RTHK新闻的定时更新
+    rthkNewsProvider.fetchRthkNews();
+
+    _logger.i('📰 RTHK新闻初始化完成');
   }
 
   ///2，设置全屏广告预加载回调
@@ -546,7 +559,7 @@ class _AnnouncementPageState extends State<AnnouncementPage> {
 
   ///10，初始化底部轮播
   void _initializeBottomWidgets() {
-    // 底部轮播现在由BottomWeatherQrcodeCarouselProvider管理
+    // 底部轮播现在由BottomWeatherQrcodeNewsCarouselProvider管理
     final bottomProvider = context.read<BottomWeatherQrcodeCarouselProvider>();
     bottomProvider.initializeBottomCarousel();
     // _logger.i('🌤️ [初始化] 底部天气二维码轮播初始化完成');
@@ -826,7 +839,29 @@ class _AnnouncementPageState extends State<AnnouncementPage> {
               flex: 4,
               child: Container(
                 width: double.infinity,
-                child: const BottomDisplayWidget(),
+                child: Column(
+                  children: [
+                    // 新闻跑马灯 - 1/8 比例
+                    Container(
+                      height: 40,
+                      width: double.infinity,
+                      margin: const EdgeInsets.symmetric(
+                          horizontal: 8, vertical: 4),
+                      child: LayoutBuilder(
+                        builder: (context, constraints) {
+                          return RthkNewsTickerWidget(
+                            height: 40,
+                            width: constraints.maxWidth,
+                          );
+                        },
+                      ),
+                    ),
+                    // 底部轮播 - 7/8 比例
+                    Expanded(
+                      child: const BottomDisplayWidget(),
+                    ),
+                  ],
+                ),
               ),
             ),
             // 设备ID显示区域 - 1/24 比例

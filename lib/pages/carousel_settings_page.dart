@@ -66,7 +66,7 @@ class _CarouselSettingsPageState extends State<CarouselSettingsPage> {
                       ),
                       SizedBox(width: 16),
                       Text(
-                        '輪播順序設置',
+                        '輪播順序顯示',
                         style: TextStyle(
                           fontSize: 28,
                           fontWeight: FontWeight.bold,
@@ -94,6 +94,38 @@ class _CarouselSettingsPageState extends State<CarouselSettingsPage> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
+                        // 说明文字
+                        Container(
+                          width: double.infinity,
+                          padding: EdgeInsets.all(16),
+                          decoration: BoxDecoration(
+                            color: Colors.blue.shade50,
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(color: Colors.blue.shade200),
+                          ),
+                          child: Row(
+                            children: [
+                              Icon(
+                                Icons.info_outline,
+                                color: Colors.blue.shade600,
+                                size: 20,
+                              ),
+                              SizedBox(width: 12),
+                              Expanded(
+                                child: Text(
+                                  '輪播順序由後台統一管理，此頁面僅供查看當前輪播順序。如需調整順序，請聯繫管理員在後台進行設置。',
+                                  style: TextStyle(
+                                    fontSize: 14,
+                                    color: Colors.blue.shade700,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        
+                        SizedBox(height: 24),
+
                         // 通告轮播设置
                         _buildAnnouncementCarouselSettings(),
 
@@ -123,7 +155,6 @@ class _CarouselSettingsPageState extends State<CarouselSettingsPage> {
     return Consumer2<AnnouncementProvider, AnnouncementCarouselProvider>(
       builder: (context, announcementProvider, carouselProvider, child) {
         final announcements = announcementProvider.carouselAnnouncements;
-        final currentOrder = carouselProvider.carouselAnnouncements;
 
         return Container(
           width: double.infinity,
@@ -168,7 +199,7 @@ class _CarouselSettingsPageState extends State<CarouselSettingsPage> {
                   ),
                   Spacer(),
                   Text(
-                    '${currentOrder.length} 個通告',
+                    '${announcements.length} 個通告',
                     style: TextStyle(
                       fontSize: 14,
                       color: Colors.grey.shade600,
@@ -177,7 +208,7 @@ class _CarouselSettingsPageState extends State<CarouselSettingsPage> {
                 ],
               ),
               SizedBox(height: 16),
-              if (currentOrder.isEmpty)
+              if (announcements.isEmpty)
                 Center(
                   child: Padding(
                     padding: EdgeInsets.all(20),
@@ -191,18 +222,8 @@ class _CarouselSettingsPageState extends State<CarouselSettingsPage> {
                   ),
                 )
               else
-                _buildReorderableList<AnnouncementModel>(
-                  items: currentOrder,
-                  onReorder: (oldIndex, newIndex) {
-                    final reorderedList =
-                        List<AnnouncementModel>.from(currentOrder);
-                    if (newIndex > oldIndex) {
-                      newIndex -= 1;
-                    }
-                    final item = reorderedList.removeAt(oldIndex);
-                    reorderedList.insert(newIndex, item);
-                    carouselProvider.setCarouselList(reorderedList);
-                  },
+                _buildReadOnlyList<AnnouncementModel>(
+                  items: announcements,
                   itemBuilder: (item, index) =>
                       _buildAnnouncementListItem(item, index),
                 ),
@@ -217,8 +238,7 @@ class _CarouselSettingsPageState extends State<CarouselSettingsPage> {
   Widget _buildTopAdCarouselSettings() {
     return Consumer2<AdvertisementProvider, TopAdCarouselProvider>(
       builder: (context, advertisementProvider, carouselProvider, child) {
-        final topAds = advertisementProvider.topAdvertisements;
-        final currentOrder = carouselProvider.topAds;
+        final topAds = advertisementProvider.topCarouselAdvertisements;
 
         return Container(
           width: double.infinity,
@@ -263,7 +283,7 @@ class _CarouselSettingsPageState extends State<CarouselSettingsPage> {
                   ),
                   Spacer(),
                   Text(
-                    '${currentOrder.length} 個廣告',
+                    '${topAds.length} 個廣告',
                     style: TextStyle(
                       fontSize: 14,
                       color: Colors.grey.shade600,
@@ -272,7 +292,7 @@ class _CarouselSettingsPageState extends State<CarouselSettingsPage> {
                 ],
               ),
               SizedBox(height: 16),
-              if (currentOrder.isEmpty)
+              if (topAds.isEmpty)
                 Center(
                   child: Padding(
                     padding: EdgeInsets.all(20),
@@ -286,17 +306,8 @@ class _CarouselSettingsPageState extends State<CarouselSettingsPage> {
                   ),
                 )
               else
-                _buildReorderableList<AdModel>(
-                  items: currentOrder,
-                  onReorder: (oldIndex, newIndex) {
-                    final reorderedList = List<AdModel>.from(currentOrder);
-                    if (newIndex > oldIndex) {
-                      newIndex -= 1;
-                    }
-                    final item = reorderedList.removeAt(oldIndex);
-                    reorderedList.insert(newIndex, item);
-                    carouselProvider.setCarouselList(reorderedList);
-                  },
+                _buildReadOnlyList<AdModel>(
+                  items: topAds,
                   itemBuilder: (item, index) =>
                       _buildAdListItem(item, index, '頂部'),
                 ),
@@ -311,8 +322,7 @@ class _CarouselSettingsPageState extends State<CarouselSettingsPage> {
   Widget _buildFullscreenAdCarouselSettings() {
     return Consumer2<AdvertisementProvider, FullscreenAdProvider>(
       builder: (context, advertisementProvider, carouselProvider, child) {
-        final fullscreenAds = advertisementProvider.fullAdvertisements;
-        final currentOrder = carouselProvider.fullscreenAds;
+        final fullscreenAds = advertisementProvider.fullCarouselAdvertisements;
 
         return Container(
           width: double.infinity,
@@ -357,7 +367,7 @@ class _CarouselSettingsPageState extends State<CarouselSettingsPage> {
                   ),
                   Spacer(),
                   Text(
-                    '${currentOrder.length} 個廣告',
+                    '${fullscreenAds.length} 個廣告',
                     style: TextStyle(
                       fontSize: 14,
                       color: Colors.grey.shade600,
@@ -386,7 +396,7 @@ class _CarouselSettingsPageState extends State<CarouselSettingsPage> {
                 ],
               ),
               SizedBox(height: 16),
-              if (currentOrder.isEmpty)
+              if (fullscreenAds.isEmpty)
                 Center(
                   child: Padding(
                     padding: EdgeInsets.all(20),
@@ -400,17 +410,8 @@ class _CarouselSettingsPageState extends State<CarouselSettingsPage> {
                   ),
                 )
               else
-                _buildReorderableList<AdModel>(
-                  items: currentOrder,
-                  onReorder: (oldIndex, newIndex) {
-                    final reorderedList = List<AdModel>.from(currentOrder);
-                    if (newIndex > oldIndex) {
-                      newIndex -= 1;
-                    }
-                    final item = reorderedList.removeAt(oldIndex);
-                    reorderedList.insert(newIndex, item);
-                    carouselProvider.setCarouselList(reorderedList);
-                  },
+                _buildReadOnlyList<AdModel>(
+                  items: fullscreenAds,
                   itemBuilder: (item, index) =>
                       _buildAdListItem(item, index, '全屏'),
                 ),
@@ -421,18 +422,16 @@ class _CarouselSettingsPageState extends State<CarouselSettingsPage> {
     );
   }
 
-  ///5，构建可重新排序的列表
-  Widget _buildReorderableList<T>({
+  ///5，构建只读列表（移除拖拽功能）
+  Widget _buildReadOnlyList<T>({
     required List<T> items,
-    required Function(int, int) onReorder,
     required Widget Function(T, int) itemBuilder,
   }) {
     return Container(
       constraints: BoxConstraints(maxHeight: 300),
-      child: ReorderableListView.builder(
+      child: ListView.builder(
         shrinkWrap: true,
         itemCount: items.length,
-        onReorder: onReorder,
         itemBuilder: (context, index) {
           final item = items[index];
           return Container(
@@ -501,7 +500,7 @@ class _CarouselSettingsPageState extends State<CarouselSettingsPage> {
             ),
           ),
           Icon(
-            Icons.drag_handle,
+            Icons.lock, // 改为锁定图标表示只读
             color: Colors.grey.shade400,
             size: 20,
           ),
@@ -568,7 +567,7 @@ class _CarouselSettingsPageState extends State<CarouselSettingsPage> {
             ),
           ),
           Icon(
-            Icons.drag_handle,
+            Icons.lock, // 改为锁定图标表示只读
             color: Colors.grey.shade400,
             size: 20,
           ),

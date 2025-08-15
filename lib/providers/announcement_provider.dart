@@ -9,6 +9,7 @@ import 'package:logger/logger.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:convert';
+import 'package:iboard_app/providers/announcement_carousel_provider.dart';
 
 class AnnouncementProvider extends ChangeNotifier {
   final Logger _logger = Logger();
@@ -19,6 +20,9 @@ class AnnouncementProvider extends ChangeNotifier {
   final AppDataProvider
       _appDataProvider; // To access token and deviceId if needed
   final FileManager _fileManager; // 添加 FileManager 实例
+  
+  // 轮播Provider引用
+  AnnouncementCarouselProvider? _announcementCarouselProvider;
 
   List<AnnouncementModel> _announcements = [];
   List<AnnouncementModel> _carouselAnnouncements = []; // 轮播专用通告数组
@@ -445,36 +449,37 @@ class AnnouncementProvider extends ChangeNotifier {
 
     try {
       // _logger.i('Fetching notices from building...');
-      // Using getNoticesBuilding as per httpapi.json for general notices
-      final responseData = await _apiClient.getNoticesBuilding();
+      // 使用新的轮播接口获取通告数据
+      final List<Map<String, dynamic>> carouselNoticesData = await _apiClient.getCarouselNotices();
+      final List<AnnouncementModel> newCarouselAnnouncements = carouselNoticesData
+          .map((jsonItem) => AnnouncementModel.fromJson(jsonItem))
+          .toList();
 
-      if (responseData.containsKey('data') && responseData['data'] is List) {
-        final List<dynamic> noticeListJson = responseData['data'];
-        final List<AnnouncementModel> newAnnouncements = noticeListJson
-            .map((jsonItem) =>
-                AnnouncementModel.fromJson(jsonItem as Map<String, dynamic>))
-            .toList();
+      // _logger.i(
+      // 'Successfully fetched ${newCarouselAnnouncements.length} carousel announcements from API.');
 
-        // _logger.i(
-        // 'Successfully fetched ${newAnnouncements.length} announcements from API.');
+      // 更新轮播通告数组（后台已排序）
+      _carouselAnnouncements = List<AnnouncementModel>.from(newCarouselAnnouncements);
 
-        // 使用智能对比更新通告列表
-        await _smartUpdateAnnouncements(newAnnouncements);
+      // 同时更新原有通告列表（保持兼容性）
+      _announcements = List<AnnouncementModel>.from(newCarouselAnnouncements);
 
-        // _logger.i(
-        // 'Announcement update completed. Total: ${_announcements.length}, Carousel announcements: ${_carouselAnnouncements.length}');
-        _error = null; // 成功时清除错误
+      // 保存更新后的数据到缓存
+      await _saveAnnouncementsToCache(_announcements);
 
-        // 如果之前有网络错误，记录恢复信息
-        if (_error != null &&
-            (_error!.contains('网络') || _error!.contains('超时'))) {
-          // _logger.i('网络已恢复，通告数据更新成功');
-        }
-      } else {
-        // _logger.w(
-        // 'Fetched notices data is not in the expected format: $responseData');
-        // 不清除现有数据，保持现状
-        _error = "Failed to parse notices data.";
+      // 通知轮播Provider更新数据
+      if (_announcementCarouselProvider != null) {
+        _announcementCarouselProvider!.updateCarouselList(_carouselAnnouncements);
+      }
+
+      // _logger.i(
+      // 'Announcement update completed. Total: ${_announcements.length}, Carousel announcements: ${_carouselAnnouncements.length}');
+      _error = null; // 成功时清除错误
+
+      // 如果之前有网络错误，记录恢复信息
+      if (_error != null &&
+          (_error!.contains('网络') || _error!.contains('超时'))) {
+        // _logger.i('网络已恢复，通告数据更新成功');
       }
     } on ApiException catch (e) {
       _logger.e('Failed to fetch notices (ApiException)',
@@ -617,4 +622,10 @@ class AnnouncementProvider extends ChangeNotifier {
   // Potentially add methods to add/update/delete announcements if the API supports it
   // and if such functionality is required by the app.
   // For now, focusing on fetching and displaying.
+
+  /// 设置轮播Provider引用
+  void setCarouselProvider(AnnouncementCarouselProvider carouselProvider) {
+    _announcementCarouselProvider = carouselProvider;
+    _logger.i('设置通告轮播Provider引用');
+  }
 }
