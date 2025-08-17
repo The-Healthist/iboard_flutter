@@ -4,7 +4,7 @@ import 'package:iboard_app/providers/announcement_carousel_provider.dart';
 import 'package:iboard_app/providers/fullscreen_ad_provider.dart';
 import 'package:iboard_app/providers/state_provider.dart';
 import 'package:iboard_app/providers/top_ad_carousel_provider.dart';
-import 'package:iboard_app/providers/bottom_weather_qrcode_carousel_provider.dart';
+import 'package:iboard_app/providers/weather_provider.dart';
 import 'package:iboard_app/widgets/carousel_widget.dart'; // 导入通知类
 
 import 'package:provider/provider.dart';
@@ -40,7 +40,6 @@ class _SettingsPageState extends State<SettingsPage> {
     final announcementCarouselProvider =
         context.read<AnnouncementCarouselProvider>();
     final fullAdCarouselProvider = context.read<FullscreenAdProvider>();
-    final bottomProvider = context.read<BottomWeatherQrcodeCarouselProvider>();
     final carouselStateProvider = context.read<CarouselStateProvider>();
 
     // 1. 进入手动操作状态以防止自动切换到全屏广告
@@ -58,13 +57,10 @@ class _SettingsPageState extends State<SettingsPage> {
     // 4. 暂停顶部广告轮播
     topAdProvider.pauseAllTimersForSettings();
 
-    // 5. 暂停底部天气二维码轮播
-    bottomProvider.pauseAllTimersForSettings();
-
-    // 6. 暂停其他定时器
+    // 5. 暂停其他定时器
     carouselStateProvider.pauseAllStateTimers();
 
-    // 7. 强制发送媒体暂停通知，确保所有视频都暂停
+    // 6. 强制发送媒体暂停通知，确保所有视频都暂停
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) {
         MediaPauseNotification().dispatch(context);
@@ -79,7 +75,6 @@ class _SettingsPageState extends State<SettingsPage> {
     final announcementCarouselProvider =
         context.read<AnnouncementCarouselProvider>();
     final fullAdCarouselProvider = context.read<FullscreenAdProvider>();
-    final bottomProvider = context.read<BottomWeatherQrcodeCarouselProvider>();
 
     // 从设置页面强制重置到默认状态（绕过手动操作状态的转换限制）
     carouselStateProvider.resetToDefault();
@@ -91,9 +86,6 @@ class _SettingsPageState extends State<SettingsPage> {
     final apiNoticeStayDuration = carouselStateProvider.noticeStayDuration;
     announcementCarouselProvider
         .resumeAllTimersFromSettings(apiNoticeStayDuration);
-
-    // 恢复底部天气二维码轮播
-    bottomProvider.resumeAllTimersFromSettings();
 
     // 恢复全屏广告轮播（如果之前处于活跃状态）
     if (fullAdCarouselProvider.isActive && fullAdCarouselProvider.isPaused) {

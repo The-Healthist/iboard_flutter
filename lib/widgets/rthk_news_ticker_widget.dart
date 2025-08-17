@@ -8,6 +8,7 @@ import 'package:logger/logger.dart';
 /// 优化后的香港电台新闻跑马灯组件
 /// 使用ScrollController和AnimationController实现水平连续滚动
 /// 结合渐变遮罩避免文字溢出和布局错乱
+/// 确保新闻标题完整显示，不被截断
 class RthkNewsTickerWidget extends StatefulWidget {
   final double height;
   final double width;
@@ -49,6 +50,7 @@ class _RthkNewsTickerWidgetState extends State<RthkNewsTickerWidget>
     super.dispose();
   }
 
+  ///1, 计算所有新闻文本的总宽度
   double _calculateTotalWidth(List<String> texts) {
     final textPainter = TextPainter(textDirection: TextDirection.ltr);
     double totalWidth = 0;
@@ -56,21 +58,28 @@ class _RthkNewsTickerWidgetState extends State<RthkNewsTickerWidget>
     for (final text in texts) {
       textPainter.text = TextSpan(
         text: text,
-        style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
+        style: const TextStyle(
+          fontSize: 14,
+          fontWeight: FontWeight.w500,
+          height: 1.2,
+        ),
       );
       textPainter.layout();
-      totalWidth += textPainter.width + 56;
+      // 为每条新闻添加足够的间距，确保完整显示
+      totalWidth += textPainter.width + 80; // 增加间距从56到80
     }
 
+    // 确保总宽度至少是容器宽度的2倍，保证滚动效果
     final minWidth = widget.width * 2;
     return totalWidth > minWidth ? totalWidth : minWidth;
   }
 
+  ///2, 启动滚动动画
   void _startScrolling() {
     if (!_scrollController.hasClients) return;
 
     final maxScrollExtent = _scrollController.position.maxScrollExtent;
-    const scrollSpeed = 50.0;
+    const scrollSpeed = 40.0; // 降低滚动速度，让用户更容易阅读长标题
     final durationSeconds = (maxScrollExtent / scrollSpeed).ceil();
 
     if (durationSeconds <= 0) return;
@@ -105,10 +114,12 @@ class _RthkNewsTickerWidgetState extends State<RthkNewsTickerWidget>
     _logger.i('▶️ 跑马灯动画启动，滚动宽度: $_totalContentWidth');
   }
 
+  ///3, 停止滚动动画
   void _stopScrolling() {
     _controller.stop();
   }
 
+  ///4, 更新新闻数据并重新启动滚动
   void _updateNews(List<String> newTexts) {
     if (newTexts.isEmpty) {
       _newsTexts = ['暂无新闻数据'];
@@ -141,6 +152,7 @@ class _RthkNewsTickerWidgetState extends State<RthkNewsTickerWidget>
     });
   }
 
+  ///5, 处理全屏广告状态变化
   void _handleFullscreenAdChange(bool isActive) {
     if (isActive && !_isPaused) {
       _pauseScrolling();
@@ -149,12 +161,14 @@ class _RthkNewsTickerWidgetState extends State<RthkNewsTickerWidget>
     }
   }
 
+  ///6, 暂停滚动
   void _pauseScrolling() {
     _isPaused = true;
     _stopScrolling();
     _logger.i('⏸️ 跑马灯动画暂停（全屏广告）');
   }
 
+  ///7, 恢复滚动
   void _resumeScrolling() {
     if (_isPaused) {
       _isPaused = false;
@@ -163,6 +177,7 @@ class _RthkNewsTickerWidgetState extends State<RthkNewsTickerWidget>
     }
   }
 
+  ///8, 构建渐变遮罩，避免文字在边缘处突然出现或消失
   Widget _buildFadeMask(Widget child) => ShaderMask(
         blendMode: BlendMode.dstIn,
         shaderCallback: (bounds) => const LinearGradient(
@@ -174,7 +189,7 @@ class _RthkNewsTickerWidgetState extends State<RthkNewsTickerWidget>
             Colors.black,
             Colors.transparent
           ],
-          stops: [0.0, 0.05, 0.95, 1.0],
+          stops: [0.0, 0.08, 0.92, 1.0], // 调整渐变范围，让文字显示更清晰
         ).createShader(bounds),
         child: child,
       );
@@ -202,20 +217,21 @@ class _RthkNewsTickerWidgetState extends State<RthkNewsTickerWidget>
                 controller: _scrollController,
                 scrollDirection: Axis.horizontal,
                 physics: const NeverScrollableScrollPhysics(),
-                itemCount: _newsTexts.length * 2,
+                itemCount: _newsTexts.length * 2, // 重复显示两次，确保无缝循环
                 itemBuilder: (context, index) {
                   final text = _newsTexts[index % _newsTexts.length];
                   return Container(
-                    margin: const EdgeInsets.only(right: 56),
-                    constraints: const BoxConstraints(maxWidth: 400),
+                    margin:
+                        const EdgeInsets.only(right: 80), // 增加右边距，确保新闻之间有足够间隔
+                    // 移除maxWidth限制，让文字能够完整显示
                     child: Text(
                       text,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
+                      // 移除maxLines和overflow限制，确保文字完整显示
                       style: const TextStyle(
                         color: Colors.black87,
                         fontSize: 14,
                         fontWeight: FontWeight.w500,
+                        height: 1.2, // 添加行高，让文字更易读
                       ),
                     ),
                   );

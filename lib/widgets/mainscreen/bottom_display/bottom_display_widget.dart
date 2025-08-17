@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:iboard_app/providers/bottom_weather_qrcode_carousel_provider.dart';
+import 'package:iboard_app/providers/weather_provider.dart';
 import 'package:iboard_app/widgets/mainscreen/bottom_display/weather_widget.dart';
 import 'package:iboard_app/widgets/mainscreen/bottom_display/qrcode_widget.dart';
 import 'package:logger/logger.dart';
@@ -25,8 +25,8 @@ class _BottomDisplayWidgetState extends State<BottomDisplayWidget> {
   ///1，构建底部显示组件 - 使用固定高度确保统一显示
   @override
   Widget build(BuildContext context) {
-    return Consumer<BottomWeatherQrcodeCarouselProvider>(
-      builder: (context, bottomProvider, child) {
+    return Consumer<WeatherProvider>(
+      builder: (context, weatherProvider, child) {
         // 获取屏幕尺寸，计算固定高度
         final screenSize = MediaQuery.of(context).size;
         final fixedHeight = screenSize.height * (4 / 24); // 根据布局比例 4/24 计算固定高度
@@ -65,7 +65,7 @@ class _BottomDisplayWidgetState extends State<BottomDisplayWidget> {
                       child: child,
                     );
                   },
-                  child: _buildCurrentWidget(bottomProvider, fixedHeight),
+                  child: _buildCurrentWidget(weatherProvider, fixedHeight),
                 ),
               ),
             ],
@@ -76,11 +76,10 @@ class _BottomDisplayWidgetState extends State<BottomDisplayWidget> {
   }
 
   ///2，构建当前显示的组件
-  Widget _buildCurrentWidget(
-      BottomWeatherQrcodeCarouselProvider provider, double height) {
-    if (provider.showWeather) {
+  Widget _buildCurrentWidget(WeatherProvider weatherProvider, double height) {
+    if (weatherProvider.showWeather) {
       return _weatherForecastWidget!;
-    } else if (provider.showQrcode) {
+    } else if (weatherProvider.showQrcode) {
       return _qrcodeWidget!;
     } else {
       // 默认显示天气

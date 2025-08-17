@@ -7,7 +7,6 @@ import 'package:iboard_app/providers/app_data_provider.dart';
 import 'package:iboard_app/providers/state_provider.dart'; // Added CarouselStateProvider import
 import 'package:iboard_app/providers/top_ad_carousel_provider.dart'; // Added TopAdCarouselProvider import
 import 'package:iboard_app/providers/fullscreen_ad_provider.dart';
-import 'package:iboard_app/providers/bottom_weather_qrcode_carousel_provider.dart';
 import 'package:iboard_app/providers/rthk_news_provider.dart';
 import 'package:iboard_app/managers/file_manager.dart';
 import 'package:iboard_app/utils/device_id_util.dart';
@@ -84,13 +83,18 @@ void main() {
               return FullscreenAdProvider(appDataProvider);
             },
           ),
-          ChangeNotifierProvider<BottomWeatherQrcodeCarouselProvider>(
+          ChangeNotifierProvider<WeatherProvider>(
             create: (context) {
-              final bottomProvider = BottomWeatherQrcodeCarouselProvider();
+              final weatherProvider = WeatherProvider();
               final appDataProvider =
                   Provider.of<AppDataProvider>(context, listen: false);
-              bottomProvider.setAppDataProvider(appDataProvider);
-              return bottomProvider;
+              // 设置AppDataProvider引用
+              weatherProvider.setAppDataProvider(appDataProvider);
+              // 初始化底部轮播
+              weatherProvider.initializeBottomCarousel();
+              // 初始化当前天气卡片轮播
+              weatherProvider.initializeCurrentWeatherCardCarousel();
+              return weatherProvider;
             },
           ),
           ChangeNotifierProvider<RthkNewsProvider>(
@@ -109,9 +113,6 @@ void main() {
                 appDataProvider: appDataProvider,
               );
             },
-          ),
-          ChangeNotifierProvider(
-            create: (context) => WeatherProvider(),
           ),
         ],
         child: MyApp(),

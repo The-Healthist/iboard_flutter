@@ -55,6 +55,15 @@ class RthkNewsProvider extends ChangeNotifier {
         _newsList =
             newsData.map((item) => RthkNewsModel.fromJson(item)).toList();
         _logger.i('📱 从本地存储加载了 ${_newsList.length} 条新闻');
+
+        // 检查是否包含备用数据
+        final fallbackCount =
+            _newsList.where((news) => news.guid.startsWith('fallback_')).length;
+        if (fallbackCount > 0) {
+          _logger.w('⚠️ 本地存储中包含 $fallbackCount 条备用新闻数据');
+        }
+      } else {
+        _logger.i('📱 本地存储中没有新闻数据');
       }
 
       // 加载最后更新时间
@@ -62,11 +71,16 @@ class RthkNewsProvider extends ChangeNotifier {
       if (lastUpdateStr != null) {
         _lastUpdateTime = DateTime.tryParse(lastUpdateStr);
         _logger.i('📅 最后更新时间: $_lastUpdateTime');
+      } else {
+        _logger.i('📅 本地存储中没有最后更新时间记录');
       }
 
       notifyListeners();
     } catch (e) {
       _logger.e('❌ 从本地存储加载新闻失败: $e');
+      // 加载失败时，保持空列表状态
+      _newsList = [];
+      _lastUpdateTime = null;
     }
   }
 
@@ -114,7 +128,24 @@ class RthkNewsProvider extends ChangeNotifier {
     }
 
     _logger.i('🔄 执行定时新闻更新');
-    await fetchRthkNews();
+
+    // 记录更新前的新闻数量，用于判断是否成功
+    final newsCountBeforeUpdate = _newsList.length;
+
+    try {
+      await fetchRthkNews();
+
+      // 检查更新是否成功（新闻数量是否有变化）
+      if (_newsList.length != newsCountBeforeUpdate) {
+        _logger
+            .i('✅ 定时更新成功，新闻数量从 $newsCountBeforeUpdate 更新为 ${_newsList.length}');
+      } else {
+        _logger.i('ℹ️ 定时更新完成，新闻数量未变化（${_newsList.length}）');
+      }
+    } catch (e) {
+      _logger.e('❌ 定时更新失败: $e');
+      // 定时更新失败不影响现有数据，继续使用缓存
+    }
   }
 
   ///5, 获取RTHK新闻数据
@@ -164,7 +195,7 @@ class RthkNewsProvider extends ChangeNotifier {
 
           // 保存到本地存储
           await _saveToLocalStorage();
-          
+
           // 通知UI更新
           notifyListeners();
         } else {
@@ -180,15 +211,25 @@ class RthkNewsProvider extends ChangeNotifier {
       _errorMessage = e.toString();
       _logger.e('❌ 获取RTHK新闻失败: $e');
 
-      // 如果API失败，使用备用新闻数据
-      _logger.i('🔄 使用备用新闻数据');
-      _useFallbackNews();
-      
-      // 备用数据也要保存到本地存储
-      await _saveToLocalStorage();
-      
-      // 通知UI更新
-      notifyListeners();
+      // 检查缓存中是否有数据
+      if (_newsList.isEmpty) {
+        // 只有在缓存为空时才使用备用新闻数据
+        _logger.i('🔄 缓存为空，使用备用新闻数据');
+        _useFallbackNews();
+
+        // 备用数据也要保存到本地存储
+        await _saveToLocalStorage();
+
+        // 通知UI更新
+        notifyListeners();
+      } else {
+        // 缓存中有数据，继续使用缓存数据，不清理或更新
+        _logger.i('📱 API失败但缓存中有 ${_newsList.length} 条新闻，继续使用缓存数据');
+        _logger.i('📅 最后更新时间: $_lastUpdateTime');
+
+        // 不更新数据，保持原有缓存数据
+        // 不调用notifyListeners()，避免UI刷新
+      }
     } finally {
       _isLoading = false;
       // 注意：这里不再调用notifyListeners()，因为成功时已经在上面调用了
@@ -242,7 +283,8 @@ class RthkNewsProvider extends ChangeNotifier {
     ];
 
     _lastUpdateTime = now;
-    _logger.i('✅ 已加载 ${_newsList.length} 条备用新闻数据');
+    _logger.i('✅ 已加载 ${_newsList.length} 条备用新闻数据（仅在缓存为空且API失败时使用）');
+    _logger.w('⚠️ 注意：这些是示例新闻数据，不是实时新闻');
   }
 
   ///6, 手动刷新新闻
@@ -262,9 +304,29 @@ class RthkNewsProvider extends ChangeNotifier {
     _logger.i('🗑️ 新闻数据已清空');
   }
 
+  ///7.1, 获取当前数据状态信息
+  Map<String, dynamic> getDataStatus() {
+    return {
+      'newsCount': _newsList.length,
+      'hasError': _hasError,
+      'errorMessage': _errorMessage,
+      'lastUpdateTime': _lastUpdateTime?.toIso8601String(),
+      'isLoading': _isLoading,
+      'isUsingFallbackData': _newsList.isNotEmpty &&
+          _newsList.any((news) => news.guid.startsWith('fallback_')),
+    };
+  }
+
   ///8, 获取所有新闻的显示文本
   List<String> getAllNewsDisplayTexts() {
-    return _newsList.map((news) => news.displayText).toList();
+    return _newsList.map((news) {
+      // 格式化显示文本：时间 + 标题
+      final timeStr = news.formattedTime.isNotEmpty
+          ? news.formattedTime
+          : '${news.pubDate.hour.toString().padLeft(2, '0')}:${news.pubDate.minute.toString().padLeft(2, '0')}';
+
+      return '【$timeStr】${news.title}';
+    }).toList();
   }
 
   @override

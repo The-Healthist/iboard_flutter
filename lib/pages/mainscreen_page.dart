@@ -12,7 +12,7 @@ import 'package:iboard_app/providers/app_data_provider.dart';
 import 'package:iboard_app/providers/state_provider.dart';
 import 'package:iboard_app/providers/top_ad_carousel_provider.dart';
 import 'package:iboard_app/providers/fullscreen_ad_provider.dart';
-import 'package:iboard_app/providers/bottom_weather_qrcode_carousel_provider.dart';
+import 'package:iboard_app/providers/weather_provider.dart';
 import 'package:iboard_app/providers/rthk_news_provider.dart';
 import 'package:iboard_app/widgets/carousel_widget.dart' as custom_carousel;
 import 'package:iboard_app/widgets/mainscreen/bottom_display/bottom_display_widget.dart';
@@ -65,8 +65,7 @@ class _AnnouncementPageState extends State<AnnouncementPage> {
       final topAdProvider = context.read<TopAdCarouselProvider>();
       final announcementCarouselProvider =
           context.read<AnnouncementCarouselProvider>();
-      final bottomProvider =
-          context.read<BottomWeatherQrcodeCarouselProvider>();
+      final bottomProvider = context.read<WeatherProvider>();
 
       // 检查状态是否发生变化
       if (_previousAppState != appState) {
@@ -249,7 +248,7 @@ class _AnnouncementPageState extends State<AnnouncementPage> {
     final announcementCarouselProvider =
         context.read<AnnouncementCarouselProvider>();
     final fullAdCarouselProvider = context.read<FullscreenAdProvider>();
-    final bottomProvider = context.read<BottomWeatherQrcodeCarouselProvider>();
+    final bottomProvider = context.read<WeatherProvider>();
 
     // 暂停顶部广告计时器
     topAdProvider.pauseAllTimersForSettings();
@@ -331,7 +330,7 @@ class _AnnouncementPageState extends State<AnnouncementPage> {
     final announcementCarouselProvider =
         context.read<AnnouncementCarouselProvider>();
     final fullAdCarouselProvider = context.read<FullscreenAdProvider>();
-    final bottomProvider = context.read<BottomWeatherQrcodeCarouselProvider>();
+    final bottomProvider = context.read<WeatherProvider>();
 
     // 恢复默认状态
     final carouselStateProvider = context.read<CarouselStateProvider>();
@@ -560,7 +559,7 @@ class _AnnouncementPageState extends State<AnnouncementPage> {
   ///10，初始化底部轮播
   void _initializeBottomWidgets() {
     // 底部轮播现在由BottomWeatherQrcodeNewsCarouselProvider管理
-    final bottomProvider = context.read<BottomWeatherQrcodeCarouselProvider>();
+    final bottomProvider = context.read<WeatherProvider>();
     bottomProvider.initializeBottomCarousel();
     // _logger.i('🌤️ [初始化] 底部天气二维码轮播初始化完成');
   }

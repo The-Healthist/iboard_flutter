@@ -7,10 +7,21 @@ import 'package:iboard_app/models/current_weather_model.dart';
 import 'package:iboard_app/models/weather_warning_model.dart';
 import 'package:logger/logger.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:iboard_app/providers/app_data_provider.dart'; // Added import for AppDataProvider
 
+/// 轮播状态枚举
+enum CarouselState { weather, qrcode }
+
+/// 当前天气卡片页面枚举
+enum CurrentWeatherPage { page1, page2 }
+
+/// 天气数据提供者 - 负责所有天气数据的获取、存储和管理
 class WeatherProvider extends ChangeNotifier {
   final Logger _logger = Logger();
   final WeatherService _weatherService = WeatherService();
+
+  // AppDataProvider引用 - 用于获取动态设置
+  AppDataProvider? _appDataProvider;
 
   // 天气数据状态
   WeatherData? _weatherForecastData;
@@ -30,6 +41,28 @@ class WeatherProvider extends ChangeNotifier {
   // 定时更新
   Timer? _updateTimer;
   bool _isPeriodicUpdateActive = false;
+
+  // 轮播状态管理
+  Timer? _bottomTimer;
+  Timer? _debugTimer;
+  bool _isBottomCarouselPaused = false;
+  CarouselState _currentState = CarouselState.weather;
+  static const int _defaultCarouselInterval = 5;
+  DateTime? _currentBottomStartTime;
+  DateTime? _currentBottomPauseTime;
+  Duration _bottomElapsedTime = Duration.zero;
+  Duration _bottomDuration = const Duration(seconds: _defaultCarouselInterval);
+
+  // 当前天气卡片轮播状态管理
+  Timer? _currentWeatherCardTimer;
+  bool _isCurrentWeatherCardPaused = false;
+  CurrentWeatherPage _currentWeatherPage = CurrentWeatherPage.page1;
+  static const int _defaultCurrentWeatherCardInterval = 8; // 当前天气卡片轮播间隔8秒
+  DateTime? _currentWeatherCardStartTime;
+  DateTime? _currentWeatherCardPauseTime;
+  Duration _currentWeatherCardElapsedTime = Duration.zero;
+  Duration _currentWeatherCardDuration =
+      const Duration(seconds: _defaultCurrentWeatherCardInterval);
 
   // 缓存键
   static const String _forecastCacheKey = 'weather_forecast_cache';
@@ -56,27 +89,70 @@ class WeatherProvider extends ChangeNotifier {
 
   bool get isPeriodicUpdateActive => _isPeriodicUpdateActive;
 
+  // 轮播相关getters
+  bool get isBottomCarouselPaused => _isBottomCarouselPaused;
+  CarouselState get currentState => _currentState;
+  Duration get bottomDuration => _bottomDuration;
+  DateTime? get currentBottomStartTime => _currentBottomStartTime;
+  Duration get bottomElapsedTime => _bottomElapsedTime;
+  bool get showWeather => _currentState == CarouselState.weather;
+  bool get showQrcode => _currentState == CarouselState.qrcode;
+
+  // 当前天气卡片轮播相关getters
+  bool get isCurrentWeatherCardPaused => _isCurrentWeatherCardPaused;
+  CurrentWeatherPage get currentWeatherPage => _currentWeatherPage;
+  Duration get currentWeatherCardDuration => _currentWeatherCardDuration;
+  DateTime? get currentWeatherCardStartTime => _currentWeatherCardStartTime;
+  Duration get currentWeatherCardElapsedTime => _currentWeatherCardElapsedTime;
+  bool get showCurrentWeatherPage1 =>
+      _currentWeatherPage == CurrentWeatherPage.page1;
+  bool get showCurrentWeatherPage2 =>
+      _currentWeatherPage == CurrentWeatherPage.page2;
+
   // 添加初始化状态跟踪
   bool _isInitialized = false;
   bool get isInitialized => _isInitialized;
 
   WeatherProvider() {
-    // _logger.i('WeatherProvider初始化');
-    _initializeProvider(); // 启动时初始化Provider
+    _logger.i('WeatherProvider初始化');
+    _initializeProvider();
+  }
+
+  /// 设置AppDataProvider引用
+  void setAppDataProvider(AppDataProvider appDataProvider) {
+    _appDataProvider = appDataProvider;
+  }
+
+  /// 检查并更新当前天气卡片轮播状态
+  void _checkAndUpdateCurrentWeatherCardCarousel() {
+    final hasWarnings = hasWarningData &&
+        weatherWarningData != null &&
+        weatherWarningData!.warnings.isNotEmpty;
+
+    if (hasWarnings && _isCurrentWeatherCardPaused) {
+      _logger.i('🌤️ [动态更新] 检测到天气警告信息，启动当前天气卡片轮播');
+      _isCurrentWeatherCardPaused = false;
+      startCurrentWeatherCardTimer();
+    } else if (!hasWarnings && !_isCurrentWeatherCardPaused) {
+      _logger.i('🌤️ [动态更新] 无天气警告信息，暂停当前天气卡片轮播');
+      _isCurrentWeatherCardPaused = true;
+      _currentWeatherCardTimer?.cancel();
+      _currentWeatherPage = CurrentWeatherPage.page1; // 重置到第一页
+      notifyListeners();
+    }
   }
 
   ///0，初始化Provider
   Future<void> _initializeProvider() async {
-    await _loadWeatherDataFromCache(); // 从缓存加载数据
+    await _loadWeatherDataFromCache();
     _isInitialized = true;
-    // _logger.i('WeatherProvider初始化完成');
+    _logger.i('WeatherProvider初始化完成');
   }
 
-  ///12，等待初始化完成
+  ///1，等待初始化完成
   Future<void> waitForInitialization() async {
     if (_isInitialized) return;
 
-    // 等待初始化完成
     while (!_isInitialized) {
       await Future.delayed(const Duration(milliseconds: 50));
     }
@@ -86,10 +162,16 @@ class WeatherProvider extends ChangeNotifier {
   void dispose() {
     _updateTimer?.cancel();
     _updateTimer = null;
+    _bottomTimer?.cancel();
+    _bottomTimer = null;
+    _debugTimer?.cancel();
+    _debugTimer = null;
+    _currentWeatherCardTimer?.cancel();
+    _currentWeatherCardTimer = null;
     super.dispose();
   }
 
-  ///1，从缓存加载天气数据
+  ///2，从缓存加载天气数据
   Future<void> _loadWeatherDataFromCache() async {
     try {
       final prefs = await SharedPreferences.getInstance();
@@ -100,9 +182,9 @@ class WeatherProvider extends ChangeNotifier {
         try {
           final forecastData = json.decode(forecastJson);
           _weatherForecastData = WeatherData.fromJson(forecastData);
-          // _logger.i('从缓存加载天气预报数据成功');
+          _logger.i('从缓存加载天气预报数据成功');
         } catch (e) {
-          // _logger.w('解析缓存的天气预报数据失败: $e');
+          _logger.w('解析缓存的天气预报数据失败: $e');
         }
       }
 
@@ -112,9 +194,9 @@ class WeatherProvider extends ChangeNotifier {
         try {
           final currentData = json.decode(currentJson);
           _currentWeatherData = CurrentWeatherDataModel.fromJson(currentData);
-          // _logger.i('从缓存加载当前天气数据成功');
+          _logger.i('从缓存加载当前天气数据成功');
         } catch (e) {
-          // _logger.w('解析缓存的当前天气数据失败: $e');
+          _logger.w('解析缓存的当前天气数据失败: $e');
         }
       }
 
@@ -124,9 +206,9 @@ class WeatherProvider extends ChangeNotifier {
         try {
           final warningData = json.decode(warningJson);
           _weatherWarningData = WeatherWarningModel.fromJson(warningData);
-          // _logger.i('从缓存加载天气警告数据成功');
+          _logger.i('从缓存加载天气警告数据成功');
         } catch (e) {
-          // _logger.w('解析缓存的天气警告数据失败: $e');
+          _logger.w('解析缓存的天气警告数据失败: $e');
         }
       }
 
@@ -136,7 +218,7 @@ class WeatherProvider extends ChangeNotifier {
     }
   }
 
-  ///2，保存天气数据到缓存
+  ///3，保存天气数据到缓存
   Future<void> _saveWeatherDataToCache() async {
     try {
       final prefs = await SharedPreferences.getInstance();
@@ -145,33 +227,33 @@ class WeatherProvider extends ChangeNotifier {
       if (_weatherForecastData != null) {
         final forecastJson = json.encode(_weatherForecastData!.toJson());
         await prefs.setString(_forecastCacheKey, forecastJson);
-        // _logger.i('天气预报数据已缓存');
+        _logger.i('天气预报数据已缓存');
       }
 
       // 保存当前天气数据
       if (_currentWeatherData != null) {
         final currentJson = json.encode(_currentWeatherData!.toJson());
         await prefs.setString(_currentCacheKey, currentJson);
-        // _logger.i('当前天气数据已缓存');
+        _logger.i('当前天气数据已缓存');
       }
 
       // 保存天气警告数据
       if (_weatherWarningData != null) {
         final warningJson = json.encode(_weatherWarningData!.toJson());
         await prefs.setString(_warningCacheKey, warningJson);
-        // _logger.i('天气警告数据已缓存');
+        _logger.i('天气警告数据已缓存');
       }
 
       // 保存最后更新时间
       await prefs.setString(_lastUpdateKey, DateTime.now().toIso8601String());
 
-      // _logger.i('天气数据已保存到缓存');
+      _logger.i('天气数据已保存到缓存');
     } catch (e) {
       _logger.e('保存天气数据到缓存失败', error: e);
     }
   }
 
-  ///3，获取天气预报数据
+  ///4，获取天气预报数据
   Future<void> fetchWeatherForecast() async {
     if (_isLoadingForecast) return;
 
@@ -182,33 +264,32 @@ class WeatherProvider extends ChangeNotifier {
 
     final stopwatch = Stopwatch()..start();
     try {
-      // _logger.i('📊 开始获取天气预报数据... - ${DateTime.now().toIso8601String()}');
+      _logger.i('📊 开始获取天气预报数据... - ${DateTime.now().toIso8601String()}');
       final weatherData = await _weatherService.fetchWeatherData();
 
       if (weatherData != null) {
         _weatherForecastData = weatherData;
-        _forecastError = null; // 清除之前的错误状态
-        await _saveWeatherDataToCache(); // 成功时保存到缓存
+        _forecastError = null;
+        await _saveWeatherDataToCache();
         stopwatch.stop();
-        // _logger.i('✅ 天气预报数据获取成功并已缓存，耗时: ${stopwatch.elapsedMilliseconds}ms');
+        _logger.i('✅ 天气预报数据获取成功并已缓存，耗时: ${stopwatch.elapsedMilliseconds}ms');
       } else {
-        // 如果有缓存数据，不设置错误状态，只记录警告
         if (_weatherForecastData != null) {
           stopwatch.stop();
-          // _logger.w(
-          //     '⚠️ 天气预报数据获取失败，但使用缓存数据，耗时: ${stopwatch.elapsedMilliseconds}ms');
+          _logger.w(
+              '⚠️ 天气预报数据获取失败，但使用缓存数据，耗时: ${stopwatch.elapsedMilliseconds}ms');
         } else {
           _forecastError = '获取天气预报数据失败';
           stopwatch.stop();
-          // _logger
-          //     .w('❌ 天气预报数据获取失败且无缓存数据，耗时: ${stopwatch.elapsedMilliseconds}ms');
+          _logger
+              .w('❌ 天气预报数据获取失败且无缓存数据，耗时: ${stopwatch.elapsedMilliseconds}ms');
         }
       }
     } catch (e) {
       _forecastError = '获取天气预报数据异常: $e';
       stopwatch.stop();
-      // _logger.e('❌ 获取天气预报数据异常，耗时: ${stopwatch.elapsedMilliseconds}ms',
-      //     error: e);
+      _logger.e('❌ 获取天气预报数据异常，耗时: ${stopwatch.elapsedMilliseconds}ms',
+          error: e);
     } finally {
       setState(() {
         _isLoadingForecast = false;
@@ -216,7 +297,7 @@ class WeatherProvider extends ChangeNotifier {
     }
   }
 
-  ///4，获取当前天气数据
+  ///5，获取当前天气数据
   Future<void> fetchCurrentWeather() async {
     if (_isLoadingCurrent) return;
 
@@ -227,33 +308,32 @@ class WeatherProvider extends ChangeNotifier {
 
     final stopwatch = Stopwatch()..start();
     try {
-      // _logger.i('🌡️ 开始获取当前天气数据... - ${DateTime.now().toIso8601String()}');
+      _logger.i('🌡️ 开始获取当前天气数据... - ${DateTime.now().toIso8601String()}');
       final currentData = await _weatherService.fetchCurrentWeatherData();
 
       if (currentData != null) {
         _currentWeatherData = currentData;
-        _currentError = null; // 清除之前的错误状态
-        await _saveWeatherDataToCache(); // 成功时保存到缓存
+        _currentError = null;
+        await _saveWeatherDataToCache();
         stopwatch.stop();
-        // _logger.i('✅ 当前天气数据获取成功并已缓存，耗时: ${stopwatch.elapsedMilliseconds}ms');
+        _logger.i('✅ 当前天气数据获取成功并已缓存，耗时: ${stopwatch.elapsedMilliseconds}ms');
       } else {
-        // 如果有缓存数据，不设置错误状态，只记录警告
         if (_currentWeatherData != null) {
           stopwatch.stop();
-          // _logger.w(
-          //     '⚠️ 当前天气数据获取失败，但使用缓存数据，耗时: ${stopwatch.elapsedMilliseconds}ms');
+          _logger.w(
+              '⚠️ 当前天气数据获取失败，但使用缓存数据，耗时: ${stopwatch.elapsedMilliseconds}ms');
         } else {
           _currentError = '获取当前天气数据失败';
           stopwatch.stop();
-          // _logger
-          //     .w('❌ 当前天气数据获取失败且无缓存数据，耗时: ${stopwatch.elapsedMilliseconds}ms');
+          _logger
+              .w('❌ 当前天气数据获取失败且无缓存数据，耗时: ${stopwatch.elapsedMilliseconds}ms');
         }
       }
     } catch (e) {
       _currentError = '获取当前天气数据异常: $e';
       stopwatch.stop();
-      // _logger.e('❌ 获取当前天气数据异常，耗时: ${stopwatch.elapsedMilliseconds}ms',
-      //     error: e);
+      _logger.e('❌ 获取当前天气数据异常，耗时: ${stopwatch.elapsedMilliseconds}ms',
+          error: e);
     } finally {
       setState(() {
         _isLoadingCurrent = false;
@@ -261,7 +341,7 @@ class WeatherProvider extends ChangeNotifier {
     }
   }
 
-  ///5，获取天气警告数据
+  ///6，获取天气警告数据
   Future<void> fetchWeatherWarnings() async {
     if (_isLoadingWarning) return;
 
@@ -272,36 +352,36 @@ class WeatherProvider extends ChangeNotifier {
 
     final stopwatch = Stopwatch()..start();
     try {
-      // _logger.i('⚠️ 开始获取天气警告数据... - ${DateTime.now().toIso8601String()}');
+      _logger.i('⚠️ 开始获取天气警告数据... - ${DateTime.now().toIso8601String()}');
       final warningData = await _weatherService.fetchWeatherWarnings();
 
       if (warningData != null) {
         _weatherWarningData = warningData;
-        _warningError = null; // 清除之前的错误状态
+        _warningError = null;
         stopwatch.stop();
-        // _logger.i(
-        //     '✅ 天气警告数据获取成功: ${warningData.warnings.length}个警告，耗时: ${stopwatch.elapsedMilliseconds}ms');
-        // _logger.d('📋 天气警告详情: ${warningData.warnings.keys.join(', ')}');
-        await _saveWeatherDataToCache(); // 成功时保存到缓存
-        // _logger.i('💾 天气警告数据已缓存');
+        _logger.i(
+            '✅ 天气警告数据获取成功: ${warningData.warnings.length}个警告，耗时: ${stopwatch.elapsedMilliseconds}ms');
+        _logger.d('📋 天气警告详情: ${warningData.warnings.keys.join(', ')}');
+        await _saveWeatherDataToCache();
+        _logger.i('💾 天气警告数据已缓存');
+        _checkAndUpdateCurrentWeatherCardCarousel(); // 更新当前天气卡片轮播状态
       } else {
-        // 如果有缓存数据，不设置错误状态，只记录警告
         if (_weatherWarningData != null) {
           stopwatch.stop();
-          // _logger.w(
-          //     '⚠️ 天气警告数据获取失败，但使用缓存数据，耗时: ${stopwatch.elapsedMilliseconds}ms');
+          _logger.w(
+              '⚠️ 天气警告数据获取失败，但使用缓存数据，耗时: ${stopwatch.elapsedMilliseconds}ms');
         } else {
           _warningError = '获取天气警告数据失败';
           stopwatch.stop();
-          // _logger
-          //     .w('❌ 天气警告数据获取失败且无缓存数据，耗时: ${stopwatch.elapsedMilliseconds}ms');
+          _logger
+              .w('❌ 天气警告数据获取失败且无缓存数据，耗时: ${stopwatch.elapsedMilliseconds}ms');
         }
       }
     } catch (e) {
       _warningError = '获取天气警告数据异常: $e';
       stopwatch.stop();
-      // _logger.e('❌ 获取天气警告数据异常，耗时: ${stopwatch.elapsedMilliseconds}ms',
-      //     error: e);
+      _logger.e('❌ 获取天气警告数据异常，耗时: ${stopwatch.elapsedMilliseconds}ms',
+          error: e);
     } finally {
       setState(() {
         _isLoadingWarning = false;
@@ -309,13 +389,12 @@ class WeatherProvider extends ChangeNotifier {
     }
   }
 
-  ///6，获取所有天气数据
+  ///7，获取所有天气数据
   Future<void> fetchAllWeatherData() async {
-    // _logger.i('🌍 开始获取所有天气数据... - ${DateTime.now().toIso8601String()}');
+    _logger.i('🌍 开始获取所有天气数据... - ${DateTime.now().toIso8601String()}');
 
     final stopwatch = Stopwatch()..start();
 
-    // 并行获取所有天气数据
     await Future.wait([
       fetchWeatherForecast(),
       fetchCurrentWeather(),
@@ -323,36 +402,36 @@ class WeatherProvider extends ChangeNotifier {
     ]);
 
     stopwatch.stop();
-    // _logger.i('✅ 所有天气数据获取完成，耗时: ${stopwatch.elapsedMilliseconds}ms');
+    _logger.i('✅ 所有天气数据获取完成，耗时: ${stopwatch.elapsedMilliseconds}ms');
   }
 
-  ///7，启动定时更新
+  ///8，启动定时更新
   void startPeriodicUpdate({Duration interval = const Duration(hours: 2)}) {
     if (_isPeriodicUpdateActive) {
-      // _logger.w('⏰ 天气定时更新已在运行中');
+      _logger.w('⏰ 天气定时更新已在运行中');
       return;
     }
 
-    // _logger.i(
-    //     '🌤️ 启动天气数据定时更新，间隔: ${interval.inMinutes}分钟 (${interval.inSeconds}秒)');
+    _logger.i(
+        '🌤️ 启动天气数据定时更新，间隔: ${interval.inMinutes}分钟 (${interval.inSeconds}秒)');
     _isPeriodicUpdateActive = true;
 
     _updateTimer = Timer.periodic(interval, (timer) {
-      // _logger.i('⏰ 执行天气数据定时更新 - ${DateTime.now().toIso8601String()}');
+      _logger.i('⏰ 执行天气数据定时更新 - ${DateTime.now().toIso8601String()}');
       fetchAllWeatherData();
     });
 
     notifyListeners();
   }
 
-  ///8，停止定时更新
+  ///9，停止定时更新
   void stopPeriodicUpdate() {
     if (!_isPeriodicUpdateActive) {
-      // _logger.w('⏰ 天气定时更新未在运行');
+      _logger.w('⏰ 天气定时更新未在运行');
       return;
     }
 
-    // _logger.i('⏹️ 停止天气数据定时更新');
+    _logger.i('⏹️ 停止天气数据定时更新');
     _updateTimer?.cancel();
     _updateTimer = null;
     _isPeriodicUpdateActive = false;
@@ -360,7 +439,7 @@ class WeatherProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  ///9，清除缓存
+  ///10，清除缓存
   Future<void> clearCache() async {
     try {
       final prefs = await SharedPreferences.getInstance();
@@ -373,14 +452,14 @@ class WeatherProvider extends ChangeNotifier {
       _currentWeatherData = null;
       _weatherWarningData = null;
 
-      // _logger.i('天气数据缓存已清除');
+      _logger.i('天气数据缓存已清除');
       notifyListeners();
     } catch (e) {
       _logger.e('清除天气数据缓存失败', error: e);
     }
   }
 
-  ///10，获取缓存状态信息
+  ///11，获取缓存状态信息
   Future<Map<String, dynamic>> getCacheStatus() async {
     try {
       final prefs = await SharedPreferences.getInstance();
@@ -402,9 +481,331 @@ class WeatherProvider extends ChangeNotifier {
     }
   }
 
-  ///11，设置状态并通知监听器
+  // ========== 轮播逻辑管理 ==========
+
+  ///12，初始化底部轮播
+  void initializeBottomCarousel() {
+    _logger.i('🌤️ [初始化] 底部轮播初始化');
+    _currentState = CarouselState.weather;
+    _isBottomCarouselPaused = false;
+    _bottomDuration = Duration(seconds: _getCarouselInterval());
+    startBottomTimer();
+  }
+
+  ///13，初始化当前天气卡片轮播
+  void initializeCurrentWeatherCardCarousel() {
+    _logger.i('🌤️ [初始化] 当前天气卡片轮播初始化');
+    _currentWeatherPage = CurrentWeatherPage.page1;
+    _isCurrentWeatherCardPaused = false;
+    _currentWeatherCardDuration =
+        Duration(seconds: _getCurrentWeatherCardInterval());
+
+    // 检查是否有天气警告信息，只有在有警告时才启动轮播
+    if (hasWarningData &&
+        weatherWarningData != null &&
+        weatherWarningData!.warnings.isNotEmpty) {
+      _logger.i('🌤️ [初始化] 检测到天气警告信息，启动当前天气卡片轮播');
+      startCurrentWeatherCardTimer();
+    } else {
+      _logger.i('🌤️ [初始化] 无天气警告信息，当前天气卡片不轮播，只显示第一页');
+      _isCurrentWeatherCardPaused = true;
+    }
+  }
+
+  ///14，启动底部轮播计时器
+  void startBottomTimer() {
+    _logger.d('🌤️ 开始底部轮播计时器: paused=$_isBottomCarouselPaused');
+    _bottomTimer?.cancel();
+
+    if (_isBottomCarouselPaused) {
+      _logger.w('⚠️ 底部轮播计时器条件不满足: paused=$_isBottomCarouselPaused');
+      return;
+    }
+
+    _currentBottomStartTime = DateTime.now();
+    _bottomDuration = Duration(seconds: _getCarouselInterval());
+    _bottomElapsedTime = Duration.zero;
+
+    _logger.d('▶️ 启动底部轮播计时器: state=$_currentState, duration=$_bottomDuration');
+    _logger.i(
+        '📝 记录底部轮播开始时间: $_currentBottomStartTime, 时长: ${_bottomDuration.inSeconds}秒');
+
+    _bottomTimer = Timer(_bottomDuration, () {
+      if (!_isBottomCarouselPaused) {
+        _logger.d('⏭️ 底部轮播计时器到期，切换到下一个状态');
+        _switchToNextState();
+      }
+    });
+  }
+
+  ///15，切换到下一个轮播状态
+  void _switchToNextState() {
+    switch (_currentState) {
+      case CarouselState.weather:
+        _currentState = CarouselState.qrcode;
+        _logger.i('🔄 底部轮播切换: 天气 -> 二维码');
+        break;
+      case CarouselState.qrcode:
+        _currentState = CarouselState.weather;
+        _logger.i('🔄 底部轮播切换: 二维码 -> 天气');
+        break;
+    }
+
+    notifyListeners();
+    startBottomTimer();
+  }
+
+  ///16，暂停底部轮播
+  void pauseBottomCarousel() {
+    _logger.i('🛑 暂停底部轮播');
+
+    _currentBottomPauseTime = DateTime.now();
+
+    if (_currentBottomStartTime != null) {
+      final rawElapsed =
+          _currentBottomPauseTime!.difference(_currentBottomStartTime!);
+      final totalElapsed = rawElapsed + _bottomElapsedTime;
+
+      if (totalElapsed >= _bottomDuration) {
+        _bottomElapsedTime = _bottomDuration;
+        final remaining = Duration.zero;
+        _logger.i(
+            '📊 [暂停] 底部轮播 - 已播放: ${_bottomElapsedTime.inSeconds}s/${_bottomDuration.inSeconds}s, 剩余: ${remaining.inSeconds}s (轮播已完成)');
+      } else {
+        _bottomElapsedTime = totalElapsed;
+        final remaining = _bottomDuration - _bottomElapsedTime;
+        _logger.i(
+            '📊 [暂停] 底部轮播 - 已播放: ${_bottomElapsedTime.inSeconds}s/${_bottomDuration.inSeconds}s, 剩余: ${remaining.inSeconds}s');
+      }
+    }
+
+    _isBottomCarouselPaused = true;
+    _bottomTimer?.cancel();
+    notifyListeners();
+  }
+
+  ///17，恢复底部轮播
+  void resumeBottomCarousel() {
+    _logger.i('▶️ 恢复底部轮播');
+
+    _isBottomCarouselPaused = false;
+
+    if (_currentBottomStartTime != null) {
+      final remainingTime = _bottomDuration - _bottomElapsedTime;
+      _logger.i(
+          '🔄 [恢复] 底部轮播 - 继续播放剩余时间：${remainingTime.inSeconds}s (已播放: ${_bottomElapsedTime.inSeconds}s)');
+
+      if (remainingTime > Duration.zero) {
+        _bottomTimer = Timer(remainingTime, () {
+          if (!_isBottomCarouselPaused) {
+            _switchToNextState();
+          }
+        });
+      } else {
+        _switchToNextState();
+      }
+    } else {
+      startBottomTimer();
+    }
+  }
+
+  ///18，启动调试定时器
+  void startDebugTimer() {
+    _debugTimer?.cancel();
+
+    _debugTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
+      if (_currentBottomStartTime != null) {
+        final now = DateTime.now();
+        final elapsed = now.difference(_currentBottomStartTime!);
+        final totalElapsed = elapsed + _bottomElapsedTime;
+        final remaining = _bottomDuration - totalElapsed;
+        final remainingSeconds = remaining.isNegative ? 0 : remaining.inSeconds;
+
+        String stateInfo = '';
+        switch (_currentState) {
+          case CarouselState.weather:
+            stateInfo = '天气';
+            break;
+          case CarouselState.qrcode:
+            stateInfo = '二维码';
+            break;
+        }
+
+        _logger.i(
+            '🐛 🌤️ 底部轮播: $stateInfo ${remainingSeconds}s/${_bottomDuration.inSeconds}s');
+      }
+    });
+  }
+
+  ///19，停止调试定时器
+  void stopDebugTimer() {
+    _debugTimer?.cancel();
+  }
+
+  ///23，设置状态并通知监听器
   void setState(VoidCallback fn) {
     fn();
     notifyListeners();
+  }
+
+  // ========== 当前天气卡片轮播逻辑管理 ==========
+
+  ///24，启动当前天气卡片轮播计时器
+  void startCurrentWeatherCardTimer() {
+    _logger.d('🌤️ 开始当前天气卡片轮播计时器: paused=$_isCurrentWeatherCardPaused');
+    _currentWeatherCardTimer?.cancel();
+
+    if (_isCurrentWeatherCardPaused) {
+      _logger.w('⚠️ 当前天气卡片轮播计时器条件不满足: paused=$_isCurrentWeatherCardPaused');
+      return;
+    }
+
+    _currentWeatherCardStartTime = DateTime.now();
+    _currentWeatherCardDuration =
+        Duration(seconds: _getCurrentWeatherCardInterval());
+    _currentWeatherCardElapsedTime = Duration.zero;
+
+    _logger.d(
+        '▶️ 启动当前天气卡片轮播计时器: page=$_currentWeatherPage, duration=$_currentWeatherCardDuration');
+    _logger.i(
+        '📝 记录当前天气卡片轮播开始时间: $_currentWeatherCardStartTime, 时长: ${_currentWeatherCardDuration.inSeconds}秒');
+
+    _currentWeatherCardTimer = Timer(_currentWeatherCardDuration, () {
+      if (!_isCurrentWeatherCardPaused) {
+        _logger.d('⏭️ 当前天气卡片轮播计时器到期，切换到下一个页面');
+        _switchToNextCurrentWeatherPage();
+      }
+    });
+  }
+
+  ///25，切换到下一个当前天气卡片页面
+  void _switchToNextCurrentWeatherPage() {
+    switch (_currentWeatherPage) {
+      case CurrentWeatherPage.page1:
+        _currentWeatherPage = CurrentWeatherPage.page2;
+        _logger.i('🔄 当前天气卡片轮播切换: 第一页 -> 第二页');
+        break;
+      case CurrentWeatherPage.page2:
+        _currentWeatherPage = CurrentWeatherPage.page1;
+        _logger.i('🔄 当前天气卡片轮播切换: 第二页 -> 第一页');
+        break;
+    }
+
+    notifyListeners();
+    startCurrentWeatherCardTimer();
+  }
+
+  ///26，暂停当前天气卡片轮播
+  void pauseCurrentWeatherCardCarousel() {
+    _logger.i('🛑 暂停当前天气卡片轮播');
+
+    _currentWeatherCardPauseTime = DateTime.now();
+
+    if (_currentWeatherCardStartTime != null) {
+      final rawElapsed = _currentWeatherCardPauseTime!
+          .difference(_currentWeatherCardStartTime!);
+      final totalElapsed = rawElapsed + _currentWeatherCardElapsedTime;
+
+      if (totalElapsed >= _currentWeatherCardDuration) {
+        _currentWeatherCardElapsedTime = _currentWeatherCardDuration;
+        final remaining = Duration.zero;
+        _logger.i(
+            '📊 [暂停] 当前天气卡片轮播 - 已播放: ${_currentWeatherCardElapsedTime.inSeconds}s/${_currentWeatherCardDuration.inSeconds}s, 剩余: ${remaining.inSeconds}s (轮播已完成)');
+      } else {
+        _currentWeatherCardElapsedTime = totalElapsed;
+        final remaining =
+            _currentWeatherCardDuration - _currentWeatherCardElapsedTime;
+        _logger.i(
+            '📊 [暂停] 当前天气卡片轮播 - 已播放: ${_currentWeatherCardElapsedTime.inSeconds}s/${_currentWeatherCardDuration.inSeconds}s, 剩余: ${remaining.inSeconds}s');
+      }
+    }
+
+    _isCurrentWeatherCardPaused = true;
+    _currentWeatherCardTimer?.cancel();
+    notifyListeners();
+  }
+
+  ///27，恢复当前天气卡片轮播
+  void resumeCurrentWeatherCardCarousel() {
+    _logger.i('▶️ 恢复当前天气卡片轮播');
+
+    _isCurrentWeatherCardPaused = false;
+
+    if (_currentWeatherCardStartTime != null) {
+      final remainingTime =
+          _currentWeatherCardDuration - _currentWeatherCardElapsedTime;
+      _logger.i(
+          '🔄 [恢复] 当前天气卡片轮播 - 继续播放剩余时间：${remainingTime.inSeconds}s (已播放: ${_currentWeatherCardElapsedTime.inSeconds}s)');
+
+      if (remainingTime > Duration.zero) {
+        _currentWeatherCardTimer = Timer(remainingTime, () {
+          if (!_isCurrentWeatherCardPaused) {
+            _switchToNextCurrentWeatherPage();
+          }
+        });
+      } else {
+        _switchToNextCurrentWeatherPage();
+      }
+    } else {
+      startCurrentWeatherCardTimer();
+    }
+  }
+
+  ///28，暂停所有定时器（用于设置页面）
+  void pauseAllTimersForSettings() {
+    _logger.i('⚙️ 暂停所有轮播定时器 - 进入设置页面');
+    _bottomTimer?.cancel();
+    _debugTimer?.cancel();
+    _currentWeatherCardTimer?.cancel();
+    _isBottomCarouselPaused = true;
+    _isCurrentWeatherCardPaused = true;
+  }
+
+  ///29，恢复所有定时器（从设置页面返回）
+  void resumeAllTimersFromSettings() {
+    _logger.i('↩️ 恢复所有轮播定时器 - 从设置页面返回');
+    _isBottomCarouselPaused = false;
+    _isCurrentWeatherCardPaused = false;
+    startBottomTimer();
+    startDebugTimer();
+    startCurrentWeatherCardTimer();
+  }
+
+  ///30，更新轮播暂停状态（兼容性方法）
+  void updateCarouselPauseState(bool isPaused) {
+    if (isPaused) {
+      pauseBottomCarousel();
+      pauseCurrentWeatherCardCarousel();
+    } else {
+      resumeBottomCarousel();
+      resumeCurrentWeatherCardCarousel();
+    }
+  }
+
+  /// 获取动态轮播间隔时间（秒）
+  int _getCarouselInterval() {
+    if (_appDataProvider?.deviceSettings != null) {
+      final interval = _appDataProvider!.deviceSettings!.bottomCarouselDuration;
+      _logger.i('🌤️ [动态设置] 底部轮播间隔时间: ${interval}秒');
+      return interval;
+    }
+    // 如果无法获取设置，使用默认值
+    _logger.w('🌤️ [动态设置] 无法获取设置，使用默认轮播间隔: $_defaultCarouselInterval秒');
+    return _defaultCarouselInterval;
+  }
+
+  /// 获取动态当前天气卡片轮播间隔时间（秒）
+  int _getCurrentWeatherCardInterval() {
+    if (_appDataProvider?.deviceSettings != null) {
+      // 如果设备设置中有当前天气卡片轮播间隔时间，使用它
+      // 如果没有，可以使用底部轮播间隔时间作为参考
+      final interval = _appDataProvider!.deviceSettings!.bottomCarouselDuration;
+      _logger.i('🌤️ [动态设置] 当前天气卡片轮播间隔时间: ${interval}秒');
+      return interval;
+    }
+    // 如果无法获取设置，使用默认值
+    _logger.w(
+        '🌤️ [动态设置] 无法获取设置，使用默认当前天气卡片轮播间隔: $_defaultCurrentWeatherCardInterval秒');
+    return _defaultCurrentWeatherCardInterval;
   }
 }

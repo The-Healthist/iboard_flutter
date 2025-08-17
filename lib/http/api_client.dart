@@ -335,7 +335,7 @@ class ApiClient {
         if (e.toString().contains('Failed host lookup') ||
             e.toString().contains('No address associated with hostname')) {
           errorType = 'DNS解析失敗';
-          userFriendlyMessage = '🌐 無法鏈接到服務器,請檢查網絡連接或聯繫管理員';
+          userFriendlyMessage = '🌐 無法連接到服務器,請檢查網絡連接或聯繫管理員';
         } else if (e.toString().contains('SocketException')) {
           errorType = 'Socket連接錯誤';
           userFriendlyMessage = '🔌 網絡連接異常，請檢查您的網絡設置';

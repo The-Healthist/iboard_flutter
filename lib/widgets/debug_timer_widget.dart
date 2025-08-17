@@ -6,7 +6,6 @@ import 'package:iboard_app/providers/weather_provider.dart';
 import 'package:iboard_app/providers/arrear_provider.dart';
 import 'package:iboard_app/providers/state_provider.dart';
 import 'package:iboard_app/providers/announcement_carousel_provider.dart';
-import 'package:iboard_app/providers/bottom_weather_qrcode_carousel_provider.dart';
 import 'package:iboard_app/providers/app_data_provider.dart';
 import 'package:logger/logger.dart';
 import 'dart:async';
@@ -68,8 +67,7 @@ class _TimerDebugWidgetState extends State<TimerDebugWidget> {
       final carouselStateProvider = context.read<CarouselStateProvider>();
       final announcementCarouselProvider =
           context.read<AnnouncementCarouselProvider>();
-      final bottomCarouselProvider =
-          context.read<BottomWeatherQrcodeCarouselProvider>();
+      final bottomCarouselProvider = context.read<WeatherProvider>();
       final appDataProvider = context.read<AppDataProvider>();
 
       // 基本信息
@@ -278,7 +276,7 @@ class _TimerDebugWidgetState extends State<TimerDebugWidget> {
   Future<void> _checkCarouselState(
     CarouselStateProvider carouselStateProvider,
     AnnouncementCarouselProvider announcementCarouselProvider,
-    BottomWeatherQrcodeCarouselProvider bottomCarouselProvider,
+    WeatherProvider bottomCarouselProvider,
   ) async {
     List<String> content = [];
 

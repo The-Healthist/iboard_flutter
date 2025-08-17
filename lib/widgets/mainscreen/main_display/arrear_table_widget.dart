@@ -609,11 +609,8 @@ class ArrearTableWidgetState extends State<ArrearTableWidget> {
           ((availableHeight / rowHeight).floor() - 1).clamp(8, 50);
 
       _itemsPerPage = dynamicRows;
-      print('📊 [自动翻页] 重新计算每页项数: $_itemsPerPage');
 
       _totalPages = (rawData.length / _itemsPerPage).ceil();
-      print(
-          '📄 [自动翻页] 启动自动翻页 - 数据总数: ${rawData.length}, 每页: $_itemsPerPage, 总页数: $_totalPages, 当前页: $_currentPage');
 
       if (_totalPages <= 1) {
         // 只有一页，直接通知完成
@@ -637,28 +634,25 @@ class ArrearTableWidgetState extends State<ArrearTableWidget> {
 
   ///12a, 启动实际的自动翻页逻辑
   void _startActualAutoPagination() {
-    print('📄 [自动翻页] 启动实际自动翻页逻辑 - 总页数: $_totalPages, 当前页: $_currentPage');
-
     // 获取设置中的翻页时间，默认为5秒
-    final appDataProvider = Provider.of<AppDataProvider>(context, listen: false);
+    final appDataProvider =
+        Provider.of<AppDataProvider>(context, listen: false);
     final deviceSettings = appDataProvider.deviceSettings;
     final paginationDuration = deviceSettings?.paymentTableOnePageDuration ?? 5;
-    
-    print('📄 [自动翻页] 使用翻页时间: ${paginationDuration}秒');
 
     _autoPaginationTimer?.cancel();
-    _autoPaginationTimer = Timer.periodic(Duration(seconds: paginationDuration), (timer) {
+    _autoPaginationTimer =
+        Timer.periodic(Duration(seconds: paginationDuration), (timer) {
       if (_isPaginationPaused) return; // 如果暂停，跳过这次执行
 
       if (_currentPage < _totalPages) {
         setState(() {
           _currentPage++;
         });
-        print('📄 [自动翻页] 切换到第 $_currentPage 页 / $_totalPages 页');
       } else {
         // 已经是最后一页，通知完成并停止定时器
         timer.cancel();
-        print('📄 [自动翻页] 已到最后一页，通知轮播切换到下一个通告');
+
         if (widget.onPaginationComplete != null) {
           widget.onPaginationComplete!(_totalPages);
         }
@@ -670,7 +664,6 @@ class ArrearTableWidgetState extends State<ArrearTableWidget> {
   void _pauseAutoPagination() {
     if (!_isPaginationPaused) {
       _isPaginationPaused = true;
-      print('⏸️ [自动翻页] 暂停自动翻页');
     }
   }
 
@@ -678,12 +671,10 @@ class ArrearTableWidgetState extends State<ArrearTableWidget> {
   void _resumeAutoPagination() {
     if (_isPaginationPaused) {
       _isPaginationPaused = false;
-      print('▶️ [自动翻页] 恢复自动翻页');
 
       // 如果定时器不活跃且还有页面需要翻页，重新启动翻页
       if ((_autoPaginationTimer == null || !_autoPaginationTimer!.isActive) &&
           _currentPage < _totalPages) {
-        print('🔄 [自动翻页] 检测到翻页定时器已停止，重新启动翻页');
         _startActualAutoPagination();
       }
     }
@@ -694,7 +685,6 @@ class ArrearTableWidgetState extends State<ArrearTableWidget> {
     _autoPaginationTimer?.cancel();
     _autoPaginationTimer = null;
     _isPaginationPaused = false;
-    print('🛑 [自动翻页] 停止自动翻页');
   }
 
   ///16, 构建空状态
