@@ -191,35 +191,47 @@ class MainScreenWidgetState extends State<MainScreenWidget> {
               decoration: BoxDecoration(
                 borderRadius: BorderRadius.circular(8),
                 border: Border.all(color: Colors.grey.shade300),
-                color: Colors.grey.shade50, // 使用浅灰色背景替代图片
+                color: Colors.white, // 改为白色背景，让图片更清晰
               ),
-              child: const Center(
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(
-                      Icons.payment,
-                      size: 64,
-                      color: Colors.grey,
-                    ),
-                    SizedBox(height: 16),
-                    Text(
-                      '電子繳費功能',
-                      style: TextStyle(
-                        fontSize: 18,
-                        color: Colors.black87,
-                        fontWeight: FontWeight.w500,
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(8), // 保持圆角
+                child: Image.asset(
+                  'assets/images/payment.png',
+                  width: double.infinity, // 宽度填满容器
+                  height: double.infinity, // 高度填满容器
+                  fit: BoxFit.cover, // 填满容器，不保持比例
+                  errorBuilder: (context, error, stackTrace) {
+                    // 如果图片加载失败，显示备用内容
+                    return const Center(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(
+                            Icons.payment,
+                            size: 64,
+                            color: Colors.grey,
+                          ),
+                          SizedBox(height: 16),
+                          Text(
+                            '電子繳費功能',
+                            style: TextStyle(
+                              fontSize: 18,
+                              color: Colors.black87,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                          SizedBox(height: 8),
+                          Text(
+                            '該大廈尚未開通此功能',
+                            style: TextStyle(
+                              fontSize: 14,
+                              color: Colors.grey,
+                            ),
+                          ),
+                        ],
                       ),
-                    ),
-                    SizedBox(height: 8),
-                    Text(
-                      '該大廈尚未開通此功能',
-                      style: TextStyle(
-                        fontSize: 14,
-                        color: Colors.grey,
-                      ),
-                    ),
-                  ],
+                    );
+                  },
                 ),
               ),
             ),
