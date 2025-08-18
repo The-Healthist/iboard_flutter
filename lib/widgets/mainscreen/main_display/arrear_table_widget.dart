@@ -43,10 +43,9 @@ class ArrearTableWidgetState extends State<ArrearTableWidget> {
     // 确保数据已加载 - 使用与欠费查询相同的数据源
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final provider = Provider.of<ArrearProvider>(context, listen: false);
-      print(
-          '📊 [ArrearTableWidget] 初始化 - 当前原始数据记录数: ${provider.rawArrearData.length}');
+      print('📊 [ArrearTableWidget] 初始化 - 检查费用数据状态');
 
-      if (provider.rawArrearData.isEmpty) {
+      if (!provider.hasData) {
         print('📊 [ArrearTableWidget] 数据为空，从缓存加载');
         provider.loadFromCache();
       } else {
@@ -54,8 +53,8 @@ class ArrearTableWidgetState extends State<ArrearTableWidget> {
       }
 
       // 如果在轮播模式下，启动自动翻页
-      if (widget.isInCarouselMode && provider.rawArrearData.isNotEmpty) {
-        _startAutoPagination(provider.rawArrearData);
+      if (widget.isInCarouselMode && provider.hasData) {
+        _startAutoPagination();
       }
     });
   }
@@ -129,7 +128,7 @@ class ArrearTableWidgetState extends State<ArrearTableWidget> {
                     child: _buildTableContent(provider),
                   ),
                   // 分頁欄放在表格下方
-                  _buildPagination(provider.rawArrearData),
+                  _buildPagination(provider),
                 ],
               ),
             ),
@@ -173,9 +172,8 @@ class ArrearTableWidgetState extends State<ArrearTableWidget> {
       );
     }
 
-    // 使用与欠费查询相同的原始数据源
-    final rawData = provider.rawArrearData;
-    if (rawData.isEmpty) {
+    // 使用新的费用数据结构
+    if (!provider.hasData) {
       return _buildEmptyState();
     }
 
@@ -212,8 +210,9 @@ class ArrearTableWidgetState extends State<ArrearTableWidget> {
           });
         }
 
-        final headers = _getTableHeaders(rawData);
-        final paginatedData = _getPaginatedData(rawData);
+        // 构建表格数据
+        final tableData = _buildTableData(provider);
+        final paginatedData = _getPaginatedData(tableData);
 
         return Container(
           margin: const EdgeInsets.all(16),
@@ -254,7 +253,7 @@ class ArrearTableWidgetState extends State<ArrearTableWidget> {
                         ),
                       ),
                     ),
-                    ...headers.map((header) => Expanded(
+                    ..._getTableHeaders(tableData).map((header) => Expanded(
                           flex: 2,
                           child: Text(
                             header,
@@ -295,7 +294,7 @@ class ArrearTableWidgetState extends State<ArrearTableWidget> {
                             ),
                           ),
                         ),
-                        ...headers.map((header) => Expanded(
+                        ..._getTableHeaders(tableData).map((header) => Expanded(
                               flex: 2,
                               child: Center(
                                 child: _buildStatusChip(record[header]),
@@ -313,90 +312,64 @@ class ArrearTableWidgetState extends State<ArrearTableWidget> {
     );
   }
 
-  ///3, 构建数据表格
-  Widget _buildDataTable(List<Map<String, dynamic>> rawData) {
-    if (rawData.isEmpty) return const SizedBox.shrink();
+  ///3, 构建表格数据
+  List<Map<String, dynamic>> _buildTableData(ArrearProvider provider) {
+    final List<Map<String, dynamic>> tableData = [];
 
-    // 获取表头（排除"單位"字段）
-    final headers = _getTableHeaders(rawData);
+    // 从物业管理费用数据构建表格数据
+    if (provider.managementFeeData != null) {
+      for (final block in provider.managementFeeData!.blocks) {
+        for (final floor in block.floors) {
+          for (final unit in floor.units) {
+            final Map<String, dynamic> rowData = {
+              '單位': '${floor.name}${unit.name}',
+            };
 
-    // 分页数据
-    final paginatedData = _getPaginatedData(rawData);
+            // 添加费用数据
+            for (final bill in unit.bills) {
+              rowData[bill.period] = bill.value;
+            }
 
-    return DataTable(
-      horizontalMargin: 0,
-      columnSpacing: 16,
-      headingRowColor:
-          MaterialStateProperty.all(Theme.of(context).primaryColor),
-      headingTextStyle: const TextStyle(
-        color: Colors.white,
-        fontWeight: FontWeight.w600,
-        fontSize: 14,
-      ),
-      dataTextStyle: const TextStyle(
-        fontSize: 13,
-        color: Colors.black87,
-      ),
-      columns: [
-        // 單位列
-        const DataColumn(
-          label: Padding(
-            padding: EdgeInsets.only(left: 16),
-            child: Text(
-              '單位',
-              style: TextStyle(fontWeight: FontWeight.w600),
-            ),
-          ),
-        ),
-        // 动态表头
-        ...headers
-            .map((header) => DataColumn(
-                  label: Expanded(
-                    child: Text(
-                      header,
-                      style: const TextStyle(fontWeight: FontWeight.w600),
-                    ),
-                  ),
-                ))
-            .toList(),
-      ],
-      rows: paginatedData.map<DataRow>((record) {
-        return DataRow(
-          color: MaterialStateProperty.resolveWith<Color?>(
-            (Set<MaterialState> states) {
-              final index = paginatedData.indexOf(record);
-              return index % 2 == 0 ? Colors.grey.shade50 : Colors.white;
-            },
-          ),
-          cells: [
-            // 單位列
-            DataCell(
-              Container(
-                padding: const EdgeInsets.symmetric(vertical: 8),
-                child: Text(
-                  record['單位']?.toString() ?? '-',
-                  style: const TextStyle(
-                    fontWeight: FontWeight.w500,
-                    color: Colors.black87,
-                  ),
-                ),
-              ),
-            ),
-            // 动态数据列
-            ...headers.map((header) {
-              final value = record[header];
-              return DataCell(
-                Container(
-                  padding:
-                      const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
-                  child: _buildStatusChip(value),
-                ),
-              );
-            }).toList(),
-          ],
-        );
-      }).toList(),
-    );
+            tableData.add(rowData);
+          }
+        }
+      }
+    }
+
+    // 从其他分摊费用数据构建表格数据
+    if (provider.otherFeeData != null) {
+      for (final block in provider.otherFeeData!.blocks) {
+        for (final floor in block.floors) {
+          for (final unit in floor.units) {
+            // 查找是否已存在该单位的行
+            final existingRowIndex = tableData
+                .indexWhere((row) => row['單位'] == '${floor.name}${unit.name}');
+
+            if (existingRowIndex != -1) {
+              // 如果已存在，添加其他费用数据
+              for (final bill in unit.bills) {
+                final key = '${bill.period} (${bill.itemId ?? "分攤費用"})';
+                tableData[existingRowIndex][key] = bill.value;
+              }
+            } else {
+              // 如果不存在，创建新行
+              final Map<String, dynamic> rowData = {
+                '單位': '${floor.name}${unit.name}',
+              };
+
+              for (final bill in unit.bills) {
+                final key = '${bill.period} (${bill.itemId ?? "分攤費用"})';
+                rowData[key] = bill.value;
+              }
+
+              tableData.add(rowData);
+            }
+          }
+        }
+      }
+    }
+
+    return tableData;
   }
 
   ///4, 构建状态芯片 - 優化尺寸以節省空間
@@ -442,45 +415,27 @@ class ArrearTableWidgetState extends State<ArrearTableWidget> {
     return value.toString();
   }
 
-  ///8, 动态计算每页显示的行数 - 優化以減少空白
-  void _calculateItemsPerPage(double availableHeight) {
-    // 计算可用高度：总高度 - 分页控件高度 - 表头高度 - 内边距
-    const double paginationHeight = 56; // 分页控件预估高度
-    const double headerHeight = 44; // 表头高度
-    const double padding = 32; // 内边距（上下各16）
-    const double rowHeight = 40; // 每行高度（優化後）
-
-    final double contentHeight =
-        availableHeight - paginationHeight - headerHeight - padding;
-    final int calculatedRows = (contentHeight / rowHeight).floor();
-
-    // 设置合理的范围：增加最少8行，最多50行以更好利用空間
-    _itemsPerPage = calculatedRows.clamp(8, 50);
-
-    print(
-        '📊 [ArrearTableWidget] 动态计算 - 可用高度: ${availableHeight.toInt()}px, 每页行数: $_itemsPerPage');
-  }
-
-  ///9, 获取表头
-  List<String> _getTableHeaders(List<Map<String, dynamic>> rawData) {
-    if (rawData.isEmpty) return [];
+  ///8, 获取表头
+  List<String> _getTableHeaders(List<Map<String, dynamic>> tableData) {
+    if (tableData.isEmpty) return [];
 
     // 获取第一条记录的所有键，排除"單位"字段
-    final firstRecord = rawData.first;
+    final firstRecord = tableData.first;
     return firstRecord.keys.where((key) => key != '單位').toList();
   }
 
-  ///10, 获取分页数据
+  ///9, 获取分页数据
   List<Map<String, dynamic>> _getPaginatedData(
-      List<Map<String, dynamic>> rawData) {
+      List<Map<String, dynamic>> tableData) {
     final startIndex = (_currentPage - 1) * _itemsPerPage;
-    final endIndex = (startIndex + _itemsPerPage).clamp(0, rawData.length);
-    return rawData.sublist(startIndex, endIndex);
+    final endIndex = (startIndex + _itemsPerPage).clamp(0, tableData.length);
+    return tableData.sublist(startIndex, endIndex);
   }
 
-  ///11, 构建分页控件
-  Widget _buildPagination(List<Map<String, dynamic>> rawData) {
-    final totalItems = rawData.length;
+  ///10, 构建分页控件
+  Widget _buildPagination(ArrearProvider provider) {
+    final tableData = _buildTableData(provider);
+    final totalItems = tableData.length;
 
     // 确保使用正确计算的每页项数
     int actualItemsPerPage = _itemsPerPage;
@@ -585,14 +540,16 @@ class ArrearTableWidgetState extends State<ArrearTableWidget> {
     );
   }
 
-  ///12, 启动自动翻页 - 仅在轮播模式下使用
-  void _startAutoPagination(List<Map<String, dynamic>> rawData) {
-    if (!widget.isInCarouselMode || rawData.isEmpty) return;
+  ///11, 启动自动翻页 - 仅在轮播模式下使用
+  void _startAutoPagination() {
+    if (!widget.isInCarouselMode) return;
 
     // 确保在启动自动翻页前先计算正确的每页项数
     WidgetsBinding.instance.addPostFrameCallback((_) {
+      final provider = Provider.of<ArrearProvider>(context, listen: false);
+      final tableData = _buildTableData(provider);
+
       // 重新计算每页项数，确保总页数准确
-      final context = this.context;
       final screenHeight = MediaQuery.of(context).size.height;
       final double mainAreaHeight = screenHeight * 14 / 24;
       final double outerPadding = 16 * 2;
@@ -610,7 +567,7 @@ class ArrearTableWidgetState extends State<ArrearTableWidget> {
 
       _itemsPerPage = dynamicRows;
 
-      _totalPages = (rawData.length / _itemsPerPage).ceil();
+      _totalPages = (tableData.length / _itemsPerPage).ceil();
 
       if (_totalPages <= 1) {
         // 只有一页，直接通知完成
@@ -632,7 +589,7 @@ class ArrearTableWidgetState extends State<ArrearTableWidget> {
     });
   }
 
-  ///12a, 启动实际的自动翻页逻辑
+  ///12, 启动实际的自动翻页逻辑
   void _startActualAutoPagination() {
     // 获取设置中的翻页时间，默认为5秒
     final appDataProvider =
@@ -710,7 +667,7 @@ class ArrearTableWidgetState extends State<ArrearTableWidget> {
             Icon(Icons.table_chart_outlined, color: Colors.grey, size: 60),
             SizedBox(height: 16),
             Text(
-              '暫無欠費數據',
+              '暫無費用數據',
               style: TextStyle(
                 fontSize: 18,
                 color: Colors.grey,

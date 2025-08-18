@@ -147,7 +147,7 @@ class _TimeSettingsPageState extends State<TimeSettingsPage> {
                                       ),
                                       SizedBox(width: 16),
                                       Text(
-                                        '设备信息',
+                                        '設備信息',
                                         style: TextStyle(
                                           fontSize: 18,
                                           fontWeight: FontWeight.bold,
@@ -157,11 +157,11 @@ class _TimeSettingsPageState extends State<TimeSettingsPage> {
                                     ],
                                   ),
                                   SizedBox(height: 24),
-                                  _buildInfoRow('设备ID', deviceId ?? '未获取'),
+                                  _buildInfoRow('設備ID', deviceId ?? '未获取'),
                                   SizedBox(height: 12),
                                   _buildInfoRow(
-                                    '登录状态',
-                                    isLoggedIn ? '已登录' : '未登录',
+                                    '登錄狀態',
+                                    isLoggedIn ? '已登錄' : '未登錄',
                                     isLoggedIn
                                         ? Colors.green.shade700
                                         : Colors.red.shade700,
@@ -169,21 +169,21 @@ class _TimeSettingsPageState extends State<TimeSettingsPage> {
                                   if (settingsModel?.building != null) ...[
                                     SizedBox(height: 12),
                                     _buildInfoRow(
-                                        '地区', settingsModel!.building.location),
+                                        '地區', settingsModel!.building.location),
                                     SizedBox(height: 12),
                                     _buildInfoRow(
-                                        '建筑物', settingsModel!.building.name),
+                                        '建築物', settingsModel.building.name),
                                     SizedBox(height: 12),
                                     _buildInfoRow('iSmart ID',
-                                        settingsModel!.building.ismartId),
+                                        settingsModel.building.ismartId),
                                     SizedBox(height: 12),
                                     _buildInfoRow('位置信息',
-                                        settingsModel!.building.location),
+                                        settingsModel.building.location),
                                   ],
                                   if (error != null) ...[
                                     SizedBox(height: 12),
                                     _buildInfoRow(
-                                        '错误信息', error, Colors.red.shade700),
+                                        '錯誤信息', error, Colors.red.shade700),
                                   ],
                                 ],
                               ),
@@ -227,7 +227,7 @@ class _TimeSettingsPageState extends State<TimeSettingsPage> {
                                         ),
                                         SizedBox(width: 16),
                                         Text(
-                                          '时间设置',
+                                          '時間設置',
                                           style: TextStyle(
                                             fontSize: 18,
                                             fontWeight: FontWeight.bold,
@@ -238,62 +238,62 @@ class _TimeSettingsPageState extends State<TimeSettingsPage> {
                                     ),
                                     SizedBox(height: 24),
                                     _buildTimeSettingRow(
-                                      '欠费更新间隔',
+                                      '欠費更新間隔',
                                       '${deviceSettings.arrearageUpdateDuration}分钟',
                                     ),
                                     SizedBox(height: 12),
                                     _buildTimeSettingRow(
-                                      '通告更新间隔',
+                                      '通告更新間隔',
                                       '${deviceSettings.noticeUpdateDuration}分钟',
                                     ),
                                     SizedBox(height: 12),
                                     _buildTimeSettingRow(
-                                      '广告更新间隔',
+                                      '廣告更新間隔',
                                       '${deviceSettings.advertisementUpdateDuration}分钟',
                                     ),
                                     SizedBox(height: 12),
                                     _buildTimeSettingRow(
-                                      '广告播放时长',
+                                      '廣告播放時長',
                                       '${deviceSettings.advertisementPlayDuration}秒',
                                     ),
                                     SizedBox(height: 12),
                                     _buildTimeSettingRow(
-                                      '通告播放时长',
+                                      '通告播放時長',
                                       '${deviceSettings.noticePlayDuration}秒',
                                     ),
                                     SizedBox(height: 12),
                                     _buildTimeSettingRow(
-                                      '空闲时长',
+                                      '空閒時長',
                                       '${deviceSettings.spareDuration}秒',
                                     ),
                                     SizedBox(height: 12),
                                     _buildTimeSettingRow(
-                                      '通告停留时长',
+                                      '通告停留時長',
                                       '${deviceSettings.noticeStayDuration}秒',
                                     ),
                                     SizedBox(height: 12),
                                     _buildTimeSettingRow(
-                                      '应用更新时间',
+                                      '應用更新時間',
                                       '${deviceSettings.appUpdateDuration}秒',
                                     ),
                                     SizedBox(height: 12),
                                     _buildTimeSettingRow(
-                                      '底部轮播时间',
+                                      '底部輪播時間',
                                       '${deviceSettings.bottomCarouselDuration}秒',
                                     ),
                                     SizedBox(height: 12),
                                     _buildTimeSettingRow(
-                                      '付款表格一页显示时间',
+                                      '付款表格一頁顯示時間',
                                       '${deviceSettings.paymentTableOnePageDuration}秒',
                                     ),
                                     SizedBox(height: 12),
                                     _buildTimeSettingRow(
-                                      '正常到通告轮播转换时间',
+                                      '正常到通告輪播轉換時間',
                                       '${deviceSettings.normalToAnnouncementCarouselDuration}秒',
                                     ),
                                     SizedBox(height: 12),
                                     _buildTimeSettingRow(
-                                      '通告轮播到全屏广告转换时间',
+                                      '通告輪播到全屏廣告轉換時間',
                                       '${deviceSettings.announcementCarouselToFullAdsCarouselDuration}秒',
                                     ),
                                   ],

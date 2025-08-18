@@ -248,7 +248,7 @@ class _TimerDebugWidgetState extends State<TimerDebugWidget> {
         .add('定时更新状态: ${provider.isPeriodicUpdateActive ? '✅ 运行中' : '❌ 已停止'}');
     content.add('更新间隔: ${updateInterval}分钟 (${updateInterval * 60}秒)');
     content.add('数据状态: ${provider.hasData ? '✅ 有数据' : '❌ 无数据'}');
-    content.add('记录总数: ${provider.rawArrearData.length}');
+    content.add('记录总数: ${provider.hasData ? '有数据' : '无数据'}');
     content.add('楼宇数量: ${provider.buildings.length}');
     content.add('选中楼宇: ${provider.selectedBuildingId ?? '未选择'}');
     content.add('选中单元: ${provider.selectedUnit ?? '未选择'}');
@@ -505,18 +505,18 @@ class _TimerDebugWidgetState extends State<TimerDebugWidget> {
 
     try {
       final arrearProvider = context.read<ArrearProvider>();
-      await arrearProvider.fetchArrears();
+      await arrearProvider.fetchFeeData();
 
       final endTime = DateTime.now();
       final duration = endTime.difference(startTime);
 
       _manualUpdateResults['arrears'] = {
         'success': true,
-        'message': '欠费数据更新成功',
+        'message': '欠费数据更新成功（包含管理费和其他分摊费用）',
         'duration': duration.inMilliseconds,
         'timestamp': endTime,
         'data': {
-          '记录总数': arrearProvider.rawArrearData.length,
+          '数据状态': arrearProvider.hasData ? '✅ 有数据' : '❌ 无数据',
           '楼宇数量': arrearProvider.buildings.length,
         }
       };

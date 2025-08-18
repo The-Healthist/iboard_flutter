@@ -56,11 +56,12 @@ class RthkNewsProvider extends ChangeNotifier {
             newsData.map((item) => RthkNewsModel.fromJson(item)).toList();
         _logger.i('📱 从本地存储加载了 ${_newsList.length} 条新闻');
 
-        // 检查是否包含备用数据
-        final fallbackCount =
-            _newsList.where((news) => news.guid.startsWith('fallback_')).length;
-        if (fallbackCount > 0) {
-          _logger.w('⚠️ 本地存储中包含 $fallbackCount 条备用新闻数据');
+        // 检查是否包含网络错误提示数据
+        final networkErrorCount = _newsList
+            .where((news) => news.guid.startsWith('network_error_'))
+            .length;
+        if (networkErrorCount > 0) {
+          _logger.w('⚠️ 本地存储中包含 $networkErrorCount 条网络错误提示数据');
         }
       } else {
         _logger.i('📱 本地存储中没有新闻数据');
@@ -213,11 +214,11 @@ class RthkNewsProvider extends ChangeNotifier {
 
       // 检查缓存中是否有数据
       if (_newsList.isEmpty) {
-        // 只有在缓存为空时才使用备用新闻数据
-        _logger.i('🔄 缓存为空，使用备用新闻数据');
-        _useFallbackNews();
+        // 只有在缓存为空时才显示网络错误提示
+        _logger.i('🔄 缓存为空，显示网络错误提示');
+        _useNetworkErrorPrompt();
 
-        // 备用数据也要保存到本地存储
+        // 网络错误提示也要保存到本地存储
         await _saveToLocalStorage();
 
         // 通知UI更新
@@ -236,55 +237,23 @@ class RthkNewsProvider extends ChangeNotifier {
     }
   }
 
-  ///5.1, 使用备用新闻数据
-  void _useFallbackNews() {
+  ///5.1, 使用网络连接失败提示
+  void _useNetworkErrorPrompt() {
     final now = DateTime.now();
     _newsList = [
       RthkNewsModel(
-        title: '香港经济持续复苏，第二季度GDP增长3.1%',
-        guid: 'fallback_001',
+        title: '網絡未能運接，暫無法顯示資訊',
+        guid: 'network_error_001',
         link: 'https://news.rthk.hk',
-        pubDate: now.subtract(const Duration(hours: 2)),
+        pubDate: now,
         formattedTime:
-            '${(now.hour - 2).toString().padLeft(2, '0')}:${now.minute.toString().padLeft(2, '0')}',
-      ),
-      RthkNewsModel(
-        title: '恒生指数今日上涨2.1%，科技股表现强劲',
-        guid: 'fallback_002',
-        link: 'https://news.rthk.hk',
-        pubDate: now.subtract(const Duration(hours: 4)),
-        formattedTime:
-            '${(now.hour - 4).toString().padLeft(2, '0')}:${now.minute.toString().padLeft(2, '0')}',
-      ),
-      RthkNewsModel(
-        title: '港府推出新一轮消费券计划，提振本地经济',
-        guid: 'fallback_003',
-        link: 'https://news.rthk.hk',
-        pubDate: now.subtract(const Duration(hours: 6)),
-        formattedTime:
-            '${(now.hour - 6).toString().padLeft(2, '0')}:${now.minute.toString().padLeft(2, '0')}',
-      ),
-      RthkNewsModel(
-        title: '香港机场客运量恢复至疫情前80%水平',
-        guid: 'fallback_004',
-        link: 'https://news.rthk.hk',
-        pubDate: now.subtract(const Duration(hours: 8)),
-        formattedTime:
-            '${(now.hour - 8).toString().padLeft(2, '0')}:${now.minute.toString().padLeft(2, '0')}',
-      ),
-      RthkNewsModel(
-        title: '香港科技创新发展迅速，吸引全球投资',
-        guid: 'fallback_005',
-        link: 'https://news.rthk.hk',
-        pubDate: now.subtract(const Duration(hours: 10)),
-        formattedTime:
-            '${(now.hour - 10).toString().padLeft(2, '0')}:${now.minute.toString().padLeft(2, '0')}',
+            '${now.hour.toString().padLeft(2, '0')}:${now.minute.toString().padLeft(2, '0')}',
       ),
     ];
 
     _lastUpdateTime = now;
-    _logger.i('✅ 已加载 ${_newsList.length} 条备用新闻数据（仅在缓存为空且API失败时使用）');
-    _logger.w('⚠️ 注意：这些是示例新闻数据，不是实时新闻');
+    _logger.i('⚠️ 网络连接失败，显示错误提示信息');
+    _logger.w('⚠️ 注意：显示网络连接失败提示，而不是模拟数据');
   }
 
   ///6, 手动刷新新闻
@@ -312,8 +281,8 @@ class RthkNewsProvider extends ChangeNotifier {
       'errorMessage': _errorMessage,
       'lastUpdateTime': _lastUpdateTime?.toIso8601String(),
       'isLoading': _isLoading,
-      'isUsingFallbackData': _newsList.isNotEmpty &&
-          _newsList.any((news) => news.guid.startsWith('fallback_')),
+      'isUsingNetworkErrorPrompt': _newsList.isNotEmpty &&
+          _newsList.any((news) => news.guid.startsWith('network_error_')),
     };
   }
 

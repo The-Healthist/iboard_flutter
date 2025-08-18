@@ -591,33 +591,33 @@ class ApiClient {
   /// 8. 获取欠费数据
   /// Endpoint: POST https://uqf0jqfm77.execute-api.ap-east-1.amazonaws.com/prod/v1/building_board/building-mf-table
   /// Body: {"blg_id": "string", "ptype": "mf"}
-  Future<List<Map<String, dynamic>>> getArrearage({String? buildingId}) async {
-    // 验证Building ID格式
-    if (buildingId != null && !_isValidBuildingId(buildingId)) {
-      throw ApiException(
-        statusCode: 400,
-        message: 'Building ID 格式无效，只能包含数字和英文字母',
-        errorData: 'Invalid building ID: $buildingId',
-      );
-    }
+  // Future<List<Map<String, dynamic>>> getArrearage({String? buildingId}) async {
+  //   // 验证Building ID格式
+  //   if (buildingId != null && !_isValidBuildingId(buildingId)) {
+  //     throw ApiException(
+  //       statusCode: 400,
+  //       message: 'Building ID 格式无效，只能包含数字和英文字母',
+  //       errorData: 'Invalid building ID: $buildingId',
+  //     );
+  //   }
 
-    const String fullUrl =
-        'https://uqf0jqfm77.execute-api.ap-east-1.amazonaws.com/prod/v1/building_board/building-mf-table';
-    final Uri url = _buildUri(fullUrl, null);
-    final Map<String, dynamic> requestBodyMap = {
-      'ptype': 'mf',
-      if (buildingId != null) 'blg_id': buildingId,
-    };
-    final String requestBody = json.encode(requestBodyMap);
-    final Map<String, String> headers =
-        _getHeaders(requiresAuth: true, contentType: 'application/json');
+  //   const String fullUrl =
+  //       'https://uqf0jqfm77.execute-api.ap-east-1.amazonaws.com/prod/v1/building_board/building-mf-table';
+  //   final Uri url = _buildUri(fullUrl, null);
+  //   final Map<String, dynamic> requestBodyMap = {
+  //     'ptype': 'mf',
+  //     if (buildingId != null) 'blg_id': buildingId,
+  //   };
+  //   final String requestBody = json.encode(requestBodyMap);
+  //   final Map<String, String> headers =
+  //       _getHeaders(requiresAuth: true, contentType: 'application/json');
 
-    _logger.i('获取欠费数据，楼宇ID: $buildingId');
-    final http.Response response = await _sendRequest(
-        () => http.post(url, headers: headers, body: requestBody),
-        apiNameForLog: 'getArrearage');
-    return _handleArrayResponse(response, 'getArrearage');
-  }
+  //   _logger.i('获取欠费数据，楼宇ID: $buildingId');
+  //   final http.Response response = await _sendRequest(
+  //       () => http.post(url, headers: headers, body: requestBody),
+  //       apiNameForLog: 'getArrearage');
+  //   return _handleArrayResponse(response, 'getArrearage');
+  // }
 
   ///9, 验证Building ID格式
   bool _isValidBuildingId(String buildingId) {
@@ -852,5 +852,68 @@ class ApiClient {
         errorData: decodedBody,
       );
     }
+  }
+
+  ///18. 獲取物業管理費用
+  /// Endpoint: POST https://uqf0jqfm77.execute-api.ap-east-1.amazonaws.com/prod/v1/building_board/building-management-fee-status
+  /// Body: {"ptype": "mf", "blg_id": "string"}
+  Future<Map<String, dynamic>> getManagementFeeStatus(
+      {String? buildingId}) async {
+    // 验证Building ID格式
+    if (buildingId != null && !_isValidBuildingId(buildingId)) {
+      throw ApiException(
+        statusCode: 400,
+        message: 'Building ID 格式无效，只能包含数字和英文字母',
+        errorData: 'Invalid building ID: $buildingId',
+      );
+    }
+
+    const String fullUrl =
+        'https://uqf0jqfm77.execute-api.ap-east-1.amazonaws.com/prod/v1/building_board/building-management-fee-status';
+    final Uri url = _buildUri(fullUrl, null);
+    final Map<String, dynamic> requestBodyMap = {
+      'ptype': 'mf',
+      if (buildingId != null) 'blg_id': buildingId,
+    };
+    final String requestBody = json.encode(requestBodyMap);
+    final Map<String, String> headers =
+        _getHeaders(requiresAuth: true, contentType: 'application/json');
+
+    _logger.i('获取物业管理费用状态，楼宇ID: $buildingId');
+    final http.Response response = await _sendRequest(
+        () => http.post(url, headers: headers, body: requestBody),
+        apiNameForLog: 'getManagementFeeStatus');
+    return _handleResponse(response, 'getManagementFeeStatus');
+  }
+
+  ///19. 獲取物業其他費用
+  /// Endpoint: POST https://uqf0jqfm77.execute-api.ap-east-1.amazonaws.com/prod/v1/building_board/building-other-fee-status
+  /// Body: {"ptype": "mf", "blg_id": "string"}
+  Future<Map<String, dynamic>> getOtherFeeStatus({String? buildingId}) async {
+    // 验证Building ID格式
+    if (buildingId != null && !_isValidBuildingId(buildingId)) {
+      throw ApiException(
+        statusCode: 400,
+        message: 'Building ID 格式无效，只能包含数字和英文字母',
+        errorData: 'Invalid building ID: $buildingId',
+      );
+    }
+
+    const String fullUrl =
+        'https://uqf0jqfm77.execute-api.ap-east-1.amazonaws.com/prod/v1/building_board/building-other-fee-status';
+    final Uri url = _buildUri(fullUrl, null);
+    final Map<String, dynamic> requestBodyMap = {
+      'ptype': 'mf',
+      if (buildingId != null) 'blg_id': buildingId,
+    };
+    final String requestBody = json.encode(requestBodyMap);
+    final Map<String, String> headers =
+        _getHeaders(requiresAuth: true, contentType: 'application/json');
+
+    _logger.i('获取物业其他费用状态，楼宇ID: $buildingId');
+    final http.Response response = await _sendRequest(
+        () => http.post(url, headers: headers, body: requestBody),
+        apiNameForLog: 'getOtherFeeStatus');
+    return _handleResponse(response, 'getOtherFeeStatus');
   }
 }

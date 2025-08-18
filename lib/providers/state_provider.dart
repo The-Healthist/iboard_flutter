@@ -229,32 +229,49 @@ class CarouselStateProvider extends ChangeNotifier {
   }
 
   /// 獲取全屏廣告状态总时间（秒）
-  int get fullscreenAdDuration =>
-      _settings?.advertisementPlayDuration ?? _defaultFullscreenAdDuration;
+  int get fullscreenAdDuration {
+    final duration = _settings?.advertisementPlayDuration;
+    return duration != null && duration > 0
+        ? duration
+        : _defaultFullscreenAdDuration;
+  }
 
   /// 獲取手動操作超時時間（秒） - 使用spareDuration
-  int get manualOperationTimeout =>
-      _settings?.spareDuration ?? _defaultManualOperationTimeout;
+  int get manualOperationTimeout {
+    final duration = _settings?.spareDuration;
+    return duration != null && duration > 0
+        ? duration
+        : _defaultManualOperationTimeout;
+  }
 
   /// 獲取無操作進入全屏廣告時間（秒） - 使用spareDuration
-  int get noActivityTimeout =>
-      _settings?.spareDuration ?? _defaultNoActivityTimeout;
+  int get noActivityTimeout {
+    final duration = _settings?.spareDuration;
+    return duration != null && duration > 0
+        ? duration
+        : _defaultNoActivityTimeout;
+  }
 
   /// 獲取每個公告停留時間（秒） - 每一個公告在輪播模式停留的時間
   int get noticeStayDuration {
-    final duration = _settings?.noticeStayDuration ?? 5;
+    final duration = _settings?.noticeStayDuration;
+    final result = duration != null && duration > 0 ? duration : 5;
     // Notice stay duration debug info (always available)
-    // print('🔍 [DEBUG] noticeStayDuration: API=${_settings?.noticeStayDuration}, 返回值=$duration');
-    return duration;
+    // print('🔍 [DEBUG] noticeStayDuration: API=${_settings?.noticeStayDuration}, 返回值=$result');
+    return result;
   }
 
   /// 獲取通告輪播到全屏廣告輪播轉換時間（秒）
-  int get announcementCarouselToFullAdsCarouselDuration =>
-      _settings?.announcementCarouselToFullAdsCarouselDuration ?? 10;
+  int get announcementCarouselToFullAdsCarouselDuration {
+    final duration = _settings?.announcementCarouselToFullAdsCarouselDuration;
+    return duration != null && duration > 0 ? duration : 10;
+  }
 
   /// 獲取正常到通告輪播轉換時間（秒）
-  int get normalToAnnouncementCarouselDuration =>
-      _settings?.normalToAnnouncementCarouselDuration ?? 10;
+  int get normalToAnnouncementCarouselDuration {
+    final duration = _settings?.normalToAnnouncementCarouselDuration;
+    return duration != null && duration > 0 ? duration : 10;
+  }
 
   /// 設置全屏廣告顯示回調
   void setFullscreenAdCallback(VoidCallback? callback) {
@@ -347,8 +364,6 @@ class CarouselStateProvider extends ChangeNotifier {
         _isTopMediaPaused = false; // 顶部广告继续播放
         _isMiddleMediaPaused = true; // 中部通告暂停
         _isBottomMediaPaused = false; // 底部天气二维码轮播继续播放
-        print(
-            '//// 2 2 2 2 2✅ 進入手動操作狀態，啟動動態計時器: ${normalToAnnouncementCarouselDuration}秒');
         break;
     }
 
@@ -423,11 +438,8 @@ class CarouselStateProvider extends ChangeNotifier {
       _currentState = _currentState.toManualOperation();
       _lastUserInteractionTime = DateTime.now();
 
-      // print('//// 1 1 1 1 1✅ 進入手動操作狀態，啟動動態計時器: ${normalToAnnouncementCarouselDuration}秒');
-
       // 如果是从全屏广告状态切换过来，需要暂停全屏广告轮播
       if (wasInFullscreenAd) {
-        print('🔄 从全屏广告状态切换到手动操作状态，暂停全屏广告轮播');
         // 通知FullAdvertisementCarouselProvider退出全屏广告模式
         _onExitFullscreenAdMode?.call();
       }
@@ -480,9 +492,6 @@ class CarouselStateProvider extends ChangeNotifier {
 
       // 調用關閉全屏廣告的回調
       _onCloseFullscreenAd?.call();
-
-      // Enter default state log (always available)
-      // print('✅ 進入默認狀態，啟動動態計時器: ${noActivityTimeout}秒');
     }
   }
 
@@ -514,10 +523,6 @@ class CarouselStateProvider extends ChangeNotifier {
     _currentState = DefaultCarouselState();
 
     notifyListeners();
-
-    // 记录日志
-    print(
-        '🔄 从手动操作状态恢复通告轮播模式，启动通告轮播计时器: ${announcementCarouselToFullAdsCarouselDuration}秒');
   }
 
   ///7， 用戶交互更新（重置手動操作計時器）

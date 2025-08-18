@@ -17,7 +17,7 @@ import 'package:iboard_app/providers/rthk_news_provider.dart';
 import 'package:iboard_app/widgets/carousel_widget.dart' as custom_carousel;
 import 'package:iboard_app/widgets/mainscreen/bottom_display/bottom_display_widget.dart';
 import 'package:iboard_app/widgets/rthk_news_ticker_widget.dart';
-// import 'package:iboard_app/widgets/mainscreen/main_display/arrear_display_widget.dart'; // 已註釋，功能整合到MainScreenWidget
+// ArrearDisplayWidget已删除，功能整合到MainScreenWidget
 import 'package:iboard_app/widgets/mainscreen/main_display/arrear_table_widget.dart';
 import 'package:iboard_app/pages/settings_page.dart';
 import 'package:logger/logger.dart';
@@ -51,8 +51,7 @@ class _AnnouncementPageState extends State<AnnouncementPage> {
   Timer? _clickResetTimer; // 点击重置定时器
 
   // 欠费组件的GlobalKey，用于调用组件方法
-  // final GlobalKey<ArrearDisplayWidgetState> _arrearDisplayKey =
-  //     GlobalKey<ArrearDisplayWidgetState>(); // 已註釋，功能整合到MainScreenWidget
+  // ArrearDisplayWidget已删除，功能整合到MainScreenWidget
   final GlobalKey<ArrearTableWidgetState> _arrearTableKey =
       GlobalKey<ArrearTableWidgetState>();
 
@@ -465,11 +464,11 @@ class _AnnouncementPageState extends State<AnnouncementPage> {
     final announcementCarouselProvider =
         context.read<AnnouncementCarouselProvider>();
 
-    // 检查是否有欠费查询页面正在显示
-    if (announcementCarouselProvider.isShowingArrearQuery) {
-      // _logger.i('📺 [全屏广告] 检测到欠费查询页面正在显示，自动隐藏');
-      announcementCarouselProvider.hideArrearQueryWidget(() {}, 10, 10);
-    }
+    // 检查是否有欠费查询页面正在显示（已删除，功能整合到MainScreenWidget）
+    // if (announcementCarouselProvider.isShowingArrearQuery) {
+    //   // _logger.i('📺 [全屏广告] 检测到欠费查询页面正在显示，自动隐藏');
+    //   announcementCarouselProvider.hideArrearQueryWidget(() {}, 10, 10);
+    // }
 
     // 检查是否有欠费总览页面正在显示
     if (announcementCarouselProvider.isShowingArrearTable) {
@@ -510,10 +509,8 @@ class _AnnouncementPageState extends State<AnnouncementPage> {
           carouselStateProvider.enterManualOperation();
           // _logger.i(
           //     '🔵 [MainScreenPage] 已进入手动操作状态: ${carouselStateProvider.currentAppState}');
-          // 调用新的显示欠费查询方法
-          // _logger.i('🔵 [MainScreenPage] 准备调用 showArrearQueryWidget');
-          announcementCarouselProvider.showArrearQueryWidget(() {});
-          // _logger.i('🔵 [MainScreenPage] showArrearQueryWidget 调用完成');
+          // 欠费查询功能已整合到MainScreenWidget中，不再需要单独的覆盖层
+          // _logger.i('🔵 [MainScreenPage] 欠费查询功能已整合到MainScreenWidget');
         } else {
           // _logger.i(
           //     '📰 [MainScreenPage] 接收到通告点击请求: ${announcement.title} (ID: ${announcement.id})');
@@ -767,34 +764,25 @@ class _AnnouncementPageState extends State<AnnouncementPage> {
                         );
                       },
                     ),
-                    // 欠费查询覆盖层 - 按需显示
-                    Consumer<AnnouncementCarouselProvider>(
-                      builder: (context, announcementCarouselProvider, child) {
-                        // _logger.i(
-                        //     '🔄 [MainScreenPage Overlay] 检查覆盖层 - isShowingArrearQuery: ${announcementCarouselProvider.isShowingArrearQuery}');
+                    // 欠费查询覆盖层 - 已删除，功能整合到MainScreenWidget
+                    // Consumer<AnnouncementCarouselProvider>(
+                    //   builder: (context, announcementCarouselProvider, child) {
+                    //     '🔄 [MainScreenPage Overlay] 检查覆盖层 - isShowingArrearQuery: ${announcementCarouselProvider.isShowingArrearQuery}');
 
-                        if (announcementCarouselProvider.isShowingArrearQuery) {
-                          // _logger.i('💰 [MainScreenPage Overlay] 显示欠费查询覆盖层');
-                          return Container(
-                            width: double.infinity,
-                            height: double.infinity,
-                            // 已註釋：功能整合到MainScreenWidget的右側展示
-                            child:
-                                const SizedBox.shrink(), // ArrearDisplayWidget(
-                            // key: _arrearDisplayKey,
-                            // onHomeButtonPressed: () {
-                            //   _logger.i('🏠 [MainScreenPage Overlay] 返回按钮被点击，隐藏覆盖层');
-                            //   announcementCarouselProvider.hideArrearQueryWidget(() {}, 10, 10,);
-                            //   // _logger.i('🏠 [MainScreenPage Overlay] 覆盖层已隐藏');
-                            // },
-                            // ),
-                          );
-                        }
+                    //     if (announcementCarouselProvider.isShowingArrearQuery) {
+                    //       '💰 [MainScreenPage Overlay] 显示欠费查询覆盖层');
+                    //       return Container(
+                    //         width: double.infinity,
+                    //         height: double.infinity,
+                    //         // ArrearDisplayWidget已删除，功能整合到MainScreenWidget的右側展示
+                    //         child: const SizedBox.shrink(),
+                    //       );
+                    //     }
 
-                        // 不显示欠费查询时返回空容器
-                        return const SizedBox.shrink();
-                      },
-                    ),
+                    //     // 不显示欠费查询时返回空容器
+                    //     return const SizedBox.shrink();
+                    //   },
+                    // ),
 
                     // 欠费总览覆盖层 - 按需显示
                     Consumer<AnnouncementCarouselProvider>(

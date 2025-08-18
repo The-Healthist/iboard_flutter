@@ -6,17 +6,14 @@ import 'package:iboard_app/widgets/carousel_widget.dart' as custom_carousel;
 import 'package:iboard_app/widgets/mainscreen/main_display/announcement_reader_widget.dart';
 import 'package:iboard_app/widgets/mainscreen/main_display/mainscreen_widget.dart';
 import 'package:iboard_app/widgets/mainscreen/main_display/arrear_table_widget.dart';
-import 'package:logger/logger.dart';
-import 'package:shared_preferences/shared_preferences.dart';
-import 'dart:convert';
+// import 'package:shared_preferences/shared_preferences.dart'; // 已删除，不再使用
+// import 'dart:convert'; // 已删除，不再使用
 import 'package:iboard_app/providers/app_data_provider.dart';
 
 /// 通告轮播Provider
 /// 负责管理通告的轮播逻辑、暂停恢复、定时器管理等
 /// 轮播顺序由后台管理，此Provider不再处理自定义顺序
 class AnnouncementCarouselProvider extends ChangeNotifier {
-  final Logger _logger = Logger();
-
   // 轮播控制器
   late custom_carousel.CarouselController _midCarouselController;
 
@@ -30,7 +27,7 @@ class AnnouncementCarouselProvider extends ChangeNotifier {
 
   // 状态管理
   bool _isMidCarouselPaused = false;
-  bool _isShowingArrearQuery = false; // 新增：是否显示欠费查询页面
+  // bool _isShowingArrearQuery = false; // 已删除：ArrearDisplayWidget已不再使用
   bool _isShowingArrearTable = false; // 新增：是否显示欠费总览页面
 
   // 时间记录相关 - 用于全屏广告暂停恢复
@@ -48,7 +45,7 @@ class AnnouncementCarouselProvider extends ChangeNotifier {
       _midCarouselController;
   List<AnnouncementModel> get carouselAnnouncements => _carouselAnnouncements;
   bool get isMidCarouselPaused => _isMidCarouselPaused;
-  bool get isShowingArrearQuery => _isShowingArrearQuery; // 新增：获取欠费查询显示状态
+  // bool get isShowingArrearQuery => _isShowingArrearQuery; // 已删除：ArrearDisplayWidget已不再使用
   bool get isShowingArrearTable => _isShowingArrearTable; // 新增：获取欠费总览显示状态
   Duration get noticeDuration => _noticeDuration;
   int get currentNoticeIndex => _currentNoticeIndex;
@@ -57,7 +54,6 @@ class AnnouncementCarouselProvider extends ChangeNotifier {
 
   AnnouncementCarouselProvider() {
     _midCarouselController = custom_carousel.CarouselController();
-    _logger.i('🔍 AnnouncementCarouselProvider 初始化完成，轮播顺序由后台管理');
   }
 
   /// 设置AppDataProvider引用
@@ -72,15 +68,14 @@ class AnnouncementCarouselProvider extends ChangeNotifier {
 
   ///1，更新轮播通告列表（由AnnouncementProvider调用）
   void updateCarouselList(List<AnnouncementModel> newCarouselAnnouncements) {
-    _carouselAnnouncements = List<AnnouncementModel>.from(newCarouselAnnouncements);
-    _logger.i('🔄 更新通告轮播列表: ${_carouselAnnouncements.length} 个通告');
+    _carouselAnnouncements =
+        List<AnnouncementModel>.from(newCarouselAnnouncements);
     notifyListeners();
   }
 
   ///2，清空轮播通告列表
   void clearCarouselList() {
     _carouselAnnouncements.clear();
-    _logger.i('🗑️ 清空通告轮播列表');
     notifyListeners();
   }
 
@@ -101,19 +96,9 @@ class AnnouncementCarouselProvider extends ChangeNotifier {
       onAnnouncementTap: (AnnouncementModel? announcement) {
         if (announcement == null) {
           // 显示欠费查询界面 - 立即进入手动操作状态
-          _logger.i(
-              '🔵 [AnnouncementCarouselProvider] 接收到欠费查询请求 (announcement = null)');
-          _logger.i('💰 用户点击欠费查询按钮，立即进入手动操作状态');
-          showArrearQueryWidget(onHomeButtonPressed);
-          _logger.i(
-              '🔵 [AnnouncementCarouselProvider] showArrearQueryWidget 调用完成');
+          // 欠费查询功能已整合到MainScreenWidget中，不再需要单独的覆盖层
         } else {
-          _logger.i(
-              '📰 [AnnouncementCarouselProvider] 接收到通告点击请求: ${announcement.title} (ID: ${announcement.id})');
-
           // 新逻辑：直接显示点击的通告，不依赖轮播列表查找
-          _logger.i(
-              '📰 [AnnouncementCarouselProvider] 直接显示点击的通告，根据文件MD5: ${announcement.file.md5}');
 
           // 直接显示独立通告
           showIndependentAnnouncement(announcement, onHomeButtonPressed);
@@ -121,10 +106,7 @@ class AnnouncementCarouselProvider extends ChangeNotifier {
       },
       onArrearTableTap: () {
         // 显示欠费总览界面
-        _logger.i('📊 [AnnouncementCarouselProvider] 接收到欠费总览请求');
         showArrearTableWidget(onHomeButtonPressed);
-        _logger
-            .i('📊 [AnnouncementCarouselProvider] showArrearTableWidget 调用完成');
       },
     );
 
@@ -152,10 +134,6 @@ class AnnouncementCarouselProvider extends ChangeNotifier {
     ];
     _midCarouselController.setCarouselArray(midWidgets);
 
-    _logger.i(
-        '🎬 [初始化] 中部轮播初始化完成: 主屏幕 + ${this.carouselAnnouncements.length} 个轮播通告 + 1个欠费总览 (只包含緊急和一般通告)');
-    // _logger.i('📋 [配置] 使用API配置的通告停留时间: ${apiNoticeStayDuration}秒');
-
     _midTimer?.cancel();
     _delayedNoticeTimer?.cancel(); // 取消之前的延迟定时器
 
@@ -176,16 +154,12 @@ class AnnouncementCarouselProvider extends ChangeNotifier {
           // 跳转到第一个通告
           _midCarouselController.jumpToIndex(_currentNoticeIndex);
 
-          _logger.i(
-              '🚀 [延迟启动] 通告轮播开始: 开始时间=${_currentNoticeStartTime}, API配置时长=${apiNoticeStayDuration}s, 索引=${_currentNoticeIndex}');
-
           // 使用统一的持续轮播方法
           _scheduleNextCarousel(apiNoticeStayDuration);
         }
       });
     } else {
-      _logger.w(
-          '⚠️ [通告轮播] 无法启动: 通告数量=${announcementWidgets.length}, 暂停状态=$_isMidCarouselPaused');
+      // 通告轮播无法启动
     }
   }
 
@@ -196,12 +170,10 @@ class AnnouncementCarouselProvider extends ChangeNotifier {
     // 检查轮播条件 - 需要至少有通告（除了主屏幕）
     final announcementCount = _midCarouselController.widgetCount - 1; // 减去主屏幕
     if (announcementCount <= 0) {
-      _logger.w('⚠️ [持续轮播] 无法启动: 通告数量不足 ($announcementCount个通告)');
       return;
     }
 
     if (_isMidCarouselPaused) {
-      _logger.w('⚠️ [持续轮播] 无法启动: 轮播已暂停');
       return;
     }
 
@@ -231,7 +203,6 @@ class AnnouncementCarouselProvider extends ChangeNotifier {
 
     final currentAnnouncementCount = _midCarouselController.widgetCount - 1;
     if (currentAnnouncementCount <= 0) {
-      _logger.w('⚠️ [调度轮播] 跳过调度: 通告数量不足');
       return;
     }
 
@@ -299,16 +270,12 @@ class AnnouncementCarouselProvider extends ChangeNotifier {
       _currentNoticeStartTime = DateTime.now();
 
       if (isArrearTable) {
-        _logger.i('📊 [轮播控制] 已切换到欠费总览，等待自动翻页完成');
         // 欠费总览会通过回调继续轮播，这里不再调度下一次
       } else {
         // 继续调度下一次轮播
         _scheduleNextCarousel(apiNoticeStayDuration);
-        // _logger.i(
-        //     '📝 [轮播切换] 切换通告(API=${apiNoticeStayDuration}s) 索引: $_currentNoticeIndex/${_midCarouselController.widgetCount}');
       }
     } catch (e) {
-      _logger.e('❌ [轮播执行] 切换失败: $e');
       // 发生错误时，延迟重试
       Future.delayed(Duration(seconds: 2), () {
         if (!_isMidCarouselPaused) {
@@ -328,9 +295,6 @@ class AnnouncementCarouselProvider extends ChangeNotifier {
     if (_currentNoticeStartTime != null) {
       _noticeElapsedTime =
           _currentNoticePauseTime!.difference(_currentNoticeStartTime!);
-      final remainingNotice = _noticeDuration - _noticeElapsedTime;
-      _logger.i(
-          '📊 [暂停] 通告 - 已播放: ${_noticeElapsedTime.inSeconds}s/${_noticeDuration.inSeconds}s, 剩余: ${remainingNotice.inSeconds}s');
     }
 
     // 设置轮播为暂停状态
@@ -387,7 +351,6 @@ class AnnouncementCarouselProvider extends ChangeNotifier {
 
             if (isCurrentlyOnArrearTable) {
               // 如果当前在欠费总览页面，不直接切换，让自动翻页完成
-              _logger.i('📊 [定时切换] 当前在欠费总览页面，等待自动翻页完成');
               // 重置开始时间，等待欠费总览翻页完成
               _currentNoticeStartTime = DateTime.now();
             } else {
@@ -403,7 +366,6 @@ class AnnouncementCarouselProvider extends ChangeNotifier {
         });
       } else {
         // 剩余时间不足的特殊处理
-        _logger.i('⚡ [恢复] 剩余时间不足，检查是否为欠费总览');
 
         // 检查当前是否在欠费总览页面（最后一个索引）
         final isCurrentlyOnArrearTable =
@@ -411,16 +373,13 @@ class AnnouncementCarouselProvider extends ChangeNotifier {
 
         if (isCurrentlyOnArrearTable) {
           // 如果当前在欠费总览页面，不直接切换，继续展示欠费总览
-          _logger.i('📊 [恢复] 当前在欠费总览页面，继续展示并恢复自动翻页');
 
           // 重置开始时间，给欠费总览足够时间完成翻页
           _currentNoticeStartTime = DateTime.now();
 
           // 不调用 _scheduleNextCarousel，让欠费总览的翻页完成回调来处理切换
-          _logger.i('📊 [恢复] 等待欠费总览自动翻页完成后再切换通告');
         } else {
           // 不是欠费总览，正常处理：直接启动下一个通告并开始无限轮播
-          _logger.i('⚡ [恢复] 非欠费总览页面，直接切换并启动无限轮播');
 
           // 如果当前不在通告上，跳转到第一个通告
           if (_currentNoticeIndex < 1) {
@@ -470,8 +429,7 @@ class AnnouncementCarouselProvider extends ChangeNotifier {
         _scheduleNextCarousel(apiNoticeStayDuration);
       }
     } else {
-      _logger.w(
-          '❌ 不满足通告轮播恢复条件: announcements=${(_midCarouselController.widgetCount - 1)}, paused=$_isMidCarouselPaused');
+      // 不满足通告轮播恢复条件
     }
   }
 
@@ -567,77 +525,58 @@ class AnnouncementCarouselProvider extends ChangeNotifier {
     }
   }
 
-  ///12，显示欠费查询界面
-  void showArrearQueryWidget(VoidCallback onHomeButtonPressed) {
-    _logger.i('💰 [showArrearQueryWidget] 开始显示欠费查询界面');
-    _logger.i(
-        '💰 [showArrearQueryWidget] 当前状态 - isShowingArrearQuery: $_isShowingArrearQuery');
+  ///12，显示欠费查询界面 - 已删除，功能整合到MainScreenWidget
+  // void showArrearQueryWidget(VoidCallback onHomeButtonPressed) {
+  //   _logger.i('💰 [showArrearQueryWidget] 开始显示欠费查询界面');
+  //   _logger.i(
+  //       '💰 [showArrearQueryWidget] 当前状态 - isShowingArrearQuery: $_isShowingArrearQuery');
 
-    // 设置显示欠费查询状态
-    _isShowingArrearQuery = true;
-    _logger.i('💰 [showArrearQueryWidget] 已设置 isShowingArrearQuery = true');
+  //   // 设置显示欠费查询状态
+  //   _isShowingArrearQuery = true;
+  //   _logger.i('💰 [showArrearQueryWidget] 已设置 isShowingArrearQuery = true');
 
-    _logger.i('💰 [showArrearQueryWidget] 准备调用 notifyListeners()');
-    notifyListeners();
-    _logger.i('💰 [showArrearQueryWidget] notifyListeners() 调用完成');
-  }
+  //   _logger.i('💰 [showArrearQueryWidget] 准备调用 notifyListeners()');
+  //   notifyListeners();
+  //   _logger.i('💰 [showArrearQueryWidget] notifyListeners() 调用完成');
+  // }
 
-  ///13，隐藏欠费查询覆盖层
-  void hideArrearQueryWidget(VoidCallback onHomeButtonPressed,
-      int apiNoticeStayDuration, int delayBeforeNotice) {
-    _logger.i('🏠 [hideArrearQueryWidget] 隐藏欠费查询覆盖层');
-    _logger.i(
-        '🏠 [hideArrearQueryWidget] 当前状态 - isShowingArrearQuery: $_isShowingArrearQuery');
+  ///13，隐藏欠费查询覆盖层 - 已删除，功能整合到MainScreenWidget
+  // void hideArrearQueryWidget(VoidCallback onHomeButtonPressed,
+  //     int apiNoticeStayDuration, int delayBeforeNotice) {
+  //   _logger.i('🏠 [hideArrearQueryWidget] 隐藏欠费查询覆盖层');
+  //   _logger.i(
+  //       '🏠 [hideArrearQueryWidget] 当前状态 - isShowingArrearQuery: $_isShowingArrearQuery');
 
-    // 重置显示欠费查询状态，隐藏覆盖层
-    _isShowingArrearQuery = false;
-    _logger.i(
-        '🏠 [hideArrearQueryWidget] 已设置 isShowingArrearQuery = false，覆盖层将被隐藏');
+  //   // 重置显示欠费查询状态，隐藏覆盖层
+  //   _isShowingArrearQuery = false;
+  //   _logger.i(
+  //       '🏠 [hideArrearQueryWidget] 已设置 isShowingArrearQuery = false，覆盖层将被隐藏');
 
-    // 通知UI更新，隐藏覆盖层
-    notifyListeners();
-    _logger.i('🏠 [hideArrearQueryWidget] 覆盖层已隐藏，底层轮播内容保持不变');
-  }
+  //   // 通知UI更新，隐藏覆盖层
+  //   notifyListeners();
+  //   _logger.i('🏠 [hideArrearQueryWidget] 覆盖层已隐藏，底层轮播内容保持不变');
+  // }
 
   ///13a，显示欠费总览界面（手动操作模式 - 不启用自动翻页）
   void showArrearTableWidget(VoidCallback onHomeButtonPressed) {
-    _logger.i('📊 [showArrearTableWidget] 开始显示欠费总览界面（手动操作模式）');
-    _logger.i(
-        '📊 [showArrearTableWidget] 当前状态 - isShowingArrearTable: $_isShowingArrearTable');
-
     // 设置显示欠费总览状态
     _isShowingArrearTable = true;
-    _logger.i(
-        '📊 [showArrearTableWidget] 已设置 isShowingArrearTable = true（手动模式，无自动翻页）');
-
-    _logger.i('📊 [showArrearTableWidget] 准备调用 notifyListeners()');
     notifyListeners();
-    _logger.i('📊 [showArrearTableWidget] notifyListeners() 调用完成');
   }
 
   ///13b，隐藏欠费总览覆盖层
   void hideArrearTableWidget(VoidCallback onHomeButtonPressed,
       int apiNoticeStayDuration, int delayBeforeNotice) {
-    _logger.i('🏠 [hideArrearTableWidget] 隐藏欠费总览覆盖层');
-    _logger.i(
-        '🏠 [hideArrearTableWidget] 当前状态 - isShowingArrearTable: $_isShowingArrearTable');
-
     // 重置显示欠费总览状态，隐藏覆盖层
     _isShowingArrearTable = false;
-    _logger.i(
-        '🏠 [hideArrearTableWidget] 已设置 isShowingArrearTable = false，覆盖层将被隐藏');
 
     // 通知UI更新，隐藏覆盖层
     notifyListeners();
-    _logger.i('🏠 [hideArrearTableWidget] 覆盖层已隐藏，底层轮播内容保持不变');
   }
 
   ///14，直接显示独立通告（不依赖轮播逻辑）
   void showIndependentAnnouncement(
       AnnouncementModel announcement, VoidCallback? onHomeButtonPressed) {
-    _logger.i(
-        '📰 [独立通告] 直接显示通告: ${announcement.title} (ID: ${announcement.id}, MD5: ${announcement.file.md5})');
-
     // 创建独立通告显示页面，直接根据通告的文件信息
     FileManager fileManager = FileManager();
     fileManager.getFile(announcement.file);
@@ -650,7 +589,6 @@ class AnnouncementCarouselProvider extends ChangeNotifier {
             () {
               // 默认返回主页行为：跳转到主屏幕
               jumpToAnnouncementIndex(0);
-              _logger.i('📰 [独立通告] 用户点击返回主页，已跳转到主屏幕');
             },
       ),
     );
@@ -667,8 +605,6 @@ class AnnouncementCarouselProvider extends ChangeNotifier {
     // 设置临时轮播内容
     _midCarouselController.setCarouselArray(tempWidgets);
     _midCarouselController.jumpToIndex(1); // 跳转到独立通告
-
-    _logger.i('📰 [独立通告] 已显示独立通告: ${announcement.title}，索引1，用户可通过返回按钮回到主屏幕');
   }
 
   ///15，创建主屏幕Widget（辅助方法）
@@ -676,8 +612,8 @@ class AnnouncementCarouselProvider extends ChangeNotifier {
     return MainScreenWidget(
       onAnnouncementTap: (AnnouncementModel? announcement) {
         if (announcement == null) {
-          // 显示欠费查询界面
-          showArrearQueryWidget(onHomeButtonPressed);
+          // 显示欠费查询界面 - 功能已整合到MainScreenWidget中
+          // showArrearQueryWidget(onHomeButtonPressed);
         } else {
           // 显示独立通告
           showIndependentAnnouncement(announcement, onHomeButtonPressed);
@@ -692,8 +628,6 @@ class AnnouncementCarouselProvider extends ChangeNotifier {
 
   ///16，创建欠费总览轮播Widget（新增方法）
   Widget _createArrearTableCarouselWidget(VoidCallback onHomeButtonPressed) {
-    _logger.i('📊 [创建欠费总览] 创建欠费总览轮播widget');
-
     return Container(
       width: double.infinity,
       height: double.infinity,
@@ -702,17 +636,14 @@ class AnnouncementCarouselProvider extends ChangeNotifier {
         isInCarouselMode: true, // 标记为轮播模式
         onHomeButtonPressed: () {
           // 点击主页按钮时，跳转回主屏幕（索引0）
-          _logger.i('🏠 [欠费总览轮播] 用户点击主页按钮，返回主屏幕');
           jumpToAnnouncementIndex(0);
         },
         onPaginationComplete: (int totalPages) {
           // 欠费总览翻页完成，切换到下一个通告
-          _logger.i('📄 [欠费总览轮播] 翻页完成（共$totalPages页），切换到下一个通告');
           _goToNextCarouselItem();
         },
         onPaginationStart: (int totalPages) {
           // 欠费总览开始翻页，动态延长当前通告停留时间
-          _logger.i('📄 [欠费总览轮播] 开始翻页（共$totalPages页），动态延长停留时间');
           _extendCurrentNoticeStayTime(totalPages);
         },
       ),
@@ -724,11 +655,13 @@ class AnnouncementCarouselProvider extends ChangeNotifier {
     // 计算需要延长的时间：从设置中获取每页翻页时间，默认为5秒
     final appDataProvider = _getAppDataProvider();
     final deviceSettings = appDataProvider?.deviceSettings;
-    final paginationDuration = deviceSettings?.paymentTableOnePageDuration ?? 5;
+    final paginationDuration =
+        deviceSettings?.paymentTableOnePageDuration != null &&
+                deviceSettings!.paymentTableOnePageDuration > 0
+            ? deviceSettings!.paymentTableOnePageDuration
+            : 5;
 
     final int extensionSeconds = totalPages * paginationDuration.toInt();
-    _logger.i(
-        '⏰ [动态延长] 延长当前通告停留时间: ${extensionSeconds}秒（共${totalPages}页，每页${paginationDuration}秒）');
 
     // 取消现有的定时器
     _midTimer?.cancel();
@@ -738,8 +671,6 @@ class AnnouncementCarouselProvider extends ChangeNotifier {
 
     // 使用延长后的时间重新调度轮播
     final extendedDuration = _noticeDuration.inSeconds + extensionSeconds;
-    _logger.i(
-        '⏰ [动态延长] 原始时长: ${_noticeDuration.inSeconds}秒, 延长后: ${extendedDuration}秒');
 
     // 使用延长后的时间调度下一次轮播
     _scheduleNextCarousel(extendedDuration);
@@ -748,7 +679,6 @@ class AnnouncementCarouselProvider extends ChangeNotifier {
   ///18，切换到下一个轮播项（欠费总览翻页完成后调用）
   void _goToNextCarouselItem() {
     if (_isMidCarouselPaused) {
-      _logger.w('⚠️ [切换轮播] 轮播已暂停，跳过切换');
       return;
     }
 
@@ -765,13 +695,10 @@ class AnnouncementCarouselProvider extends ChangeNotifier {
       // 记录新通告开始时间
       _currentNoticeStartTime = DateTime.now();
 
-      _logger.i(
-          '🔄 [欠费总览完成] 切换到下一个轮播项，索引: $_currentNoticeIndex/${_midCarouselController.widgetCount}');
-
       // 重新启动轮播定时器，使用当前API配置的停留时间
       _scheduleNextCarousel(_noticeDuration.inSeconds);
     } catch (e) {
-      _logger.e('❌ [切换轮播] 切换失败: $e');
+      // 切换失败
     }
   }
 
@@ -791,20 +718,16 @@ class AnnouncementCarouselProvider extends ChangeNotifier {
 
   ///15，自动隐藏所有覆盖层（用于全屏广告状态）
   void autoHideAllOverlays() {
-    _logger.i('🎬 [autoHideAllOverlays] 全屏广告状态触发，自动隐藏所有覆盖层');
-
     bool needsNotify = false;
 
-    // 如果欠费查询覆盖层正在显示，则隐藏它
-    if (_isShowingArrearQuery) {
-      _logger.i('🎬 [autoHideAllOverlays] 自动隐藏欠费查询覆盖层');
-      _isShowingArrearQuery = false;
-      needsNotify = true;
-    }
+    // 如果欠费查询覆盖层正在显示，则隐藏它（已删除，功能整合到MainScreenWidget）
+    // if (_isShowingArrearQuery) {
+    //   _isShowingArrearQuery = false;
+    //   needsNotify = true;
+    // }
 
     // 如果欠费总览覆盖层正在显示，则隐藏它
     if (_isShowingArrearTable) {
-      _logger.i('🎬 [autoHideAllOverlays] 自动隐藏欠费总览覆盖层');
       _isShowingArrearTable = false;
       needsNotify = true;
     }
@@ -812,9 +735,6 @@ class AnnouncementCarouselProvider extends ChangeNotifier {
     // 只有在确实需要隐藏覆盖层时才通知UI更新
     if (needsNotify) {
       notifyListeners();
-      _logger.i('🎬 [autoHideAllOverlays] 所有覆盖层已自动隐藏，通告轮播现在可见');
-    } else {
-      _logger.i('🎬 [autoHideAllOverlays] 没有需要隐藏的覆盖层');
     }
   }
 }
