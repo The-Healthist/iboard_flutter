@@ -9,8 +9,8 @@ import 'package:iboard_app/providers/announcement_provider.dart';
 import 'package:iboard_app/providers/state_provider.dart'; // Added import for CarouselStateProvider
 import 'package:iboard_app/providers/announcement_carousel_provider.dart'; // Added import for AnnouncementCarouselProvider
 import 'package:iboard_app/providers/advertisement_provider.dart'; // Added import for AdvertisementProvider
-import 'package:iboard_app/providers/top_ad_carousel_provider.dart'; // Added import for TopAdCarouselProvider
-import 'package:iboard_app/providers/fullscreen_ad_provider.dart'; // Added import for FullscreenAdProvider
+import 'package:iboard_app/providers/ad_top_carousel_provider.dart'; // Added import for TopAdCarouselProvider
+import 'package:iboard_app/providers/ad_fullscreen_provider.dart'; // Added import for FullscreenAdProvider
 
 import 'package:provider/provider.dart';
 
@@ -114,7 +114,6 @@ class _MainPageState extends State<MainPage> {
       setState(() {
         _isAdsDialogOpen = false;
       });
-
       // 關閉全屏廣告彈窗後，自動切換到手動操作狀態
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted) {

@@ -20,7 +20,7 @@ class AnnouncementProvider extends ChangeNotifier {
   final AppDataProvider
       _appDataProvider; // To access token and deviceId if needed
   final FileManager _fileManager; // 添加 FileManager 实例
-  
+
   // 轮播Provider引用
   AnnouncementCarouselProvider? _announcementCarouselProvider;
 
@@ -113,42 +113,14 @@ class AnnouncementProvider extends ChangeNotifier {
       return true;
     }
 
-    // 创建ID到通告的映射以便快速比较
-    final currentAnnouncementsMap = {
-      for (AnnouncementModel announcement in _announcements)
-        announcement.id: announcement
-    };
-    final newAnnouncementsMap = {
-      for (AnnouncementModel announcement in newAnnouncements)
-        announcement.id: announcement
-    };
-
-    // 检查是否有新增或删除的通告
-    if (currentAnnouncementsMap.keys
-            .toSet()
-            .difference(newAnnouncementsMap.keys.toSet())
-            .isNotEmpty ||
-        newAnnouncementsMap.keys
-            .toSet()
-            .difference(currentAnnouncementsMap.keys.toSet())
-            .isNotEmpty) {
-      return true;
-    }
-
-    // 检查现有通告是否有内容变化
-    for (final id in currentAnnouncementsMap.keys) {
-      final currentAnnouncement = currentAnnouncementsMap[id]!;
-      final newAnnouncement = newAnnouncementsMap[id]!;
-
-      // 比较关键字段
-      if (currentAnnouncement.title != newAnnouncement.title ||
-          currentAnnouncement.description != newAnnouncement.description ||
-          currentAnnouncement.file.url != newAnnouncement.file.url ||
-          currentAnnouncement.file.md5 != newAnnouncement.file.md5) {
+    /// 判断通告list是否变化(只需要比对id即可比对顺序和数据是否对的上)
+    for (int i = 0; i < _announcements.length; i++) {
+      final old = _announcements[i];
+      final newer = newAnnouncements[i];
+      if (old.id != newer.id) {
         return true;
       }
     }
-
     return false;
   }
 
@@ -161,27 +133,22 @@ class AnnouncementProvider extends ChangeNotifier {
   /// 开始定期更新通告数据
   void startPeriodicUpdate() {
     if (_isPeriodicUpdateActive) {
-      // _logger.i('Periodic announcement update is already active.');
+      _logger.i('开始定期更新通告数据');
       return;
     }
 
     // 获取更新间隔时间（从设置中获取，单位：分钟）
     final updateIntervalMinutes =
-        _appDataProvider.deviceSettings?.noticeUpdateDuration ?? 5; // 默认5分钟
-    final updateIntervalSeconds = updateIntervalMinutes * 60; // 转换为秒
-    // _logger.i(
-    // 'Starting periodic announcement update with interval: ${updateIntervalMinutes} minutes (${updateIntervalSeconds}s)');
-
+        _appDataProvider.deviceSettings?.noticeUpdateDuration ?? 5;
+    final updateIntervalSeconds = updateIntervalMinutes * 60;
     _isPeriodicUpdateActive = true;
 
-    // 立即执行一次更新
     fetchNotices();
 
     // 设置定时器进行周期性更新
     _updateTimer =
         Timer.periodic(Duration(seconds: updateIntervalSeconds), (timer) {
       if (_isPeriodicUpdateActive) {
-        // _logger.i('Performing periodic announcement update...');
         fetchNotices();
       } else {
         timer.cancel();
@@ -196,23 +163,16 @@ class AnnouncementProvider extends ChangeNotifier {
       _updateTimer = null;
     }
     _isPeriodicUpdateActive = false;
-    // _logger.i('Periodic announcement update stopped.');
   }
 
   /// 重新初始化Provider（当依赖变化时调用）
   void reinitialize() {
-    // _logger.i('AnnouncementProvider reinitializing...');
-
-    // 停止现有的定时更新
     stopPeriodicUpdate();
-
-    // 重新加载缓存数据
     _loadAnnouncementsFromCache();
 
     // 如果AppDataProvider已登录，重新启动定时更新
     Future.delayed(const Duration(milliseconds: 100), () {
       if (_appDataProvider.isLoggedIn) {
-        // _logger.i('重新初始化完成，重启通告定时更新');
         startPeriodicUpdate();
       }
     });
@@ -312,31 +272,28 @@ class AnnouncementProvider extends ChangeNotifier {
     }
   }
 
-  ///5，智能对比更新通告列表
+  ///5，更新缓存并处理文件下载或者删除
   Future<void> _smartUpdateAnnouncements(
       List<AnnouncementModel> newAnnouncements) async {
     try {
       // 检查数据是否真的发生了变化
       if (!_hasDataChanged(newAnnouncements)) {
-        // _logger.i('通告数据没有变化，跳过更新操作');
+        _logger.i('通告数据没有变化，跳过更新操作');
         return;
       }
 
-      // _logger.i('检测到通告数据变化，开始更新...');
+      _logger.i('检测到通告数据变化，开始更新...');
 
-      // 将现有通告转换为 Map，以 ID 为键方便查找
       final Map<int, AnnouncementModel> currentAnnouncementsMap = {
         for (AnnouncementModel announcement in _announcements)
           announcement.id: announcement
       };
 
-      // 将新通告转换为 Map
       final Map<int, AnnouncementModel> newAnnouncementsMap = {
         for (AnnouncementModel announcement in newAnnouncements)
           announcement.id: announcement
       };
 
-      // 找出新增的通告
       final List<AnnouncementModel> addedAnnouncements = [];
       for (AnnouncementModel newAnnouncement in newAnnouncements) {
         if (!currentAnnouncementsMap.containsKey(newAnnouncement.id)) {
@@ -344,7 +301,6 @@ class AnnouncementProvider extends ChangeNotifier {
         }
       }
 
-      // 找出删除的通告
       final List<AnnouncementModel> removedAnnouncements = [];
       for (AnnouncementModel currentAnnouncement in _announcements) {
         if (!newAnnouncementsMap.containsKey(currentAnnouncement.id)) {
@@ -352,41 +308,31 @@ class AnnouncementProvider extends ChangeNotifier {
         }
       }
 
-      // _logger.i(
-      // 'Announcement update analysis: ${addedAnnouncements.length} added, ${removedAnnouncements.length} removed');
-
-      // 处理新增的通告 - 检查并下载文件（异步处理，不阻塞主流程）
+      // 处理新增的通告
       for (AnnouncementModel addedAnnouncement in addedAnnouncements) {
         try {
           final bool isCached = await _isFileCached(
               addedAnnouncement.file.md5, addedAnnouncement.file.url);
           if (!isCached) {
-            // _logger.i(
-            // 'Downloading new announcement file: ${addedAnnouncement.title}');
-            // 异步下载，不等待完成
             _predownloadFile(addedAnnouncement).catchError((error) {
               _logger.e(
                   'Failed to download announcement file: ${addedAnnouncement.title}',
                   error: error);
             });
           } else {
-            // _logger.i(
-            // 'Announcement file already cached: ${addedAnnouncement.title}');
+            _logger.i(
+                'Announcement file already cached: ${addedAnnouncement.title}');
           }
         } catch (e) {
           _logger.e(
               'Error checking cache for announcement: ${addedAnnouncement.title}',
               error: e);
-          // 继续处理其他文件，不中断整个流程
         }
       }
 
-      // 处理删除的通告 - 删除缓存文件（异步处理）
+      // 处理删除的通告
       for (AnnouncementModel removedAnnouncement in removedAnnouncements) {
         try {
-          // _logger.i(
-          // 'Removing cached file for deleted announcement: ${removedAnnouncement.title}');
-          // 异步删除，不等待完成
           _deleteCachedFile(removedAnnouncement.file.md5).catchError((error) {
             _logger.e(
                 'Failed to delete cached file for: ${removedAnnouncement.title}',
@@ -396,39 +342,32 @@ class AnnouncementProvider extends ChangeNotifier {
           _logger.e(
               'Error deleting cache for announcement: ${removedAnnouncement.title}',
               error: e);
-          // 继续处理其他文件，不中断整个流程
         }
       }
 
-      // 更新通告列表（主要操作，确保成功）
-      _announcements =
-          List<AnnouncementModel>.from(newAnnouncements); // 创建副本，避免引用问题
+      // 更新通告列表
+      _announcements = List<AnnouncementModel>.from(newAnnouncements);
 
       // 更新轮播通告数组
       _updateCarouselAnnouncements();
 
       // 保存更新后的数据到缓存
       await _saveAnnouncementsToCache(_announcements);
-
-      // _logger.i('Smart announcement update completed successfully.');
     } catch (e, stackTrace) {
       _logger.e('Error in smart announcement update',
           error: e, stackTrace: stackTrace);
-      // 如果智能更新失败，至少确保基本更新完成
       try {
         _announcements = List<AnnouncementModel>.from(newAnnouncements);
         _updateCarouselAnnouncements();
         await _saveAnnouncementsToCache(_announcements);
-        // _logger.w('Fallback to basic announcement update completed.');
       } catch (fallbackError) {
         _logger.e('Even fallback announcement update failed',
             error: fallbackError);
-        // 保持现有数据不变
       }
     }
   }
 
-  // Interface to fetch/update announcements
+  ///6，fetchNotices,获取轮播通告数据
   Future<void> fetchNotices() async {
     if (_appDataProvider.token == null) {
       _error = "Authentication token is missing. Cannot fetch notices.";
@@ -437,50 +376,38 @@ class AnnouncementProvider extends ChangeNotifier {
       return;
     }
 
-    // 防止重复调用 - 如果正在加载中，直接返回
     if (_isLoading) {
-      // _logger.w('fetchNotices already in progress, skipping duplicate call.');
       return;
     }
-
     _isLoading = true;
     _error = null;
     notifyListeners();
 
     try {
-      // _logger.i('Fetching notices from building...');
-      // 使用新的轮播接口获取通告数据
-      final List<Map<String, dynamic>> carouselNoticesData = await _apiClient.getCarouselNotices();
-      final List<AnnouncementModel> newCarouselAnnouncements = carouselNoticesData
+      final List<Map<String, dynamic>> carouselNoticesData =
+          await _apiClient.getCarouselNotices();
+      final List<AnnouncementModel> fetchedAnnouncements = carouselNoticesData
           .map((jsonItem) => AnnouncementModel.fromJson(jsonItem))
           .toList();
 
-      // _logger.i(
-      // 'Successfully fetched ${newCarouselAnnouncements.length} carousel announcements from API.');
+      // 判断是否有数据变化(只比对id顺序和数量即可)
+      final bool hasChanges = _hasDataChanged(fetchedAnnouncements);
 
-      // 更新轮播通告数组（后台已排序）
-      _carouselAnnouncements = List<AnnouncementModel>.from(newCarouselAnnouncements);
-
-      // 同时更新原有通告列表（保持兼容性）
-      _announcements = List<AnnouncementModel>.from(newCarouselAnnouncements);
-
-      // 保存更新后的数据到缓存
-      await _saveAnnouncementsToCache(_announcements);
-
-      // 通知轮播Provider更新数据
-      if (_announcementCarouselProvider != null) {
-        _announcementCarouselProvider!.updateCarouselList(_carouselAnnouncements);
+      if (!hasChanges) {
+        _logger.i('通告数据无变化，跳过更新与通知');
+        _error = null;
+        return;
       }
-
-      // _logger.i(
-      // 'Announcement update completed. Total: ${_announcements.length}, Carousel announcements: ${_carouselAnnouncements.length}');
-      _error = null; // 成功时清除错误
+      await _smartUpdateAnnouncements(fetchedAnnouncements);
+      if (_announcementCarouselProvider != null) {
+        _announcementCarouselProvider!
+            .updateCarouselList(_carouselAnnouncements);
+        _logger.i('通告数据变更，已通知轮播Provider更新列表');
+      }
 
       // 如果之前有网络错误，记录恢复信息
       if (_error != null &&
-          (_error!.contains('网络') || _error!.contains('超时'))) {
-        // _logger.i('网络已恢复，通告数据更新成功');
-      }
+          (_error!.contains('网络') || _error!.contains('超时'))) {}
     } on ApiException catch (e) {
       _logger.e('Failed to fetch notices (ApiException)',
           error: e, stackTrace: e.errorData is StackTrace ? e.errorData : null);
@@ -516,55 +443,37 @@ class AnnouncementProvider extends ChangeNotifier {
 
       // 详细的网络错误处理
       String errorMessage;
-      bool isNetworkError = false;
 
       if (e.toString().contains('SocketException') ||
           e.toString().contains('Connection timed out') ||
           e.toString().contains('ClientException')) {
         errorMessage = '网络连接失败，使用缓存的通告数据继续轮播';
-        isNetworkError = true;
-        // _logger.w('网络连接问题检测到，保持现有数据: $e');
       } else if (e.toString().contains('TimeoutException') ||
           e.toString().contains('请求超时')) {
         errorMessage = '请求超时，使用缓存的通告数据继续轮播';
-        isNetworkError = true;
-        // _logger.w('请求超时检测到，保持现有数据: $e');
       } else if (e.toString().contains('FormatException')) {
         errorMessage = '服务器返回数据格式错误，保持现有通告数据';
-        // _logger.w('数据格式错误检测到，保持现有数据: $e');
       } else {
         errorMessage = '发生未知错误，保持现有通告数据: $e';
-        // _logger.w('未知错误检测到，保持现有数据: $e');
       }
 
       _error = errorMessage;
-
-      // 网络错误时检查并确保有可用的通告数据
-      if (isNetworkError) {
-        await _ensureCachedAnnouncementsAvailable();
-      }
-
-      // 发生任何错误时都不清除现有数据，保持现状让轮播继续
-      // _logger.i(
-      // '错误处理完成，保持现有通告数据: ${_announcements.length}个通告，${_carouselAnnouncements.length}个轮播通告');
     } finally {
       _isLoading = false;
       notifyListeners();
     }
   }
 
-  // 更新轮播通告数组 - 只包含緊急和一般通告
+  // 7,更新轮播通告数组 - 只包含緊急和一般通告
   void _updateCarouselAnnouncements() {
     _carouselAnnouncements = _announcements
         .where((announcement) =>
             announcement.uiType == AnnouncementTypeUi.emergency ||
             announcement.uiType == AnnouncementTypeUi.general)
         .toList();
-    // _logger.i(
-    // 'Updated carousel announcements: ${_carouselAnnouncements.length} announcements (emergency + general only)');
   }
 
-  // 获取轮播专用通告 - 返回緊急和一般通告
+  // 获取轮播专用通告
   List<AnnouncementModel> getCarouselAnnouncements() {
     return _carouselAnnouncements;
   }
@@ -577,51 +486,6 @@ class AnnouncementProvider extends ChangeNotifier {
       return null; // Not found
     }
   }
-
-  /// 确保在网络错误时有可用的缓存通告数据
-  Future<void> _ensureCachedAnnouncementsAvailable() async {
-    try {
-      // 如果当前没有通告数据，尝试从缓存中加载
-      if (_announcements.isEmpty) {
-        // _logger.i('当前通告列表为空，尝试从缓存中恢复通告数据...');
-
-        // 这里可以实现从本地缓存（SharedPreferences或数据库）加载通告数据的逻辑
-        // 目前先记录日志，未来可以扩展实际的缓存恢复逻辑
-        // _logger.w('TODO: 实现从本地缓存恢复通告数据的功能');
-
-        // 暂时创建一个默认的通告以确保轮播能够继续工作
-        // 在实际应用中，这应该从缓存中加载真实的通告数据
-        /*
-        final defaultAnnouncement = AnnouncementModel(
-          id: -1,
-          title: '网络连接中断 - 使用缓存数据',
-          content: '正在尝试重新连接网络，请稍候...',
-          uiType: AnnouncementTypeUi.general,
-          file: FileModel(url: '', md5: ''),
-          fromDate: DateTime.now().subtract(Duration(days: 1)),
-          toDate: DateTime.now().add(Duration(days: 1)),
-        );
-        _announcements = [defaultAnnouncement];
-        _updateCarouselAnnouncements();
-        // _logger.i('已创建默认通告以确保轮播继续工作');
-        */
-      } else {
-        // _logger.i('当前有 ${_announcements.length} 个通告数据可用，继续使用现有数据');
-      }
-
-      // 确保轮播通告数组也有数据
-      if (_carouselAnnouncements.isEmpty && _announcements.isNotEmpty) {
-        _updateCarouselAnnouncements();
-        // _logger.i('重新更新轮播通告数组: ${_carouselAnnouncements.length} 个轮播通告');
-      }
-    } catch (e) {
-      _logger.e('检查缓存通告数据时发生错误', error: e);
-    }
-  }
-
-  // Potentially add methods to add/update/delete announcements if the API supports it
-  // and if such functionality is required by the app.
-  // For now, focusing on fetching and displaying.
 
   /// 设置轮播Provider引用
   void setCarouselProvider(AnnouncementCarouselProvider carouselProvider) {

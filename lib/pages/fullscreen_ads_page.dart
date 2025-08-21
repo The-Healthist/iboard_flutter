@@ -1,7 +1,7 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:iboard_app/providers/advertisement_provider.dart';
-import 'package:iboard_app/providers/fullscreen_ad_provider.dart';
+import 'package:iboard_app/providers/ad_fullscreen_provider.dart';
 import 'package:iboard_app/widgets/debug_fullad_time_widget.dart';
 import 'package:provider/provider.dart';
 import 'package:logger/logger.dart';

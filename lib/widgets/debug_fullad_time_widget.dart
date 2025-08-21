@@ -1,7 +1,7 @@
 import 'dart:async';
 // foundation.dart import removed as kDebugMode is no longer used
 import 'package:flutter/material.dart';
-import 'package:iboard_app/providers/fullscreen_ad_provider.dart';
+import 'package:iboard_app/providers/ad_fullscreen_provider.dart';
 import 'package:iboard_app/providers/state_provider.dart';
 import 'package:provider/provider.dart';
 

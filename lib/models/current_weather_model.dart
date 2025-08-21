@@ -330,12 +330,12 @@ class CurrentWeatherDataModel {
     dynamic rawWarningMessage = json['warningMessage'];
     List<String>? parsedWarningMessage;
     if (rawWarningMessage == null || rawWarningMessage == "") {
-      parsedWarningMessage = null; // 空字符串和null都处理为null
+      parsedWarningMessage = null;
     } else if (rawWarningMessage is List) {
       parsedWarningMessage = rawWarningMessage.map((e) => e as String).toList();
     } else if (rawWarningMessage is String) {
       if (rawWarningMessage.trim().isEmpty) {
-        parsedWarningMessage = null; // 空白字符串处理为null
+        parsedWarningMessage = null;
       } else {
         // If a non-empty string could be a single warning message
         parsedWarningMessage = <String>[rawWarningMessage];

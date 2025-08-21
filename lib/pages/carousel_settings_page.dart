@@ -4,12 +4,10 @@ import 'package:iboard_app/models/ad_model.dart';
 import 'package:iboard_app/providers/announcement_carousel_provider.dart';
 import 'package:iboard_app/providers/announcement_provider.dart';
 import 'package:iboard_app/providers/advertisement_provider.dart';
-import 'package:iboard_app/providers/fullscreen_ad_provider.dart';
-import 'package:iboard_app/providers/top_ad_carousel_provider.dart';
-import 'package:iboard_app/widgets/carousel_widget.dart';
+import 'package:iboard_app/providers/ad_fullscreen_provider.dart';
+import 'package:iboard_app/providers/ad_top_carousel_provider.dart';
 import 'package:iboard_app/widgets/debug_fullscreen_ad_widget.dart';
 import 'package:provider/provider.dart';
-import 'package:iboard_app/utils/debug_cache_util.dart';
 
 class CarouselSettingsPage extends StatefulWidget {
   const CarouselSettingsPage({Key? key}) : super(key: key);
@@ -123,7 +121,7 @@ class _CarouselSettingsPageState extends State<CarouselSettingsPage> {
                             ],
                           ),
                         ),
-                        
+
                         SizedBox(height: 24),
 
                         // 通告轮播设置

@@ -959,34 +959,34 @@ class AppDataProvider extends ChangeNotifier {
 
   // Example of how other API calls might be exposed or handled via provider if needed,
   // though direct use of `appDataProvider.apiClient.method()` is also fine.
-  Future<Map<String, dynamic>?> fetchAdvertisements() async {
-    if (token == null) {
-      _error = "Not authenticated. Please login.";
-      notifyListeners();
-      return null;
-    }
-    _isLoading = true;
-    _error = null;
-    notifyListeners();
-    try {
-      final data = await _apiClient.getAdvertisementsBuilding();
-      _isLoading = false;
-      notifyListeners();
-      return data;
-    } on ApiException catch (e) {
-      _logger.e('Failed to fetch advertisements', error: e);
-      _error = e.message;
-      _isLoading = false;
-      notifyListeners();
-      return null;
-    } catch (e) {
-      _logger.e('Unexpected error fetching advertisements', error: e);
-      _error = "An unexpected error occurred.";
-      _isLoading = false;
-      notifyListeners();
-      return null;
-    }
-  }
+  // Future<Map<String, dynamic>?> fetchAdvertisements() async {
+  //   if (token == null) {
+  //     _error = "Not authenticated. Please login.";
+  //     notifyListeners();
+  //     return null;
+  //   }
+  //   _isLoading = true;
+  //   _error = null;
+  //   notifyListeners();
+  //   try {
+  //     final data = await _apiClient.getAdvertisementsBuilding();
+  //     _isLoading = false;
+  //     notifyListeners();
+  //     return data;
+  //   } on ApiException catch (e) {
+  //     _logger.e('Failed to fetch advertisements', error: e);
+  //     _error = e.message;
+  //     _isLoading = false;
+  //     notifyListeners();
+  //     return null;
+  //   } catch (e) {
+  //     _logger.e('Unexpected error fetching advertisements', error: e);
+  //     _error = "An unexpected error occurred.";
+  //     _isLoading = false;
+  //     notifyListeners();
+  //     return null;
+  //   }
+  // }
 
   /// 初始化获取欠费数据 - 使用新的双接口实现
   Future<void> initGetArrearData() async {

@@ -441,33 +441,33 @@ class ApiClient {
 
   // 2. Get Advertisements for Building
   // Endpoint: GET <<baseUrl>>/api/device/client/advertisements
-  Future<Map<String, dynamic>> getAdvertisementsBuilding() async {
-    const String endpointPath = '/api/device/client/advertisements';
-    final Uri url = _buildUri(endpointPath, null);
-    final Map<String, String> headers =
-        _getHeaders(requiresAuth: true, contentType: 'application/json');
+  // Future<Map<String, dynamic>> getAdvertisementsBuilding() async {
+  //   const String endpointPath = '/api/device/client/advertisements';
+  //   final Uri url = _buildUri(endpointPath, null);
+  //   final Map<String, String> headers =
+  //       _getHeaders(requiresAuth: true, contentType: 'application/json');
 
-    // _logger.i('Fetching advertisements for building.');
-    final http.Response response = await _sendRequest(
-        () => http.get(url, headers: headers),
-        apiNameForLog: 'getAdvertisementsBuilding');
-    return _handleResponse(response, 'getAdvertisementsBuilding');
-  }
+  //   // _logger.i('Fetching advertisements for building.');
+  //   final http.Response response = await _sendRequest(
+  //       () => http.get(url, headers: headers),
+  //       apiNameForLog: 'getAdvertisementsBuilding');
+  //   return _handleResponse(response, 'getAdvertisementsBuilding');
+  // }
 
   // 3. Get Notices for Building
   // Endpoint: GET <<baseUrl>>/api/device/client/notices
-  Future<Map<String, dynamic>> getNoticesBuilding() async {
-    const String endpointPath = '/api/device/client/notices';
-    final Uri url = _buildUri(endpointPath, null);
-    final Map<String, String> headers =
-        _getHeaders(requiresAuth: true, contentType: 'application/json');
+  // Future<Map<String, dynamic>> getNoticesBuilding() async {
+  //   const String endpointPath = '/api/device/client/notices';
+  //   final Uri url = _buildUri(endpointPath, null);
+  //   final Map<String, String> headers =
+  //       _getHeaders(requiresAuth: true, contentType: 'application/json');
 
-    // _logger.i('Fetching notices for building.');
-    final http.Response response = await _sendRequest(
-        () => http.get(url, headers: headers),
-        apiNameForLog: 'getNoticesBuilding');
-    return _handleResponse(response, 'getNoticesBuilding');
-  }
+  //   // _logger.i('Fetching notices for building.');
+  //   final http.Response response = await _sendRequest(
+  //       () => http.get(url, headers: headers),
+  //       apiNameForLog: 'getNoticesBuilding');
+  //   return _handleResponse(response, 'getNoticesBuilding');
+  // }
 
   // 4. Health Test
   // Endpoint: POST <<baseUrl>>/api/device/client/health_test
@@ -627,30 +627,30 @@ class ApiClient {
   }
 
   ///10. 獲取全屏廣告列表
-  Future<List<Map<String, dynamic>>> getFullAdvertisementsBuilding() async {
-    const String endpointPath = '/api/device/client/full_advertisements';
-    final Uri url = _buildUri(endpointPath, null);
-    final Map<String, String> headers =
-        _getHeaders(requiresAuth: true, contentType: 'application/json');
+  // Future<List<Map<String, dynamic>>> getFullAdvertisementsBuilding() async {
+  //   const String endpointPath = '/api/device/client/full_advertisements';
+  //   final Uri url = _buildUri(endpointPath, null);
+  //   final Map<String, String> headers =
+  //       _getHeaders(requiresAuth: true, contentType: 'application/json');
 
-    final http.Response response = await _sendRequest(
-        () => http.get(url, headers: headers),
-        apiNameForLog: 'getFullAdvertisementsBuilding');
-    return _handleArrayResponse(response, 'getFullAdvertisementsBuilding');
-  }
+  //   final http.Response response = await _sendRequest(
+  //       () => http.get(url, headers: headers),
+  //       apiNameForLog: 'getFullAdvertisementsBuilding');
+  //   return _handleArrayResponse(response, 'getFullAdvertisementsBuilding');
+  // }
 
   ///11. 獲取頂端廣告列表
-  Future<List<Map<String, dynamic>>> getTopAdvertisementsBuilding() async {
-    const String endpointPath = '/api/device/client/top_advertisements';
-    final Uri url = _buildUri(endpointPath, null);
-    final Map<String, String> headers =
-        _getHeaders(requiresAuth: true, contentType: 'application/json');
+  // Future<List<Map<String, dynamic>>> getTopAdvertisementsBuilding() async {
+  //   const String endpointPath = '/api/device/client/top_advertisements';
+  //   final Uri url = _buildUri(endpointPath, null);
+  //   final Map<String, String> headers =
+  //       _getHeaders(requiresAuth: true, contentType: 'application/json');
 
-    final http.Response response = await _sendRequest(
-        () => http.get(url, headers: headers),
-        apiNameForLog: 'getTopAdvertisementsBuilding');
-    return _handleArrayResponse(response, 'getTopAdvertisementsBuilding');
-  }
+  //   final http.Response response = await _sendRequest(
+  //       () => http.get(url, headers: headers),
+  //       apiNameForLog: 'getTopAdvertisementsBuilding');
+  //   return _handleArrayResponse(response, 'getTopAdvertisementsBuilding');
+  // }
 
   ///12. 輪播頂端廣告順序
   Future<List<Map<String, dynamic>>> getCarouselTopAdvertisements() async {

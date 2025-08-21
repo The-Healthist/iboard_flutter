@@ -5,8 +5,8 @@ import 'package:iboard_app/providers/announcement_provider.dart';
 import 'package:iboard_app/providers/announcement_carousel_provider.dart';
 import 'package:iboard_app/providers/app_data_provider.dart';
 import 'package:iboard_app/providers/state_provider.dart'; // Added CarouselStateProvider import
-import 'package:iboard_app/providers/top_ad_carousel_provider.dart'; // Added TopAdCarouselProvider import
-import 'package:iboard_app/providers/fullscreen_ad_provider.dart';
+import 'package:iboard_app/providers/ad_top_carousel_provider.dart'; // Added TopAdCarouselProvider import
+import 'package:iboard_app/providers/ad_fullscreen_provider.dart';
 import 'package:iboard_app/providers/rthk_news_provider.dart';
 import 'package:iboard_app/providers/app_update_provider.dart'; // 添加应用更新Provider导入
 import 'package:iboard_app/managers/file_manager.dart';

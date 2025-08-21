@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:iboard_app/pages/time_settings_page.dart';
 import 'package:iboard_app/providers/announcement_carousel_provider.dart';
-import 'package:iboard_app/providers/fullscreen_ad_provider.dart';
+import 'package:iboard_app/providers/ad_fullscreen_provider.dart';
 import 'package:iboard_app/providers/state_provider.dart';
-import 'package:iboard_app/providers/top_ad_carousel_provider.dart';
+import 'package:iboard_app/providers/ad_top_carousel_provider.dart';
 
 import 'package:iboard_app/providers/app_update_provider.dart'; // 导入更新Provider
 import 'package:iboard_app/widgets/carousel_widget.dart'; // 导入通知类

@@ -10,8 +10,8 @@ import 'package:path_provider/path_provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:convert';
 import 'package:iboard_app/utils/enhanced_video_pool_manager.dart';
-import 'package:iboard_app/providers/top_ad_carousel_provider.dart';
-import 'package:iboard_app/providers/fullscreen_ad_provider.dart';
+import 'package:iboard_app/providers/ad_top_carousel_provider.dart';
+import 'package:iboard_app/providers/ad_fullscreen_provider.dart';
 
 class AdvertisementProvider extends ChangeNotifier {
   final Logger _logger = Logger();
@@ -86,7 +86,7 @@ class AdvertisementProvider extends ChangeNotifier {
   }) {
     _topAdCarouselProvider = topAdCarouselProvider;
     _fullscreenAdProvider = fullscreenAdProvider;
-    _logger.i('设置广告轮播Provider引用');
+    _logger.i('設置廣告輪播Provider引用');
   }
 
   ///1，保存广告数据到SharedPreferences缓存
@@ -97,7 +97,7 @@ class AdvertisementProvider extends ChangeNotifier {
           advertisements.map((ad) => ad.toJson()).toList();
       final jsonString = json.encode(adsJson);
       await prefs.setString(_advertisementsDataKey, jsonString);
-      _logger.i('💾 广告数据已保存到缓存: ${advertisements.length}个广告');
+      _logger.i('💾 廣告數據已保存到緩存: ${advertisements.length}個廣告');
     } catch (e) {
       _logger.e('保存广告数据到缓存失败', error: e);
     }
@@ -114,7 +114,7 @@ class AdvertisementProvider extends ChangeNotifier {
       await prefs.setString(_topCarouselAdvertisementsKey, jsonString);
       // _logger.i('💾 顶部广告轮播数据已保存到缓存: ${advertisements.length}个广告');
     } catch (e) {
-      _logger.e('保存顶部广告轮播数据到缓存失败', error: e);
+      _logger.e('保存頂部廣告輪播數據到緩存失敗', error: e);
     }
   }
 
@@ -127,9 +127,9 @@ class AdvertisementProvider extends ChangeNotifier {
           advertisements.map((ad) => ad.toJson()).toList();
       final jsonString = json.encode(adsJson);
       await prefs.setString(_fullCarouselAdvertisementsKey, jsonString);
-      _logger.i('💾 全屏广告轮播数据已保存到缓存: ${advertisements.length}个广告');
+      _logger.i('💾 全屏廣告輪播數據已保存到緩存: ${advertisements.length}個廣告');
     } catch (e) {
-      _logger.e('保存全屏广告轮播数据到缓存失败', error: e);
+      _logger.e('保存全屏廣告輪播數據到緩存失敗', error: e);
     }
   }
 
@@ -145,13 +145,13 @@ class AdvertisementProvider extends ChangeNotifier {
             .toList();
 
         _advertisements = cachedAds;
-        _logger.i('📂 从缓存加载广告数据成功: ${cachedAds.length}个广告');
+        _logger.i('📂 從緩存加載廣告數據成功: ${cachedAds.length}個廣告');
         notifyListeners();
       } else {
-        _logger.w('缓存中没有找到广告数据');
+        _logger.w('緩存中沒有找到廣告數據');
       }
     } catch (e) {
-      _logger.e('从缓存加载广告数据失败', error: e);
+      _logger.e('從緩存加載廣告數據失敗', error: e);
     }
   }
 
@@ -189,13 +189,13 @@ class AdvertisementProvider extends ChangeNotifier {
             .toList();
 
         _fullCarouselAdvertisements = cachedAds;
-        _logger.i('📂 从缓存加载全屏广告轮播数据成功: ${cachedAds.length}个广告');
+        _logger.i('📂 從緩存加載全屏廣告輪播數據成功: ${cachedAds.length}個廣告');
         notifyListeners();
       } else {
-        _logger.w('缓存中没有找到全屏广告轮播数据');
+        _logger.w('緩存中沒有找到全屏廣告輪播數據');
       }
     } catch (e) {
-      _logger.e('从缓存加载全屏广告轮播数据失败', error: e);
+      _logger.e('從緩存加載全屏廣告輪播數據失敗', error: e);
     }
   }
 
@@ -212,9 +212,9 @@ class AdvertisementProvider extends ChangeNotifier {
       await prefs.remove(_advertisementsDataKey);
       await prefs.remove(_topCarouselAdvertisementsKey);
       await prefs.remove(_fullCarouselAdvertisementsKey);
-      _logger.i('广告数据缓存已清除');
+      _logger.i('廣告數據緩存已清除');
     } catch (e) {
-      _logger.e('清除广告数据缓存失败', error: e);
+      _logger.e('清除廣告數據緩存失敗', error: e);
     }
   }
 
@@ -320,7 +320,7 @@ class AdvertisementProvider extends ChangeNotifier {
     // 如果AppDataProvider已登录，重新启动定时更新
     Future.delayed(const Duration(milliseconds: 100), () {
       if (_appDataProvider.isLoggedIn) {
-        _logger.i('重新初始化完成，重启广告定时更新');
+        _logger.i('重新初始化完成，重啟廣告定時更新');
         startPeriodicUpdate();
       }
     });
@@ -555,7 +555,7 @@ class AdvertisementProvider extends ChangeNotifier {
       final List<Future> futures = [
         _apiClient.getCarouselTopAdvertisements(),
         _apiClient.getCarouselFullAdvertisements(),
-        _apiClient.getAdvertisementsBuilding(), // 保留原有的广告接口作为备用
+        // _apiClient.getAdvertisementsBuilding(), // 保留原有的广告接口作为备用
       ];
 
       final List results = await Future.wait(futures);
@@ -573,24 +573,6 @@ class AdvertisementProvider extends ChangeNotifier {
       final List<AdModel> newFullCarouselAds = fullCarouselData
           .map((jsonItem) => AdModel.fromJson(jsonItem))
           .toList();
-
-      // 处理原有广告数据（作为备用）
-      final Map<String, dynamic> advertisementData =
-          results[2] as Map<String, dynamic>;
-      final List<AdModel> newAdvertisements = [];
-      if (advertisementData.containsKey('data') &&
-          advertisementData['data'] is List) {
-        final List<dynamic> advertisementListJson =
-            advertisementData['data'] as List<dynamic>;
-        newAdvertisements.addAll(advertisementListJson
-            .map((jsonItem) =>
-                AdModel.fromJson(jsonItem as Map<String, dynamic>))
-            .toList());
-      }
-
-      _logger.i(
-          'Successfully fetched data: ${newTopCarouselAds.length} top carousel ads, ${newFullCarouselAds.length} full carousel ads, ${newAdvertisements.length} general ads');
-
       // 更新轮播广告列表（后台已排序）
       _topCarouselAdvertisements = List<AdModel>.from(newTopCarouselAds);
       _fullCarouselAdvertisements = List<AdModel>.from(newFullCarouselAds);
@@ -605,11 +587,6 @@ class AdvertisementProvider extends ChangeNotifier {
       }
       if (_fullscreenAdProvider != null) {
         _fullscreenAdProvider!.updateCarouselList(_fullCarouselAdvertisements);
-      }
-
-      // 更新原有广告列表（保持兼容性）
-      if (newAdvertisements.isNotEmpty) {
-        await _smartUpdateAdvertisements(newAdvertisements);
       }
 
       _logger.i(
@@ -679,7 +656,6 @@ class AdvertisementProvider extends ChangeNotifier {
         await _ensureCachedAdvertisementsAvailable();
       }
 
-      // 发生任何错误时都不清除现有数据，保持现状让轮播继续
       _logger.i(
           '错误处理完成，保持现有广告数据: ${_advertisements.length}个广告，${_topCarouselAdvertisements.length}个顶部轮播广告，${_fullCarouselAdvertisements.length}个全屏轮播广告');
     } finally {

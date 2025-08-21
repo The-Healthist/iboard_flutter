@@ -43,15 +43,10 @@ class ArrearTableWidgetState extends State<ArrearTableWidget> {
     // 确保数据已加载 - 使用与欠费查询相同的数据源
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final provider = Provider.of<ArrearProvider>(context, listen: false);
-      print('📊 [ArrearTableWidget] 初始化 - 检查费用数据状态');
 
       if (!provider.hasData) {
-        print('📊 [ArrearTableWidget] 数据为空，从缓存加载');
         provider.loadFromCache();
-      } else {
-        print('📊 [ArrearTableWidget] 使用现有数据，与欠费查询共享同一数据源');
       }
-
       // 如果在轮播模式下，启动自动翻页
       if (widget.isInCarouselMode && provider.hasData) {
         _startAutoPagination();
@@ -72,16 +67,9 @@ class ArrearTableWidgetState extends State<ArrearTableWidget> {
           final shouldPauseCarousel =
               currentAppState == AppState.fullscreenAd ||
                   currentAppState == AppState.manualOperation;
-
-          print(
-              '🎬 [轮播状态同步] 当前应用状态: ${currentAppState.name}, 通告轮播应暂停: $shouldPauseCarousel, 自动翻页状态: ${_isPaginationPaused ? "已暂停" : "运行中"}');
-
-          // 自动翻页与通告轮播状态同步
           if (shouldPauseCarousel && !_isPaginationPaused) {
-            print('🛑 [轮播状态同步] 通告轮播暂停，同步暂停自动翻页');
             _pauseAutoPagination();
           } else if (!shouldPauseCarousel && _isPaginationPaused) {
-            print('▶️ [轮播状态同步] 通告轮播恢复，同步恢复自动翻页');
             _resumeAutoPagination();
           }
         }
@@ -199,8 +187,6 @@ class ArrearTableWidgetState extends State<ArrearTableWidget> {
         // 如果每页项数发生变化，更新状态以确保分页控件显示正确
         if (_itemsPerPage != dynamicRows) {
           _itemsPerPage = dynamicRows;
-          print('📊 [表格内容] 更新每页项数: $_itemsPerPage');
-          // 使用 WidgetsBinding.instance.addPostFrameCallback 来确保在渲染完成后更新状态
           WidgetsBinding.instance.addPostFrameCallback((_) {
             if (mounted) {
               setState(() {
@@ -423,13 +409,9 @@ class ArrearTableWidgetState extends State<ArrearTableWidget> {
           headerHeight;
       actualItemsPerPage =
           ((availableHeight / rowHeight).floor() - 1).clamp(8, 50);
-
-      print('📊 [分页控件] 重新计算每页项数: 从$_itemsPerPage调整为$actualItemsPerPage');
     }
 
     final totalPages = (totalItems / actualItemsPerPage).ceil();
-    print(
-        '📄 [分页控件] 计算总页数: 数据总数=$totalItems, 每页=$actualItemsPerPage, 总页数=$totalPages');
 
     if (totalPages <= 1) return const SizedBox.shrink();
 

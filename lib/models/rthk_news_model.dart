@@ -1,7 +1,7 @@
 import 'package:intl/intl.dart';
 
-/// 香港电台新闻模型
-/// 对应RTHK RSS数据结构
+/// 香港電台新聞模型
+/// 對應RTHK RSS資料結構
 class RthkNewsModel {
   final String title;
   final String guid;
@@ -17,12 +17,12 @@ class RthkNewsModel {
     required this.formattedTime,
   });
 
-  ///1, 从RSS XML数据创建新闻模型
+  ///1, 從RSS XML資料建立新聞模型
   factory RthkNewsModel.fromRssXml(Map<String, dynamic> item) {
-    // 解析发布时间
+    // 解析發佈時間
     DateTime pubDate = _parseRssDate(item['pubDate'] ?? '');
 
-    // 格式化时间为 HH:mm 格式
+    // 格式化時間為 HH:mm 格式
     String formattedTime =
         '${pubDate.hour.toString().padLeft(2, '0')}:${pubDate.minute.toString().padLeft(2, '0')}';
 
@@ -35,9 +35,9 @@ class RthkNewsModel {
     );
   }
 
-  ///2, 提取CDATA内容
+  ///2, 提取CDATA內容
   static String _extractCDataContent(String rawContent) {
-    // 查找CDATA标签
+    // 查找CDATA標籤
     final cdataPattern = RegExp(r'<!\[CDATA\[(.*?)\]\]>', dotAll: true);
     final match = cdataPattern.firstMatch(rawContent);
 
@@ -45,14 +45,14 @@ class RthkNewsModel {
       return match.group(1)?.trim() ?? rawContent;
     }
 
-    // 如果没有CDATA标签，直接返回原内容
+    // 如果沒有CDATA標籤，直接回傳原內容
     return rawContent;
   }
 
   ///3, 解析RSS日期格式
   static DateTime _parseRssDate(String dateStr) {
     try {
-      // 尝试解析RTHK的日期格式: "Fri, 15 Aug 2025 16:40:08 +0800"
+      // 嘗試解析RTHK的日期格式: "Fri, 15 Aug 2025 16:40:08 +0800"
       final formats = [
         'EEE, dd MMM yyyy HH:mm:ss Z',
         'EEE, dd MMM yyyy HH:mm:ss',
@@ -63,21 +63,21 @@ class RthkNewsModel {
         try {
           return DateFormat(format).parse(dateStr);
         } catch (e) {
-          // 继续尝试下一个格式
+          // 繼續嘗試下一個格式
         }
       }
 
-      // 如果所有格式都失败，返回当前时间
+      // 如果所有格式都失敗，回傳當前時間
       return DateTime.now();
     } catch (e) {
       return DateTime.now();
     }
   }
 
-  ///4, 获取显示格式的新闻文本
+  ///4, 取得顯示格式的新聞文字
   String get displayText => '($formattedTime) $title';
 
-  ///5, 转换为JSON格式
+  ///5, 轉換為JSON格式
   Map<String, dynamic> toJson() {
     return {
       'title': title,
@@ -88,7 +88,7 @@ class RthkNewsModel {
     };
   }
 
-  ///6, 从JSON格式创建模型
+  ///6, 從JSON格式建立模型
   factory RthkNewsModel.fromJson(Map<String, dynamic> json) {
     return RthkNewsModel(
       title: json['title'] ?? '',

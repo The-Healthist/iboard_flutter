@@ -173,24 +173,32 @@ class _CarouselWidgetState extends State<CarouselWidget>
   }
 
   /// Set the carousel array with a new list of widgets
+  ///
+  /// Preserve current index when possible to avoid jumping back to the main screen
+  /// during runtime updates. If previous index is out of range, clamp to last.
   void setCarouselArray(List<Widget> widgets) {
+    final int prevIndex = _currentIndex;
+
     setState(() {
       _widgets = List.from(widgets);
-      _currentIndex = 0;
+      if (_widgets.isEmpty) {
+        _currentIndex = 0;
+      } else {
+        _currentIndex = prevIndex.clamp(0, _widgets.length - 1);
+      }
     });
 
     if (_widgets.isNotEmpty && _pageController.hasClients) {
-      _pageController.animateToPage(
-        0,
-        duration: widget.animationDuration,
-        curve: widget.animationCurve,
-      );
+      // Jump to the preserved index without animation to avoid interrupting media playback
+      debugPrint(
+          'CarouselWidget: jumping to page $_currentIndex without animation');
+      _pageController.jumpToPage(_currentIndex);
     }
 
     _restartAutoPlay();
 
     if (widget.onPageChanged != null) {
-      widget.onPageChanged!(_widgets.isEmpty ? -1 : 0);
+      widget.onPageChanged!(_widgets.isEmpty ? -1 : _currentIndex);
     }
   }
 

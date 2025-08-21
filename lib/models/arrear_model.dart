@@ -1,4 +1,4 @@
-// 物业管理费用相关模型
+// 物業管理費用相關模型
 class ManagementFeeModel {
   final List<Block> blocks;
 
@@ -94,9 +94,9 @@ class Unit {
 
 class Bill {
   final String period;
-  final dynamic value; // 可以是数字或字符串 "已付"
-  final String? itemId; // 其他费用特有字段
-  final String? remark; // 其他费用特有字段
+  final dynamic value; // 可以是數字或字串「已付」
+  final String? itemId; // 其他費用特有欄位
+  final String? remark; // 其他費用特有欄位
 
   Bill({
     required this.period,
@@ -106,7 +106,7 @@ class Bill {
   });
 
   factory Bill.fromJson(Map<String, dynamic> json) {
-    // 处理物业管理费用的账单格式
+    // 處理物業管理費用的賬單格式
     if (json.length == 1) {
       final entry = json.entries.first;
       return Bill(
@@ -115,7 +115,7 @@ class Bill {
       );
     }
 
-    // 处理其他费用的账单格式
+    // 處理其他費用的賬單格式
     return Bill(
       period: json['trs_to']?.toString() ?? '',
       value: json['trs_val'],
@@ -126,7 +126,7 @@ class Bill {
 
   Map<String, dynamic> toJson() {
     if (itemId != null || remark != null) {
-      // 其他费用格式
+      // 其他費用格式
       return {
         'trs_to': period,
         'trs_val': value,
@@ -134,15 +134,15 @@ class Bill {
         if (remark != null) 'remark': remark,
       };
     } else {
-      // 物业管理费用格式
+      // 物業管理費用格式
       return {period: value};
     }
   }
 
-  ///1, 检查是否已付款
+  ///1, 檢查是否已付款
   bool get isPaid => value == "已付";
 
-  ///2, 获取费用金额（如果是数字）
+  ///2, 取得費用金額（如果是數字）
   double? get amount {
     if (value is num) {
       return value.toDouble();
@@ -150,22 +150,22 @@ class Bill {
     return null;
   }
 
-  ///3, 获取费用状态描述
+  ///3, 取得費用狀態描述
   String get statusDescription {
     if (isPaid) {
       return "已付";
     }
     if (amount != null) {
       if (amount! < 0) {
-        return "欠费 ${amount!.abs().toStringAsFixed(0)}";
+        return "欠費 ${amount!.abs().toStringAsFixed(0)}";
       } else {
-        return "余额 ${amount!.toStringAsFixed(0)}";
+        return "餘額 ${amount!.toStringAsFixed(0)}";
       }
     }
-    return "未知状态";
+    return "未知狀態";
   }
 
-  ///4, 获取完整的费用信息（用于其他费用显示）
+  ///4, 取得完整的費用資訊（用於其他費用顯示）
   Map<String, dynamic> get fullFeeInfo {
     return {
       'period': period,
@@ -175,11 +175,11 @@ class Bill {
     };
   }
 
-  ///5, 是否为其他费用（有itemId或remark）
+  ///5, 是否為其他費用（有itemId或remark）
   bool get isOtherFee => itemId != null || remark != null;
 }
 
-// 其他公摊费用相关模型
+// 其他公攤費用相關模型
 class OtherFeeModel {
   final List<Block> blocks;
 
@@ -201,7 +201,7 @@ class OtherFeeModel {
   }
 }
 
-// 保留原有的欠费模型以保持向后兼容
+// 保留原有的欠費模型以保持向後兼容
 class ArrearModel {
   final String id;
   final String blgId;

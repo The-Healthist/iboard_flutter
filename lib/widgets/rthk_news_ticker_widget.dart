@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:iboard_app/providers/rthk_news_provider.dart';
 import 'package:iboard_app/widgets/debug_rthk_news_widget.dart';
-import 'package:iboard_app/providers/fullscreen_ad_provider.dart';
+import 'package:iboard_app/providers/ad_fullscreen_provider.dart';
 import 'package:logger/logger.dart';
 
 /// 优化后的香港电台新闻跑马灯组件

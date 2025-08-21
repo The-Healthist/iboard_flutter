@@ -239,17 +239,17 @@ class _TimeSettingsPageState extends State<TimeSettingsPage> {
                                     SizedBox(height: 24),
                                     _buildTimeSettingRow(
                                       '欠費更新間隔',
-                                      '${deviceSettings.arrearageUpdateDuration}分钟',
+                                      '${deviceSettings.arrearageUpdateDuration}分鐘',
                                     ),
                                     SizedBox(height: 12),
                                     _buildTimeSettingRow(
                                       '通告更新間隔',
-                                      '${deviceSettings.noticeUpdateDuration}分钟',
+                                      '${deviceSettings.noticeUpdateDuration}分鐘',
                                     ),
                                     SizedBox(height: 12),
                                     _buildTimeSettingRow(
                                       '廣告更新間隔',
-                                      '${deviceSettings.advertisementUpdateDuration}分钟',
+                                      '${deviceSettings.advertisementUpdateDuration}分鐘',
                                     ),
                                     SizedBox(height: 12),
                                     _buildTimeSettingRow(
