@@ -164,6 +164,19 @@ class Bill {
     }
     return "未知状态";
   }
+
+  ///4, 获取完整的费用信息（用于其他费用显示）
+  Map<String, dynamic> get fullFeeInfo {
+    return {
+      'period': period,
+      'value': value,
+      'itemId': itemId,
+      'remark': remark,
+    };
+  }
+
+  ///5, 是否为其他费用（有itemId或remark）
+  bool get isOtherFee => itemId != null || remark != null;
 }
 
 // 其他公摊费用相关模型

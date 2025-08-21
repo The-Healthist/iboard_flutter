@@ -4,7 +4,8 @@ import 'package:iboard_app/providers/announcement_carousel_provider.dart';
 import 'package:iboard_app/providers/fullscreen_ad_provider.dart';
 import 'package:iboard_app/providers/state_provider.dart';
 import 'package:iboard_app/providers/top_ad_carousel_provider.dart';
-import 'package:iboard_app/providers/weather_provider.dart';
+
+import 'package:iboard_app/providers/app_update_provider.dart'; // 导入更新Provider
 import 'package:iboard_app/widgets/carousel_widget.dart'; // 导入通知类
 
 import 'package:provider/provider.dart';
@@ -266,6 +267,8 @@ class _SettingsPageState extends State<SettingsPage> {
                           subtitle: '配置網絡連接',
                           onTap: () {},
                         ),
+                        SizedBox(height: 16),
+                        _buildVersionUpdateItem(),
                       ],
                     ),
                   ),
@@ -331,6 +334,123 @@ class _SettingsPageState extends State<SettingsPage> {
         ),
         onTap: onTap,
       ),
+    );
+  }
+
+  ///8. 构建版本更新项目
+  Widget _buildVersionUpdateItem() {
+    return Consumer<AppUpdateProvider>(
+      builder: (context, updateProvider, child) {
+        return Container(
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(8),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.grey.withOpacity(0.1),
+                spreadRadius: 1,
+                blurRadius: 3,
+                offset: Offset(0, 1),
+              ),
+            ],
+          ),
+          child: ListTile(
+            leading: Container(
+              padding: EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: Colors.blue.shade50,
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Icon(
+                Icons.system_update,
+                color: Colors.blue.shade600,
+                size: 24,
+              ),
+            ),
+            title: Text(
+              '版本更新',
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            subtitle: Text(
+              '檢查應用程序版本更新',
+              style: TextStyle(
+                fontSize: 14,
+                color: Colors.grey.shade600,
+              ),
+            ),
+            trailing: updateProvider.hasLocalApk
+                ? ElevatedButton(
+                    onPressed: updateProvider.isInstalling
+                        ? null // 安装中时禁用按钮
+                        : () async {
+                            await updateProvider.installApk();
+                          },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: updateProvider.isInstalling
+                          ? Colors.grey.shade400 // 安装中时使用灰色背景
+                          : Colors.blue.shade600,
+                      foregroundColor: Colors.white,
+                      padding:
+                          EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                      minimumSize: Size(80, 32), // 稍微增加按钮宽度以容纳loading
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(16),
+                      ),
+                    ),
+                    child: updateProvider.isInstalling
+                        ? Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              SizedBox(
+                                width: 14,
+                                height: 14,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  valueColor: AlwaysStoppedAnimation<Color>(
+                                      Colors.white),
+                                ),
+                              ),
+                              SizedBox(width: 6),
+                              Text(
+                                '安装中',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                            ],
+                          )
+                        : Text(
+                            '更新',
+                            style: TextStyle(
+                                fontSize: 12, fontWeight: FontWeight.w500),
+                          ),
+                  )
+                : Container(
+                    padding: EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                    decoration: BoxDecoration(
+                      color: Colors.grey.shade50,
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(color: Colors.grey.shade200),
+                    ),
+                    child: Text(
+                      '已是最新版本',
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w500,
+                        color: Colors.grey.shade600,
+                      ),
+                    ),
+                  ),
+            onTap: updateProvider.hasLocalApk
+                ? null // 有更新时不允许整行点击，只能点击按钮
+                : () => _navigateToSubPage(TimeSettingsPage()),
+          ),
+        );
+      },
     );
   }
 }

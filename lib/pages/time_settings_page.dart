@@ -1,12 +1,9 @@
 import 'package:flutter/material.dart';
-import 'package:iboard_app/providers/announcement_carousel_provider.dart';
 import 'package:iboard_app/providers/app_data_provider.dart';
-import 'package:iboard_app/providers/fullscreen_ad_provider.dart';
-import 'package:iboard_app/providers/state_provider.dart';
-import 'package:iboard_app/providers/top_ad_carousel_provider.dart';
-import 'package:iboard_app/widgets/carousel_widget.dart';
+import 'package:iboard_app/providers/app_update_provider.dart'; // 导入更新Provider
 import 'package:iboard_app/widgets/debug_timer_widget.dart';
 import 'package:iboard_app/widgets/debug_update_time_widget.dart'; // 导入调试窗口
+
 import 'package:provider/provider.dart';
 import 'package:flutter/foundation.dart'; // 导入kDebugMode
 
@@ -27,7 +24,6 @@ class _TimeSettingsPageState extends State<TimeSettingsPage> {
       },
       child: Consumer<AppDataProvider>(
         builder: (context, appDataProvider, child) {
-          final hasDeviceId = appDataProvider.deviceId != null;
           final isLoggedIn = appDataProvider.isLoggedIn;
           final deviceId = appDataProvider.deviceId;
           final settingsModel = appDataProvider.settingsModel;
@@ -189,6 +185,10 @@ class _TimeSettingsPageState extends State<TimeSettingsPage> {
                               ),
                             ),
 
+                            // 版本信息卡片
+                            SizedBox(height: 24),
+                            _buildVersionInfoCard(context),
+
                             // 时间设置卡片
                             if (deviceSettings != null) ...[
                               SizedBox(height: 24),
@@ -283,17 +283,17 @@ class _TimeSettingsPageState extends State<TimeSettingsPage> {
                                     ),
                                     SizedBox(height: 12),
                                     _buildTimeSettingRow(
-                                      '付款表格一頁顯示時間',
+                                      '付款表格一頁顯示',
                                       '${deviceSettings.paymentTableOnePageDuration}秒',
                                     ),
                                     SizedBox(height: 12),
                                     _buildTimeSettingRow(
-                                      '正常到通告輪播轉換時間',
+                                      '正常到通告轉換',
                                       '${deviceSettings.normalToAnnouncementCarouselDuration}秒',
                                     ),
                                     SizedBox(height: 12),
                                     _buildTimeSettingRow(
-                                      '通告輪播到全屏廣告轉換時間',
+                                      '通告到廣告轉換',
                                       '${deviceSettings.announcementCarouselToFullAdsCarouselDuration}秒',
                                     ),
                                   ],
@@ -394,7 +394,7 @@ class _TimeSettingsPageState extends State<TimeSettingsPage> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Container(
-          width: 100,
+          width: 140, // 扩大宽度，与时间设置保持一致
           child: Text(
             '$label:',
             style: TextStyle(
@@ -444,6 +444,186 @@ class _TimeSettingsPageState extends State<TimeSettingsPage> {
           ),
         ),
       ],
+    );
+  }
+
+  ///13. 构建版本信息卡片 - 参考设备信息样式
+  Widget _buildVersionInfoCard(BuildContext context) {
+    return Consumer<AppUpdateProvider>(
+      builder: (context, updateProvider, child) {
+        return Container(
+          width: double.infinity,
+          padding: EdgeInsets.all(24),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(8),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.grey.withOpacity(0.05),
+                spreadRadius: 1,
+                blurRadius: 3,
+                offset: Offset(0, 2),
+              ),
+            ],
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // 标题行 - 与设备信息样式一致
+              Row(
+                children: [
+                  Container(
+                    padding: EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      color: Colors.green.shade50,
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Icon(
+                      Icons.system_update,
+                      color: Colors.green.shade600,
+                      size: 24,
+                    ),
+                  ),
+                  SizedBox(width: 16),
+                  Expanded(
+                    child: Text(
+                      '版本信息',
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.grey.shade800,
+                      ),
+                    ),
+                  ),
+                  // 检查更新按钮
+                  IconButton(
+                    onPressed: updateProvider.isCheckingUpdate
+                        ? null
+                        : () async {
+                            await updateProvider.checkForUpdate(
+                                autoDownload: true);
+                          },
+                    icon: updateProvider.isCheckingUpdate
+                        ? SizedBox(
+                            width: 20,
+                            height: 20,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              valueColor: AlwaysStoppedAnimation<Color>(
+                                  Colors.blue.shade600),
+                            ),
+                          )
+                        : Icon(
+                            Icons.refresh,
+                            color: Colors.blue.shade600,
+                          ),
+                    tooltip: '檢查更新',
+                  ),
+                ],
+              ),
+              SizedBox(height: 24),
+
+              // 当前版本信息 - 使用统一的行样式
+              _buildInfoRow('當前版本', updateProvider.currentVersion ?? '獲取中...'),
+
+              // 最新版本信息
+              if (updateProvider.hasUpdate) ...[
+                SizedBox(height: 12),
+                _buildInfoRow('最新版本', updateProvider.remoteVersion ?? '未知',
+                    Colors.green.shade700),
+              ],
+
+              // APK下载状态
+              if (updateProvider.hasUpdate) ...[
+                SizedBox(height: 12),
+                _buildInfoRow(
+                    'APK狀態',
+                    updateProvider.hasLocalApk ? '下載成功' : '未下載',
+                    updateProvider.hasLocalApk
+                        ? Colors.green.shade700
+                        : Colors.orange.shade600),
+              ],
+
+              // 更新描述
+              if (updateProvider.updateDescription != null) ...[
+                SizedBox(height: 12),
+                _buildInfoRow('更新內容', updateProvider.updateDescription!),
+              ],
+
+              // 错误信息
+              if (updateProvider.error != null) ...[
+                SizedBox(height: 12),
+                _buildInfoRow(
+                    '錯誤信息', updateProvider.error!, Colors.red.shade700),
+              ],
+
+              // 状态提示
+              if (updateProvider.currentVersion != null) ...[
+                SizedBox(height: 20),
+                if (updateProvider.hasUpdate && updateProvider.hasLocalApk) ...[
+                  Container(
+                    width: double.infinity,
+                    padding: EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: Colors.blue.shade50,
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: Colors.blue.shade200),
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(
+                          Icons.download_done,
+                          color: Colors.blue.shade600,
+                          size: 20,
+                        ),
+                        SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            '新版本已下載到應用緩存，請到設置頁面進行更新',
+                            style: TextStyle(
+                              fontSize: 14,
+                              color: Colors.blue.shade700,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ] else if (!updateProvider.hasUpdate) ...[
+                  Container(
+                    width: double.infinity,
+                    padding: EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: Colors.green.shade50,
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: Colors.green.shade200),
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(
+                          Icons.check_circle,
+                          color: Colors.green.shade600,
+                          size: 20,
+                        ),
+                        SizedBox(width: 8),
+                        Text(
+                          '當前已是最新版本',
+                          style: TextStyle(
+                            fontSize: 14,
+                            color: Colors.green.shade700,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ],
+            ],
+          ),
+        );
+      },
     );
   }
 }

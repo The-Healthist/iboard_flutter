@@ -23,10 +23,10 @@ class ApiClient {
   String? _token;
   final Logger _logger = Logger();
 
-  // 网络请求配置
-  static const Duration _requestTimeout = Duration(seconds: 30); // 30秒超时
-  static const int _maxRetryAttempts = 1; // 最大重试1次
-  static const Duration _retryDelay = Duration(seconds: 3); // 重试间隔3秒
+  // 網絡請求配置
+  static const Duration _requestTimeout = Duration(seconds: 30); // 30秒超時
+  static const int _maxRetryAttempts = 1; // 最大重試1次
+  static const Duration _retryDelay = Duration(seconds: 3); // 重試間隔3秒
 
   // For managing token refresh
   bool _isRefreshingToken = false; // True if a refresh operation is active
@@ -79,7 +79,7 @@ class ApiClient {
     return headers;
   }
 
-  ///2, 处理返回数组数据的HTTP响应
+  ///2, 處理返回數組數據的HTTP響應
   Future<List<Map<String, dynamic>>> _handleArrayResponse(
       http.Response response, String apiName) async {
     final String decodedBody = utf8.decode(response.bodyBytes);
@@ -92,7 +92,7 @@ class ApiClient {
       try {
         final decoded = json.decode(decodedBody);
 
-        // 检查是否是服务端返回的错误响应
+        // 檢查是否是服務端返回的錯誤響應
         if (decoded is Map &&
             decoded.containsKey('status') &&
             decoded['status'] == 'error') {
@@ -305,39 +305,39 @@ class ApiClient {
 
     for (int attempt = 1; attempt <= _maxRetryAttempts; attempt++) {
       try {
-        // _logger.i('$apiNameForLog - 尝试第 $attempt/$_maxRetryAttempts 次请求');
+        // _logger.i('$apiNameForLog - 嘗試第 $attempt/$_maxRetryAttempts 次請求');
 
-        // 应用超时到请求函数
+        // 應用超時到請求函數
         response = await requestFunction().timeout(
           _requestTimeout,
           onTimeout: () {
             throw Exception(
-                '请求超时 (${_requestTimeout.inSeconds}秒) - $apiNameForLog');
+                '請求超時 (${_requestTimeout.inSeconds}秒) - $apiNameForLog');
           },
         );
 
-        // 如果请求成功，跳出重试循环
+        // 如果請求成功，跳出重試循環
         // _logger.i(
-        //     '$apiNameForLog - 第 $attempt 次请求成功 (状态码: ${response.statusCode})');
+        //     '$apiNameForLog - 第 $attempt 次請求成功 (狀態碼: ${response.statusCode})');
         break;
       } catch (e, stackTrace) {
         lastException = e is Exception ? e : Exception(e.toString());
 
-        // 详细记录网络错误类型并生成用户友好消息
+        // 詳細記錄網絡錯誤類型並生成用戶友好消息
         String errorType = 'Unknown';
         String userFriendlyMessage = '';
 
         if (e.toString().contains('Failed host lookup') ||
             e.toString().contains('No address associated with hostname')) {
           errorType = 'DNS解析失敗';
-          userFriendlyMessage = '🌐 無法連接到服務器,請檢查網絡連接或聯繫管理員';
+          userFriendlyMessage = '🌐 無法連接到伺服器,請檢查網絡連接或聯繫管理員';
         } else if (e.toString().contains('SocketException')) {
           errorType = 'Socket連接錯誤';
           userFriendlyMessage = '🔌 網絡連接異常，請檢查您的網絡設置';
         } else if (e.toString().contains('TimeoutException') ||
             e.toString().contains('請求超時')) {
           errorType = '請求超時';
-          userFriendlyMessage = '⏱️ 服務器響應超時，請稍後重試';
+          userFriendlyMessage = '⏱️ 伺服器響應超時，請稍後重試';
         } else if (e.toString().contains('ClientException')) {
           errorType = '客戶端錯誤';
           userFriendlyMessage = '📱 應用連接錯誤，請重啟應用或檢查網絡';
@@ -346,20 +346,20 @@ class ApiClient {
         }
 
         if (attempt == _maxRetryAttempts) {
-          // 最后一次尝试失败，抛出用户友好的异常
+          // 最後一次嘗試失敗，拋出用戶友好的異常
           _logger.e(
               '$apiNameForLog - 所有 $_maxRetryAttempts 次請求嘗試均失敗 (最後錯誤類型: $errorType)',
               error: e,
               stackTrace: stackTrace);
 
-          // 抛出包含用户友好消息的异常
+          // 拋出包含用戶友好消息的異常
           throw ApiException(
             message: userFriendlyMessage,
             statusCode: null,
             errorData: e.toString(),
           );
         } else {
-          // 还有重试机会，记录警告并等待
+          // 還有重試機會，記錄警告並等待
           _logger.w(
               '$apiNameForLog - 第 $attempt 次請求失敗 ($errorType)，${_retryDelay.inSeconds}秒後重試');
           await Future.delayed(_retryDelay);
@@ -367,9 +367,9 @@ class ApiClient {
       }
     }
 
-    // 如果response仍然为null，说明所有重试都失败了
+    // 如果response仍然為null，說明所有重試都失敗了
     if (response == null) {
-      throw lastException ?? Exception('请求失败，未知错误 - $apiNameForLog');
+      throw lastException ?? Exception('請求失敗，未知錯誤 - $apiNameForLog');
     }
 
     // Section 3: Handle 401 for the main request (retry logic)
@@ -552,7 +552,7 @@ class ApiClient {
     const String endpointPath = '/api/admin/device';
     final Uri url = _buildUri(endpointPath, null);
 
-    // 默认设置
+    // 默認設置
     final defaultSettings = {
       "arrearageUpdateDuration": 5,
       "noticeUpdateDuration": 10,
@@ -588,15 +588,15 @@ class ApiClient {
     return responseData;
   }
 
-  /// 8. 获取欠费数据
+  /// 8. 獲取欠費數據
   /// Endpoint: POST https://uqf0jqfm77.execute-api.ap-east-1.amazonaws.com/prod/v1/building_board/building-mf-table
   /// Body: {"blg_id": "string", "ptype": "mf"}
   // Future<List<Map<String, dynamic>>> getArrearage({String? buildingId}) async {
-  //   // 验证Building ID格式
+  //   // 驗證Building ID格式
   //   if (buildingId != null && !_isValidBuildingId(buildingId)) {
   //     throw ApiException(
   //       statusCode: 400,
-  //       message: 'Building ID 格式无效，只能包含数字和英文字母',
+  //       message: 'Building ID 格式無效，只能包含數字和英文字母',
   //       errorData: 'Invalid building ID: $buildingId',
   //     );
   //   }
@@ -612,21 +612,21 @@ class ApiClient {
   //   final Map<String, String> headers =
   //       _getHeaders(requiresAuth: true, contentType: 'application/json');
 
-  //   _logger.i('获取欠费数据，楼宇ID: $buildingId');
+  //   _logger.i('獲取欠費數據，樓宇ID: $buildingId');
   //   final http.Response response = await _sendRequest(
   //       () => http.post(url, headers: headers, body: requestBody),
   //       apiNameForLog: 'getArrearage');
   //   return _handleArrayResponse(response, 'getArrearage');
   // }
 
-  ///9, 验证Building ID格式
+  ///9, 驗證Building ID格式
   bool _isValidBuildingId(String buildingId) {
-    // Building ID只能包含数字和英文字母
+    // Building ID只能包含數字和英文字母
     final RegExp validPattern = RegExp(r'^[a-zA-Z0-9]+$');
     return validPattern.hasMatch(buildingId) && buildingId.isNotEmpty;
   }
 
-  ///10. 获取全屏广告列表
+  ///10. 獲取全屏廣告列表
   Future<List<Map<String, dynamic>>> getFullAdvertisementsBuilding() async {
     const String endpointPath = '/api/device/client/full_advertisements';
     final Uri url = _buildUri(endpointPath, null);
@@ -639,7 +639,7 @@ class ApiClient {
     return _handleArrayResponse(response, 'getFullAdvertisementsBuilding');
   }
 
-  ///11. 获取顶端广告列表
+  ///11. 獲取頂端廣告列表
   Future<List<Map<String, dynamic>>> getTopAdvertisementsBuilding() async {
     const String endpointPath = '/api/device/client/top_advertisements';
     final Uri url = _buildUri(endpointPath, null);
@@ -652,7 +652,7 @@ class ApiClient {
     return _handleArrayResponse(response, 'getTopAdvertisementsBuilding');
   }
 
-  ///12. 轮播顶端广告顺序
+  ///12. 輪播頂端廣告順序
   Future<List<Map<String, dynamic>>> getCarouselTopAdvertisements() async {
     const String endpointPath =
         '/api/device/client/carousel/top_advertisements';
@@ -666,7 +666,7 @@ class ApiClient {
     return _handleArrayResponse(response, 'getCarouselTopAdvertisements');
   }
 
-  ///13. 轮播完整广告列表
+  ///13. 輪播完整廣告列表
   Future<List<Map<String, dynamic>>> getCarouselFullAdvertisements() async {
     const String endpointPath =
         '/api/device/client/carousel/full_advertisements';
@@ -680,7 +680,7 @@ class ApiClient {
     return _handleArrayResponse(response, 'getCarouselFullAdvertisements');
   }
 
-  ///14. 轮播通知列表
+  ///14. 輪播通知列表
   Future<List<Map<String, dynamic>>> getCarouselNotices() async {
     const String endpointPath = '/api/device/client/carousel/notices';
     final Uri url = _buildUri(endpointPath, null);
@@ -693,7 +693,7 @@ class ApiClient {
     return _handleArrayResponse(response, 'getCarouselNotices');
   }
 
-  ///15. 获取应用版本信息
+  ///15. 獲取應用版本資訊
   Future<Map<String, dynamic>> getAppVersion() async {
     const String endpointPath = '/api/app/version';
     final Uri url = _buildUri(endpointPath, null);
@@ -706,41 +706,41 @@ class ApiClient {
     return _handleResponse(response, 'getAppVersion');
   }
 
-  ///16. 获取香港特区政府新闻公报RSS
+  ///16. 獲取香港特區政府新聞公報RSS
   /// Endpoint: GET http://www.info.gov.hk/gia/rss/general_zh.xml
   Future<List<Map<String, dynamic>>> getNewsAnnouncements() async {
     const String fullUrl = 'http://www.info.gov.hk/gia/rss/general_zh.xml';
     final Uri url = _buildUri(fullUrl, null);
 
-    // RSS接口不需要认证，使用基本headers
+    // RSS介面不需要認證，使用基本headers
     final Map<String, String> headers = {
       'Content-Type': 'application/xml; charset=utf-8',
       'User-Agent': 'iBoard_Flutter/1.0',
     };
 
-    _logger.i('获取香港特区政府新闻公报RSS数据');
+    _logger.i('獲取香港特區政府新聞公報RSS數據');
 
     try {
       final http.Response response = await _sendRequest(
           () => http.get(url, headers: headers),
           apiNameForLog: 'getNewsAnnouncements');
 
-      // 处理XML响应
+      // 處理XML響應
       return _handleRssXmlResponse(response, 'getNewsAnnouncements');
     } catch (e) {
-      _logger.e('获取新闻公报失败: $e');
+      _logger.e('獲取新聞公報失敗: $e');
       rethrow;
     }
   }
 
-  ///16.1. 获取香港电台财经新闻RSS
+  ///16.1. 獲取香港電台財經新聞RSS
   /// Endpoint: GET https://rthk9.rthk.hk/rthk/news/rss/c_expressnews_cfinance.xml
   Future<List<Map<String, dynamic>>> getRthkNews() async {
     const String fullUrl =
         'https://rthk9.rthk.hk/rthk/news/rss/c_expressnews_cfinance.xml';
     final Uri url = _buildUri(fullUrl, null);
 
-    // RSS接口不需要认证，使用基本headers
+    // RSS介面不需要認證，使用基本headers
     final Map<String, String> headers = {
       'Content-Type': 'application/xml; charset=utf-8',
       'User-Agent': 'iBoard_Flutter/1.0',
@@ -748,30 +748,30 @@ class ApiClient {
       'Cache-Control': 'no-cache',
     };
 
-    _logger.i('🌐 开始获取香港电台财经新闻RSS数据');
+    _logger.i('🌐 開始獲取香港電台財經新聞RSS數據');
 
     try {
-      // 增加超时时间到60秒
+      // 增加超時時間到60秒
       final http.Response response = await _sendRequest(
         () => http.get(url, headers: headers).timeout(
           const Duration(seconds: 60), // 增加到60秒
           onTimeout: () {
-            throw Exception('RTHK新闻RSS请求超时 (60秒)');
+            throw Exception('RTHK新聞RSS請求超時 (60秒)');
           },
         ),
         apiNameForLog: 'getRthkNews',
       );
 
-      // 处理XML响应
+      // 處理XML響應
       return _handleRssXmlResponse(response, 'getRthkNews');
     } catch (e) {
-      _logger.e('❌ 获取RTHK新闻失败: $e');
+      _logger.e('❌ 獲取RTHK新聞失敗: $e');
 
-      // 如果是超时错误，提供更友好的错误信息
-      if (e.toString().contains('超时')) {
+      // 如果是超時錯誤，提供更友好的錯誤信息
+      if (e.toString().contains('超時')) {
         throw ApiException(
           statusCode: null,
-          message: '❌ RTHK新闻RSS请求超时，请检查网络连接或稍后重试',
+          message: '❌ RTHK新聞RSS請求超時，請檢查網絡連接或稍後重試',
           errorData: 'TimeoutException: ${e.toString()}',
         );
       }
@@ -780,23 +780,23 @@ class ApiClient {
     }
   }
 
-  ///17. 处理RSS XML响应
+  ///17. 處理RSS XML響應
   Future<List<Map<String, dynamic>>> _handleRssXmlResponse(
       http.Response response, String apiName) async {
     final String decodedBody = utf8.decode(response.bodyBytes);
 
     if (response.statusCode >= 200 && response.statusCode < 300) {
-      _logger.i('$apiName 成功 (状态码: ${response.statusCode})');
+      _logger.i('$apiName 成功 (狀態碼: ${response.statusCode})');
 
       if (decodedBody.isEmpty) {
         return [];
       }
 
       try {
-        // 简单的XML解析，提取item元素
+        // 簡單的XML解析，提取item元素
         final List<Map<String, dynamic>> items = [];
 
-        // 使用正则表达式提取item标签内容
+        // 使用正則表達式提取item標籤內容
         final RegExp itemRegex = RegExp(
           r'<item>(.*?)</item>',
           dotAll: true,
@@ -834,21 +834,21 @@ class ApiClient {
           }
         }
 
-        _logger.i('成功解析 ${items.length} 条新闻公报');
+        _logger.i('成功解析 ${items.length} 條新聞公報');
         return items;
       } catch (e, stackTrace) {
-        _logger.e('解析RSS XML失败: $e', error: e, stackTrace: stackTrace);
+        _logger.e('解析RSS XML失敗: $e', error: e, stackTrace: stackTrace);
         throw ApiException(
           statusCode: response.statusCode,
-          message: '成功接收响应，但解析RSS XML失败',
+          message: '成功接收響應，但解析RSS XML失敗',
           errorData: decodedBody,
         );
       }
     } else {
-      _logger.w('$apiName 失败 (状态码: ${response.statusCode}), 响应体: $decodedBody');
+      _logger.w('$apiName 失敗 (狀態碼: ${response.statusCode}), 響應體: $decodedBody');
       throw ApiException(
         statusCode: response.statusCode,
-        message: '$apiName 失败',
+        message: '$apiName 失敗',
         errorData: decodedBody,
       );
     }
@@ -859,11 +859,11 @@ class ApiClient {
   /// Body: {"ptype": "mf", "blg_id": "string"}
   Future<Map<String, dynamic>> getManagementFeeStatus(
       {String? buildingId}) async {
-    // 验证Building ID格式
+    // 驗證Building ID格式
     if (buildingId != null && !_isValidBuildingId(buildingId)) {
       throw ApiException(
         statusCode: 400,
-        message: 'Building ID 格式无效，只能包含数字和英文字母',
+        message: 'Building ID 格式無效，只能包含數字和英文字母',
         errorData: 'Invalid building ID: $buildingId',
       );
     }
@@ -879,7 +879,7 @@ class ApiClient {
     final Map<String, String> headers =
         _getHeaders(requiresAuth: true, contentType: 'application/json');
 
-    _logger.i('获取物业管理费用状态，楼宇ID: $buildingId');
+    _logger.i('獲取物業管理費用狀態，樓宇ID: $buildingId');
     final http.Response response = await _sendRequest(
         () => http.post(url, headers: headers, body: requestBody),
         apiNameForLog: 'getManagementFeeStatus');
@@ -890,11 +890,11 @@ class ApiClient {
   /// Endpoint: POST https://uqf0jqfm77.execute-api.ap-east-1.amazonaws.com/prod/v1/building_board/building-other-fee-status
   /// Body: {"ptype": "mf", "blg_id": "string"}
   Future<Map<String, dynamic>> getOtherFeeStatus({String? buildingId}) async {
-    // 验证Building ID格式
+    // 驗證Building ID格式
     if (buildingId != null && !_isValidBuildingId(buildingId)) {
       throw ApiException(
         statusCode: 400,
-        message: 'Building ID 格式无效，只能包含数字和英文字母',
+        message: 'Building ID 格式無效，只能包含數字和英文字母',
         errorData: 'Invalid building ID: $buildingId',
       );
     }
@@ -910,7 +910,7 @@ class ApiClient {
     final Map<String, String> headers =
         _getHeaders(requiresAuth: true, contentType: 'application/json');
 
-    _logger.i('获取物业其他费用状态，楼宇ID: $buildingId');
+    _logger.i('獲取物業其他費用狀態，樓宇ID: $buildingId');
     final http.Response response = await _sendRequest(
         () => http.post(url, headers: headers, body: requestBody),
         apiNameForLog: 'getOtherFeeStatus');

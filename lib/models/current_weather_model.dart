@@ -68,7 +68,7 @@ class RainfallDataModel {
       unit: json['unit'] as String,
       place: json['place'] as String,
       max: json['max'] as num,
-      main: json['main'] as String,
+      main: (json['main'] as String?) ?? "", // 处理null或空字符串
       min: json['min'] as num?,
     );
   }
@@ -304,16 +304,38 @@ class CurrentWeatherDataModel {
     this.uvindex,
   });
 
+  ///1，解析tcmessage字段 - 处理空字符串和List类型
+  static List<String>? _parseTcMessage(dynamic value) {
+    if (value == null || value == "") {
+      return null;
+    }
+    if (value is List) {
+      return value.map((e) => e as String).toList();
+    }
+    if (value is String && value.isNotEmpty) {
+      return [value];
+    }
+    return null;
+  }
+
+  ///2，解析空字符串字段 - 将空字符串转换为null
+  static String? _parseEmptyString(dynamic value) {
+    if (value == null || value == "") {
+      return null;
+    }
+    return value as String?;
+  }
+
   factory CurrentWeatherDataModel.fromJson(Map<String, dynamic> json) {
     dynamic rawWarningMessage = json['warningMessage'];
     List<String>? parsedWarningMessage;
-    if (rawWarningMessage == null) {
-      parsedWarningMessage = null;
+    if (rawWarningMessage == null || rawWarningMessage == "") {
+      parsedWarningMessage = null; // 空字符串和null都处理为null
     } else if (rawWarningMessage is List) {
       parsedWarningMessage = rawWarningMessage.map((e) => e as String).toList();
     } else if (rawWarningMessage is String) {
-      if (rawWarningMessage.isEmpty) {
-        parsedWarningMessage = <String>[]; // Empty string becomes an empty list
+      if (rawWarningMessage.trim().isEmpty) {
+        parsedWarningMessage = null; // 空白字符串处理为null
       } else {
         // If a non-empty string could be a single warning message
         parsedWarningMessage = <String>[rawWarningMessage];
@@ -333,20 +355,22 @@ class CurrentWeatherDataModel {
           : null,
       warningMessage: parsedWarningMessage, // Use the safely parsed value
       icon: (json['icon'] as List<dynamic>?)?.map((e) => e as int).toList(),
-      iconUpdateTime: json['iconUpdateTime'] as String?,
+      iconUpdateTime: _parseEmptyString(json['iconUpdateTime']),
       updateTime: json['updateTime'] as String,
       temperature: json['temperature'] != null
           ? CurrentTemperatureInfoModel.fromJson(
               json['temperature'] as Map<String, dynamic>)
           : null,
-      mintempFrom00To09: json['mintempFrom00To09'] as String?,
-      rainfallFrom00To12: json['rainfallFrom00To12'] as String?,
-      rainfallLastMonth: json['rainfallLastMonth'] as String?,
-      rainfallJanuaryToLastMonth: json['rainfallJanuaryToLastMonth'] as String?,
+      tcmessage: _parseTcMessage(json['tcmessage']),
+      mintempFrom00To09: _parseEmptyString(json['mintempFrom00To09']),
+      rainfallFrom00To12: _parseEmptyString(json['rainfallFrom00To12']),
+      rainfallLastMonth: _parseEmptyString(json['rainfallLastMonth']),
+      rainfallJanuaryToLastMonth:
+          _parseEmptyString(json['rainfallJanuaryToLastMonth']),
       humidity: json['humidity'] != null
           ? HumidityInfoModel.fromJson(json['humidity'] as Map<String, dynamic>)
           : null,
-      uvindex: json['uvindex'] != null
+      uvindex: json['uvindex'] != null && json['uvindex'] != ""
           ? UvIndexInfoModel.fromJson(json['uvindex'] as Map<String, dynamic>)
           : null,
     );

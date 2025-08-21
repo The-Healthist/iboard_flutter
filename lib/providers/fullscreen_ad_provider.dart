@@ -179,8 +179,6 @@ class FullscreenAdProvider extends ChangeNotifier {
       startFullscreenAdTimer(_currentAdIndex);
       startDebugTimer();
       _currentStateStartTime = DateTime.now();
-      _logger.i(
-          '🚀 进入全屏广告模式: 索引=$_currentAdIndex, 总数=${this.fullscreenAds.length}');
     }
 
     notifyListeners();
@@ -233,8 +231,8 @@ class FullscreenAdProvider extends ChangeNotifier {
         }
       });
     } else {
-      _logger.i(
-          '⏰ 启动标准广告计时器: ${fullscreenAdDuration}秒 (索引: $_currentAdIndex/${this.fullscreenAds.length})');
+      // _logger.i(
+      //     '⏰ 启动标准广告计时器: ${fullscreenAdDuration}秒 (索引: $_currentAdIndex/${this.fullscreenAds.length})');
       _fullscreenTimer = Timer(Duration(seconds: fullscreenAdDuration), () {
         if (_isActive && !_isPaused) {
           _logger.d('⏭️ 标准广告计时器到期，切换到下一个');
@@ -410,7 +408,7 @@ class FullscreenAdProvider extends ChangeNotifier {
     // 为下次进入准备下一个广告（但不触发切换逻辑）
     if (this.fullscreenAds.isNotEmpty) {
       _currentAdIndex = (_currentAdIndex + 1) % this.fullscreenAds.length;
-      _logger.i(' 3 3   33 3 🔄 广告索引更新为下一个: $_currentAdIndex');
+      // _logger.i(' 3 3   33 3 🔄 广告索引更新为下一个: $_currentAdIndex');
     }
 
     // 确保取消所有定时器

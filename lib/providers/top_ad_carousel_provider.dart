@@ -77,7 +77,7 @@ class TopAdCarouselProvider extends ChangeNotifier {
     List<Widget> adWidgets = this.topAds.map((ad) {
       FileManager fileManager = FileManager();
       fileManager.getFile(ad.file);
-      return Center(
+      return SizedBox.expand(
         child: TopAdWidget(
           ad: ad,
           fileManager: fileManager,

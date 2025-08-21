@@ -161,7 +161,6 @@ class VideoResourceManager {
         }
 
         final success = !controller.value.isPlaying;
-        _logger.d(success ? '✅ 视频已安全暂停' : '⚠️ 视频暂停状态不确定');
         return success;
       }
       return true; // 已经暂停或未初始化
@@ -185,7 +184,6 @@ class VideoResourceManager {
         }
 
         final success = controller.value.isPlaying;
-        _logger.d(success ? '✅ 视频已安全播放' : '⚠️ 视频播放状态不确定');
         return success;
       }
       return true; // 已经播放或未初始化

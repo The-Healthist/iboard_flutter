@@ -32,6 +32,9 @@ class _TopAdWidgetState extends State<TopAdWidget> {
   String? _localFilePath;
   String? _error;
   bool _isManuallyPaused = false; // 添加手动暂停标记
+  bool _isDownloading = false; // 添加下载状态标记
+  int _retryCount = 0; // 添加重试计数
+  static const int _maxRetries = 3; // 最大重试次数
 
   // 保存AdvertisementProvider引用，避免dispose时context访问问题
   AdvertisementProvider? _advertisementProvider;
@@ -50,9 +53,14 @@ class _TopAdWidgetState extends State<TopAdWidget> {
   }
 
   //1，加载广告文件
-  Future<void> _loadFile() async {
+  Future<void> _loadFile([bool isRetry = false]) async {
+    if (!isRetry) {
+      _retryCount = 0;
+    }
+    
     setState(() {
       _isLoading = true;
+      _isDownloading = false;
       _error = null;
     });
 
@@ -64,15 +72,37 @@ class _TopAdWidgetState extends State<TopAdWidget> {
     } else {
       // _logger.i(
       //     'Ad file not pre-cached or path is invalid, attempting to download...');
+      setState(() {
+        _isDownloading = true;
+      });
+      
       // Assuming FileModel is compatible with fileManager.getFile
       final File? downloadedFile =
           await widget.fileManager.getFile(widget.ad.file);
+      
+      setState(() {
+        _isDownloading = false;
+      });
+      
       if (downloadedFile != null) {
         _localFilePath = downloadedFile.path;
       } else {
-        _error = 'Failed to load ad file.';
-        _logger.e(
-            'Failed to download file for ad: ${widget.ad.title}'); // Assuming AdModel has a title
+        // 只有在超过最大重试次数时才显示错误
+        if (_retryCount >= _maxRetries) {
+          _error = 'Failed to load ad file after $_maxRetries attempts.';
+          _logger.e(
+              'Failed to download file for ad after $_maxRetries attempts: ${widget.ad.title}');
+        } else {
+          // 否则保持加载状态，等待重试
+          _logger.w(
+              'Failed to download file for ad (attempt ${_retryCount + 1}/$_maxRetries): ${widget.ad.title}');
+          _retryCount++;
+          // 延迟重试
+          await Future.delayed(Duration(seconds: 2 * _retryCount));
+          if (mounted) {
+            return _loadFile(true);
+          }
+        }
       }
     }
 
@@ -285,19 +315,53 @@ class _TopAdWidgetState extends State<TopAdWidget> {
     Widget contentWidget;
 
     if (_isLoading) {
-      contentWidget = const Center(child: CircularProgressIndicator());
+      // 根据是否在下载显示不同的加载状态
+      if (_isDownloading) {
+        contentWidget = Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const CircularProgressIndicator(),
+              const SizedBox(height: 12),
+              Text(
+                '正在下載廣告內容... (${_retryCount > 0 ? '重試 $_retryCount/$_maxRetries' : ''})',
+                style: const TextStyle(fontSize: 14, color: Colors.grey),
+                textAlign: TextAlign.center,
+              ),
+            ],
+          ),
+        );
+      } else {
+        contentWidget = const Center(child: CircularProgressIndicator());
+      }
     } else if (_error != null) {
       contentWidget = Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(Icons.error_outline, color: Colors.red, size: 40),
-            SizedBox(height: 8),
-            Text(_error!,
-                textAlign: TextAlign.center,
-                style: TextStyle(color: Colors.red, fontSize: 16)),
-            SizedBox(height: 8),
-            ElevatedButton(onPressed: _loadFile, child: Text('Retry'))
+            Icon(Icons.warning_amber_outlined, color: Colors.orange, size: 40),
+            const SizedBox(height: 8),
+            Text(
+              '廣告內容載入失敗',
+              textAlign: TextAlign.center,
+              style: const TextStyle(color: Colors.grey, fontSize: 16),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              '將在下個週期重新嘗試',
+              textAlign: TextAlign.center,
+              style: const TextStyle(color: Colors.grey, fontSize: 12),
+            ),
+            const SizedBox(height: 8),
+            ElevatedButton(
+              onPressed: () => _loadFile(),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.orange,
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+              ),
+              child: const Text('立即重試', style: TextStyle(fontSize: 12)),
+            ),
           ],
         ),
       );
@@ -311,7 +375,7 @@ class _TopAdWidgetState extends State<TopAdWidget> {
         if (_videoController != null && _videoController!.value.isInitialized) {
           contentWidget = SizedBox.expand(
             child: FittedBox(
-              fit: BoxFit.cover,
+              fit: BoxFit.fill,
               child: SizedBox(
                 width: _videoController!.value.size.width,
                 height: _videoController!.value.size.height,
@@ -327,26 +391,28 @@ class _TopAdWidgetState extends State<TopAdWidget> {
           mimeType == 'image/jpg' ||
           mimeType == 'image/png' ||
           mimeType == 'image/gif') {
-        contentWidget = Image.file(
-          File(_localFilePath!),
-          fit: BoxFit.cover, // 改为 cover 让图片填满容器
-          width: double.infinity,
-          height: double.infinity,
-          errorBuilder: (context, error, stackTrace) {
-            _logger.e('Error displaying ad image',
-                error: error, stackTrace: stackTrace);
-            // Attempt to show a more specific error if this happens after initial load
-            // This might be redundant if _loadFile already set an error.
-            WidgetsBinding.instance.addPostFrameCallback((_) {
-              if (mounted && _error == null) {
-                // Check if an error isn't already displayed
-                setState(() {
-                  _error = 'Could not display ad image.';
-                });
-              }
-            });
-            return Center(child: Text('Could not display ad image.'));
-          },
+        contentWidget = SizedBox.expand(
+          child: Image.file(
+            File(_localFilePath!),
+            fit: BoxFit.fill, // 忽略比例，彻底填满区域
+            width: double.infinity,
+            height: double.infinity,
+            errorBuilder: (context, error, stackTrace) {
+              _logger.e('Error displaying ad image',
+                  error: error, stackTrace: stackTrace);
+              // Attempt to show a more specific error if this happens after initial load
+              // This might be redundant if _loadFile already set an error.
+              WidgetsBinding.instance.addPostFrameCallback((_) {
+                if (mounted && _error == null) {
+                  // Check if an error isn't already displayed
+                  setState(() {
+                    _error = 'Could not display ad image.';
+                  });
+                }
+              });
+              return Center(child: Text('Could not display ad image.'));
+            },
+          ),
         );
       } else {
         // This case should be caught by _loadFile and set _error.

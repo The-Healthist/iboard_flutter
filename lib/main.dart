@@ -8,6 +8,7 @@ import 'package:iboard_app/providers/state_provider.dart'; // Added CarouselStat
 import 'package:iboard_app/providers/top_ad_carousel_provider.dart'; // Added TopAdCarouselProvider import
 import 'package:iboard_app/providers/fullscreen_ad_provider.dart';
 import 'package:iboard_app/providers/rthk_news_provider.dart';
+import 'package:iboard_app/providers/app_update_provider.dart'; // 添加应用更新Provider导入
 import 'package:iboard_app/managers/file_manager.dart';
 import 'package:iboard_app/utils/device_id_util.dart';
 
@@ -19,6 +20,7 @@ import 'pages/carousel_settings_page.dart'; // 添加轮播设置页面导入
 import 'pages/error_page.dart'; // 添加错误页面导入
 import 'providers/arrear_provider.dart'; // 添加欠费provider导入
 import 'providers/weather_provider.dart'; // 添加天气provider导入
+
 import 'dart:async';
 
 void main() {
@@ -112,6 +114,15 @@ void main() {
                 apiClient: appDataProvider.apiClient,
                 appDataProvider: appDataProvider,
               );
+            },
+          ),
+          ChangeNotifierProvider<AppUpdateProvider>(
+            create: (context) {
+              final updateProvider = AppUpdateProvider();
+              // 在应用启动时初始化权限和检查更新（启用自动下载）
+              updateProvider.initializePermissions();
+              updateProvider.checkForUpdate(autoDownload: true);
+              return updateProvider;
             },
           ),
         ],
@@ -272,6 +283,21 @@ class _HomePageState extends State<HomePage> {
               print('欠费数据初始化完成');
             } catch (e) {
               print('欠费数据初始化失败: $e');
+            }
+
+            // 检查应用更新
+            try {
+              final updateProvider =
+                  Provider.of<AppUpdateProvider>(context, listen: false);
+              await updateProvider.checkForUpdate(autoDownload: true);
+
+              // 如果有更新，自动下载到缓存
+              if (mounted && updateProvider.hasUpdate) {
+                print('🔄 检测到应用更新: ${updateProvider.remoteVersion}');
+                print('📦 更新包将自动下载到应用缓存目录');
+              }
+            } catch (e) {
+              print('检查应用更新失败: $e');
             }
 
             // 自动跳转到主页面

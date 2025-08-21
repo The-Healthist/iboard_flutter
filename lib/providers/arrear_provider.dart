@@ -251,12 +251,57 @@ class ArrearProvider extends ChangeNotifier {
     return result.isEmpty ? null : result;
   }
 
+  ///25, 根据费用类型获取指定楼层和单位的完整费用记录（包含所有字段）
+  List<Bill>? getDetailedFeesByUnitAndType(
+      String selectedFloor, String selectedUnit, FeeType feeType) {
+    final List<Bill> result = [];
+
+    if (feeType == FeeType.management && _managementFeeData != null) {
+      // 获取物业管理费用
+      for (final block in _managementFeeData!.blocks) {
+        for (final floor in block.floors) {
+          if (floor.name == selectedFloor) {
+            for (final unit in floor.units) {
+              if (unit.name == selectedUnit) {
+                result.addAll(unit.bills);
+              }
+            }
+          }
+        }
+      }
+    } else if (feeType == FeeType.other && _otherFeeData != null) {
+      // 获取其他分摊费用
+      for (final block in _otherFeeData!.blocks) {
+        for (final floor in block.floors) {
+          if (floor.name == selectedFloor) {
+            for (final unit in floor.units) {
+              if (unit.name == selectedUnit) {
+                result.addAll(unit.bills);
+              }
+            }
+          }
+        }
+      }
+    }
+
+    return result.isEmpty ? null : result;
+  }
+
   ///6, 获取当前选中单位的费用记录
   Map<String, dynamic>? get currentArrearage {
     if (_selectedFloor == null || _selectedUnit == null) {
       return null;
     }
     return getFeesByUnitAndType(
+        _selectedFloor!, _selectedUnit!, _selectedFeeType);
+  }
+
+  ///26, 获取当前选中单位的详细费用记录（包含所有字段）
+  List<Bill>? get currentDetailedArrearage {
+    if (_selectedFloor == null || _selectedUnit == null) {
+      return null;
+    }
+    return getDetailedFeesByUnitAndType(
         _selectedFloor!, _selectedUnit!, _selectedFeeType);
   }
 
@@ -490,16 +535,12 @@ class ArrearProvider extends ChangeNotifier {
       ]);
 
       // 处理物业管理费用数据
-      if (results[0] != null) {
-        _managementFeeData = ManagementFeeModel.fromJson(results[0]);
-        _logger.i('✅ 成功获取物业管理费用数据');
-      }
+      _managementFeeData = ManagementFeeModel.fromJson(results[0]);
+      _logger.i('✅ 成功获取物业管理费用数据');
 
       // 处理其他分摊费用数据
-      if (results[1] != null) {
-        _otherFeeData = OtherFeeModel.fromJson(results[1]);
-        _logger.i('✅ 成功获取其他分摊费用数据');
-      }
+      _otherFeeData = OtherFeeModel.fromJson(results[1]);
+      _logger.i('✅ 成功获取其他分摊费用数据');
 
       // 保存到缓存
       await saveToCache();
@@ -534,14 +575,22 @@ class ArrearProvider extends ChangeNotifier {
   ///18, 设置楼宇ismartId
   void setSelectedBuildingId(String? buildingId) {
     _selectedBuildingId = buildingId;
+    _selectedFloor = null;
     _selectedUnit = null;
     _logger.i('设置楼宇ismartId: $buildingId');
 
     if (buildingId != null) {
-      final floors = getFloors(buildingId);
-      if (floors.isNotEmpty) {
-        _selectedUnit = floors[0];
-        _logger.i('自动选择第一个单元: ${floors[0]}');
+      final floorList = buildings;
+      if (floorList.isNotEmpty) {
+        _selectedFloor = floorList[0];
+        _logger.i('自动选择第一个楼层: ${floorList[0]}');
+
+        // 然后为这个楼层选择第一个单位
+        final units = getFloors(_selectedFloor!);
+        if (units.isNotEmpty) {
+          _selectedUnit = units[0];
+          _logger.i('自动选择第一个单位: ${units[0]}');
+        }
       }
     }
 

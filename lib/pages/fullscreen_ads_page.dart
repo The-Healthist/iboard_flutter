@@ -18,7 +18,6 @@ class _FullscreenAdsPageState extends State<FullscreenAdsPage> {
   @override
   void initState() {
     super.initState();
-    _logger.i('🎬 全屏广告页面初始化');
   }
 
   @override
@@ -47,7 +46,6 @@ class _FullscreenAdsPageState extends State<FullscreenAdsPage> {
       final fullAds = advertisementProvider.fullCarouselAdvertisements;
 
       if (fullAds.isNotEmpty) {
-        _logger.i('🎬 初始化全屏广告数据: ${fullAds.length}个广告');
         fullscreenAdProvider.updateFullscreenAds(fullAds);
       } else {
         _logger.w('⚠️ 没有可用的全屏广告数据');
@@ -68,7 +66,6 @@ class _FullscreenAdsPageState extends State<FullscreenAdsPage> {
       // 只有当数据真正发生变化时才更新
       if (fullAds.isNotEmpty &&
           fullAds.length != fullscreenAdProvider.fullscreenAds.length) {
-        _logger.i('🔄 检测到全屏广告数据变化，更新中: ${fullAds.length}个广告');
         fullscreenAdProvider.updateFullscreenAds(fullAds);
       }
     } catch (e) {
@@ -91,7 +88,6 @@ class _FullscreenAdsPageState extends State<FullscreenAdsPage> {
             final error = advertisementProvider.error!;
             if (fullAds.isNotEmpty) {
               // 有缓存数据时，无论什么错误都继续使用缓存数据
-              _logger.i('🎯 [网络错误] 检测到错误但有缓存数据，继续使用: ${fullAds.length}个全屏广告');
             } else if (error.contains('网络连接失败') ||
                 error.contains('请求超时') ||
                 error.contains('无法连接到服务器') ||

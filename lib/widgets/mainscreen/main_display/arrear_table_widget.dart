@@ -312,11 +312,11 @@ class ArrearTableWidgetState extends State<ArrearTableWidget> {
     );
   }
 
-  ///3, 构建表格数据
+  ///3, 构建表格数据（仅包含物业管理费用）
   List<Map<String, dynamic>> _buildTableData(ArrearProvider provider) {
     final List<Map<String, dynamic>> tableData = [];
 
-    // 从物业管理费用数据构建表格数据
+    // 仅从物业管理费用数据构建表格数据
     if (provider.managementFeeData != null) {
       for (final block in provider.managementFeeData!.blocks) {
         for (final floor in block.floors) {
@@ -331,39 +331,6 @@ class ArrearTableWidgetState extends State<ArrearTableWidget> {
             }
 
             tableData.add(rowData);
-          }
-        }
-      }
-    }
-
-    // 从其他分摊费用数据构建表格数据
-    if (provider.otherFeeData != null) {
-      for (final block in provider.otherFeeData!.blocks) {
-        for (final floor in block.floors) {
-          for (final unit in floor.units) {
-            // 查找是否已存在该单位的行
-            final existingRowIndex = tableData
-                .indexWhere((row) => row['單位'] == '${floor.name}${unit.name}');
-
-            if (existingRowIndex != -1) {
-              // 如果已存在，添加其他费用数据
-              for (final bill in unit.bills) {
-                final key = '${bill.period} (${bill.itemId ?? "分攤費用"})';
-                tableData[existingRowIndex][key] = bill.value;
-              }
-            } else {
-              // 如果不存在，创建新行
-              final Map<String, dynamic> rowData = {
-                '單位': '${floor.name}${unit.name}',
-              };
-
-              for (final bill in unit.bills) {
-                final key = '${bill.period} (${bill.itemId ?? "分攤費用"})';
-                rowData[key] = bill.value;
-              }
-
-              tableData.add(rowData);
-            }
           }
         }
       }
@@ -607,8 +574,10 @@ class ArrearTableWidgetState extends State<ArrearTableWidget> {
           _currentPage++;
         });
       } else {
-        // 已经是最后一页，通知完成并停止定时器
-        timer.cancel();
+        // 已经是最后一页，重置到第一页并通知完成
+        setState(() {
+          _currentPage = 1; // 重置到第一页，開始新的循環
+        });
 
         if (widget.onPaginationComplete != null) {
           widget.onPaginationComplete!(_totalPages);

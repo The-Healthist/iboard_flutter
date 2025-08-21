@@ -101,7 +101,7 @@ class Settings {
   final int arrearageUpdateDuration; // 欠費更新時間(先不管)
   final int noticeUpdateDuration; // 通知更新時間(分鐘)
   final int advertisementUpdateDuration; // 廣告更新時間(分鐘)
-  final int appUpdateDuration; // 應用更新時間(秒)
+  final int appUpdateDuration; // 應用更新時間(分鐘)
   final int advertisementPlayDuration; // 全屏廣告播放時間(秒)
   final int noticePlayDuration; // 通告輪播總時間（先不管）
   final int spareDuration; // 手動操作超時時間/無操作進入全屏廣告時間(秒)

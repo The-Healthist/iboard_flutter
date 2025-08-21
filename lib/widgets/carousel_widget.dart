@@ -394,6 +394,7 @@ class _CarouselWidgetState extends State<CarouselWidget>
   Widget build(BuildContext context) {
     if (_widgets.isEmpty) {
       return Container(
+        width: double.infinity,
         height: widget.height,
         child: const Center(
           child: Text(
@@ -408,6 +409,7 @@ class _CarouselWidgetState extends State<CarouselWidget>
     }
 
     return Container(
+      width: double.infinity,
       height: widget.height,
       child: Column(
         children: [

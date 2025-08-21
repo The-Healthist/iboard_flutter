@@ -310,7 +310,7 @@ class MainScreenWidgetState extends State<MainScreenWidget> {
             children: buildings.map((building) {
               final isSelected = _selectedBuilding == building;
               // 检查该楼层是否有其他分摊费用
-              final hasOtherFees = provider.hasOtherFeesForFloor(building);
+              // final hasOtherFees = provider.hasOtherFeesForFloor(building);
               return GestureDetector(
                 onTap: () {
                   setState(() {
@@ -319,7 +319,6 @@ class MainScreenWidgetState extends State<MainScreenWidget> {
                     _showArrearResults = false; // 重置查詢結果
                     // 设置楼层（不是buildingId）
                     provider.setSelectedFloor(building);
-                    print('🔍 [MainScreenWidget] 选择楼层: "$building"');
                   });
                 },
                 child: Container(
@@ -328,16 +327,16 @@ class MainScreenWidgetState extends State<MainScreenWidget> {
                   decoration: BoxDecoration(
                     color: isSelected
                         ? Theme.of(context).primaryColor
-                        : hasOtherFees
-                            ? Colors.purple.shade100 // 有其他分摊费用的楼层使用淡紫色背景
-                            : Colors.grey.shade100,
+                        // : hasOtherFees
+                        //     ? Colors.purple.shade100 // 有其他分摊费用的楼层使用淡紫色背景
+                        : Colors.grey.shade100,
                     borderRadius: BorderRadius.circular(8),
                     border: Border.all(
                       color: isSelected
                           ? Theme.of(context).primaryColor
-                          : hasOtherFees
-                              ? Colors.purple.shade300 // 有其他分摊费用的楼层使用淡紫色边框
-                              : Colors.grey.shade300,
+                          // : hasOtherFees
+                          //     ? Colors.purple.shade300 // 有其他分摊费用的楼层使用淡紫色边框
+                          : Colors.grey.shade300,
                       width: 1,
                     ),
                   ),
@@ -382,15 +381,15 @@ class MainScreenWidgetState extends State<MainScreenWidget> {
           if (floors.isEmpty) ...[
             Container(
               width: double.infinity,
-              padding: const EdgeInsets.all(16),
+              padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: Colors.grey.shade50,
+                color: Theme.of(context).colorScheme.primary.withOpacity(0.10),
                 borderRadius: BorderRadius.circular(8),
                 border: Border.all(color: Colors.grey.shade200),
               ),
               child: Center(
                 child: Text(
-                  '暫無單位數據',
+                  '請先選擇樓層',
                   style: TextStyle(
                     fontSize: 14,
                     color: Colors.grey.shade600,
@@ -407,8 +406,8 @@ class MainScreenWidgetState extends State<MainScreenWidget> {
               children: floors.map((floor) {
                 final isSelected = _selectedFloor == floor;
                 // 检查该单位是否有其他分摊费用（根据费用类型决定是否显示淡紫色）
-                final hasOtherFees =
-                    provider.hasOtherFees(_selectedBuilding!, floor);
+                // final hasOtherFees =
+                //     provider.hasOtherFees(_selectedBuilding!, floor);
 
                 return GestureDetector(
                   onTap: () {
@@ -426,16 +425,16 @@ class MainScreenWidgetState extends State<MainScreenWidget> {
                     decoration: BoxDecoration(
                       color: isSelected
                           ? Theme.of(context).primaryColor
-                          : hasOtherFees
-                              ? Colors.purple.shade100
-                              : Colors.grey.shade100,
+                          // : hasOtherFees
+                          //     ? Colors.purple.shade100
+                          : Colors.grey.shade100,
                       borderRadius: BorderRadius.circular(8),
                       border: Border.all(
                         color: isSelected
                             ? Theme.of(context).primaryColor
-                            : hasOtherFees
-                                ? Colors.purple.shade300
-                                : Colors.grey.shade300,
+                            // : hasOtherFees
+                            //     ? Colors.purple.shade300
+                            : Colors.grey.shade300,
                         width: 1,
                       ),
                     ),
@@ -478,8 +477,9 @@ class MainScreenWidgetState extends State<MainScreenWidget> {
           }
         },
         style: ElevatedButton.styleFrom(
-          backgroundColor:
-              canQuery ? Theme.of(context).primaryColor : Colors.grey.shade100,
+          backgroundColor: canQuery
+              ? Theme.of(context).primaryColor
+              : Theme.of(context).colorScheme.primary.withOpacity(0.12),
           foregroundColor: canQuery ? Colors.white : Colors.black87,
           padding: const EdgeInsets.symmetric(vertical: 8), // 保持原有 padding
           shape: RoundedRectangleBorder(
@@ -583,7 +583,7 @@ class MainScreenWidgetState extends State<MainScreenWidget> {
     return Container(
       padding: const EdgeInsets.all(0),
       decoration: BoxDecoration(
-        // color: Colors.white,
+        color: Theme.of(context).colorScheme.primary.withOpacity(0.12),
         borderRadius: BorderRadius.circular(12),
       ),
       child: Center(
@@ -674,9 +674,6 @@ class MainScreenWidgetState extends State<MainScreenWidget> {
 
   ///13, 構建數據內容
   Widget _buildArrearDataContent(ArrearProvider provider) {
-    final feeTypeText =
-        provider.selectedFeeType == FeeType.management ? '管理費用' : '其他費用';
-
     return Container(
       padding: const EdgeInsets.all(5),
       decoration: BoxDecoration(
@@ -698,7 +695,7 @@ class MainScreenWidgetState extends State<MainScreenWidget> {
                   size: 24),
               const SizedBox(width: 8),
               Text(
-                '查詢結果 - ${_selectedBuilding}${_selectedFloor}單位 ($feeTypeText)',
+                '  ${_selectedBuilding}${_selectedFloor}單位',
                 style: const TextStyle(
                   fontSize: 18,
                   fontWeight: FontWeight.w600,
@@ -719,6 +716,12 @@ class MainScreenWidgetState extends State<MainScreenWidget> {
 
   ///14, 構建欠費記錄列表
   Widget _buildArrearList(ArrearProvider provider) {
+    // 如果是其他费用类型，使用详细显示
+    if (provider.selectedFeeType == FeeType.other) {
+      return _buildDetailedArrearList(provider);
+    }
+
+    // 管理费用使用原有简单显示
     final currentArrearage = provider.currentArrearage;
 
     if (currentArrearage == null) {
@@ -761,6 +764,96 @@ class MainScreenWidgetState extends State<MainScreenWidget> {
                         fontWeight: FontWeight.w600,
                         color: _getArrearStatusColor(entry.value),
                       ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        );
+      }).toList(),
+    );
+  }
+
+  ///14.1, 構建其他費用詳細記錄列表（簡潔左右兩列顯示）
+  Widget _buildDetailedArrearList(ArrearProvider provider) {
+    final detailedArrearage = provider.currentDetailedArrearage;
+
+    if (detailedArrearage == null || detailedArrearage.isEmpty) {
+      return const Center(
+        child: Text('暫無數據'),
+      );
+    }
+
+    return Column(
+      children: detailedArrearage.map((bill) {
+        return Container(
+          margin: const EdgeInsets.only(bottom: 10),
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: Colors.grey.shade50,
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(color: Colors.grey.shade200),
+          ),
+          child: Row(
+            children: [
+              // 左側兩條信息
+              Expanded(
+                flex: 1,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // 期間
+                    Text(
+                      bill.period,
+                      style: const TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.black87,
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    // 項目
+                    Text(
+                      bill.itemId ?? '分攤費用',
+                      style: const TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w500,
+                        color: Colors.blue,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+
+              const SizedBox(width: 16),
+
+              // 右側兩條信息
+              Expanded(
+                flex: 1,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    // 金額
+                    Text(
+                      bill.value.toString(),
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                        color: _getArrearStatusColor(bill.value),
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    // 備註
+                    Text(
+                      bill.remark ?? '-',
+                      style: TextStyle(
+                        fontSize: 13,
+                        color: Colors.grey.shade700,
+                      ),
+                      textAlign: TextAlign.end,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
                     ),
                   ],
                 ),
@@ -894,8 +987,11 @@ class MainScreenWidgetState extends State<MainScreenWidget> {
   ) {
     final isSelected = provider.selectedFeeType == feeType;
     final isOtherFee = feeType == FeeType.other;
-    final hasOtherFeeData =
-        provider.hasOtherFeeData && !provider.isOtherFeeDataEmpty;
+
+    // 檢查該費用類型是否有數據
+    final hasData = isOtherFee
+        ? (provider.hasOtherFeeData && !provider.isOtherFeeDataEmpty)
+        : provider.hasManagementFeeData;
 
     return ElevatedButton(
       onPressed: () {
@@ -904,18 +1000,17 @@ class MainScreenWidgetState extends State<MainScreenWidget> {
         setState(() {
           _showArrearResults = false;
         });
-        print('🔍 [MainScreenWidget] 选择费用类型: $chineseTitle');
       },
       style: ElevatedButton.styleFrom(
         backgroundColor: isSelected
             ? Theme.of(context).primaryColor
-            : isOtherFee && !hasOtherFeeData
-                ? Colors.grey.shade300
-                : Colors.grey.shade100,
+            : !hasData
+                ? Theme.of(context).colorScheme.primary.withOpacity(0.12)
+                : Theme.of(context).colorScheme.primary.withOpacity(0.12),
         foregroundColor: isSelected
             ? Colors.white
-            : isOtherFee && !hasOtherFeeData
-                ? Colors.grey.shade500
+            : !hasData
+                ? Colors.black87
                 : Colors.black87,
         padding: const EdgeInsets.symmetric(vertical: 6),
         shape: RoundedRectangleBorder(
@@ -1062,7 +1157,7 @@ class MainScreenWidgetState extends State<MainScreenWidget> {
                         "讀取中...")) // Show loading text if initially loading and no data yet
                 : filteredAnnouncements.isEmpty
                     ? const Center(
-                        child: Text('沒有任何通告.')) // Updated for all types
+                        child: Text('没有任何通告.')) // Updated for all types
                     : ListView.builder(
                         itemCount: filteredAnnouncements.length,
                         itemBuilder: (context, index) {

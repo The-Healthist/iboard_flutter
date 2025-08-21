@@ -454,6 +454,13 @@ class _WeatherWidgetState extends State<WeatherWidget> {
 
     if (weatherProvider.currentError != null ||
         !weatherProvider.hasCurrentData) {
+      final hasError = weatherProvider.currentError != null;
+      final errorText = hasError
+          ? weatherProvider.currentError!.contains('解析错误')
+              ? '天氣數據格式錯誤'
+              : '當前天氣暫時無法取得'
+          : '當前天氣暫時無法取得';
+
       return Container(
         margin: const EdgeInsets.all(4.0),
         decoration: BoxDecoration(
@@ -474,10 +481,23 @@ class _WeatherWidgetState extends State<WeatherWidget> {
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: 8),
-            const Icon(Icons.cloud_off, size: 40, color: Colors.grey),
+            Icon(
+                hasError && weatherProvider.currentError!.contains('解析错误')
+                    ? Icons.error_outline
+                    : Icons.cloud_off,
+                size: 40,
+                color:
+                    hasError && weatherProvider.currentError!.contains('解析错误')
+                        ? Colors.orange
+                        : Colors.grey),
             const SizedBox(height: 8),
-            const Text('當前天氣暫時無法取得',
-                style: TextStyle(fontSize: 12, color: Colors.grey)),
+            Text(errorText,
+                style: const TextStyle(fontSize: 12, color: Colors.grey)),
+            if (hasError && weatherProvider.currentError!.contains('解析错误')) ...[
+              const SizedBox(height: 4),
+              const Text('請檢查網絡連接或稍後重試',
+                  style: TextStyle(fontSize: 10, color: Colors.grey)),
+            ],
             const SizedBox(height: 8),
             ElevatedButton.icon(
               onPressed: () {

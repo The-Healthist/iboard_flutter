@@ -110,8 +110,6 @@ class _RthkNewsTickerWidgetState extends State<RthkNewsTickerWidget>
     _controller.addStatusListener(_animationStatusListener);
     _controller.addStatusListener(_animationStatusListener);
     _controller.forward();
-
-    _logger.i('▶️ 跑马灯动画启动，滚动宽度: $_totalContentWidth');
   }
 
   ///3, 停止滚动动画
@@ -165,7 +163,6 @@ class _RthkNewsTickerWidgetState extends State<RthkNewsTickerWidget>
   void _pauseScrolling() {
     _isPaused = true;
     _stopScrolling();
-    _logger.i('⏸️ 跑马灯动画暂停（全屏广告）');
   }
 
   ///7, 恢复滚动
@@ -173,11 +170,38 @@ class _RthkNewsTickerWidgetState extends State<RthkNewsTickerWidget>
     if (_isPaused) {
       _isPaused = false;
       _controller.forward();
-      _logger.i('▶️ 跑马灯动画恢复');
     }
   }
 
-  ///8, 构建渐变遮罩，避免文字在边缘处突然出现或消失
+  ///8, 智能确定显示项目数量
+  int _getItemCount() {
+    // 如果只有一条新闻（通常是网络错误提示），检查是否需要滚动
+    if (_newsTexts.length == 1) {
+      // 计算单条新闻的宽度
+      final textPainter = TextPainter(textDirection: TextDirection.ltr);
+      textPainter.text = TextSpan(
+        text: _newsTexts.first,
+        style: const TextStyle(
+          fontSize: 14,
+          fontWeight: FontWeight.w500,
+          height: 1.2,
+        ),
+      );
+      textPainter.layout();
+
+      // 如果单条新闻宽度小于容器宽度，不需要滚动，只显示一次
+      if (textPainter.width < widget.width - 160) {
+        // 减去左右边距
+        return 1;
+      }
+      // 如果单条新闻很长，需要重复显示来实现滚动
+      return 2;
+    }
+    // 如果有多条新闻，重复显示两次确保无缝循环
+    return _newsTexts.length * 2;
+  }
+
+  ///9, 构建渐变遮罩，避免文字在边缘处突然出现或消失
   Widget _buildFadeMask(Widget child) => ShaderMask(
         blendMode: BlendMode.dstIn,
         shaderCallback: (bounds) => const LinearGradient(
@@ -217,7 +241,7 @@ class _RthkNewsTickerWidgetState extends State<RthkNewsTickerWidget>
                 controller: _scrollController,
                 scrollDirection: Axis.horizontal,
                 physics: const NeverScrollableScrollPhysics(),
-                itemCount: _newsTexts.length * 2, // 重复显示两次，确保无缝循环
+                itemCount: _getItemCount(), // 根据新闻数量智能确定显示次数
                 itemBuilder: (context, index) {
                   final text = _newsTexts[index % _newsTexts.length];
                   return Container(
