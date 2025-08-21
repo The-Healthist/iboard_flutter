@@ -10,15 +10,14 @@ import 'package:provider/provider.dart';
 
 class AnnouncementReaderWidget extends StatefulWidget {
   final AnnouncementModel announcement;
-  final FileManager
-      fileManager; // Pass FileManager if needed for direct file operations, or rely on pre-fetched path
-  final VoidCallback? onHomeButtonPressed; // 添加主頁按鈕回調
+  final FileManager fileManager;
+  final VoidCallback? onHomeButtonPressed;
 
   const AnnouncementReaderWidget({
     super.key,
     required this.announcement,
-    required this.fileManager, // Or get it from a provider
-    this.onHomeButtonPressed, // 可選的主頁按鈕回調
+    required this.fileManager,
+    this.onHomeButtonPressed,
   });
 
   @override
@@ -49,13 +48,10 @@ class AnnouncementReaderWidgetState extends State<AnnouncementReaderWidget> {
     if (widget.announcement.file.localFilePath != null &&
         await File(widget.announcement.file.localFilePath!).exists()) {
       _localFilePath = widget.announcement.file.localFilePath;
-      // _logger.i('Using pre-cached file: $_localFilePath');
     } else {
-      // _logger.i(
-      //     'File not pre-cached or path is invalid, attempting to download...');
       final File? downloadedFile =
           await widget.fileManager.getFile(widget.announcement.file);
-      if (!mounted) return; // Added mounted check
+      if (!mounted) return;
 
       if (downloadedFile != null) {
         _localFilePath = downloadedFile.path;
@@ -73,18 +69,14 @@ class AnnouncementReaderWidgetState extends State<AnnouncementReaderWidget> {
       if (mimeType == 'video/mp4') {
         _initializeVideoPlayer();
       } else {
-        // For PDF and images, we might not need specific initialization here
-        // as they are handled by their respective widgets directly with the file path.
         if (mounted) {
-          // Added mounted check
           setState(() {
             _isLoading = false;
           });
         }
       }
     } else {
-      if (mounted) {
-        // Added mounted check
+              if (mounted) {
         setState(() {
           _isLoading = false;
         });
@@ -94,46 +86,31 @@ class AnnouncementReaderWidgetState extends State<AnnouncementReaderWidget> {
 
   void _initializeVideoPlayer() {
     if (_localFilePath == null) return;
-    // If called when widget is not mounted, do nothing.
     if (!mounted) return;
 
-    // Clean up previous controller if any and nullify the reference.
     _videoController?.dispose();
     _videoController = null;
 
     final newVideoController =
         VideoPlayerController.file(File(_localFilePath!));
-    // Store the new controller instance.
-    // It's important to use newVideoController in the async callbacks
-    // to ensure operations are on the correct instance.
     _videoController = newVideoController;
 
     newVideoController.initialize().then((_) {
-      // Check mounted *again* because this is an async callback.
-      // Also check if the controller (_videoController) is still this newVideoController.
-      // This handles cases where dispose() might have been called or another
-      // initialization might have started.
       if (!mounted || _videoController != newVideoController) {
-        // If not mounted, or if this callback is for an old/stale controller,
-        // dispose the controller this callback was working on and do nothing further.
         newVideoController.dispose();
         return;
       }
 
-      // Now it's safe to call setState and use the controller.
       setState(() {
         _isLoading = false;
       });
-      // These operations should be on newVideoController which is confirmed to be current.
       newVideoController.play();
       newVideoController.setLooping(true);
     }).catchError((error, stackTrace) {
       _logger.e('Error initializing video player',
           error: error, stackTrace: stackTrace);
-      // Check mounted and controller validity again.
       if (!mounted || _videoController != newVideoController) {
-        newVideoController
-            .dispose(); // Dispose the controller this callback was for.
+        newVideoController.dispose();
         return;
       }
 
@@ -141,10 +118,7 @@ class AnnouncementReaderWidgetState extends State<AnnouncementReaderWidget> {
         _error = 'Could not play video.';
         _isLoading = false;
       });
-      // The newVideoController failed to initialize or play properly.
-      // It will be disposed if another initialization occurs or in the main dispose() method.
-      // Alternatively, could explicitly dispose newVideoController here too.
-      // newVideoController.dispose();
+
     });
   }
 
@@ -160,7 +134,7 @@ class AnnouncementReaderWidgetState extends State<AnnouncementReaderWidget> {
         // 释放资源
         _videoController!.dispose();
       } catch (e) {
-        _logger.w('⚠️ 释放通告视频控制器时出错: $e');
+
       } finally {
         _videoController = null;
       }
@@ -179,10 +153,8 @@ class AnnouncementReaderWidgetState extends State<AnnouncementReaderWidget> {
     if (_videoController != null && _videoController!.value.isInitialized) {
       if (isMediaPaused && _videoController!.value.isPlaying) {
         _videoController!.pause();
-        // _logger.d('暂停通告视频播放');
       } else if (!isMediaPaused && !_videoController!.value.isPlaying) {
         _videoController!.play();
-        // _logger.d('恢复通告视频播放');
       }
     }
 
@@ -221,7 +193,6 @@ class AnnouncementReaderWidgetState extends State<AnnouncementReaderWidget> {
         onError: (error) {
           _logger.e('Error displaying PDF', error: error);
           if (mounted) {
-            // Added mounted check
             setState(() {
               _error = 'Could not display PDF.';
             });
@@ -229,12 +200,10 @@ class AnnouncementReaderWidgetState extends State<AnnouncementReaderWidget> {
         },
       );
     } else if (mimeType.startsWith('image/')) {
-      // For local files, Image.file is better. CachedNetworkImage is for network URLs with caching.
-      // Since we ensure the file is local via FileManager, we use Image.file.
       contentWidget = InteractiveViewer(
         child: Image.file(
           File(_localFilePath!),
-          fit: BoxFit.cover, // 改为 cover 让图片填满容器
+          fit: BoxFit.cover,
           width: double.infinity,
           height: double.infinity,
           errorBuilder: (context, error, stackTrace) {
@@ -257,19 +226,15 @@ class AnnouncementReaderWidgetState extends State<AnnouncementReaderWidget> {
           ),
         );
       } else {
-        // Video is still initializing or failed
         contentWidget = const Center(child: CircularProgressIndicator());
       }
     } else {
       contentWidget = Center(child: Text('Unsupported file type: $mimeType'));
     }
 
-    // 添加主頁按鈕覆蓋層
     return Stack(
       children: [
-        // 主要內容
         contentWidget,
-        // 主頁按鈕 - 位於右上角
         if (widget.onHomeButtonPressed != null)
           Positioned(
             top: 16,

@@ -23,6 +23,11 @@ class TopAdCarouselProvider extends ChangeNotifier {
 
   // 广告数据 - 使用AdvertisementProvider的轮播数据
   List<AdModel> _topAds = [];
+  
+  // Widget缓存机制 - 避免重建正在播放的Widget
+  final Map<String, Widget> _widgetCache = {};
+  final Map<String, FileManager> _fileManagerCache = {};
+  bool _pendingWidgetUpdate = false;
 
   // 状态管理
   bool _isTopCarouselPaused = false;
@@ -51,9 +56,31 @@ class TopAdCarouselProvider extends ChangeNotifier {
 
   ///1，更新轮播广告列表（由AdvertisementProvider调用）
   void updateCarouselList(List<AdModel> newTopAds) {
+    // 检查数据是否真的发生了变化
+    if (_areAdsListsEqual(_topAds, newTopAds)) {
+      return;
+    }
+    
     _topAds = List<AdModel>.from(newTopAds);
-    // _logger.i('🔄 更新顶部广告轮播列表: ${_topAds.length} 个广告');
+    
+    // 智能更新：如果正在播放，延迟更新Widget
+    if (!_isTopCarouselPaused && _topTimer != null && _topTimer!.isActive) {
+      _logger.i('🎬 检测到正在播放顶部广告，延迟更新Widget');
+      _pendingWidgetUpdate = true;
+    } else {
+      // 不在播放状态，可以安全更新
+      _smartUpdateWidgets();
+    }
     notifyListeners();
+  }
+  
+  ///1a，检查两个广告列表是否相等
+  bool _areAdsListsEqual(List<AdModel> list1, List<AdModel> list2) {
+    if (list1.length != list2.length) return false;
+    for (int i = 0; i < list1.length; i++) {
+      if (list1[i].id != list2[i].id) return false;
+    }
+    return true;
   }
 
   ///2，清空轮播广告列表
@@ -73,24 +100,64 @@ class TopAdCarouselProvider extends ChangeNotifier {
     // 使用自定义顺序更新方法
     updateCarouselList(topAds);
 
-    // Create ad widgets from the API AdModel instances
-    List<Widget> adWidgets = this.topAds.map((ad) {
-      FileManager fileManager = FileManager();
-      fileManager.getFile(ad.file);
-      return SizedBox.expand(
-        child: TopAdWidget(
-          ad: ad,
-          fileManager: fileManager,
-        ),
-      );
-    }).toList();
-    _topCarouselController.setCarouselArray(adWidgets);
+    // 使用智能更新方法创建Widget
+    _smartUpdateWidgets();
 
     if (this.topAds.length > 1) {
       startTopAdTimer(0); // Start timer for the first ad
     }
-
-    // _logger.i('🎬 [初始化] 顶部广告轮播初始化完成，广告数量: ${this.topAds.length}');
+  }
+  
+  ///3a，智能更新Widget（使用缓存）
+  void _smartUpdateWidgets() {
+    final Map<String, Widget> widgetMap = {};
+    final List<String> orderedKeys = [];
+    final Set<String> usedKeys = {};
+    
+    for (final ad in this.topAds) {
+      final key = 'top_ad_${ad.id}';
+      usedKeys.add(key);
+      orderedKeys.add(key);
+      
+      // 检查缓存中是否已有此Widget
+      if (_widgetCache.containsKey(key)) {
+        // 使用缓存的Widget
+        widgetMap[key] = _widgetCache[key]!;
+      } else {
+        // 创建新Widget并缓存
+        final widget = _createCachedAdWidget(ad);
+        _widgetCache[key] = widget;
+        widgetMap[key] = widget;
+      }
+    }
+    
+    // 清理不再使用的缓存
+    _widgetCache.removeWhere((key, value) => !usedKeys.contains(key));
+    _fileManagerCache.removeWhere((key, value) => !usedKeys.contains(key));
+    
+    // 使用智能更新方法，而不是setCarouselArray
+    _topCarouselController.smartUpdateCarousel(widgetMap, orderedKeys);
+    _pendingWidgetUpdate = false;
+  }
+  
+  ///3b，创建缓存的广告Widget
+  Widget _createCachedAdWidget(AdModel ad) {
+    final key = 'top_ad_${ad.id}';
+    
+    // 重用或创建FileManager
+    if (!_fileManagerCache.containsKey(key)) {
+      _fileManagerCache[key] = FileManager();
+    }
+    final fileManager = _fileManagerCache[key]!;
+    fileManager.getFile(ad.file);
+    
+    return SizedBox.expand(
+      child: TopAdWidget(
+        key: ValueKey(key),
+        ad: ad,
+        fileManager: fileManager,
+      ),
+    );
   }
 
   ///7，启动顶部广告计时器
@@ -317,6 +384,11 @@ class TopAdCarouselProvider extends ChangeNotifier {
   ///9，处理页面变化事件
   void onPageChanged(int index) {
     if (!_isTopCarouselPaused && this.topAds.isNotEmpty) {
+      // 检查是否有待更新的Widget
+      if (_pendingWidgetUpdate) {
+        _logger.i('🔄 执行延迟的顶部广告Widget更新');
+        _smartUpdateWidgets();
+      }
       startTopAdTimer(index);
     }
   }
@@ -356,6 +428,10 @@ class TopAdCarouselProvider extends ChangeNotifier {
 
     _debugTimer?.cancel();
     _debugTimer = null;
+    
+    // 清理缓存
+    _widgetCache.clear();
+    _fileManagerCache.clear();
 
     super.dispose();
   }

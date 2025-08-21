@@ -42,16 +42,12 @@ class AnnouncementProvider extends ChangeNotifier {
 
   AnnouncementProvider(
       this._apiClient, this._appDataProvider, this._fileManager) {
-    // _logger.i('AnnouncementProvider initialized.');
     _loadAnnouncementsFromCache(); // 启动时从缓存加载数据
 
     // 延迟检查AppDataProvider登录状态，确保初始化完成
     Future.delayed(const Duration(milliseconds: 100), () {
       if (_appDataProvider.isLoggedIn) {
-        // _logger.i('AppDataProvider已登录，自动启动通告定时更新');
         startPeriodicUpdate();
-      } else {
-        // _logger.w('AppDataProvider未登录，跳过自动启动通告定时更新');
       }
     });
   }
@@ -65,7 +61,7 @@ class AnnouncementProvider extends ChangeNotifier {
           announcements.map((announcement) => announcement.toJson()).toList();
       final jsonString = json.encode(announcementsJson);
       await prefs.setString(_announcementsDataKey, jsonString);
-      // _logger.i('💾 通告数据已保存到缓存: ${announcements.length}个通告');
+
     } catch (e) {
       _logger.e('保存通告数据到缓存失败', error: e);
     }
@@ -86,10 +82,7 @@ class AnnouncementProvider extends ChangeNotifier {
 
         _announcements = cachedAnnouncements;
         _updateCarouselAnnouncements(); // 更新轮播通告数组
-        // _logger.i('📂 从缓存加载通告数据成功: ${cachedAnnouncements.length}个通告');
         notifyListeners();
-      } else {
-        // _logger.w('缓存中没有找到通告数据');
       }
     } catch (e) {
       _logger.e('从缓存加载通告数据失败', error: e);
@@ -101,7 +94,7 @@ class AnnouncementProvider extends ChangeNotifier {
     try {
       final prefs = await SharedPreferences.getInstance();
       await prefs.remove(_announcementsDataKey);
-      // _logger.i('通告数据缓存已清除');
+
     } catch (e) {
       _logger.e('清除通告数据缓存失败', error: e);
     }
@@ -194,9 +187,7 @@ class AnnouncementProvider extends ChangeNotifier {
         final File expectedFile =
             File('${fileManagerCacheDir.path}/$expectedFileName');
         if (await expectedFile.exists()) {
-          // _logger.i(
-          // 'Found cached announcement file in FileManager cache: $expectedFileName');
-          return true;
+                return true;
         }
 
         // 兼容性检查：检查是否有任何以 MD5 开头的文件
@@ -205,9 +196,7 @@ class AnnouncementProvider extends ChangeNotifier {
             final String basename =
                 entity.path.split('/').last.split('\\').last;
             if (basename.startsWith(md5)) {
-              // _logger.i(
-              // 'Found cached announcement file with MD5 prefix: $basename');
-              return true;
+                        return true;
             }
           }
         }
@@ -224,20 +213,11 @@ class AnnouncementProvider extends ChangeNotifier {
   /// 使用 FileManager 预下载文件
   Future<void> _predownloadFile(AnnouncementModel announcement) async {
     try {
-      // _logger.i(
-      // 'Pre-downloading announcement file using FileManager: ${announcement.title}');
-
       // 使用 FileManager 下载文件
       final File? downloadedFile =
           await _fileManager.getFile(announcement.file);
 
-      if (downloadedFile != null) {
-        // _logger.i(
-        // 'Announcement file downloaded successfully via FileManager: ${announcement.title}');
-      } else {
-        // _logger.w(
-        // 'Failed to download announcement file via FileManager: ${announcement.title}');
-      }
+
     } catch (e) {
       _logger.e(
           'Error pre-downloading announcement file: ${announcement.title}',
@@ -261,7 +241,6 @@ class AnnouncementProvider extends ChangeNotifier {
                 entity.path.split('/').last.split('\\').last;
             if (basename.startsWith(md5)) {
               await entity.delete();
-              // _logger.i('Deleted cached announcement file: $basename');
               break; // 找到并删除第一个匹配的文件即可
             }
           }

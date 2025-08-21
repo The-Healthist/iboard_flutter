@@ -27,8 +27,8 @@ class AnnouncementCarouselProvider extends ChangeNotifier {
 
   // 状态管理
   bool _isMidCarouselPaused = false;
-  // bool _isShowingArrearQuery = false; // 已删除：ArrearDisplayWidget已不再使用
-  bool _isShowingArrearTable = false; // 新增：是否显示欠费总览页面
+
+  bool _isShowingArrearTable = false;
 
   // 时间记录相关 - 用于全屏广告暂停恢复
   DateTime? _currentNoticeStartTime; // 当前通告开始时间
@@ -40,20 +40,24 @@ class AnnouncementCarouselProvider extends ChangeNotifier {
   // AppDataProvider引用 - 用于获取动态设置
   AppDataProvider? _appDataProvider;
 
-  // 新增：保存主页按钮回调
+
   late VoidCallback _homeButtonCallback;
 
-  // 新增：延遲套用的輪播資料與欠費分頁狀態
-  List<AnnouncementModel>? _pendingCarouselAnnouncements;
+
+
   bool _isArrearPaginationActive = false;
+  
+  // 緩存Widget實例和FileManager
+  final Map<String, Widget> _widgetCache = {};
+  final Map<String, FileManager> _fileManagerCache = {};
 
   // Getters
   custom_carousel.CarouselController get midCarouselController =>
       _midCarouselController;
   List<AnnouncementModel> get carouselAnnouncements => _carouselAnnouncements;
   bool get isMidCarouselPaused => _isMidCarouselPaused;
-  // bool get isShowingArrearQuery => _isShowingArrearQuery; // 已删除：ArrearDisplayWidget已不再使用
-  bool get isShowingArrearTable => _isShowingArrearTable; // 新增：获取欠费总览显示状态
+
+  bool get isShowingArrearTable => _isShowingArrearTable;
   Duration get noticeDuration => _noticeDuration;
   int get currentNoticeIndex => _currentNoticeIndex;
   DateTime? get currentNoticeStartTime => _currentNoticeStartTime;
@@ -75,72 +79,136 @@ class AnnouncementCarouselProvider extends ChangeNotifier {
 
   ///1，更新轮播通告列表（由AnnouncementProvider调用）
   void updateCarouselList(List<AnnouncementModel> newCarouselAnnouncements) {
-    // 欠費總覽顯示或其分頁進行時，延後套用，避免中斷當前顯示
-    final bool isOnArrear = _midCarouselController.widgetCount > 0 &&
-        _currentNoticeIndex == (_midCarouselController.widgetCount - 1);
-    if (_isArrearPaginationActive || isOnArrear) {
-      _pendingCarouselAnnouncements =
-          List<AnnouncementModel>.from(newCarouselAnnouncements);
-      return;
-    }
-
-    _applyCarouselUpdate(newCarouselAnnouncements);
+    // 使用智能增量更新
+    _smartUpdateCarousel(newCarouselAnnouncements);
   }
 
-  ///2，實際套用輪播列表更新（不打斷當前播放）
-  void _applyCarouselUpdate(List<AnnouncementModel> newCarouselAnnouncements) {
-    final int oldWidgetCount = _midCarouselController.widgetCount;
-    final int oldIndex = _currentNoticeIndex;
-
-    int? currentAnnouncementId;
-    final bool wasOnMain = oldIndex == 0;
-    final bool wasOnArrear =
-        oldWidgetCount > 0 && oldIndex == (oldWidgetCount - 1);
-
-    if (oldIndex > 0 && oldIndex - 1 < _carouselAnnouncements.length) {
-      currentAnnouncementId = _carouselAnnouncements[oldIndex - 1].id;
+  ///2a，智能更新轮播内容（增量更新，不破坏当前状态）
+  void _smartUpdateCarousel(List<AnnouncementModel> newCarouselAnnouncements) {
+    // 如果数据完全相同，不需要更新
+    if (_isAnnouncementListEqual(_carouselAnnouncements, newCarouselAnnouncements)) {
+      return;
     }
-
-    _carouselAnnouncements =
-        List<AnnouncementModel>.from(newCarouselAnnouncements);
-
-    final mainWidget = _createMainScreenWidget(_homeButtonCallback);
-    final announcementWidgets = _carouselAnnouncements.map((announcement) {
-      final fileManager = FileManager();
-      fileManager.getFile(announcement.file);
-      return Center(
-        child: AnnouncementReaderWidget(
-          announcement: announcement,
-          fileManager: fileManager,
-          onHomeButtonPressed: _homeButtonCallback,
-        ),
-      );
-    }).toList();
-    final arrearWidget = _createArrearTableCarouselWidget(_homeButtonCallback);
-    final midWidgets = [mainWidget, ...announcementWidgets, arrearWidget];
-
-    // 計算更新後應停留的索引，盡量保持當前展示的通告不變
-    int desiredIndex;
-    if (wasOnMain) {
-      desiredIndex = 0;
-    } else if (wasOnArrear) {
-      desiredIndex = midWidgets.length - 1;
-    } else if (currentAnnouncementId != null) {
-      final idx = _carouselAnnouncements
-          .indexWhere((a) => a.id == currentAnnouncementId);
-      desiredIndex = idx >= 0
-          ? idx + 1
-          : (oldIndex.clamp(1, midWidgets.length - 1) as int);
-    } else {
-      desiredIndex = (oldIndex.clamp(0, midWidgets.length - 1) as int);
+    
+    _carouselAnnouncements = List<AnnouncementModel>.from(newCarouselAnnouncements);
+    
+    // 构建widget映射表
+    final Map<String, Widget> widgetMap = {};
+    final List<String> orderedKeys = [];
+    final Set<String> usedKeys = {};
+    
+    // 1. 主屏幕widget（固定key）- 使用緩存
+    const mainScreenKey = 'main_screen';
+    if (!_widgetCache.containsKey(mainScreenKey)) {
+      _widgetCache[mainScreenKey] = _createMainScreenWidget(_homeButtonCallback);
     }
-
-    _midCarouselController.setCarouselArray(midWidgets);
-    _currentNoticeIndex = desiredIndex;
-    _midCarouselController.jumpToIndex(desiredIndex);
-
-    // 不重置開始時間與定時器，避免立刻切換到下一條
+    widgetMap[mainScreenKey] = _widgetCache[mainScreenKey]!;
+    orderedKeys.add(mainScreenKey);
+    usedKeys.add(mainScreenKey);
+    
+    // 2. 通告widgets（使用通告ID作为key）- 智能緩存
+    for (final announcement in _carouselAnnouncements) {
+      final key = 'announcement_${announcement.id}';
+      
+      // 檢查是否需要更新Widget（新通告或內容變化）
+      if (!_widgetCache.containsKey(key) || _hasAnnouncementChanged(key, announcement)) {
+        // 重用或創建FileManager
+        if (!_fileManagerCache.containsKey(key)) {
+          _fileManagerCache[key] = FileManager();
+        }
+        final fileManager = _fileManagerCache[key]!;
+        fileManager.getFile(announcement.file);
+        
+        // 創建新Widget並緩存
+        _widgetCache[key] = Center(
+          child: AnnouncementReaderWidget(
+            key: ValueKey(key), // 添加Key確保狀態保持
+            announcement: announcement,
+            fileManager: fileManager,
+            onHomeButtonPressed: _homeButtonCallback,
+          ),
+        );
+      }
+      
+      widgetMap[key] = _widgetCache[key]!;
+      orderedKeys.add(key);
+      usedKeys.add(key);
+    }
+    
+    // 3. 欠费总览widget（使用数据版本作为key）- 智能缓存
+    final arrearDataVersion = _arrearProvider?.currentDataVersion ?? 'default';
+    final arrearTableKey = 'arrear_table_$arrearDataVersion';
+    
+    if (!_widgetCache.containsKey(arrearTableKey) || _arrearProvider?.hasPendingUpdate == true) {
+      if (_arrearProvider != null) {
+        _widgetCache[arrearTableKey] = _arrearProvider!.createArrearTableWidget(
+          onHomeButtonPressed: () {
+            jumpToAnnouncementIndex(0);
+          },
+          isInCarouselMode: true,
+          onPaginationComplete: (int totalPages) {
+            _isArrearPaginationActive = false;
+            _goToNextCarouselItem();
+          },
+          onPaginationStart: (int totalPages) {
+            _isArrearPaginationActive = true;
+            _extendCurrentNoticeStayTime(totalPages);
+          },
+        );
+        
+        // 清理旧的欠费表单缓存
+        _widgetCache.removeWhere((key, value) => 
+          key.startsWith('arrear_table_') && key != arrearTableKey);
+        
+        // 标记更新已应用
+        _arrearProvider!.markUpdateApplied();
+      } else {
+        // 如果没有ArrearProvider，使用默认方法
+        _widgetCache[arrearTableKey] = _createArrearTableCarouselWidget(_homeButtonCallback);
+      }
+    }
+    
+    widgetMap[arrearTableKey] = _widgetCache[arrearTableKey]!;
+    orderedKeys.add(arrearTableKey);
+    usedKeys.add(arrearTableKey);
+    
+    // 清理不再使用的緩存
+    _cleanupUnusedCache(usedKeys);
+    
+    // 使用智能更新，保持当前查看的内容不变
+    _midCarouselController.smartUpdateCarousel(widgetMap, orderedKeys);
+    
     notifyListeners();
+  }
+  
+  ///2c，检查通告列表是否相同
+  bool _isAnnouncementListEqual(List<AnnouncementModel> list1, List<AnnouncementModel> list2) {
+    if (list1.length != list2.length) return false;
+    for (int i = 0; i < list1.length; i++) {
+      if (list1[i].id != list2[i].id) return false;
+    }
+    return true;
+  }
+  
+  ///2d，檢查通告內容是否變化
+  bool _hasAnnouncementChanged(String key, AnnouncementModel newAnnouncement) {
+    // 這裡可以添加更詳細的比較邏輯
+    // 目前簡單比較ID和文件MD5
+    final cachedWidget = _widgetCache[key];
+    if (cachedWidget == null) return true;
+    
+    // 如果需要更精確的比較，可以在Widget中保存announcement的引用
+    // 這裡暫時返回false，假設同ID的通告內容不變
+    return false;
+  }
+  
+  ///2e，清理不再使用的緩存
+  void _cleanupUnusedCache(Set<String> usedKeys) {
+    // 清理Widget緩存
+    _widgetCache.removeWhere((key, value) => !usedKeys.contains(key));
+    
+    // 清理FileManager緩存
+    _fileManagerCache.removeWhere((key, value) => !usedKeys.contains(key));
   }
 
   ///2，清空轮播通告列表
@@ -159,52 +227,12 @@ class AnnouncementCarouselProvider extends ChangeNotifier {
   }) {
     // 保存主页回调
     _homeButtonCallback = onHomeButtonPressed;
-    // 使用自定义顺序更新方法
-    updateCarouselList(carouselAnnouncements);
     _noticeDuration = Duration(seconds: apiNoticeStayDuration);
+    
+    // 初始化时使用智能更新
+    _smartUpdateCarousel(carouselAnnouncements);
 
-    // 创建带回调的主屏幕部件
-    Widget mainScreenWidget = MainScreenWidget(
-      onAnnouncementTap: (AnnouncementModel? announcement) {
-        if (announcement == null) {
-          // 显示欠费查询界面 - 立即进入手动操作状态
-          // 欠费查询功能已整合到MainScreenWidget中，不再需要单独的覆盖层
-        } else {
-          // 新逻辑：直接显示点击的通告，不依赖轮播列表查找
-
-          // 直接显示独立通告
-          showIndependentAnnouncement(announcement, onHomeButtonPressed);
-        }
-      },
-      onArrearTableTap: () {
-        // 显示欠费总览界面
-        showArrearTableWidget(onHomeButtonPressed);
-      },
-    );
-
-    // 只为轮播通告（緊急和一般）创建widget
-    List<Widget> announcementWidgets =
-        this.carouselAnnouncements.map((announcement) {
-      FileManager fileManager = FileManager();
-      fileManager.getFile(announcement.file);
-      return Center(
-          child: AnnouncementReaderWidget(
-        announcement: announcement,
-        fileManager: fileManager,
-        onHomeButtonPressed: onHomeButtonPressed,
-      ));
-    }).toList();
-
-    // 创建欠费总览轮播widget
-    Widget arrearTableCarouselWidget =
-        _createArrearTableCarouselWidget(onHomeButtonPressed);
-
-    final midWidgets = [
-      mainScreenWidget,
-      ...announcementWidgets,
-      arrearTableCarouselWidget, // 在轮播末尾添加欠费总览
-    ];
-    _midCarouselController.setCarouselArray(midWidgets);
+    // 初始化完成后不需要重复创建widgets，已经在_smartUpdateCarousel中处理
 
     _midTimer?.cancel();
     _delayedNoticeTimer?.cancel();
@@ -212,9 +240,9 @@ class AnnouncementCarouselProvider extends ChangeNotifier {
     _currentNoticeIndex = 0;
     _midCarouselController.jumpToIndex(0);
 
-    if (announcementWidgets.length > 0 && !_isMidCarouselPaused) {
+    if (_carouselAnnouncements.isNotEmpty && !_isMidCarouselPaused) {
       _delayedNoticeTimer = Timer(Duration(seconds: delayBeforeNotice), () {
-        if (announcementWidgets.length > 0 && !_isMidCarouselPaused) {
+        if (_carouselAnnouncements.isNotEmpty && !_isMidCarouselPaused) {
           // 记录通告开始时间，从第一个通告开始（索引1）
           _currentNoticeStartTime = DateTime.now();
           _currentNoticeIndex = 1; // 从第一个通告开始，跳过主屏幕（索引0）
@@ -505,38 +533,7 @@ class AnnouncementCarouselProvider extends ChangeNotifier {
     // 完全禁用调试定时器以减少系统资源占用和日志输出
     return;
 
-    // _debugTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
-    //   // 如果不启用日志，直接返回
-    //   if (!enableLogging) return;
-
-    //   // 计算通告剩余时间 - 使用实时API配置
-    //   int noticeRemaining = 0;
-    //   String statusInfo = '';
-
-    //   if (_isMidCarouselPaused) {
-    //     statusInfo = ' [暂停状态]';
-    //   } else if (_currentNoticeStartTime != null) {
-    //     final elapsed = DateTime.now().difference(_currentNoticeStartTime!);
-    //     final remaining = Duration(seconds: apiNoticeStayDuration) - elapsed;
-    //     noticeRemaining = remaining.isNegative ? 0 : remaining.inSeconds;
-    //   } else {
-    //     statusInfo = ' [未启动]';
-    //   }
-
-    //   // 获取当前通告信息
-    //   String currentNoticeInfo = '';
-    //   if (_currentNoticeIndex > 0 &&
-    //       _currentNoticeIndex <= this.carouselAnnouncements.length) {
-    //     final currentAnnouncement =
-    //         this.carouselAnnouncements[_currentNoticeIndex - 1];
-    //     currentNoticeInfo = ' - ${currentAnnouncement.title}';
-    //   } else if (_currentNoticeIndex == 0) {
-    //     currentNoticeInfo = ' - 主屏幕';
-    //   }
-
-    //   _logger.i(
-    //       '🕐 [调试] 通告轮播: ${noticeRemaining}s/${apiNoticeStayDuration}s$statusInfo 索引:$_currentNoticeIndex$currentNoticeInfo');
-    // });
+ 
   }
 
   ///8，停止调试定时器
@@ -673,13 +670,8 @@ class AnnouncementCarouselProvider extends ChangeNotifier {
           jumpToAnnouncementIndex(0);
         },
         onPaginationComplete: (int totalPages) {
-          // 欠費總覽翻頁完成，若有延遲更新先套用
+          // 欠費總覽翻頁完成
           _isArrearPaginationActive = false;
-          if (_pendingCarouselAnnouncements != null) {
-            final pending = _pendingCarouselAnnouncements!;
-            _pendingCarouselAnnouncements = null;
-            _applyCarouselUpdate(pending);
-          }
           // 然後切換到下一個通告
           _goToNextCarouselItem();
         },
@@ -694,6 +686,8 @@ class AnnouncementCarouselProvider extends ChangeNotifier {
 
   ///17，动态延长当前通告停留时间（欠费总览开始翻页时调用）
   void _extendCurrentNoticeStayTime(int totalPages) {
+    // 在欠费总览翻页期间，暂停应用任何待定更新
+    _isArrearPaginationActive = true;
     // 计算需要延长的时间：从设置中获取每页翻页时间，默认为5秒
     final appDataProvider = _getAppDataProvider();
     final deviceSettings = appDataProvider?.deviceSettings;
@@ -723,7 +717,7 @@ class AnnouncementCarouselProvider extends ChangeNotifier {
     }
 
     try {
-      // 计算下一个通告索引，跳过主屏幕（索引0）
+      // 切换到下一个通告
       _currentNoticeIndex++;
       if (_currentNoticeIndex >= _midCarouselController.widgetCount) {
         _currentNoticeIndex = 1; // 回到第一个通告，跳过主屏幕
@@ -752,6 +746,10 @@ class AnnouncementCarouselProvider extends ChangeNotifier {
 
     _delayedNoticeTimer?.cancel();
     _delayedNoticeTimer = null;
+    
+    // 清理所有緩存
+    _widgetCache.clear();
+    _fileManagerCache.clear();
 
     super.dispose();
   }

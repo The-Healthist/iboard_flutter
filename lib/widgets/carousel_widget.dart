@@ -23,6 +23,12 @@ class CarouselController {
   void setCarouselArray(List<Widget> widgets) {
     _state?.setCarouselArray(widgets);
   }
+  
+  /// Smart update carousel widgets with minimal disruption
+  /// Uses widget keys to identify and preserve existing widgets
+  void smartUpdateCarousel(Map<String, Widget> widgetMap, List<String> orderedKeys) {
+    _state?.smartUpdateCarousel(widgetMap, orderedKeys);
+  }
 
   /// Clear all widgets from the carousel
   void clearCarouselArray() {
@@ -128,6 +134,12 @@ class _CarouselWidgetState extends State<CarouselWidget>
     with TickerProviderStateMixin {
   late PageController _pageController;
   late List<Widget> _widgets;
+  
+  // 新增：使用Map管理widgets，实现智能更新
+  final Map<String, Widget> _widgetMap = {};
+  List<String> _widgetKeys = [];
+  String? _currentWidgetKey;
+  
   int _currentIndex = 0;
   Timer? _autoPlayTimer;
   bool _isAnimating = false;
@@ -181,6 +193,11 @@ class _CarouselWidgetState extends State<CarouselWidget>
 
     setState(() {
       _widgets = List.from(widgets);
+      // 同时清空Map缓存，使用传统方式
+      _widgetMap.clear();
+      _widgetKeys.clear();
+      _currentWidgetKey = null;
+      
       if (_widgets.isEmpty) {
         _currentIndex = 0;
       } else {
@@ -190,13 +207,72 @@ class _CarouselWidgetState extends State<CarouselWidget>
 
     if (_widgets.isNotEmpty && _pageController.hasClients) {
       // Jump to the preserved index without animation to avoid interrupting media playback
-      debugPrint(
-          'CarouselWidget: jumping to page $_currentIndex without animation');
+      
       _pageController.jumpToPage(_currentIndex);
     }
 
     _restartAutoPlay();
 
+    if (widget.onPageChanged != null) {
+      widget.onPageChanged!(_widgets.isEmpty ? -1 : _currentIndex);
+    }
+  }
+  
+  /// Smart update carousel with minimal disruption
+  /// This method intelligently updates widgets by:
+  /// 1. Preserving existing widgets that haven't changed
+  /// 2. Only adding/removing/reordering as needed
+  /// 3. Maintaining current viewing position
+  void smartUpdateCarousel(Map<String, Widget> newWidgetMap, List<String> newOrderedKeys) {
+    if (newOrderedKeys.isEmpty) {
+      clearCarouselArray();
+      return;
+    }
+    
+    // 记录当前正在查看的widget的key
+    if (_widgetKeys.isNotEmpty && _currentIndex < _widgetKeys.length) {
+      _currentWidgetKey = _widgetKeys[_currentIndex];
+    }
+    
+    setState(() {
+      // 智能更新Map：只更新变化的部分
+      // 1. 添加新的widgets
+      newWidgetMap.forEach((key, widget) {
+        if (!_widgetMap.containsKey(key) || _widgetMap[key] != widget) {
+          _widgetMap[key] = widget;
+        }
+      });
+      
+      // 2. 删除不再需要的widgets
+      _widgetMap.removeWhere((key, value) => !newWidgetMap.containsKey(key));
+      
+      // 3. 更新顺序
+      _widgetKeys = List.from(newOrderedKeys);
+      
+      // 4. 根据新顺序生成widget列表
+      _widgets = _widgetKeys.map((key) => _widgetMap[key]!).toList();
+      
+      // 5. 智能定位：尝试保持在当前widget
+      if (_currentWidgetKey != null && _widgetKeys.contains(_currentWidgetKey)) {
+        // 当前widget还存在，定位到它
+        _currentIndex = _widgetKeys.indexOf(_currentWidgetKey!);
+      } else if (_currentIndex >= _widgets.length) {
+        // 当前索引超出范围，调整到最后一个
+        _currentIndex = _widgets.length - 1;
+      }
+      // 否则保持当前索引不变
+    });
+    
+    // 使用jumpToPage避免动画，保持流畅
+    if (_widgets.isNotEmpty && _pageController.hasClients) {
+      if (_pageController.page?.round() != _currentIndex) {
+
+        _pageController.jumpToPage(_currentIndex);
+      }
+    }
+    
+    _restartAutoPlay();
+    
     if (widget.onPageChanged != null) {
       widget.onPageChanged!(_widgets.isEmpty ? -1 : _currentIndex);
     }
@@ -219,7 +295,7 @@ class _CarouselWidgetState extends State<CarouselWidget>
   /// Delete a widget at the specified index
   void delete(int index) {
     if (index < 0 || index >= _widgets.length) {
-      // debugPrint('CarouselWidget: Invalid index $index for deletion');
+
       return;
     }
 
@@ -312,7 +388,7 @@ class _CarouselWidgetState extends State<CarouselWidget>
           _isAnimating = false;
         });
       }
-      // debugPrint('CarouselWidget: Animation error - $error');
+
     });
   }
 
@@ -347,7 +423,7 @@ class _CarouselWidgetState extends State<CarouselWidget>
           _isAnimating = false;
         });
       }
-      // debugPrint('CarouselWidget: Animation error - $error');
+
     });
   }
 
@@ -384,7 +460,7 @@ class _CarouselWidgetState extends State<CarouselWidget>
     if (context.mounted) {
       // 使用通知机制通知所有子组件
       MediaPauseNotification().dispatch(context);
-      // debugPrint('CarouselWidget: Sent media pause notification');
+
     }
   }
 
@@ -394,7 +470,7 @@ class _CarouselWidgetState extends State<CarouselWidget>
     if (context.mounted) {
       // 使用通知机制通知所有子组件
       MediaResumeNotification().dispatch(context);
-      // debugPrint('CarouselWidget: Sent media resume notification');
+
     }
   }
 
@@ -440,6 +516,13 @@ class _CarouselWidgetState extends State<CarouselWidget>
               },
               itemCount: _widgets.length,
               itemBuilder: (context, index) {
+                // 使用key包装widget以保持状态
+                if (_widgetKeys.isNotEmpty && index < _widgetKeys.length) {
+                  return KeyedSubtree(
+                    key: ValueKey(_widgetKeys[index]),
+                    child: _widgets[index],
+                  );
+                }
                 return _widgets[index];
               },
             ),

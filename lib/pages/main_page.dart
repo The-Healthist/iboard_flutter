@@ -69,6 +69,9 @@ class _MainPageState extends State<MainPage> {
 
         // 设置通告轮播Provider引用
         announcementProvider.setCarouselProvider(announcementCarouselProvider);
+        
+        // 设置ArrearProvider引用
+        announcementCarouselProvider.setArrearProvider(arrearProvider);
 
         // 设置广告轮播Provider引用
         advertisementProvider.setCarouselProviders(

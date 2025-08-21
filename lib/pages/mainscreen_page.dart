@@ -484,6 +484,10 @@ class _AnnouncementPageState extends State<AnnouncementPage> {
     final carouselStateProvider = context.read<CarouselStateProvider>();
     final announcementCarouselProvider =
         context.read<AnnouncementCarouselProvider>();
+    final arrearProvider = context.read<ArrearProvider>();
+    
+    // 设置ArrearProvider引用
+    announcementCarouselProvider.setArrearProvider(arrearProvider);
 
     // 使用轮播专用通告数组 - 只包含緊急和一般通告
     List<AnnouncementModel> carouselAnnouncements =

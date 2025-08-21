@@ -22,6 +22,10 @@ class FullscreenAdProvider extends ChangeNotifier {
   // 广告数据 - 使用AdvertisementProvider的轮播数据
   List<AdModel> _fullscreenAds = [];
   List<Widget> _adWidgets = [];
+  
+  // Widget缓存机制 - 避免重建正在播放的Widget
+  final Map<String, Widget> _widgetCache = {};
+  final Map<String, FileManager> _fileManagerCache = {};
 
   // 状态管理
   bool _isPaused = false;
@@ -50,6 +54,9 @@ class FullscreenAdProvider extends ChangeNotifier {
 
   // 视频播放进度记录
   Map<String, Duration> _videoProgressMap = {};
+  
+  // 标记是否有待更新的Widget
+  bool _pendingWidgetUpdate = false;
 
   // Getters
   List<AdModel> get fullscreenAds => _fullscreenAds;
@@ -82,8 +89,15 @@ class FullscreenAdProvider extends ChangeNotifier {
     _fullscreenAds = List<AdModel>.from(newFullscreenAds);
     _logger.i('🔄 更新全屏广告轮播列表: ${_fullscreenAds.length} 个广告');
 
-    // 重新创建广告Widget
-    _createAdWidgets();
+    // 智能更新：如果正在播放，延迟更新Widget
+    if (_isActive && !_isPaused) {
+      _logger.i('🎬 检测到正在播放全屏广告，延迟更新Widget直到下次切换');
+      // 标记需要更新，在下次切换时执行
+      _pendingWidgetUpdate = true;
+    } else {
+      // 不在播放状态，可以安全更新
+      _smartCreateAdWidgets();
+    }
     notifyListeners();
   }
 
@@ -129,6 +143,68 @@ class FullscreenAdProvider extends ChangeNotifier {
       return _createSingleAdWidget(entry.value, entry.key);
     }).toList();
     // _logger.i('📺 创建了 ${_adWidgets.length} 个广告Widget');
+  }
+  
+  ///7a, 智能创建广告Widget（使用缓存）
+  void _smartCreateAdWidgets() {
+    final List<Widget> newWidgets = [];
+    final Set<String> usedKeys = {};
+    
+    for (int i = 0; i < this.fullscreenAds.length; i++) {
+      final ad = this.fullscreenAds[i];
+      final key = 'fullscreen_ad_${ad.id}';
+      usedKeys.add(key);
+      
+      // 检查缓存中是否已有此Widget
+      if (_widgetCache.containsKey(key)) {
+        // 使用缓存的Widget
+        newWidgets.add(_widgetCache[key]!);
+      } else {
+        // 创建新Widget并缓存
+        final widget = _createCachedAdWidget(ad, i);
+        _widgetCache[key] = widget;
+        newWidgets.add(widget);
+      }
+    }
+    
+    // 清理不再使用的缓存
+    _widgetCache.removeWhere((key, value) => !usedKeys.contains(key));
+    _fileManagerCache.removeWhere((key, value) => !usedKeys.contains(key));
+    
+    _adWidgets = newWidgets;
+    _pendingWidgetUpdate = false;
+    
+    // 注意：全屏广告不使用CarouselWidget，所以不需要调用smartUpdateCarousel
+    // 它直接管理_adWidgets列表，通过getCurrentWidget()获取当前显示的Widget
+  }
+  
+  ///7b, 创建缓存的广告Widget
+  Widget _createCachedAdWidget(AdModel ad, int index) {
+    final key = 'fullscreen_ad_${ad.id}';
+    
+    // 重用或创建FileManager
+    if (!_fileManagerCache.containsKey(key)) {
+      _fileManagerCache[key] = FileManager();
+    }
+    final fileManager = _fileManagerCache[key]!;
+    fileManager.getFile(ad.file);
+    
+    return FullAdWidget(
+      key: ValueKey(key),
+      ad: ad,
+      fileManager: fileManager,
+      initialVideoPosition: null,
+      onVideoProgressChanged: (adId, position) {
+        if (_currentAdIndex < this.fullscreenAds.length &&
+            this.fullscreenAds[_currentAdIndex].id.toString() == adId) {
+          final currentAd = getCurrentAd();
+          if (currentAd != null &&
+              currentAd.file.mimeType.startsWith('image/')) {
+            saveVideoProgress(adId, position);
+          }
+        }
+      },
+    );
   }
 
   ///8, 创建单个广告Widget
@@ -252,15 +328,17 @@ class FullscreenAdProvider extends ChangeNotifier {
       return;
     }
 
-    // final oldIndex = _currentAdIndex; // 注释掉因为日志被注释了
     // 切换到下一个广告 - 使用模运算确保循环
     _currentAdIndex = (_currentAdIndex + 1) % this.fullscreenAds.length;
 
     // 额外的安全检查
     _validateAndFixIndex();
-
-    // _logger.i(
-    //     '🔄 全屏广告切换: $oldIndex → $_currentAdIndex (总数: ${this.fullscreenAds.length})');
+    
+    // 检查是否有待更新的Widget
+    if (_pendingWidgetUpdate) {
+      _logger.i('🔄 执行延迟的Widget更新');
+      _smartCreateAdWidgets();
+    }
 
     // 重置时间记录
     _adElapsedTime = Duration.zero;
@@ -536,6 +614,10 @@ class FullscreenAdProvider extends ChangeNotifier {
 
     _debugTimer?.cancel();
     _debugTimer = null;
+    
+    // 清理缓存
+    _widgetCache.clear();
+    _fileManagerCache.clear();
 
     super.dispose();
   }

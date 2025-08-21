@@ -29,6 +29,10 @@ class ArrearTableWidgetState extends State<ArrearTableWidget> {
   Timer? _autoPaginationTimer; // 自动翻页定时器
   bool _isPaginationPaused = false; // 翻页是否暂停
   int _totalPages = 0; // 总页数
+  
+  // 数据版本跟踪 - 用于检测数据更新
+  String? _lastDataVersion;
+  bool _isWaitingForDataUpdate = false;
 
   ///1, 自动返回主页方法 - 用于全屏广告状态时调用
   void autoReturnToHome() {
@@ -58,6 +62,14 @@ class ArrearTableWidgetState extends State<ArrearTableWidget> {
   Widget build(BuildContext context) {
     return Consumer<ArrearProvider>(
       builder: (context, provider, child) {
+        // 检测数据版本是否变化
+        if (_lastDataVersion != provider.currentDataVersion) {
+          if (_lastDataVersion != null && widget.isInCarouselMode) {
+            // 数据已更新，但在轮播模式下不立即切换，等待下次翻页
+            _isWaitingForDataUpdate = true;
+          }
+          _lastDataVersion = provider.currentDataVersion;
+        }
         // 监听媒体暂停状态 - 仅在轮播模式下生效
         if (widget.isInCarouselMode) {
           final carouselStateProvider = context.watch<CarouselStateProvider>();
@@ -556,13 +568,23 @@ class ArrearTableWidgetState extends State<ArrearTableWidget> {
           _currentPage++;
         });
       } else {
-        // 已经是最后一页，重置到第一页并通知完成
-        setState(() {
-          _currentPage = 1; // 重置到第一页，開始新的循環
-        });
-
-        if (widget.onPaginationComplete != null) {
-          widget.onPaginationComplete!(_totalPages);
+        // 已经是最后一页，检查是否有待更新的数据
+        if (_isWaitingForDataUpdate) {
+          // 有新数据待更新，在这里切换到新的Widget
+          _isWaitingForDataUpdate = false;
+          // 通知AnnouncementCarouselProvider更新欠费表单Widget
+          if (widget.onPaginationComplete != null) {
+            widget.onPaginationComplete!(_totalPages);
+          }
+        } else {
+          // 没有新数据，正常重置到第一页
+          setState(() {
+            _currentPage = 1;
+          });
+          
+          if (widget.onPaginationComplete != null) {
+            widget.onPaginationComplete!(_totalPages);
+          }
         }
       }
     });
