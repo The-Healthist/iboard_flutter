@@ -1,18 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:iboard_app/utils/qr_code_util.dart';
-import 'package:logger/logger.dart';
 
-/// 二维码生成工具测试页面
-/// 用于验证二维码生成功能是否正常工作
 class QrCodeTestPage extends StatefulWidget {
   const QrCodeTestPage({super.key});
 
   @override
-  _QrCodeTestPageState createState() => _QrCodeTestPageState();
+  QrCodeTestPageState createState() => QrCodeTestPageState();
 }
 
-class _QrCodeTestPageState extends State<QrCodeTestPage> {
-  final Logger _logger = Logger();
+class QrCodeTestPageState extends State<QrCodeTestPage> {
   final QrCodeUtil _qrCodeUtil = QrCodeUtil();
 
   @override

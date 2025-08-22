@@ -232,12 +232,6 @@ class EnhancedVideoPoolManager {
   ) async {
     try {
       if (controller.value.isInitialized) {
-        // 检查控制器状态
-        final wasPlaying = controller.value.isPlaying;
-        final position = controller.value.position;
-
-        // _logger.d(
-        //     '🔧 [增强视频池] 重置控制器 - 之前状态: 播放中=$wasPlaying, 位置=${position.inSeconds}s');
 
         // 重置到开头
         await controller.seekTo(Duration.zero);

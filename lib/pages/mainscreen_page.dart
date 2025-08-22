@@ -11,7 +11,7 @@ import 'package:iboard_app/providers/announcement_carousel_provider.dart';
 import 'package:iboard_app/providers/app_data_provider.dart';
 import 'package:iboard_app/providers/state_provider.dart';
 import 'package:iboard_app/providers/ad_top_carousel_provider.dart';
-import 'package:iboard_app/providers/ad_fullscreen_provider.dart';
+import 'package:iboard_app/providers/ad_full_carousel_provider.dart';
 import 'package:iboard_app/providers/weather_provider.dart';
 import 'package:iboard_app/providers/rthk_news_provider.dart';
 import 'package:iboard_app/widgets/carousel_widget.dart' as custom_carousel;
@@ -28,10 +28,10 @@ class AnnouncementPage extends StatefulWidget {
   const AnnouncementPage({super.key});
 
   @override
-  _AnnouncementPageState createState() => _AnnouncementPageState();
+  AnnouncementPageState createState() => AnnouncementPageState();
 }
 
-class _AnnouncementPageState extends State<AnnouncementPage> {
+class AnnouncementPageState extends State<AnnouncementPage> {
   final Logger _logger = Logger();
   late custom_carousel.CarouselController _bottomCarouselController;
 
@@ -134,7 +134,8 @@ class _AnnouncementPageState extends State<AnnouncementPage> {
     // 初始化 _arrearProvider
     _arrearProvider = Provider.of<ArrearProvider>(context, listen: false);
     // 将 _arrearProvider 传递给 AnnouncementCarouselProvider
-    final announcementCarouselProvider = Provider.of<AnnouncementCarouselProvider>(context, listen: false);
+    final announcementCarouselProvider =
+        Provider.of<AnnouncementCarouselProvider>(context, listen: false);
     announcementCarouselProvider.setArrearProvider(_arrearProvider);
   }
 
@@ -164,15 +165,6 @@ class _AnnouncementPageState extends State<AnnouncementPage> {
     // 设置退出全屏广告模式回调
     stateProvider.setExitFullscreenAdModeCallback(() {
       fullAdProvider.exitFullscreenMode();
-    });
-
-    // 设置智能轮播切换回调
-    stateProvider
-        .setSmartCarouselSwitchCallback((isNeedCarousel, carouselTime) {
-      // 当需要轮播时，触发全屏广告切换
-      if (isNeedCarousel) {
-        fullAdProvider.nextAd();
-      }
     });
   }
 
@@ -288,89 +280,6 @@ class _AnnouncementPageState extends State<AnnouncementPage> {
     carouselStateProvider.enterManualOperation();
 
     // _logger.i('⚙️ 设置页面模式 - 所有轮播已暂停');
-  }
-
-  ///5.2，从全屏广告状态退出，恢复所有轮播
-  void _exitFullscreenAdMode() {
-    final fullAdCarouselProvider =
-        Provider.of<FullscreenAdProvider>(context, listen: false);
-    final topAdCarouselProvider =
-        Provider.of<TopAdCarouselProvider>(context, listen: false);
-    final announcementCarouselProvider =
-        Provider.of<AnnouncementCarouselProvider>(context, listen: false);
-    final stateProvider =
-        Provider.of<CarouselStateProvider>(context, listen: false);
-
-    // 记录退出前的状态
-    final wasInFullscreenAd =
-        stateProvider.currentAppState == AppState.fullscreenAd;
-
-    // 退出全屏广告模式
-    fullAdCarouselProvider.exitFullscreenMode();
-
-    if (wasInFullscreenAd) {
-      // 立即恢复顶部广告轮播（不等待状态变化）
-      // 确保顶部广告能够立即恢复视频播放和轮播
-      topAdCarouselProvider.resumeTopCarousel();
-
-      // 恢复通告轮播
-      announcementCarouselProvider.resumeMidCarousel(
-          stateProvider.noticeStayDuration,
-          forceJumpToIndex: true);
-
-      // 设置日志输出标志 - 默认状态下只显示顶部广告和通告轮播的日志
-      fullAdCarouselProvider.startDebugTimer();
-      announcementCarouselProvider.startDebugTimer(
-          stateProvider.noticeStayDuration,
-          enableLogging: true);
-
-      // 记录恢复完成的日志
-      // _logger.i('✅ 全屏广告状态退出完成：顶部广告、通告轮播已恢复');
-    }
-  }
-
-  ///5.3，从设置页面返回后恢复所有轮播和计时器
-  void _resumeAllCarouselsFromSettings() {
-    // _logger.i('↩️ 从设置页面返回 - 恢复所有轮播和计时器');
-
-    final topAdProvider = context.read<TopAdCarouselProvider>();
-    final announcementCarouselProvider =
-        context.read<AnnouncementCarouselProvider>();
-    final fullAdCarouselProvider = context.read<FullscreenAdProvider>();
-    final bottomProvider = context.read<WeatherProvider>();
-
-    // 恢复默认状态
-    final carouselStateProvider = context.read<CarouselStateProvider>();
-    carouselStateProvider.enterDefaultState();
-
-    // 恢复顶部广告轮播
-    topAdProvider.resumeAllTimersFromSettings();
-
-    // 恢复通告轮播
-    final apiNoticeStayDuration = carouselStateProvider.noticeStayDuration;
-    announcementCarouselProvider
-        .resumeAllTimersFromSettings(apiNoticeStayDuration);
-
-    // 恢复底部天气二维码轮播
-    bottomProvider.resumeAllTimersFromSettings();
-
-    // 恢复全屏广告轮播（如果之前处于活跃状态）
-    if (fullAdCarouselProvider.isActive && fullAdCarouselProvider.isPaused) {
-      fullAdCarouselProvider.resumeCarousel();
-      fullAdCarouselProvider.startDebugTimer();
-    }
-
-    // 设置其他轮播为运行状态
-    _isBottomCarouselPaused = false;
-
-    // 恢复其他轮播中的媒体内容
-    _bottomCarouselController.resumeAllMedia();
-
-    // 重新启动调试定时器和监控定时器
-    _startDebugTimer();
-    _startCarouselWatchdog();
-
-    // _logger.i('↩️ 设置页面返回 - 所有轮播已恢复');
   }
 
   ///6，正常退出全屏广告状态，恢复所有轮播
@@ -553,11 +462,26 @@ class _AnnouncementPageState extends State<AnnouncementPage> {
     final advertisementProvider =
         Provider.of<AdvertisementProvider>(context, listen: false);
     final topAdProvider = context.read<TopAdCarouselProvider>();
-    List<AdModel> topAds = advertisementProvider.topAdvertisements;
+    
+    // 優先使用輪播專用的緩存數據
+    List<AdModel> topAds = advertisementProvider.topCarouselAdvertisements;
+    
+    // 如果輪播數據為空，則使用舊的廣告數據作為後備
+    if (topAds.isEmpty) {
+      topAds = advertisementProvider.topAdvertisements;
+      _logger.w('⚠️ 輪播專用數據為空，使用舊廣告數據作為後備: ${topAds.length} 個廣告');
+    } else {
+      _logger.i('✅ 使用輪播專用數據: ${topAds.length} 個廣告');
+    }
 
-    topAdProvider.initializeTopWidgets(topAds);
+    if (topAds.isNotEmpty) {
+      topAdProvider.initializeTopWidgets(topAds);
+      _logger.i('✅ 頂部廣告輪播初始化完成: ${topAds.length} 個廣告');
+    } else {
+      _logger.w('⚠️ 沒有可用的頂部廣告數據');
+    }
 
-    // 启动顶部广告调试定时器
+    // 啟動頂部廣告調試定時器
     topAdProvider.startDebugTimer();
   }
 

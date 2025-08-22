@@ -1,7 +1,7 @@
 import 'dart:async';
 // foundation.dart import removed as kDebugMode is no longer used
 import 'package:flutter/material.dart';
-import 'package:iboard_app/providers/ad_fullscreen_provider.dart';
+import 'package:iboard_app/providers/ad_full_carousel_provider.dart';
 import 'package:iboard_app/providers/state_provider.dart';
 import 'package:provider/provider.dart';
 
@@ -11,10 +11,10 @@ class DebugFullAdTimeWidget extends StatefulWidget {
   const DebugFullAdTimeWidget({super.key});
 
   @override
-  _DebugFullAdTimeWidgetState createState() => _DebugFullAdTimeWidgetState();
+  DebugFullAdTimeWidgetState createState() => DebugFullAdTimeWidgetState();
 }
 
-class _DebugFullAdTimeWidgetState extends State<DebugFullAdTimeWidget> {
+class DebugFullAdTimeWidgetState extends State<DebugFullAdTimeWidget> {
   Timer? _updateTimer;
 
   @override

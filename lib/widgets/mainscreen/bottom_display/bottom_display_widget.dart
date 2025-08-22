@@ -8,10 +8,10 @@ class BottomDisplayWidget extends StatefulWidget {
   const BottomDisplayWidget({super.key});
 
   @override
-  _BottomDisplayWidgetState createState() => _BottomDisplayWidgetState();
+  BottomDisplayWidgetState createState() => BottomDisplayWidgetState();
 }
 
-class _BottomDisplayWidgetState extends State<BottomDisplayWidget> {
+class BottomDisplayWidgetState extends State<BottomDisplayWidget> {
   // 预创建widget实例用于复用，避免每次切换时重新创建
   Widget? _weatherForecastWidget;
   Widget? _qrcodeWidget;

@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:iboard_app/models/settings_model.dart';
 import 'package:iboard_app/providers/announcement_carousel_provider.dart';
+import 'package:logger/logger.dart';
 
 /// 播放狀態枚舉
 enum PlaybackState {
@@ -164,6 +165,7 @@ class ManualOperationCarouselState extends CarouselState {
 
 /// 狀態提供者類
 class CarouselStateProvider extends ChangeNotifier {
+  final Logger _logger = Logger();
   CarouselState _currentState = DefaultCarouselState();
 
   // 计时器相關
@@ -191,9 +193,6 @@ class CarouselStateProvider extends ChangeNotifier {
   VoidCallback? _onPreloadFullscreenAd; // 预加载全屏广告的回调
   VoidCallback? _onEnterFullscreenAdMode; // 进入全屏广告模式的回调（通知FullAdProvider）
   VoidCallback? _onExitFullscreenAdMode; // 退出全屏广告模式的回调（通知FullAdProvider）
-  // ignore: unused_field
-  Function(bool isNeedCarousel, int carouselTime)?
-      _onSmartCarouselSwitch; // 智能轮播切换回调 - 保留以备后用
 
   // Provider引用
   AnnouncementCarouselProvider? _announcementCarouselProvider; // 通告轮播Provider引用
@@ -296,12 +295,6 @@ class CarouselStateProvider extends ChangeNotifier {
   /// 设置退出全屏广告模式回调
   void setExitFullscreenAdModeCallback(VoidCallback? callback) {
     _onExitFullscreenAdMode = callback;
-  }
-
-  /// 设置智能轮播切换回调
-  void setSmartCarouselSwitchCallback(
-      Function(bool isNeedCarousel, int carouselTime)? callback) {
-    _onSmartCarouselSwitch = callback;
   }
 
   /// 設置通告轮播下一个回调
@@ -606,7 +599,7 @@ class CarouselStateProvider extends ChangeNotifier {
       // 通告轮播模式对应默认状态，所以检查默认状态
       if (_currentState.currentAppState == AppState.defaultState) {
         // Announcement carousel timer expired log
-        print(
+        _logger.i(
             '⏰ 通告輪播計時器到期 ($announcementCarouselToFullAdsCarouselDuration秒)，切換到全屏廣告');
         enterFullscreenAd();
       }
@@ -648,7 +641,7 @@ class CarouselStateProvider extends ChangeNotifier {
       }
     } catch (e) {
       // State transition failed log (always available)
-      print('State transition failed: $e');
+      _logger.e('State transition failed: $e');
       return false;
     }
   }
@@ -786,31 +779,6 @@ Timer Info: $timerInfo
   }
 
   ///22， 恢复通告轮播
-  void _resumeNoticeCarousel() {
-    if (!_isNoticeCarouselActive || !_isNoticeCarouselPaused) return;
-
-    _isNoticeCarouselPaused = false;
-
-    // 计算剩余时间
-    final remainingTime =
-        Duration(seconds: noticeStayDuration) - _noticeElapsedTime;
-
-    if (remainingTime.isNegative || remainingTime.inSeconds <= 0) {
-      // 如果已经超时，立即切换到下一个
-      _onNoticeCarouselNext?.call();
-      _resetNoticeTimer();
-    } else {
-      // 重新设置定时器
-      _noticeTimerStartTime = DateTime.now();
-      _startNoticeCarouselTimer(remainingTime);
-    }
-
-    _startNoticeLogTimer();
-
-    // Resume notice carousel log (always available)
-    // print('▶️ 恢复通告轮播 - 剩余时间: ${remainingTime.inSeconds}秒');
-  }
-
   ///23， 启动通告轮播定时器
   void _startNoticeCarouselTimer([Duration? customDuration]) {
     _noticeCarouselTimer?.cancel();

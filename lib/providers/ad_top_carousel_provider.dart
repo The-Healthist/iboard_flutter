@@ -8,6 +8,7 @@ import 'package:logger/logger.dart';
 
 class TopAdCarouselProvider extends ChangeNotifier {
   final Logger _logger = Logger();
+  bool _mounted = true;
 
   // 轮播控制器
   late custom_carousel.CarouselController _topCarouselController;
@@ -53,19 +54,41 @@ class TopAdCarouselProvider extends ChangeNotifier {
   void updateCarouselList(List<AdModel> newTopAds) {
     // 检查数据是否真的发生了变化
     if (_areAdsListsEqual(_topAds, newTopAds)) {
+      _logger.d('顶部广告数据无变化，跳过更新');
       return;
     }
 
     _topAds = List<AdModel>.from(newTopAds);
+    _logger.i('🔄 更新顶部广告轮播列表: ${newTopAds.length} 個廣告');
 
+    // 智能更新：如果正在播放，延迟更新Widget
     if (!_isTopCarouselPaused && _topTimer != null && _topTimer!.isActive) {
-      // 延迟更新，避免中断当前播放
       _pendingWidgetUpdate = true;
+      _logger.i('🎬 檢測到正在播放頂部廣告，延遲更新Widget直到下次切換');
     } else {
+      // 不在播放状态，可以安全更新
       _smartUpdateWidgets();
-      _pendingWidgetUpdate = false;
     }
     notifyListeners();
+  }
+
+  ///13，檢查緩存狀態並驗證數據完整性
+  bool validateCacheData() {
+    if (_topAds.isEmpty) {
+      _logger.w('⚠️ 頂部廣告數據為空');
+      return false;
+    }
+
+    // 檢查每個廣告的文件是否有效
+    for (final ad in _topAds) {
+      if (ad.file.url.isEmpty) {
+        _logger.w('⚠️ 發現無效的廣告文件: ${ad.title}');
+        return false;
+      }
+    }
+
+    _logger.i('✅ 緩存數據驗證通過: ${_topAds.length} 個廣告');
+    return true;
   }
 
   ///1a，检查两个广告列表是否相等
@@ -102,7 +125,7 @@ class TopAdCarouselProvider extends ChangeNotifier {
     }
   }
 
-  ///3a，智能更新Widget（使用缓存）
+  ///3a，智能更新Widget（避免重建正在播放的Widget）
   void _smartUpdateWidgets() {
     if (topAds.isEmpty) {
       return;
@@ -111,21 +134,31 @@ class TopAdCarouselProvider extends ChangeNotifier {
     final Map<String, Widget> widgetMap = {};
     final List<String> orderedKeys = [];
     final Set<String> usedKeys = {};
+    final currentIndex = _topCarouselController.currentIndex;
 
-    for (final ad in topAds) {
+    for (int i = 0; i < topAds.length; i++) {
+      final ad = topAds[i];
       final key = 'top_ad_${ad.id}';
       usedKeys.add(key);
       orderedKeys.add(key);
 
-      if (_widgetCache.containsKey(key)) {
+      // 如果是當前播放的廣告且Widget已存在，保持不變
+      if (i == currentIndex && _widgetCache.containsKey(key)) {
+        widgetMap[key] = _widgetCache[key]!;
+        _logger.d('🔄 保持當前播放廣告Widget: ${ad.title}');
+      } else if (_widgetCache.containsKey(key)) {
+        // 其他已緩存的Widget也保持不變
         widgetMap[key] = _widgetCache[key]!;
       } else {
+        // 只為新廣告創建Widget
         final widget = _createCachedAdWidget(ad);
         _widgetCache[key] = widget;
         widgetMap[key] = widget;
+        _logger.d('🆕 創建新廣告Widget: ${ad.title}');
       }
     }
 
+    // 清理不再使用的緩存
     _widgetCache.removeWhere((key, value) => !usedKeys.contains(key));
     _fileManagerCache.removeWhere((key, value) => !usedKeys.contains(key));
 
@@ -154,34 +187,29 @@ class TopAdCarouselProvider extends ChangeNotifier {
 
   ///7，启动顶部广告计时器
   void startTopAdTimer(int currentIndex) {
-    // _logger.d(
-    //     '🎬 开始顶部广告计时器: index=$currentIndex, ads=${this.topAds.length}, paused=$_isTopCarouselPaused');
     _topTimer?.cancel();
     if (topAds.length <= 1 ||
         currentIndex < 0 ||
         currentIndex >= topAds.length ||
         _isTopCarouselPaused) {
-      // _logger.w(
-      //     '⚠️ 顶部广告计时器条件不满足: ads=${this.topAds.length}, index=$currentIndex, paused=$_isTopCarouselPaused');
       return;
     }
 
     final ad = topAds[currentIndex];
-    // 记录当前广告开始时间和总时长
     _currentTopAdStartTime = DateTime.now();
     _topAdDuration = ad.durationObject;
     _currentTopAdIndex = currentIndex;
-
-    // 只有当切换到新广告时才重置已播放时间
     _topAdElapsedTime = Duration.zero;
-
-    // _logger.d('▶️ 启动顶部广告计时器: ${ad.title}, duration=${ad.durationObject}');
-    // _logger.i(
-    //     '📝 记录顶部广告开始时间: $_currentTopAdStartTime, 索引: $_currentTopAdIndex, 时长: ${_topAdDuration.inSeconds}秒');
 
     _topTimer = Timer(ad.durationObject, () {
       if (_topCarouselController.widgetCount > 1 && !_isTopCarouselPaused) {
-        // _logger.d('⏭️ 顶部广告计时器到期，切换到下一个');
+        // 在播放下一個廣告之前檢查是否有待處理的更新（參考全屏廣告邏輯）
+        if (_pendingWidgetUpdate) {
+          _logger.i('🔄 執行延遲的Widget更新');
+          _smartUpdateWidgets();
+          _pendingWidgetUpdate = false;
+        }
+
         _topCarouselController.playNext();
         // onPageChanged will then call startTopAdTimer for the new page
       }
@@ -373,14 +401,8 @@ class TopAdCarouselProvider extends ChangeNotifier {
   }
 
   ///9，处理页面变化事件
-  /// 优化后的逻辑：只在需要时执行一次Widget更新，避免重复触发
   void onPageChanged(int index) {
     if (!_isTopCarouselPaused && topAds.isNotEmpty) {
-      // 检查是否有待更新的Widget - 只在切换时执行一次
-      if (_pendingWidgetUpdate) {
-        _smartUpdateWidgets();
-        _pendingWidgetUpdate = false; // 确保只执行一次，避免重复更新
-      }
       startTopAdTimer(index);
     }
   }
@@ -413,18 +435,17 @@ class TopAdCarouselProvider extends ChangeNotifier {
     notifyListeners();
   }
 
+  bool get mounted => _mounted;
+
   @override
   void dispose() {
+    _mounted = false;
     _topTimer?.cancel();
     _topTimer = null;
-
     _debugTimer?.cancel();
     _debugTimer = null;
-
-    // 清理缓存
     _widgetCache.clear();
     _fileManagerCache.clear();
-
     super.dispose();
   }
 }

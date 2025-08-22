@@ -47,7 +47,7 @@ class ArrearProvider extends ChangeNotifier {
   // 定时更新相关
   Timer? _updateTimer; // 定时更新定时器
   bool _isPeriodicUpdateActive = false; // 是否正在进行定期更新
-  
+
   // Widget缓存机制 - 为欠费表单轮播优化
   final Map<String, Widget> _widgetCache = {};
   final Map<String, dynamic> _cachedTableData = {}; // 缓存表格数据
@@ -60,7 +60,7 @@ class ArrearProvider extends ChangeNotifier {
 
   // 定时更新状态getter
   bool get isPeriodicUpdateActive => _isPeriodicUpdateActive;
-  
+
   // Widget缓存相关getter
   bool get hasPendingUpdate => _hasPendingUpdate;
   String? get currentDataVersion => _currentDataVersion;
@@ -557,10 +557,10 @@ class ArrearProvider extends ChangeNotifier {
 
       // 保存到缓存
       await saveToCache();
-      
+
       // 更新数据版本标识
       _updateDataVersion();
-      
+
       // 标记有待更新的数据（在轮播中会延迟应用）
       _hasPendingUpdate = true;
 
@@ -733,16 +733,16 @@ class ArrearProvider extends ChangeNotifier {
       }
     });
   }
-  
+
   ///27, 更新数据版本标识
   void _updateDataVersion() {
     _currentDataVersion = DateTime.now().millisecondsSinceEpoch.toString();
   }
-  
+
   ///28, 获取表格数据（缓存版本）
   List<Map<String, dynamic>> getTableData() {
     final List<Map<String, dynamic>> tableData = [];
-    
+
     // 从物业管理费用数据构建表格数据
     if (_managementFeeData != null) {
       for (final block in _managementFeeData!.blocks) {
@@ -751,21 +751,21 @@ class ArrearProvider extends ChangeNotifier {
             final Map<String, dynamic> rowData = {
               '單位': '${floor.name}${unit.name}',
             };
-            
+
             // 添加费用数据
             for (final bill in unit.bills) {
               rowData[bill.period] = bill.value;
             }
-            
+
             tableData.add(rowData);
           }
         }
       }
     }
-    
+
     return tableData;
   }
-  
+
   ///29, 创建欠费表单Widget（缓存版本）
   Widget createArrearTableWidget({
     required VoidCallback? onHomeButtonPressed,
@@ -775,13 +775,13 @@ class ArrearProvider extends ChangeNotifier {
   }) {
     final dataVersion = _currentDataVersion ?? 'initial';
     final key = 'arrear_table_$dataVersion';
-    
+
     // 检查缓存中是否已有此Widget
     if (_widgetCache.containsKey(key)) {
       _logger.i('💾 使用缓存的欠费表单Widget: $key');
       return _widgetCache[key]!;
     }
-    
+
     // 创建新的Widget并缓存
     final widget = ArrearTableWidget(
       key: ValueKey(key),
@@ -790,34 +790,34 @@ class ArrearProvider extends ChangeNotifier {
       onPaginationComplete: onPaginationComplete,
       onPaginationStart: onPaginationStart,
     );
-    
+
     // 缓存Widget和数据
     _widgetCache[key] = widget;
     _cachedTableData[key] = getTableData();
-    
+
     // 清理旧缓存（保留最新的2个版本）
     _cleanupOldCache();
-    
+
     _logger.i('🆕 创建新的欠费表单Widget: $key');
     return widget;
   }
-  
+
   ///30, 清理旧缓存
   void _cleanupOldCache() {
     if (_widgetCache.length > 2) {
       // 保留最新的2个版本，删除更旧的
       final keys = _widgetCache.keys.toList()..sort();
       final keysToRemove = keys.take(keys.length - 2);
-      
+
       for (final key in keysToRemove) {
         _widgetCache.remove(key);
         _cachedTableData.remove(key);
       }
-      
+
       _logger.i('🗑️ 清理旧欠费表单缓存: ${keysToRemove.length}个');
     }
   }
-  
+
   ///31, 标记数据更新完成（由ArrearTableWidget调用）
   void markUpdateApplied() {
     _hasPendingUpdate = false;

@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:iboard_app/providers/advertisement_provider.dart';
-import 'package:iboard_app/providers/ad_fullscreen_provider.dart';
+import 'package:iboard_app/providers/ad_full_carousel_provider.dart';
 import 'package:iboard_app/managers/file_manager.dart';
 import 'package:iboard_app/models/ad_model.dart';
 import 'package:provider/provider.dart';

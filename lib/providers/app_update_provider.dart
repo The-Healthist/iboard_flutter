@@ -8,9 +8,11 @@ import 'package:open_file/open_file.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../http/api_client.dart';
 import '../utils/version_util.dart';
+import 'package:logger/logger.dart';
 
 ///1. 应用更新状态管理Provider - 整合所有更新功能
 class AppUpdateProvider with ChangeNotifier {
+  final Logger _logger = Logger();
   final Dio _dio = Dio();
   CancelToken? _downloadCancelToken;
   Timer? _updateCheckTimer;
@@ -94,9 +96,9 @@ class AppUpdateProvider with ChangeNotifier {
         _hasInstallPermission =
             await Permission.requestInstallPackages.isGranted;
 
-        print('📋 权限状态检查完成:');
-        print('  存储权限: ${_hasStoragePermission ? '已授权' : '未授权'}');
-        print('  安装权限: ${_hasInstallPermission ? '已授权' : '未授权'}');
+        _logger.i('📋 權限狀態檢查完成:');
+        _logger.i('  存儲權限: ${_hasStoragePermission ? '已授權' : '未授權'}');
+        _logger.i('  安裝權限: ${_hasInstallPermission ? '已授權' : '未授權'}');
 
         notifyListeners();
       } else {
@@ -104,7 +106,7 @@ class AppUpdateProvider with ChangeNotifier {
         _hasInstallPermission = true;
       }
     } catch (e) {
-      print('❌ 权限状态检查失败: $e');
+      _logger.e('❌ 權限狀態檢查失敗: $e');
     }
   }
 
@@ -116,7 +118,7 @@ class AppUpdateProvider with ChangeNotifier {
       // Android 13+ (API 33+) 不需要存储权限
       final androidInfo = await _getAndroidVersion();
       if (androidInfo >= 33) {
-        print('📱 Android 13+，不需要存储权限');
+        _logger.i('📱 Android 13+，不需要存儲權限');
         return true;
       }
 
@@ -135,7 +137,7 @@ class AppUpdateProvider with ChangeNotifier {
       // Android 10及以下
       return await Permission.storage.isGranted;
     } catch (e) {
-      print('❌ 检查存储权限失败: $e');
+      _logger.e('❌ 檢查存儲權限失敗: $e');
       return false;
     }
   }
@@ -156,7 +158,7 @@ class AppUpdateProvider with ChangeNotifier {
   ///6. 请求所有必要权限
   Future<bool> requestAllPermissions() async {
     try {
-      print('🔐 开始请求应用更新所需权限...');
+      _logger.i('🔐 開始請求應用更新所需權限...');
 
       if (Platform.isAndroid) {
         // 请求存储权限
@@ -168,16 +170,16 @@ class AppUpdateProvider with ChangeNotifier {
         _hasStoragePermission = storageGranted;
         _hasInstallPermission = installGranted;
 
-        print('📋 权限请求结果:');
-        print('  存储权限: ${storageGranted ? '已授权' : '被拒绝'}');
-        print('  安装权限: ${installGranted ? '已授权' : '被拒绝'}');
+        _logger.i('📋 權限請求結果:');
+        _logger.i('  存儲權限: ${storageGranted ? '已授權' : '被拒絕'}');
+        _logger.i('  安裝權限: ${installGranted ? '已授權' : '被拒絕'}');
 
         notifyListeners();
 
         // 如果存储权限被拒绝，建议使用系统下载器
         if (!storageGranted) {
           _useSystemDownloader = true;
-          print('💡 存储权限被拒绝，将使用系统下载管理器');
+          _logger.i('💡 存儲權限被拒絕，將使用系統下載管理器');
         }
 
         return installGranted; // 安装权限是必需的
@@ -185,7 +187,7 @@ class AppUpdateProvider with ChangeNotifier {
 
       return true;
     } catch (e) {
-      print('❌ 权限请求失败: $e');
+      _logger.e('❌ 權限請求失敗: $e');
       _error = '权限请求失败: $e';
       notifyListeners();
       return false;
@@ -218,7 +220,7 @@ class AppUpdateProvider with ChangeNotifier {
       final storageStatus = await Permission.storage.request();
       return storageStatus.isGranted;
     } catch (e) {
-      print('❌ 存储权限请求失败: $e');
+      _logger.e('❌ 存儲權限請求失敗: $e');
       return false;
     }
   }
@@ -230,7 +232,7 @@ class AppUpdateProvider with ChangeNotifier {
       _error = null;
       notifyListeners();
 
-      print('🔍 AppUpdateProvider: 开始检查更新');
+      _logger.i('🔍 AppUpdateProvider: 開始檢查更新');
 
       // 获取当前应用版本
       final currentVersionInfo = await VersionUtil.getCurrentAppVersion();
@@ -239,7 +241,7 @@ class AppUpdateProvider with ChangeNotifier {
 
       _currentVersion =
           VersionUtil.formatVersionInfo(currentVersion, currentBuild);
-      print('📱 当前版本: $_currentVersion');
+      _logger.i('📱 當前版本: $_currentVersion');
 
       // 获取远程版本信息
       final apiClient =
@@ -247,7 +249,7 @@ class AppUpdateProvider with ChangeNotifier {
       final response = await apiClient.getAppVersion();
 
       if (response['data'] == null) {
-        print('❌ 获取远程版本信息失败: 响应数据为空');
+        _logger.e('❌ 獲取遠程版本信息失敗: 響應數據為空');
         _error = '获取版本信息失败';
         _hasUpdate = false;
         _hasLocalApk = false;
@@ -258,7 +260,7 @@ class AppUpdateProvider with ChangeNotifier {
       final currentVersionData = versionData['currentVersion'];
 
       if (currentVersionData == null) {
-        print('❌ 远程版本数据为空');
+        _logger.e('❌ 遠程版本數據為空');
         _error = '远程版本数据为空';
         _hasUpdate = false;
         _hasLocalApk = false;
@@ -277,30 +279,30 @@ class AppUpdateProvider with ChangeNotifier {
       _updateDescription = description;
       _downloadUrl = downloadUrl;
 
-      print('🌐 远程版本: $_remoteVersion');
-      print('📝 更新描述: $description');
-      print('🔗 下载链接: $downloadUrl');
+      _logger.i('🌐 遠程版本: $_remoteVersion');
+      _logger.i('📝 更新描述: $description');
+      _logger.i('🔗 下載鏈接: $downloadUrl');
 
       // 检查是否需要更新
       final needsUpdate = VersionUtil.needsUpdate(
           currentVersion, currentBuild, remoteVersion, remoteBuild);
 
       if (needsUpdate) {
-        print('✅ 发现新版本，需要更新');
+        _logger.i('✅ 發現新版本，需要更新');
         _hasUpdate = true;
         // 检查是否已下载
         await _checkLocalApk();
 
         // 如果需要自动下载且本地没有APK
         if (autoDownload && !_hasLocalApk) {
-          print('🚀 自动开始下载更新包...');
+          _logger.i('🚀 自動開始下載更新包...');
           // 延迟一点时间确保UI更新完成
           Future.delayed(const Duration(milliseconds: 500), () async {
             await downloadApk();
           });
         }
       } else {
-        print('✅ 当前版本已是最新版本');
+        _logger.i('✅ 當前版本已是最新版本');
         _hasUpdate = false;
         _hasLocalApk = false;
       }
@@ -308,7 +310,7 @@ class AppUpdateProvider with ChangeNotifier {
       _error = '检查更新失败: $e';
       _hasUpdate = false;
       _hasLocalApk = false;
-      print('❌ AppUpdateProvider: 检查更新异常 - $e');
+      _logger.e('❌ AppUpdateProvider: 檢查更新異常 - $e');
     } finally {
       _isCheckingUpdate = false;
       notifyListeners();
@@ -333,10 +335,10 @@ class AppUpdateProvider with ChangeNotifier {
       _error = null;
       notifyListeners();
 
-      print('⬇️ AppUpdateProvider: 开始下载APK');
+      _logger.i('⬇️ AppUpdateProvider: 開始下載APK');
 
       // 使用应用缓存目录，无需存储权限
-      print('📁 使用应用缓存目录下载，无需存储权限');
+      _logger.i('📁 使用應用緩存目錄下載，無需存儲權限');
 
       // 清理旧文件以释放空间
       await cleanOldApkFiles();
@@ -347,12 +349,12 @@ class AppUpdateProvider with ChangeNotifier {
           'iboard_v${_remoteVersionNumber}_$_remoteBuildNumber.apk';
       final filePath = '${downloadDir.path}/$fileName';
 
-      print('📁 下载路径: $filePath');
+      _logger.i('📁 下載路徑: $filePath');
 
       // 检查文件是否已存在
       final file = File(filePath);
       if (await file.exists()) {
-        print('✅ APK文件已存在: $filePath');
+        _logger.i('✅ APK文件已存在: $filePath');
         _localApkPath = filePath;
         _hasLocalApk = true;
         _downloadProgress = 100;
@@ -377,8 +379,8 @@ class AppUpdateProvider with ChangeNotifier {
 
             // 只在进度变化且为10的倍数时输出日志，减少日志频率
             if (newProgress != _downloadProgress && newProgress % 1000 == 0) {
-              print(
-                  '📥 下载进度: $newProgress% (${(received / 1024 / 1024).toStringAsFixed(1)}MB/${(total / 1024 / 1024).toStringAsFixed(1)}MB)');
+              _logger.i(
+                  '📥 下載進度: $newProgress% (${(received / 1024 / 1024).toStringAsFixed(1)}MB/${(total / 1024 / 1024).toStringAsFixed(1)}MB)');
             }
 
             _downloadProgress = newProgress;
@@ -390,21 +392,21 @@ class AppUpdateProvider with ChangeNotifier {
       // 验证文件是否下载成功
       if (await file.exists()) {
         final fileSize = await file.length();
-        print('✅ APK下载成功: $filePath ($fileSize bytes)');
+        _logger.i('✅ APK下載成功: $filePath ($fileSize bytes)');
         _localApkPath = filePath;
         _hasLocalApk = true;
         _downloadProgress = 100;
       } else {
-        print('❌ APK文件下载失败');
+        _logger.e('❌ APK文件下載失敗');
         _error = '文件下载失败';
         _hasLocalApk = false;
       }
     } catch (e) {
       if (e is DioException && e.type == DioExceptionType.cancel) {
-        print('⏹️ 下载已取消');
+        _logger.i('⏹️ 下載已取消');
         _hasLocalApk = false;
       } else {
-        print('❌ 下载APK失败: $e');
+        _logger.e('❌ 下載APK失敗: $e');
         _error = '下载失败: $e';
         _hasLocalApk = false;
       }
@@ -418,7 +420,7 @@ class AppUpdateProvider with ChangeNotifier {
   void cancelDownload() {
     if (_isDownloading) {
       _downloadCancelToken?.cancel('用户取消下载');
-      print('⏹️ AppUpdateProvider: 用户取消下载');
+      _logger.i('⏹️ AppUpdateProvider: 用戶取消下載');
     }
   }
 
@@ -435,11 +437,11 @@ class AppUpdateProvider with ChangeNotifier {
       _error = null;
       notifyListeners();
 
-      print('📦 AppUpdateProvider: 开始安装APK');
+      _logger.i('📦 AppUpdateProvider: 開始安裝APK');
 
       final file = File(_localApkPath!);
       if (!await file.exists()) {
-        print('❌ APK文件不存在: $_localApkPath');
+        _logger.e('❌ APK文件不存在: $_localApkPath');
         _error = 'APK文件不存在';
         return;
       }
@@ -447,7 +449,7 @@ class AppUpdateProvider with ChangeNotifier {
       // 请求安装权限
       final installPermission = await _requestInstallPermission();
       if (!installPermission) {
-        print('❌ 缺少安装权限');
+        _logger.e('❌ 缺少安裝權限');
         _error = '缺少安装权限';
         return;
       }
@@ -456,14 +458,14 @@ class AppUpdateProvider with ChangeNotifier {
       final result = await OpenFile.open(_localApkPath!);
 
       if (result.type == ResultType.done) {
-        print('✅ APK安装程序已启动');
+        _logger.i('✅ APK安裝程序已啟動');
       } else {
-        print('❌ 启动APK安装失败: ${result.message}');
+        _logger.e('❌ 啟動APK安裝失敗: ${result.message}');
         _error = '启动APK安装失败: ${result.message}';
       }
     } catch (e) {
       _error = '安装失败: $e';
-      print('❌ AppUpdateProvider: 安装APK异常 - $e');
+      _logger.e('❌ AppUpdateProvider: 安裝APK異常 - $e');
     } finally {
       _isInstalling = false;
       notifyListeners();
@@ -487,14 +489,14 @@ class AppUpdateProvider with ChangeNotifier {
       if (await file.exists()) {
         _localApkPath = filePath;
         _hasLocalApk = true;
-        print('✅ AppUpdateProvider: 找到本地APK文件 - $filePath');
+        _logger.i('✅ AppUpdateProvider: 找到本地APK文件 - $filePath');
       } else {
         _hasLocalApk = false;
-        print('❌ AppUpdateProvider: 本地APK文件不存在');
+        _logger.i('❌ AppUpdateProvider: 本地APK文件不存在');
       }
     } catch (e) {
       _hasLocalApk = false;
-      print('❌ AppUpdateProvider: 检查本地APK失败 - $e');
+      _logger.e('❌ AppUpdateProvider: 檢查本地APK失敗 - $e');
     }
   }
 
@@ -528,13 +530,13 @@ class AppUpdateProvider with ChangeNotifier {
         totalSize += await file.length();
       }
 
-      print(
-          '📁 缓存目录APK文件总大小: ${(totalSize / 1024 / 1024).toStringAsFixed(2)}MB');
+      _logger.i(
+          '📁 緩存目錄APK文件總大小: ${(totalSize / 1024 / 1024).toStringAsFixed(2)}MB');
 
       // 如果缓存大小超过100MB或文件数量超过3个，进行清理
       if (totalSize > 100 * 1024 * 1024 || apkFiles.length > 3) {
-        print(
-            '⚠️ 缓存空间需要清理（大小: ${(totalSize / 1024 / 1024).toStringAsFixed(2)}MB，文件数: ${apkFiles.length}）');
+        _logger.i(
+            '⚠️ 緩存空間需要清理（大小: ${(totalSize / 1024 / 1024).toStringAsFixed(2)}MB，文件數: ${apkFiles.length}）');
 
         // 按修改时间排序，保留最新的文件
         apkFiles.sort(
@@ -543,26 +545,17 @@ class AppUpdateProvider with ChangeNotifier {
         // 保留最新的1个文件，删除其他
         for (int i = 1; i < apkFiles.length; i++) {
           await apkFiles[i].delete();
-          print('🗑️ 删除旧APK文件: ${apkFiles[i].path}');
+          _logger.i('🗑️ 刪除舊APK文件: ${apkFiles[i].path}');
         }
 
-        print('✅ 缓存清理完成，保留最新文件，删除了 ${apkFiles.length - 1} 个旧文件');
+        _logger.i('✅ 緩存清理完成，保留最新文件，刪除了 ${apkFiles.length - 1} 個舊文件');
       } else {
-        print(
-            '✅ 缓存空间正常（${(totalSize / 1024 / 1024).toStringAsFixed(2)}MB），无需清理');
+        _logger.i(
+            '✅ 緩存空間正常（${(totalSize / 1024 / 1024).toStringAsFixed(2)}MB），無需清理');
       }
     } catch (e) {
-      print('❌ AppUpdateProvider: 清理APK文件失败 - $e');
+      _logger.e('❌ AppUpdateProvider: 清理APK文件失敗 - $e');
     }
-  }
-
-  ///9. 请求存储权限
-  Future<bool> _requestStoragePermission() async {
-    if (Platform.isAndroid) {
-      final status = await Permission.storage.request();
-      return status.isGranted;
-    }
-    return true;
   }
 
   ///10. 请求安装权限
@@ -577,7 +570,7 @@ class AppUpdateProvider with ChangeNotifier {
   ///10. 使用系统下载管理器下载APK
   Future<void> downloadWithSystemDownloader() async {
     try {
-      print('📱 使用系统下载管理器下载APK');
+      _logger.i('📱 使用系統下載管理器下載APK');
 
       // 使用系统浏览器打开下载链接
       await _openUrlInBrowser(_downloadUrl!);
@@ -588,14 +581,14 @@ class AppUpdateProvider with ChangeNotifier {
 
       // 提示用户手动安装
       _error = null;
-      print('💡 已使用系统下载管理器开始下载，请在下载完成后手动安装APK');
+      _logger.i('💡 已使用系統下載管理器開始下載，請在下載完成後手動安裝APK');
 
       // 定期检查下载文件夹中是否有APK文件
       _startCheckingDownloadFolder();
 
       notifyListeners();
     } catch (e) {
-      print('❌ 系统下载管理器启动失败: $e');
+      _logger.e('❌ 系統下載管理器啟動失敗: $e');
       _error = '启动系统下载失败: $e';
       _isDownloading = false;
       notifyListeners();
@@ -613,12 +606,12 @@ class AppUpdateProvider with ChangeNotifier {
           uri,
           mode: LaunchMode.externalApplication, // 强制使用外部浏览器
         );
-        print('✅ 已在浏览器中打开下载链接');
+        _logger.i('✅ 已在瀏覽器中打開下載鏈接');
       } else {
         throw Exception('无法启动浏览器');
       }
     } catch (e) {
-      print('❌ 打开浏览器失败: $e');
+      _logger.e('❌ 打開瀏覽器失敗: $e');
       // 降级方案：显示下载链接让用户手动复制
       _error = '无法自动打开浏览器，请手动复制以下链接下载：\n$url';
       rethrow;
@@ -634,7 +627,7 @@ class AppUpdateProvider with ChangeNotifier {
           timer.cancel();
         }
       } catch (e) {
-        print('检查下载文件夹失败: $e');
+        _logger.e('檢查下載文件夾失敗: $e');
       }
     });
   }
@@ -654,7 +647,7 @@ class AppUpdateProvider with ChangeNotifier {
 
       for (final file in files) {
         if (file is File && file.path.contains(fileName)) {
-          print('✅ 在系统下载文件夹找到APK: ${file.path}');
+          _logger.i('✅ 在系統下載文件夾找到APK: ${file.path}');
           _localApkPath = file.path;
           _hasLocalApk = true;
           _downloadProgress = 100;
@@ -665,7 +658,7 @@ class AppUpdateProvider with ChangeNotifier {
 
       return false;
     } catch (e) {
-      print('检查系统下载文件夹失败: $e');
+      _logger.e('檢查系統下載文件夾失敗: $e');
       return false;
     }
   }
@@ -679,12 +672,12 @@ class AppUpdateProvider with ChangeNotifier {
 
       if (!await downloadDir.exists()) {
         await downloadDir.create(recursive: true);
-        print('📁 创建APK缓存目录: ${downloadDir.path}');
+        _logger.i('📁 創建APK緩存目錄: ${downloadDir.path}');
       }
 
       return downloadDir;
     } catch (e) {
-      print('❌ 获取缓存目录失败，尝试应用文档目录: $e');
+      _logger.e('❌ 獲取緩存目錄失敗，嘗試應用文檔目錄: $e');
 
       // 降级方案：使用应用文档目录
       try {
@@ -697,7 +690,7 @@ class AppUpdateProvider with ChangeNotifier {
 
         return downloadDir;
       } catch (e2) {
-        print('❌ 获取应用文档目录也失败: $e2');
+        _logger.e('❌ 獲取應用文檔目錄也失敗: $e2');
         rethrow;
       }
     }
@@ -758,14 +751,14 @@ class AppUpdateProvider with ChangeNotifier {
       {Duration interval = const Duration(hours: 6)}) {
     stopPeriodicUpdateCheck(); // 先停止现有的定时器
 
-    print('🔄 启动定期版本检查，间隔: ${interval.inHours}小时');
+    _logger.i('🔄 啟動定期版本檢查，間隔: ${interval.inHours}小時');
 
     _updateCheckTimer = Timer.periodic(interval, (timer) async {
       try {
-        print('🔄 定期检查版本更新...');
+        _logger.i('🔄 定期檢查版本更新...');
         await checkForUpdate();
       } catch (e) {
-        print('❌ 定期检查更新失败: $e');
+        _logger.e('❌ 定期檢查更新失敗: $e');
       }
     });
   }
@@ -775,7 +768,7 @@ class AppUpdateProvider with ChangeNotifier {
     if (_updateCheckTimer != null) {
       _updateCheckTimer!.cancel();
       _updateCheckTimer = null;
-      print('⏹️ 已停止定期版本检查');
+      _logger.i('⏹️ 已停止定期版本檢查');
     }
   }
 

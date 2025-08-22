@@ -2,7 +2,6 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:iboard_app/providers/app_data_provider.dart';
 import 'package:iboard_app/widgets/weather_icon_widget.dart';
-import 'package:iboard_app/widgets/debug_weather_data_widget.dart';
 import 'package:iboard_app/providers/weather_provider.dart';
 import 'package:iboard_app/models/weather_warning_model.dart';
 import 'package:iboard_app/models/current_weather_model.dart';
@@ -26,10 +25,10 @@ class WeatherWidget extends StatefulWidget {
   });
 
   @override
-  _WeatherWidgetState createState() => _WeatherWidgetState();
+  WeatherWidgetState createState() => WeatherWidgetState();
 }
 
-class _WeatherWidgetState extends State<WeatherWidget> {
+class WeatherWidgetState extends State<WeatherWidget> {
   final Logger _logger = Logger();
   String _currentWeatherLocation = '香港天文台';
   Timer? _timeUpdateTimer;
@@ -136,16 +135,6 @@ class _WeatherWidgetState extends State<WeatherWidget> {
     } catch (e) {
       _logger.e('获取位置信息失败，使用默认位置', error: e);
     }
-  }
-
-  ///4，打开天气数据调试页面
-  void _openWeatherDebugPage() {
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (context) => const WeatherDataDebugWidget(),
-      ),
-    );
   }
 
   String _getWeatherIconUrl(int iconCode) {

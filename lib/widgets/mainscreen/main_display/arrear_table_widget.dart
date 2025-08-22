@@ -29,7 +29,7 @@ class ArrearTableWidgetState extends State<ArrearTableWidget> {
   Timer? _autoPaginationTimer; // 自动翻页定时器
   bool _isPaginationPaused = false; // 翻页是否暂停
   int _totalPages = 0; // 总页数
-  
+
   // 数据版本跟踪 - 用于检测数据更新
   String? _lastDataVersion;
   bool _isWaitingForDataUpdate = false;
@@ -581,7 +581,7 @@ class ArrearTableWidgetState extends State<ArrearTableWidget> {
           setState(() {
             _currentPage = 1;
           });
-          
+
           if (widget.onPaginationComplete != null) {
             widget.onPaginationComplete!(_totalPages);
           }

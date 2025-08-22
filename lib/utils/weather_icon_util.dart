@@ -1,10 +1,7 @@
 import 'package:flutter/services.dart';
-import 'package:logger/logger.dart';
 
 /// 天气图标工具类 - 管理本地和网络天气图标资源
 class WeatherIconUtil {
-  static final Logger _logger = Logger();
-
   /// 天气图标缓存
   static final Map<int, String> _iconCache = {};
 
@@ -138,6 +135,11 @@ class WeatherIconUtil {
       if (await isLocalIconAvailable(iconCode)) {
         loadedCount++;
       }
+    }
+    if (loadedCount < commonIconCodes.length) {
+      // _logger.w('⚠️ 部分天气图标预加载失败: $loadedCount/${commonIconCodes.length}');
+    } else {
+      // _logger.i('✅ 天气图标预加载完成: $loadedCount/${commonIconCodes.length}');
     }
 
     // _logger.i('✅ 天气图标预加载完成: $loadedCount/${commonIconCodes.length}');

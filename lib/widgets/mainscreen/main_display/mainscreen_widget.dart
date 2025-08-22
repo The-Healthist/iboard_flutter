@@ -3,6 +3,7 @@ import 'package:iboard_app/models/announcement_model.dart';
 import 'package:iboard_app/providers/announcement_provider.dart';
 import 'package:iboard_app/providers/arrear_provider.dart';
 import 'package:provider/provider.dart';
+import 'package:logger/logger.dart';
 
 class MainScreenWidget extends StatefulWidget {
   final Function(AnnouncementModel? announcement)?
@@ -20,6 +21,7 @@ class MainScreenWidget extends StatefulWidget {
 }
 
 class MainScreenWidgetState extends State<MainScreenWidget> {
+  final Logger _logger = Logger();
   // Set default to all
   AnnouncementTypeUi _selectedAnnouncementType = AnnouncementTypeUi.all;
   // 当前选中的楼层与单位
@@ -48,10 +50,10 @@ class MainScreenWidgetState extends State<MainScreenWidget> {
 
               // 处理功能按钮点击
               if (chineseTitle == '欠費查詢') {
-                print('🔵 [MainScreenWidget] 用户点击欠费查询按钮 - 在右侧显示');
+                _logger.i('🔵 [MainScreenWidget] 用戶點擊欠費查詢按鈕 - 在右側顯示');
                 // 不再调用回调函数，直接在右侧显示欠费查询内容
                 // widget.onAnnouncementTap?.call(null); // 注释掉原有逻辑
-                print('🔵 [MainScreenWidget] 右侧显示欠费查询内容');
+                _logger.i('🔵 [MainScreenWidget] 右側顯示欠費查詢內容');
               }
               // 添加繳費表單功能
               // else if (chineseTitle == '繳費表單') {
@@ -67,7 +69,7 @@ class MainScreenWidgetState extends State<MainScreenWidget> {
               //   print('🔵 [MainScreenWidget] 已调用 onArrearTableTap()');
               // }
               else {
-                print('$chineseTitle pressed');
+                _logger.i('$chineseTitle pressed');
               }
             },
             style: ElevatedButton.styleFrom(
@@ -130,7 +132,7 @@ class MainScreenWidgetState extends State<MainScreenWidget> {
                 setState(() {
                   _selectedAnnouncementType = type;
                   // Filtering will be applied by the ListView builder
-                  print('Selected type: $type');
+                  _logger.i('Selected type: $type');
                 });
               }
             },
@@ -416,7 +418,7 @@ class MainScreenWidgetState extends State<MainScreenWidget> {
                       _showArrearResults = false; // 重置查詢結果
                       // 设置单位
                       provider.setSelectedUnit(floor);
-                      print('🔍 [MainScreenWidget] 选择单位: "$floor"');
+                      _logger.i('🔍 [MainScreenWidget] 選擇單位: "$floor"');
                     });
                   },
                   child: Container(
@@ -1169,12 +1171,12 @@ class MainScreenWidgetState extends State<MainScreenWidget> {
                               subtitle: Text(
                                   '${_getAnnouncementTypeText(announcement.uiType)} - ${announcement.description}'),
                               onTap: () {
-                                print(
-                                    '📰 [MainScreenWidget] 用户点击通告: ${announcement.title} (类型: ${announcement.uiType})');
+                                _logger.i(
+                                    '📰 [MainScreenWidget] 用戶點擊通告: ${announcement.title} (類型: ${announcement.uiType})');
                                 // 调用回调函数传递announcement对象
                                 widget.onAnnouncementTap?.call(announcement);
-                                print(
-                                    '📰 [MainScreenWidget] 已调用 onAnnouncementTap(${announcement.title})');
+                                _logger.i(
+                                    '📰 [MainScreenWidget] 已調用 onAnnouncementTap(${announcement.title})');
                               },
                             ),
                           );

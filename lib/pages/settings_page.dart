@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:iboard_app/pages/time_settings_page.dart';
 import 'package:iboard_app/providers/announcement_carousel_provider.dart';
-import 'package:iboard_app/providers/ad_fullscreen_provider.dart';
+import 'package:iboard_app/providers/ad_full_carousel_provider.dart';
 import 'package:iboard_app/providers/state_provider.dart';
 import 'package:iboard_app/providers/ad_top_carousel_provider.dart';
 
@@ -14,10 +14,10 @@ class SettingsPage extends StatefulWidget {
   const SettingsPage({super.key});
 
   @override
-  _SettingsPageState createState() => _SettingsPageState();
+  SettingsPageState createState() => SettingsPageState();
 }
 
-class _SettingsPageState extends State<SettingsPage> {
+class SettingsPageState extends State<SettingsPage> {
   ///1, 初始化状态 - 暂停所有轮播
   @override
   void initState() {
@@ -134,19 +134,19 @@ class _SettingsPageState extends State<SettingsPage> {
 
   @override
   Widget build(BuildContext context) {
-    return WillPopScope(
-      onWillPop: () async {
-        // 在返回前恢复所有轮播
-        _resumeAllCarouselsFromSettings();
+    return PopScope(
+      onPopInvoked: (didPop) {
+        if (didPop) {
+          // 在返回前恢复所有轮播
+          _resumeAllCarouselsFromSettings();
 
-        // 延迟发送媒体恢复通知，确保所有视频都恢复播放
-        WidgetsBinding.instance.addPostFrameCallback((_) {
-          if (mounted) {
-            MediaResumeNotification().dispatch(context);
-          }
-        });
-
-        return true; // 允许返回
+          // 延迟发送媒体恢复通知，确保所有视频都恢复播放
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (mounted) {
+              MediaResumeNotification().dispatch(context);
+            }
+          });
+        }
       },
       child: Scaffold(
         body: Container(
@@ -253,7 +253,8 @@ class _SettingsPageState extends State<SettingsPage> {
                           icon: Icons.schedule,
                           title: '時間設定',
                           subtitle: '查看設備資訊和系統時間參數設置',
-                          onTap: () => _navigateToSubPage(const TimeSettingsPage()),
+                          onTap: () =>
+                              _navigateToSubPage(const TimeSettingsPage()),
                         ),
                         const SizedBox(height: 16),
                         _buildSettingsItem(
@@ -395,8 +396,8 @@ class _SettingsPageState extends State<SettingsPage> {
                           ? Colors.grey.shade400 // 安装中时使用灰色背景
                           : Colors.blue.shade600,
                       foregroundColor: Colors.white,
-                      padding:
-                          const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 16, vertical: 8),
                       minimumSize: const Size(80, 32), // 稍微增加按钮宽度以容纳loading
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(16),
@@ -432,7 +433,8 @@ class _SettingsPageState extends State<SettingsPage> {
                           ),
                   )
                 : Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                     decoration: BoxDecoration(
                       color: Colors.grey.shade50,
                       borderRadius: BorderRadius.circular(16),

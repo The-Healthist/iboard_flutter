@@ -175,7 +175,6 @@ class _CarouselWidgetState extends State<CarouselWidget>
   // 新增：使用Map管理widgets，实现智能更新
   final Map<String, Widget> _widgetMap = {};
   List<String> _widgetKeys = [];
-  String? _currentWidgetKey;
 
   int _currentIndex = 0;
   Timer? _autoPlayTimer;
@@ -196,7 +195,6 @@ class _CarouselWidgetState extends State<CarouselWidget>
         _widgetMap[k] = widget.initialWidgets[i];
         _widgetKeys.add(k);
       }
-      _currentWidgetKey = _widgetKeys.isNotEmpty ? _widgetKeys[0] : null;
     }
 
     _startAutoPlay();
@@ -245,7 +243,6 @@ class _CarouselWidgetState extends State<CarouselWidget>
       // 同时清空Map缓存，使用传统方式
       _widgetMap.clear();
       _widgetKeys.clear();
-      _currentWidgetKey = null;
 
       if (_widgets.isEmpty) {
         _currentIndex = 0;
@@ -274,17 +271,9 @@ class _CarouselWidgetState extends State<CarouselWidget>
   /// 3. Maintaining current viewing position
   void smartUpdateCarousel(
       Map<String, Widget> newWidgetMap, List<String> newOrderedKeys) {
-    debugPrint(
-        '[Carousel] smartUpdateCarousel called: newKeys=${newOrderedKeys.length}, currentKeys=${_widgetKeys.length}, hasClients=${_pageController.hasClients}');
-
     if (newOrderedKeys.isEmpty) {
       clearCarouselArray();
       return;
-    }
-
-    // 记录当前正在查看的widget的key
-    if (_widgetKeys.isNotEmpty && _currentIndex < _widgetKeys.length) {
-      _currentWidgetKey = _widgetKeys[_currentIndex];
     }
 
     setState(() {
@@ -305,16 +294,10 @@ class _CarouselWidgetState extends State<CarouselWidget>
       // 4. 根据新顺序生成widget列表
       _widgets = _widgetKeys.map((key) => _widgetMap[key]!).toList();
 
-      // 5. 智能定位：尝试保持在当前widget
-      if (_currentWidgetKey != null &&
-          _widgetKeys.contains(_currentWidgetKey)) {
-        // 当前widget还存在，定位到它
-        _currentIndex = _widgetKeys.indexOf(_currentWidgetKey!);
-      } else if (_currentIndex >= _widgets.length) {
-        // 当前索引超出范围，调整到最后一个
-        _currentIndex = _widgets.length - 1;
+      // 5. 智能定位：保持当前索引，如果超出范围则调整
+      if (_currentIndex >= _widgets.length) {
+        _currentIndex = _widgets.isNotEmpty ? _widgets.length - 1 : 0;
       }
-      // 否则保持当前索引不变
     });
 
     // 使用jumpToPage避免动画，保持流畅

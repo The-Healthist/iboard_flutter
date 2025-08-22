@@ -1,7 +1,10 @@
 import 'package:package_info_plus/package_info_plus.dart';
+import 'package:logger/logger.dart';
 
 ///1. 版本工具类 - 处理版本比较和获取本地版本信息
 class VersionUtil {
+  static final Logger _logger = Logger();
+
   ///2. 获取当前应用版本信息
   static Future<Map<String, String>> getCurrentAppVersion() async {
     try {
@@ -14,7 +17,7 @@ class VersionUtil {
         'packageName': packageInfo.packageName,
       };
     } catch (e) {
-      print('获取应用版本信息失败: $e');
+      _logger.e('獲取應用版本信息失敗: $e');
       return {
         'version': '1.0.0',
         'buildNumber': '1',
@@ -47,7 +50,7 @@ class VersionUtil {
 
       return 0;
     } catch (e) {
-      print('版本比较失败: $e');
+      _logger.e('版本比較失敗: $e');
       return 0;
     }
   }
@@ -62,7 +65,7 @@ class VersionUtil {
       if (b1 < b2) return -1;
       return 0;
     } catch (e) {
-      print('构建号比较失败: $e');
+      _logger.e('構建號比較失敗: $e');
       return 0;
     }
   }

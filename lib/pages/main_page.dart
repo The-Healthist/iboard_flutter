@@ -11,8 +11,9 @@ import 'package:iboard_app/providers/state_provider.dart'; // Added import for C
 import 'package:iboard_app/providers/announcement_carousel_provider.dart'; // Added import for AnnouncementCarouselProvider
 import 'package:iboard_app/providers/advertisement_provider.dart'; // Added import for AdvertisementProvider
 import 'package:iboard_app/providers/ad_top_carousel_provider.dart'; // Added import for TopAdCarouselProvider
-import 'package:iboard_app/providers/ad_fullscreen_provider.dart'; // Added import for FullscreenAdProvider
+import 'package:iboard_app/providers/ad_full_carousel_provider.dart'; // Added import for FullscreenAdProvider
 import 'package:iboard_app/providers/arrear_provider.dart'; // Added import for ArrearProvider
+import 'package:logger/logger.dart';
 
 import 'package:provider/provider.dart';
 
@@ -70,7 +71,8 @@ class MainPageState extends State<MainPage> {
             context.read<AnnouncementCarouselProvider>();
         final topAdCarouselProvider = context.read<TopAdCarouselProvider>();
         final fullscreenAdProvider = context.read<FullscreenAdProvider>();
-        final arrearProvider = context.read<ArrearProvider>(); // 获取ArrearProvider实例
+        final arrearProvider =
+            context.read<ArrearProvider>(); // 获取ArrearProvider实例
 
         // 设置通告轮播Provider引用
         announcementProvider.setCarouselProvider(announcementCarouselProvider);
@@ -157,7 +159,7 @@ class MainPageState extends State<MainPage> {
       if (wasInFullscreenAd) {
         WidgetsBinding.instance.addPostFrameCallback((_) {
           if (mounted) {
-            print('🔄 通過closeAdsDialog關閉全屏廣告，自動切換到手動操作狀態');
+            Logger().i('🔄 通過closeAdsDialog關閉全屏廣告，自動切換到手動操作狀態');
             carouselProvider.enterManualOperation();
 
             // 通知通告轮播提供者回到主屏幕

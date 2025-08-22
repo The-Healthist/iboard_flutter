@@ -10,7 +10,6 @@ import 'package:iboard_app/utils/device_id_util.dart';
 import 'dart:io';
 import 'dart:typed_data';
 import 'package:path_provider/path_provider.dart';
-import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'dart:async';
 
@@ -21,7 +20,6 @@ class AppDataProvider extends ChangeNotifier {
   SettingsModel? _settingsModel;
   String? _deviceId;
   String _baseUrl; // Should be initialized, e.g., from a config
-  final String? _fallbackUrl; // 备用服务器地址
   CarouselStateProvider? _carouselStateProvider; // 添加对CarouselStateProvider的引用
   ArrearProvider? _arrearProvider; // 添加对ArrearProvider的引用
 
@@ -78,9 +76,7 @@ class AppDataProvider extends ChangeNotifier {
 
   AppDataProvider({
     required String baseUrl,
-    String? fallbackUrl,
-  })  : _baseUrl = baseUrl,
-        _fallbackUrl = fallbackUrl {
+  }) : _baseUrl = baseUrl {
     _apiClient = ApiClient(
       baseUrl: _baseUrl,
       onNeedsTokenRefresh: _handleTokenRefresh,
@@ -88,19 +84,6 @@ class AppDataProvider extends ChangeNotifier {
   }
 
   ///1, 切换到备用服务器
-  void _switchToFallbackServer() {
-    if (_fallbackUrl != null && _fallbackUrl.isNotEmpty) {
-      _baseUrl = _fallbackUrl;
-      _apiClient = ApiClient(
-        baseUrl: _baseUrl,
-        onNeedsTokenRefresh: _handleTokenRefresh,
-      );
-      notifyListeners();
-    } else {
-      _logger.e('没有配置备用服务器地址');
-    }
-  }
-
   ///1，保存登录设备数据到SharedPreferences缓存
   Future<void> _saveLoginDeviceData(Map<String, dynamic> responseData) async {
     try {
@@ -268,37 +251,6 @@ class AppDataProvider extends ChangeNotifier {
   }
 
   ///10，执行登录逻辑的私有方法
-  Future<void> _performLogin() async {
-    try {
-      final responseData = await _apiClient.login(deviceId: _deviceId!);
-      _settingsModel = SettingsModel.fromJson(responseData);
-
-      // 保存登录设备数据到缓存
-      await _saveLoginDeviceData(responseData);
-
-      // 验证并持久化Settings配置
-      if (_settingsModel?.settings != null) {
-        await _validateAndPersistSettings(_settingsModel!.settings);
-      }
-
-      // 设置ArrearProvider的楼宇ID
-      if (_settingsModel != null) {
-        final buildingIsmartId = _settingsModel!.building.ismartId;
-        if (buildingIsmartId.isNotEmpty) {
-          setBuildingIdToArrearProvider(buildingIsmartId);
-          // 初始化二维码
-          await initializeQrCodes();
-        }
-      }
-
-      _error = null;
-    } catch (e) {
-      _logger.e('登录失败', error: e);
-      _error = 'Login failed: $e';
-      _settingsModel = null;
-    }
-  }
-
   ///11，从缓存加载登录设备数据的方法（保留原有方法以供其他地方使用）
   Future<void> initializeFromCache() async {
     _isLoading = true;
@@ -1123,66 +1075,6 @@ class AppDataProvider extends ChangeNotifier {
   }
 
   ///3，下载二维码到本地文件（带重试机制）
-  Future<String?> _downloadQrCodeToLocal(
-      String qrCodeUrl, String fileName) async {
-    const maxRetries = 3;
-    const retryDelay = Duration(seconds: 2);
-
-    for (int attempt = 1; attempt <= maxRetries; attempt++) {
-      try {
-        // 创建HTTP客户端，设置超时
-        final client = http.Client();
-        final request = http.Request('GET', Uri.parse(qrCodeUrl));
-
-        // 发起HTTP请求获取图片数据，设置30秒超时
-        final streamedResponse = await client.send(request).timeout(
-          const Duration(seconds: 30),
-          onTimeout: () {
-            client.close();
-            throw Exception('请求超时');
-          },
-        );
-
-        if (streamedResponse.statusCode != 200) {
-          client.close();
-          if (attempt < maxRetries) {
-            await Future.delayed(retryDelay);
-            continue;
-          }
-          return null;
-        }
-
-        // 读取响应数据
-        final responseBytes = await streamedResponse.stream.toBytes();
-        client.close();
-
-        // 获取应用文档目录
-        final directory = await getApplicationDocumentsDirectory();
-        final qrCodeDir = Directory('${directory.path}/qr_codes');
-
-        // 确保目录存在
-        if (!await qrCodeDir.exists()) {
-          await qrCodeDir.create(recursive: true);
-        }
-
-        // 保存文件
-        final filePath = '${qrCodeDir.path}/$fileName';
-        final file = File(filePath);
-        await file.writeAsBytes(responseBytes);
-
-        return filePath;
-      } catch (e) {
-        if (attempt < maxRetries) {
-          await Future.delayed(retryDelay);
-        } else {
-          _logger.e('下载二维码到本地最终失败，所有重试都已用完', error: e);
-        }
-      }
-    }
-
-    return null;
-  }
-
   ///4，保存二维码图片数据到本地文件
   Future<String?> _saveQrCodeImageToLocal(
       Uint8List imageData, String fileName) async {

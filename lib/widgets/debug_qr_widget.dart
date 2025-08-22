@@ -11,10 +11,10 @@ class QrDebugWidget extends StatefulWidget {
   const QrDebugWidget({super.key});
 
   @override
-  _QrDebugWidgetState createState() => _QrDebugWidgetState();
+  QrDebugWidgetState createState() => QrDebugWidgetState();
 }
 
-class _QrDebugWidgetState extends State<QrDebugWidget> {
+class QrDebugWidgetState extends State<QrDebugWidget> {
   final Logger _logger = Logger();
   Map<String, dynamic> _debugInfo = {};
 
@@ -55,10 +55,10 @@ class _QrDebugWidgetState extends State<QrDebugWidget> {
     // 添加本地缓存路径信息
     await _addCachePathInfo(debugInfo);
 
-    // 投诉二维码状态
+    // 投訴二维码状态
     final complaintQrCode = appDataProvider.cachedComplaintQrCode;
     final complaintQrData = _buildComplaintQrCodeData(appDataProvider);
-    debugInfo['投诉二维码'] = {
+    debugInfo['投訴二维码'] = {
       '是否为空': complaintQrCode == null,
       '本地文件路径': complaintQrCode ?? 'null',
       '生成的目标URL': complaintQrData ?? 'null',
@@ -69,20 +69,20 @@ class _QrDebugWidgetState extends State<QrDebugWidget> {
       // 检查本地文件
       final file = File(complaintQrCode);
       final exists = await file.exists();
-      debugInfo['投诉二维码']['文件存在'] = exists;
+      debugInfo['投訴二维码']['文件存在'] = exists;
 
       if (exists) {
         final stat = await file.stat();
-        debugInfo['投诉二维码']['文件大小'] = '${stat.size} bytes';
-        debugInfo['投诉二维码']['修改时间'] = stat.modified.toString();
-        debugInfo['投诉二维码']['生成状态'] = '✅ 本地生成成功';
+        debugInfo['投訴二维码']['文件大小'] = '${stat.size} bytes';
+        debugInfo['投訴二维码']['修改时间'] = stat.modified.toString();
+        debugInfo['投訴二维码']['生成状态'] = '✅ 本地生成成功';
       } else {
         debugInfo['投诉二维码']['生成状态'] = '❌ 本地生成失败';
-        debugInfo['投诉二维码']['错误信息'] = '本地文件不存在，可能生成失败或文件被删除';
+        debugInfo['投訴二维码']['错误信息'] = '本地文件不存在，可能生成失败或文件被删除';
       }
     } else {
-      debugInfo['投诉二维码']['生成状态'] = '❌ 未生成';
-      debugInfo['投诉二维码']['错误信息'] = '二维码未生成或初始化失败';
+      debugInfo['投訴二维码']['生成状态'] = '❌ 未生成';
+      debugInfo['投訴二维码']['错误信息'] = '二维码未生成或初始化失败';
     }
 
     // 登记二维码状态
@@ -157,68 +157,68 @@ class _QrDebugWidgetState extends State<QrDebugWidget> {
       }
     } catch (e) {
       debugInfo['本地生成工具'] = {
-        '工具状态': '❌ 加载失败',
-        '错误信息': e.toString(),
+        '工具状态': '❌ 加載失敗',
+        '錯誤信息': e.toString(),
       };
-      _logger.e('❌ 获取本地生成工具信息失败', error: e);
+      _logger.e('❌ 獲取本地生成工具信息失敗', error: e);
     }
   }
 
-  ///添加缓存路径和错误信息
+  ///添加緩存路徑和錯誤信息
   Future<void> _addCachePathInfo(Map<String, dynamic> debugInfo) async {
     try {
-      // 获取应用文档目录
+      // 獲取應用文檔目錄
       final directory = await getApplicationDocumentsDirectory();
       final qrCodeDir = Directory('${directory.path}/qr_codes');
 
-      debugInfo['缓存路径信息'] = {
-        '应用文档目录': directory.path,
-        '二维码目录': qrCodeDir.path,
-        '二维码目录存在': await qrCodeDir.exists(),
+      debugInfo['緩存路徑信息'] = {
+        '應用文檔目錄': directory.path,
+        '二維碼目錄': qrCodeDir.path,
+        '二維碼目錄存在': await qrCodeDir.exists(),
       };
 
-      // 如果目录存在，列出所有文件
+      // 如果目錄存在，列出所有文件
       if (await qrCodeDir.exists()) {
         final files = await qrCodeDir.list().toList();
-        debugInfo['缓存路径信息']['目录文件数量'] = files.length;
-        debugInfo['缓存路径信息']['文件列表'] =
+        debugInfo['緩存路徑信息']['目錄文件數量'] = files.length;
+        debugInfo['緩存路徑信息']['文件列表'] =
             files.map((f) => f.path.split('/').last).toList();
       } else {
-        debugInfo['缓存路径信息']['错误信息'] = '二维码缓存目录不存在';
+        debugInfo['緩存路徑信息']['錯誤信息'] = '二維碼緩存目錄不存在';
       }
 
-      // 检查权限
+      // 檢查權限
       try {
         if (!await qrCodeDir.exists()) {
           await qrCodeDir.create(recursive: true);
-          debugInfo['缓存路径信息']['目录创建'] = '成功';
-          // 测试写入权限
+          debugInfo['緩存路徑信息']['目錄創建'] = '成功';
+          // 測試寫入權限
           final testFile = File('${qrCodeDir.path}/test.txt');
           await testFile.writeAsString('test');
           await testFile.delete();
-          debugInfo['缓存路径信息']['写入权限'] = '正常';
+          debugInfo['緩存路徑信息']['寫入權限'] = '正常';
         }
       } catch (e) {
-        debugInfo['缓存路径信息']['权限错误'] = e.toString();
+        debugInfo['緩存路徑信息']['權限錯誤'] = e.toString();
       }
     } catch (e) {
-      debugInfo['缓存路径信息'] = {'错误': '获取缓存路径失败: $e'};
-      _logger.e('❌ 获取缓存路径信息失败', error: e);
+      debugInfo['緩存路徑信息'] = {'錯誤': '獲取緩存路徑失敗: $e'};
+      _logger.e('❌ 獲取緩存路徑信息失敗', error: e);
     }
   }
 
-  ///获取文本颜色
+  ///獲取文本顏色
   Color _getTextColor(String key, dynamic value) {
-    // 根据关键字和值来设置颜色
+    // 根據關鍵字和值來設置顏色
     if (value == null || value == 'null') {
       return Colors.red;
     }
 
-    if (key.contains('错误') || key.contains('失败')) {
+    if (key.contains('錯誤') || key.contains('失敗')) {
       return Colors.red;
     }
 
-    if (key.contains('生成状态') || key.contains('下载状态')) {
+    if (key.contains('生成狀態') || key.contains('下載狀態')) {
       if (value.toString().contains('✅')) {
         return Colors.green;
       } else if (value.toString().contains('❌')) {
@@ -232,100 +232,106 @@ class _QrDebugWidgetState extends State<QrDebugWidget> {
       return Colors.red;
     }
 
-    if (key.contains('写入权限') && value == '正常') {
+    if (key.contains('寫入權限') && value == '正常') {
       return Colors.green;
     }
 
-    if (key.contains('工具状态') && value.toString().contains('✅')) {
+    if (key.contains('工具狀態') && value.toString().contains('✅')) {
       return Colors.green;
     }
 
-    if (key.contains('测试生成') && value.toString().contains('✅')) {
+    if (key.contains('測試生成') && value.toString().contains('✅')) {
       return Colors.green;
     }
 
-    if (key.contains('数据验证') && value.toString().contains('✅')) {
+    if (key.contains('數據驗證') && value.toString().contains('✅')) {
       return Colors.green;
     }
 
     return Colors.black87;
   }
 
-  ///获取文本粗细
+  ///獲取文本粗細
   FontWeight _getTextWeight(String key) {
-    if (key.contains('生成状态') || key.contains('下载状态') || key.contains('错误信息')) {
+    if (key.contains('生成狀態') || key.contains('下載狀態') || key.contains('錯誤信息')) {
       return FontWeight.bold;
     }
     return FontWeight.normal;
   }
 
-  ///2，手动重新生成投诉二维码
+  ///2，手動重新生成投訴二維碼
   Future<void> _regenerateComplaintQrCode() async {
-    // _logger.i('🔄 手动重新生成投诉二维码');
+    // _logger.i('🔄 手動重新生成投訴二維碼');
+    if (!mounted) return;
     final appDataProvider = context.read<AppDataProvider>();
 
     try {
-      // 清除现有缓存
+      // 清除現有緩存
       await appDataProvider.clearQrCodeCache();
 
       // 重新生成
       final result = await appDataProvider.generateComplaintQrCode();
-      // _logger.i('✅ 投诉二维码本地重新生成结果: $result');
+      // _logger.i('✅ 投訴二維碼本地重新生成結果: $result');
 
-      // 刷新调试信息
+      // 刷新調試信息
       await _checkQrCodeStatus();
 
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(result != null ? '投诉二维码本地重新生成成功' : '投诉二维码本地重新生成失败'),
+          content: Text(result != null ? '投訴二維碼本地重新生成成功' : '投訴二維碼本地重新生成失敗'),
           backgroundColor: result != null ? Colors.green : Colors.red,
         ),
       );
     } catch (e) {
-      // _logger.e('❌ 重新生成投诉二维码失败', error: e);
+      // _logger.e('❌ 重新生成投訴二維碼失敗', error: e);
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('本地重新生成失败: $e'),
+          content: Text('本地重新生成失敗: $e'),
           backgroundColor: Colors.red,
         ),
       );
     }
   }
 
-  ///3，手动重新生成登记二维码
+  ///3，手動重新生成登記二維碼
   Future<void> _regenerateRegistrationQrCode() async {
-    // _logger.i('🔄 手动重新生成登记二维码');
+    // _logger.i('🔄 手動重新生成登記二維碼');
+    if (!mounted) return;
     final appDataProvider = context.read<AppDataProvider>();
 
     try {
-      // 清除现有缓存
+      // 清除現有緩存
       await appDataProvider.clearQrCodeCache();
 
       // 重新生成
       final result = await appDataProvider.generateRegistrationQrCode();
-      // _logger.i('✅ 登记二维码本地重新生成结果: $result');
+      // _logger.i('✅ 登記二維碼本地重新生成結果: $result');
 
-      // 刷新调试信息
+      // 刷新調試信息
       await _checkQrCodeStatus();
 
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(result != null ? '登记二维码本地重新生成成功' : '登记二维码本地重新生成失败'),
+          content: Text(result != null ? '登記二維碼本地重新生成成功' : '登記二維碼本地重新生成失敗'),
           backgroundColor: result != null ? Colors.green : Colors.red,
         ),
       );
     } catch (e) {
-      // _logger.e('❌ 重新生成登记二维码失败', error: e);
+      // _logger.e('❌ 重新生成登記二維碼失敗', error: e);
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('本地重新生成失败: $e'),
+          content: Text('本地重新生成失敗: $e'),
           backgroundColor: Colors.red,
         ),
       );
     }
   }
 
-  ///4，构建调试信息卡片
+  ///4，構建調試信息卡片
   Widget _buildDebugCard(String title, Map<String, dynamic> data) {
     return Card(
       margin: const EdgeInsets.all(8),
@@ -343,29 +349,27 @@ class _QrDebugWidgetState extends State<QrDebugWidget> {
               ),
             ),
             const SizedBox(height: 8),
-            ...data.entries
-                .map((entry) => Padding(
-                      padding: const EdgeInsets.symmetric(vertical: 2),
-                      child: Row(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            '${entry.key}: ',
-                            style: const TextStyle(fontWeight: FontWeight.w600),
-                          ),
-                          Expanded(
-                            child: Text(
-                              entry.value.toString(),
-                              style: TextStyle(
-                                color: _getTextColor(entry.key, entry.value),
-                                fontWeight: _getTextWeight(entry.key),
-                              ),
-                            ),
-                          ),
-                        ],
+            ...data.entries.map((entry) => Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 2),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        '${entry.key}: ',
+                        style: const TextStyle(fontWeight: FontWeight.w600),
                       ),
-                    ))
-                ,
+                      Expanded(
+                        child: SelectableText(
+                          entry.value.toString(),
+                          style: TextStyle(
+                            color: _getTextColor(entry.key, entry.value),
+                            fontWeight: _getTextWeight(entry.key),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                )),
           ],
         ),
       ),
@@ -398,19 +402,19 @@ class _QrDebugWidgetState extends State<QrDebugWidget> {
 
             // 本地生成工具信息
             if (_debugInfo['本地生成工具'] != null)
-              _buildDebugCard('本地生成工具', _debugInfo['本地生成工具']),
+              _buildDebugCard('本地生成工具', _debugInfo['本地生成工具']!),
 
-            // 缓存路径信息
-            if (_debugInfo['缓存路径信息'] != null)
-              _buildDebugCard('缓存路径信息', _debugInfo['缓存路径信息']),
+            // 緩存路徑信息
+            if (_debugInfo['緩存路徑信息'] != null)
+              _buildDebugCard('緩存路徑信息', _debugInfo['緩存路徑信息']!),
 
-            // 投诉二维码信息
-            if (_debugInfo['投诉二维码'] != null)
-              _buildDebugCard('投诉二维码', _debugInfo['投诉二维码']),
+            // 投訴二维码信息
+            if (_debugInfo['投訴二维码'] != null)
+              _buildDebugCard('投訴二维码', _debugInfo['投訴二维码']!),
 
             // 登记二维码信息
             if (_debugInfo['登记二维码'] != null)
-              _buildDebugCard('登记二维码', _debugInfo['登记二维码']),
+              _buildDebugCard('登记二维码', _debugInfo['登记二维码']!),
 
             const SizedBox(height: 20),
 
@@ -424,7 +428,7 @@ class _QrDebugWidgetState extends State<QrDebugWidget> {
                     backgroundColor: Colors.orange,
                     foregroundColor: Colors.white,
                   ),
-                  child: const Text('重新生成投诉二维码'),
+                  child: const Text('重新生成投訴二维码'),
                 ),
                 ElevatedButton(
                   onPressed: _regenerateRegistrationQrCode,
@@ -439,7 +443,7 @@ class _QrDebugWidgetState extends State<QrDebugWidget> {
 
             const SizedBox(height: 20),
 
-            // 全部重新生成按钮
+            // 全部重新生成按鈕
             SizedBox(
               width: double.infinity,
               child: ElevatedButton(

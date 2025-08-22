@@ -9,10 +9,10 @@ class DebugRthkNewsWidget extends StatefulWidget {
   const DebugRthkNewsWidget({super.key});
 
   @override
-  _DebugRthkNewsWidgetState createState() => _DebugRthkNewsWidgetState();
+  DebugRthkNewsWidgetState createState() => DebugRthkNewsWidgetState();
 }
 
-class _DebugRthkNewsWidgetState extends State<DebugRthkNewsWidget> {
+class DebugRthkNewsWidgetState extends State<DebugRthkNewsWidget> {
   Timer? _updateTimer;
 
   @override

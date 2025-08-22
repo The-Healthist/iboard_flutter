@@ -23,10 +23,10 @@ class WeatherIconWidget extends StatefulWidget {
   });
 
   @override
-  _WeatherIconWidgetState createState() => _WeatherIconWidgetState();
+  WeatherIconWidgetState createState() => WeatherIconWidgetState();
 }
 
-class _WeatherIconWidgetState extends State<WeatherIconWidget> {
+class WeatherIconWidgetState extends State<WeatherIconWidget> {
   final Logger _logger = Logger();
   bool _useLocalIcon = true;
   late Future<bool> _localIconAvailable;

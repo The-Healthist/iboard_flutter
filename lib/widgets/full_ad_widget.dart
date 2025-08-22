@@ -14,8 +14,8 @@ class FullAdWidget extends StatefulWidget {
   final FileManager fileManager;
   final Duration? initialVideoPosition; // 初始视频播放位置
   final Function(String adId, Duration position)?
-      onVideoProgressChanged; // 视频进度变化回调
-  final VoidCallback? onVideoDisposed; // 视频资源释放完成回调
+      onVideoProgressChanged; // 视频进度变化回掉
+  final VoidCallback? onVideoDisposed; // 视频资源释放完成回掉
 
   const FullAdWidget({
     super.key,
@@ -83,7 +83,7 @@ class _FullAdWidgetState extends State<FullAdWidget> {
             if (widget.onVideoDisposed != null) {
               widget.onVideoDisposed!();
             }
-            // _logger.i('✅ 全屏广告视频控制器已释放到增强池中');
+            // _logger.i('✅ 全屏广告视频控制器已释放到增強池中');
           });
         } else {
           _logger.w('⚠️ AdvertisementProvider引用为空，无法释放视频控制器');
@@ -114,6 +114,7 @@ class _FullAdWidgetState extends State<FullAdWidget> {
     }
   }
 
+  ///2，初始化视频
   Future<void> _initializeVideo() async {
     if (_isLoadingVideo || !mounted) return;
 
@@ -129,6 +130,7 @@ class _FullAdWidgetState extends State<FullAdWidget> {
       if (_videoController != null && _currentFilePath != null) {
         _videoController!.removeListener(_onVideoProgressChanged);
         // 确保Provider引用可用
+        if (!mounted) return;
         _advertisementProvider ??= context.read<AdvertisementProvider>();
         await _advertisementProvider!.videoPoolManager.releaseController(
           filePath: _currentFilePath!,
@@ -140,6 +142,7 @@ class _FullAdWidgetState extends State<FullAdWidget> {
 
       // 尝试从FileManager获取本地缓存的视频文件
       final File? localFile = await widget.fileManager.getFile(widget.ad.file);
+      if (!mounted) return;
 
       String filePath;
       bool isNetwork = false;
@@ -168,6 +171,7 @@ class _FullAdWidgetState extends State<FullAdWidget> {
       _isNetworkVideo = isNetwork;
 
       // 使用增强视频池管理器初始化
+      if (!mounted) return;
       _advertisementProvider ??= context.read<AdvertisementProvider>();
       _videoController =
           await _advertisementProvider!.videoPoolManager.getController(
@@ -218,15 +222,17 @@ class _FullAdWidgetState extends State<FullAdWidget> {
       // 添加进度监听器
       _videoController!.addListener(_onVideoProgressChanged);
 
-      // 自动播放视频（不循环，让Provider控制播放）
+      // 自動播放视頻（不循環，讓Provider控制播放）
       _videoController!.setLooping(false);
       await _videoController!.safePlay();
-      // _logger.i('🎬 视频初始化成功并开始播放');
+      // _logger.i('🎬 視頻初始化成功並開始播放');
     } catch (e) {
-      _logger.e('❌ 视频初始化失败: $e');
+      _logger.e('❌ 視頻初始化失敗: $e');
 
-      // 清理资源
+      // 清理資源
       if (_videoController != null && _currentFilePath != null) {
+        if (!mounted) return;
+        _advertisementProvider ??= context.read<AdvertisementProvider>();
         await _advertisementProvider!.videoPoolManager.releaseController(
           filePath: _currentFilePath!,
           videoType: VideoType.fullAd,
@@ -238,7 +244,7 @@ class _FullAdWidgetState extends State<FullAdWidget> {
       if (mounted) {
         setState(() {
           _isLoadingVideo = false;
-          _errorMessage = '视频加载失败: $e';
+          _errorMessage = '視頻加載失敗: $e';
           _isVideoInitialized = false;
         });
       }
@@ -255,7 +261,7 @@ class _FullAdWidgetState extends State<FullAdWidget> {
           // 广告内容显示
           _buildAdContent(),
 
-          // 可选：添加一个关闭按钮 (如果需要的话)
+          // 可选：添加一个关闭按钮 (如果需要的話)
           // Positioned(
           //   top: 40,
           //   right: 20,
@@ -269,8 +275,9 @@ class _FullAdWidgetState extends State<FullAdWidget> {
     );
   }
 
+  ///3，構建廣告內容
   Widget _buildAdContent() {
-    // 根据文件类型显示不同的内容
+    // 根據文件類型顯示不同的內容
     if (widget.ad.file.mimeType.startsWith('image/')) {
       return _buildImageAd();
     } else if (widget.ad.file.mimeType.startsWith('video/')) {
@@ -280,6 +287,7 @@ class _FullAdWidgetState extends State<FullAdWidget> {
     }
   }
 
+  ///4，構建圖片廣告
   Widget _buildImageAd() {
     return FutureBuilder<File?>(
       future: widget.fileManager.getFile(widget.ad.file),
@@ -306,20 +314,21 @@ class _FullAdWidgetState extends State<FullAdWidget> {
               width: double.infinity,
               height: double.infinity,
               errorBuilder: (context, error, stackTrace) {
-                _logger.e('本地图片加载失败: ${localFile.path}', error: error);
+                _logger.e('本地圖片加載失敗: ${localFile.path}', error: error);
                 return _buildNetworkImage();
               },
             ),
           );
         }
 
-        // 如果本地文件不存在，显示默认广告而不是尝试网络加载
-        // _logger.w('本地图片文件不存在，显示默认广告: ${widget.ad.file.url}');
+        // 如果本地文件不存在，顯示默認廣告而不是嘗試網絡加載
+        // _logger.w('本地圖片文件不存在，顯示默認廣告: ${widget.ad.file.url}');
         return _buildDefaultAd();
       },
     );
   }
 
+  ///5，構建網絡圖片
   Widget _buildNetworkImage() {
     return Image.network(
       widget.ad.file.url,
@@ -347,6 +356,7 @@ class _FullAdWidgetState extends State<FullAdWidget> {
     );
   }
 
+  ///6，構建視頻廣告
   Widget _buildVideoAd() {
     if (_isLoadingVideo) {
       return Container(
@@ -359,8 +369,8 @@ class _FullAdWidgetState extends State<FullAdWidget> {
             children: [
               CircularProgressIndicator(color: Colors.white),
               SizedBox(height: 20),
-              Text(
-                '正在加载视频...',
+              SelectableText(
+                '正在加載視頻...',
                 style: TextStyle(
                   color: Colors.white,
                   fontSize: 18,
@@ -387,8 +397,8 @@ class _FullAdWidgetState extends State<FullAdWidget> {
                 color: Colors.red,
               ),
               const SizedBox(height: 20),
-              const Text(
-                '视频加载失败',
+              const SelectableText(
+                '視頻加載失敗',
                 style: TextStyle(
                   color: Colors.white,
                   fontSize: 24,
@@ -396,7 +406,7 @@ class _FullAdWidgetState extends State<FullAdWidget> {
                 ),
               ),
               const SizedBox(height: 10),
-              Text(
+              SelectableText(
                 _errorMessage!,
                 style: const TextStyle(
                   color: Colors.white70,
@@ -407,7 +417,7 @@ class _FullAdWidgetState extends State<FullAdWidget> {
               const SizedBox(height: 20),
               ElevatedButton(
                 onPressed: _initializeVideo,
-                child: const Text('重试'),
+                child: const SelectableText('重試'),
               ),
             ],
           ),
@@ -446,7 +456,7 @@ class _FullAdWidgetState extends State<FullAdWidget> {
               color: Colors.white,
             ),
             const SizedBox(height: 20),
-            const Text(
+            const SelectableText(
               '視頻廣告',
               style: TextStyle(
                 color: Colors.white,
@@ -455,7 +465,7 @@ class _FullAdWidgetState extends State<FullAdWidget> {
               ),
             ),
             const SizedBox(height: 10),
-            Text(
+            SelectableText(
               widget.ad.title,
               style: const TextStyle(
                 color: Colors.white70,
@@ -469,6 +479,7 @@ class _FullAdWidgetState extends State<FullAdWidget> {
     );
   }
 
+  ///7，構建默認廣告
   Widget _buildDefaultAd() {
     return Container(
       width: double.infinity,

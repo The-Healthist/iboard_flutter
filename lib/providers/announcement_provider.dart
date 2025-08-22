@@ -88,16 +88,6 @@ class AnnouncementProvider extends ChangeNotifier {
     }
   }
 
-  ///3，清除通告数据缓存
-  Future<void> _clearAnnouncementsCache() async {
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.remove(_announcementsDataKey);
-    } catch (e) {
-      _logger.e('清除通告数据缓存失败', error: e);
-    }
-  }
-
   ///4，检查数据是否真的发生了变化
   bool _hasDataChanged(List<AnnouncementModel> newAnnouncements) {
     if (_announcements.length != newAnnouncements.length) {
@@ -169,14 +159,11 @@ class AnnouncementProvider extends ChangeNotifier {
     });
   }
 
-  /// 检查文件是否已缓存（使用 FileManager 检查）
+  ///8，检查文件是否已缓存（使用 FileManager 检查）
   Future<bool> _isFileCached(String md5, String url) async {
     try {
-      // 使用 FileManager 的命名规则检查文件是否存在
       final String fileNameFromUrl = Uri.parse(url).pathSegments.last;
       final String expectedFileName = '${md5}_$fileNameFromUrl';
-
-      // 检查 FileManager 的缓存目录
       final Directory appDir = await getApplicationDocumentsDirectory();
       final Directory fileManagerCacheDir =
           Directory('${appDir.path}/file_cache');
@@ -188,7 +175,6 @@ class AnnouncementProvider extends ChangeNotifier {
           return true;
         }
 
-        // 兼容性检查：检查是否有任何以 MD5 开头的文件
         await for (FileSystemEntity entity in fileManagerCacheDir.list()) {
           if (entity is File) {
             final String basename =
@@ -208,22 +194,21 @@ class AnnouncementProvider extends ChangeNotifier {
     }
   }
 
-  /// 使用 FileManager 预下载文件
+  ///7，使用 FileManager 预下载文件
   Future<void> _predownloadFile(AnnouncementModel announcement) async {
     try {
-      // 使用 FileManager 下载文件
+      await _fileManager.getFile(announcement.file);
+      _logger.i('成功預下載通告文件: ${announcement.title}');
     } catch (e) {
       _logger.e(
           'Error pre-downloading announcement file: ${announcement.title}',
           error: e);
-      // 不重新抛出异常，让调用方继续处理其他文件
     }
   }
 
-  /// 删除缓存文件（清理不再需要的文件）
+  ///9，删除缓存文件（清理不再需要的文件）
   Future<void> _deleteCachedFile(String md5) async {
     try {
-      // 检查 FileManager 的缓存目录
       final Directory appDir = await getApplicationDocumentsDirectory();
       final Directory fileManagerCacheDir =
           Directory('${appDir.path}/file_cache');
@@ -235,7 +220,8 @@ class AnnouncementProvider extends ChangeNotifier {
                 entity.path.split('/').last.split('\\').last;
             if (basename.startsWith(md5)) {
               await entity.delete();
-              break; // 找到并删除第一个匹配的文件即可
+              _logger.i('成功刪除緩存通告文件: $md5');
+              break;
             }
           }
         }

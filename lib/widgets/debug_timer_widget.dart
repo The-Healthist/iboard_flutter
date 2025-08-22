@@ -632,6 +632,7 @@ class _TimerDebugWidgetState extends State<TimerDebugWidget> {
       final endTime = DateTime.now();
       final duration = endTime.difference(startTime);
 
+      if (!mounted) return;
       final appDataProvider = context.read<AppDataProvider>();
       _manualUpdateResults['manual_login'] = {
         'success': false,
@@ -879,8 +880,7 @@ class _TimerDebugWidgetState extends State<TimerDebugWidget> {
                                         line,
                                         style: const TextStyle(fontSize: 14),
                                       ),
-                                    ))
-                                ,
+                                    )),
                             // 显示手动更新按钮（如果有的话）
                             if (info['manualUpdateButton'] != null)
                               info['manualUpdateButton'] as Widget,

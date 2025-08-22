@@ -511,12 +511,13 @@ class WeatherProvider extends ChangeNotifier {
 
       if (totalElapsed >= _bottomDuration) {
         _bottomElapsedTime = _bottomDuration;
+        Duration.zero;
         //    _logger.i(
-        //      '📊 [暂停] 底部轮播 - 已播放: ${_bottomElapsedTime.inSeconds}s/${_bottomDuration.inSeconds}s, 剩余: 0s (轮播已完成)');
+        //      '📊 [暂停] 底部轮播 - 已播放: ${_bottomElapsedTime.inSeconds}s/${_bottomDuration.inSeconds}s, 剩余: ${remaining.inSeconds}s (轮播已完成)');
       } else {
         _bottomElapsedTime = totalElapsed;
         //  _logger.i(
-        //    '📊 [暂停] 底部轮播 - 已播放: ${_bottomElapsedTime.inSeconds}s/${_bottomDuration.inSeconds}s, 剩余: ${(_bottomDuration - _bottomElapsedTime).inSeconds}s');
+        //    '📊 [暂停] 底部轮播 - 已播放: ${_bottomElapsedTime.inSeconds}s/${_bottomDuration.inSeconds}s, 剩余: ${remaining.inSeconds}s');
       }
     }
 
@@ -555,16 +556,6 @@ class WeatherProvider extends ChangeNotifier {
     _debugTimer?.cancel();
 
     _debugTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
-      if (_currentBottomStartTime != null) {
-        final now = DateTime.now();
-        final elapsed = now.difference(_currentBottomStartTime!);
-        final totalElapsed = elapsed + _bottomElapsedTime;
-        final remaining = _bottomDuration - totalElapsed;
-        final remainingSeconds = remaining.isNegative ? 0 : remaining.inSeconds;
-
-        //  _logger.i(
-//'🐛 🌤️ 底部轮播: ${_currentState == CarouselState.weather ? "天气" : "二维码"} ${remainingSeconds}s/${_bottomDuration.inSeconds}s');
-      }
     });
   }
 

@@ -4,7 +4,7 @@ import 'package:iboard_app/models/ad_model.dart';
 import 'package:iboard_app/providers/announcement_carousel_provider.dart';
 import 'package:iboard_app/providers/announcement_provider.dart';
 import 'package:iboard_app/providers/advertisement_provider.dart';
-import 'package:iboard_app/providers/ad_fullscreen_provider.dart';
+import 'package:iboard_app/providers/ad_full_carousel_provider.dart';
 import 'package:iboard_app/providers/ad_top_carousel_provider.dart';
 import 'package:iboard_app/widgets/debug_fullscreen_ad_widget.dart';
 import 'package:provider/provider.dart';
@@ -13,16 +13,16 @@ class CarouselSettingsPage extends StatefulWidget {
   const CarouselSettingsPage({super.key});
 
   @override
-  _CarouselSettingsPageState createState() => _CarouselSettingsPageState();
+  CarouselSettingsPageState createState() => CarouselSettingsPageState();
 }
 
-class _CarouselSettingsPageState extends State<CarouselSettingsPage> {
+class CarouselSettingsPageState extends State<CarouselSettingsPage> {
   @override
   Widget build(BuildContext context) {
-    return WillPopScope(
-      onWillPop: () async {
+    return PopScope(
+      onPopInvoked: (didPop) {
         // 直接返回，不恢复轮播，因为这只是返回到设置页面
-        return true; // 允许返回
+        // PopScope handles the pop automatically
       },
       child: Scaffold(
         backgroundColor: Colors.grey.shade50,

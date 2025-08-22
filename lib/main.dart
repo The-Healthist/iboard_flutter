@@ -6,7 +6,7 @@ import 'package:iboard_app/providers/announcement_carousel_provider.dart';
 import 'package:iboard_app/providers/app_data_provider.dart';
 import 'package:iboard_app/providers/state_provider.dart'; // Added CarouselStateProvider import
 import 'package:iboard_app/providers/ad_top_carousel_provider.dart'; // Added TopAdCarouselProvider import
-import 'package:iboard_app/providers/ad_fullscreen_provider.dart';
+import 'package:iboard_app/providers/ad_full_carousel_provider.dart';
 import 'package:iboard_app/providers/rthk_news_provider.dart';
 import 'package:iboard_app/providers/app_update_provider.dart'; // 添加应用更新Provider导入
 import 'package:iboard_app/managers/file_manager.dart';
@@ -20,8 +20,11 @@ import 'pages/carousel_settings_page.dart'; // 添加轮播设置页面导入
 import 'pages/error_page.dart'; // 添加错误页面导入
 import 'providers/arrear_provider.dart'; // 添加欠费provider导入
 import 'providers/weather_provider.dart'; // 添加天气provider导入
+import 'package:logger/logger.dart';
 
 import 'dart:async';
+
+final Logger _logger = Logger();
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
@@ -54,12 +57,9 @@ void main() {
             create: (context) {
               final appDataProvider =
                   Provider.of<AppDataProvider>(context, listen: false);
-              final fileManager =
-                  Provider.of<FileManager>(context, listen: false);
               return AdvertisementProvider(
                 appDataProvider.apiClient,
                 appDataProvider,
-                fileManager,
               );
             },
           ),
@@ -130,8 +130,7 @@ void main() {
       ),
     );
   }, (error, stack) {
-    print('Uncaught error: '
-        '\$error\nStack trace: \$stack');
+    _logger.e('Uncaught error: $error', error: error, stackTrace: stack);
   });
 }
 
@@ -162,10 +161,11 @@ class HomePage extends StatefulWidget {
   const HomePage({super.key});
 
   @override
-  _HomePageState createState() => _HomePageState();
+  HomePageState createState() => HomePageState();
 }
 
-class _HomePageState extends State<HomePage> {
+class HomePageState extends State<HomePage> {
+  final Logger _logger = Logger();
   bool _isInitializing = false;
   String? _initializationError;
 
@@ -224,54 +224,62 @@ class _HomePageState extends State<HomePage> {
                 !weatherProvider.hasWarningData) {
               await weatherProvider.fetchAllWeatherData();
             } else {
-              print('使用缓存的天气数据');
+              _logger.i('使用緩存的天氣數據');
             }
 
             weatherProvider.startPeriodicUpdate(
                 interval: const Duration(minutes: 1));
-            print('天气数据初始化完成 - 定时更新间隔设置为1分钟');
+            _logger.i('天氣數據初始化完成 - 定時更新間隔設置為1分鐘');
           } catch (e) {
-            print('天气数据初始化失败: $e');
+            _logger.e('天氣數據初始化失敗: $e');
           }
 
           // 执行登录前检查缓存状态
-          print('🚀 开始执行设备初始化和登录流程');
-          print('🔍 检查初始化前的缓存状态...');
+          _logger.i('🚀 開始執行設備初始化和登錄流程');
+          _logger.i('🔍 檢查初始化前的緩存狀態...');
           await appDataProvider.debugSharedPreferencesKeys();
           final hasCachedData = await appDataProvider.hasCachedLoginData();
-          print('🔍 初始化前缓存数据存在: $hasCachedData');
+          _logger.i('🔍 初始化前緩存數據存在: $hasCachedData');
 
           await appDataProvider.initialize(deviceIdToSet: deviceId);
-          print('🚀 设备初始化流程完成');
+          _logger.i('🚀 設備初始化流程完成');
 
           // 初始化完成后启动定时更新和初始化欠费数据（数据可能来自登录或缓存）
-          print('初始化完成，登录状态: ${appDataProvider.isLoggedIn}');
-          print('Token状态: ${appDataProvider.token != null ? '有效' : '无效'}');
-          print(
-              '设备设置状态: ${appDataProvider.deviceSettings != null ? '已加载' : '未加载'}');
-          print('数据源: ${appDataProvider.isLoggedIn ? '最新登录数据' : '缓存备用数据'}');
+          _logger.i('初始化完成，登錄狀態: ${appDataProvider.isLoggedIn}');
+          _logger.i('Token狀態: ${appDataProvider.token != null ? '有效' : '無效'}');
+          _logger.i(
+              '設備設置狀態: ${appDataProvider.deviceSettings != null ? '已加載' : '未加載'}');
+          _logger.i('數據源: ${appDataProvider.isLoggedIn ? '最新登錄數據' : '緩存備用數據'}');
 
           // 如果有设备设置数据（无论是从登录还是缓存获取），就启动应用
           if (appDataProvider.deviceSettings != null) {
             // 启动定时登录任务（12小时一次）
             appDataProvider.startPeriodicLogin();
-            print('定时登录任务已启动');
+            _logger.i('定時登錄任務已啟動');
 
             // 启动健康检查定时任务（30分钟一次）
             appDataProvider.startPeriodicHealthCheck();
-            print('健康检查定时任务已启动');
+            _logger.i('健康檢查定時任務已啟動');
+
+            // 初始化轮播广告数据（优先调用新的API接口）
+            try {
+              await advertisementProvider.initializeCarouselAdvertisements();
+              _logger.i('✅ 輪播廣告數據初始化完成');
+            } catch (e) {
+              _logger.e('輪播廣告數據初始化失敗，將使用緩存數據: $e');
+            }
 
             // 启动广告定时更新
-            print(
-                '准备启动广告定时更新，设备设置: ${appDataProvider.deviceSettings?.advertisementUpdateDuration ?? '未设置'}');
+            _logger.i(
+                '準備啟動廣告定時更新，設備設置: ${appDataProvider.deviceSettings?.advertisementUpdateDuration ?? '未設置'}');
             advertisementProvider.startPeriodicUpdate();
-            print('广告定时更新已启动');
+            _logger.i('廣告定時更新已啟動');
 
             // 启动通告定时更新
-            print(
-                '准备启动通告定时更新，设备设置: ${appDataProvider.deviceSettings?.noticeUpdateDuration ?? '未设置'}');
+            _logger.i(
+                '準備啟動通告定時更新，設備設置: ${appDataProvider.deviceSettings?.noticeUpdateDuration ?? '未設置'}');
             announcementProvider.startPeriodicUpdate();
-            print('通告定时更新已启动');
+            _logger.i('通告定時更新已啟動');
 
             // 启动欠费数据定时更新
             final deviceSettings = appDataProvider.deviceSettings;
@@ -279,32 +287,34 @@ class _HomePageState extends State<HomePage> {
                 deviceSettings?.arrearageUpdateDuration ?? 1;
             arrearProvider.startPeriodicUpdate(
                 updateIntervalMinutes: arrearUpdateInterval);
-            print('欠费数据定时更新已启动，间隔: $arrearUpdateInterval分钟');
+            _logger.i('欠費數據定時更新已啟動，間隔: $arrearUpdateInterval分鐘');
 
             // 初始化欠费数据
             try {
               await appDataProvider.initGetArrearData();
-              print('欠费数据初始化完成');
+              _logger.i('欠費數據初始化完成');
             } catch (e) {
-              print('欠费数据初始化失败: $e');
+              _logger.e('欠費數據初始化失敗: $e');
             }
 
-            // 检查应用更新
+            // 檢查應用更新
             try {
+              if (!mounted) return;
               final updateProvider =
                   Provider.of<AppUpdateProvider>(context, listen: false);
               await updateProvider.checkForUpdate(autoDownload: true);
 
-              // 如果有更新，自动下载到缓存
-              if (mounted && updateProvider.hasUpdate) {
-                print('🔄 检测到应用更新: ${updateProvider.remoteVersion}');
-                print('📦 更新包将自动下载到应用缓存目录');
+              if (!mounted) return;
+              // 如果有更新，自動下載到緩存
+              if (updateProvider.hasUpdate) {
+                _logger.i('🔄 檢測到應用更新: ${updateProvider.remoteVersion}');
+                _logger.i('📦 更新包將自動下載到應用緩存目錄');
               }
             } catch (e) {
-              print('检查应用更新失败: $e');
+              _logger.e('檢查應用更新失敗: $e');
             }
 
-            // 自动跳转到主页面
+            // 自動跳轉到主頁面
             if (mounted) {
               Navigator.pushReplacementNamed(context, '/main');
             }
@@ -317,7 +327,7 @@ class _HomePageState extends State<HomePage> {
             });
           }
         } catch (e) {
-          print('Auto login failed: $e');
+          _logger.e('Auto login failed: $e');
           final error = e.toString();
 
           setState(() {
@@ -326,7 +336,7 @@ class _HomePageState extends State<HomePage> {
         }
       }
     } catch (e) {
-      print('Failed to generate device ID: $e');
+      _logger.e('Failed to generate device ID: $e');
       setState(() {
         _initializationError = '设备ID生成失败: $e';
       });
@@ -410,7 +420,7 @@ class _HomePageState extends State<HomePage> {
                             _isDataParseError(appDataProvider.error!)) &&
                         appDataProvider.deviceSettings != null) {
                       // 有缓存数据，继续正常流程，不显示错误
-                      print('检测到网络错误或数据解析错误但有缓存数据，继续使用缓存数据运行');
+                      _logger.i('檢測到網絡錯誤或數據解析錯誤但有緩存數據，繼續使用緩存數據運行');
                     } else {
                       // 没有缓存数据或非网络错误，显示错误页面
                       return ErrorPage(

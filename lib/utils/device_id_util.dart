@@ -193,52 +193,6 @@ class DeviceIdUtil {
         .join();
   }
 
-  /// 获取设备信息（保留旧方法以兼容）
-  Future<String> _getDeviceInfo() async {
-    DeviceInfoPlugin deviceInfo = DeviceInfoPlugin();
-    String info = '';
-
-    try {
-      if (kIsWeb) {
-        WebBrowserInfo webInfo = await deviceInfo.webBrowserInfo;
-        // Web平台尽量收集更多信息以提高唯一性
-        info =
-            '${webInfo.browserName.name}|${webInfo.platform}|${webInfo.userAgent}|${webInfo.vendor}';
-      } else if (defaultTargetPlatform == TargetPlatform.android) {
-        AndroidDeviceInfo androidInfo = await deviceInfo.androidInfo;
-        // Android平台使用更多固定信息
-        info =
-            '${androidInfo.model}|${androidInfo.id}|${androidInfo.brand}|${androidInfo.board}|${androidInfo.device}|${androidInfo.display}|${androidInfo.hardware}|${androidInfo.fingerprint}';
-      } else if (defaultTargetPlatform == TargetPlatform.iOS) {
-        IosDeviceInfo iosInfo = await deviceInfo.iosInfo;
-        // iOS平台使用设备标识符
-        info =
-            '${iosInfo.model}|${iosInfo.systemName}|${iosInfo.systemVersion}|${iosInfo.identifierForVendor}|${iosInfo.name}|${iosInfo.localizedModel}';
-      } else if (defaultTargetPlatform == TargetPlatform.windows) {
-        WindowsDeviceInfo winInfo = await deviceInfo.windowsInfo;
-        info =
-            '${winInfo.computerName}|${winInfo.deviceId}|${winInfo.userName}';
-      } else if (defaultTargetPlatform == TargetPlatform.macOS) {
-        MacOsDeviceInfo macInfo = await deviceInfo.macOsInfo;
-        info =
-            '${macInfo.computerName}|${macInfo.model}|${macInfo.systemGUID}|${macInfo.hostName}';
-      } else if (defaultTargetPlatform == TargetPlatform.linux) {
-        LinuxDeviceInfo linuxInfo = await deviceInfo.linuxInfo;
-        info =
-            '${linuxInfo.name}|${linuxInfo.version}|${linuxInfo.id}|${linuxInfo.machineId}';
-      } else {
-        // 其他平台，使用一个固定字符串加上平台信息
-        info = 'unknown_platform|${defaultTargetPlatform.toString()}';
-      }
-    } catch (e) {
-      // 如果获取设备信息失败，使用平台信息作为备选
-      // 不使用时间戳，因为这会导致每次生成不同的ID
-      info = 'fallback|${defaultTargetPlatform.toString()}';
-    }
-
-    return info;
-  }
-
   /// 从设备信息生成确定性ID
   String _generateDeterministicId(String deviceInfo) {
     // 使用SHA-256生成哈希

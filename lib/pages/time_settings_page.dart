@@ -11,10 +11,10 @@ class TimeSettingsPage extends StatefulWidget {
   const TimeSettingsPage({super.key});
 
   @override
-  _TimeSettingsPageState createState() => _TimeSettingsPageState();
+  TimeSettingsPageState createState() => TimeSettingsPageState();
 }
 
-class _TimeSettingsPageState extends State<TimeSettingsPage> {
+class TimeSettingsPageState extends State<TimeSettingsPage> {
   bool _isLoading = false;
 
   Future<void> _refreshData() async {
@@ -23,25 +23,31 @@ class _TimeSettingsPageState extends State<TimeSettingsPage> {
     });
 
     try {
-      final appDataProvider = Provider.of<AppDataProvider>(context, listen: false);
+      if (!mounted) return;
+      final appDataProvider =
+          Provider.of<AppDataProvider>(context, listen: false);
       await appDataProvider.initialize();
     } catch (e) {
-      // 处理错误，例如显示SnackBar
+      // 處理錯誤，例如顯示SnackBar
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('刷新失败: $e')),
+        SnackBar(content: Text('刷新失敗: $e')),
       );
     } finally {
-      setState(() {
-        _isLoading = false;
-      });
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
     }
   }
+
   @override
   Widget build(BuildContext context) {
-    return WillPopScope(
-      onWillPop: () async {
+    return PopScope(
+      onPopInvoked: (didPop) {
         // 直接返回，不恢复轮播，因为这只是返回到设置页面
-        return true; // 允许返回
+        // PopScope handles the pop automatically
       },
       child: Consumer<AppDataProvider>(
         builder: (context, appDataProvider, child) {

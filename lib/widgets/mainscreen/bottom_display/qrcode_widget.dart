@@ -15,10 +15,10 @@ class QrcodeWidget extends StatefulWidget {
   });
 
   @override
-  _QrcodeWidgetState createState() => _QrcodeWidgetState();
+  QrcodeWidgetState createState() => QrcodeWidgetState();
 }
 
-class _QrcodeWidgetState extends State<QrcodeWidget> {
+class QrcodeWidgetState extends State<QrcodeWidget> {
   final Logger _logger = Logger();
 
   @override

@@ -1,7 +1,7 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:iboard_app/providers/advertisement_provider.dart';
-import 'package:iboard_app/providers/ad_fullscreen_provider.dart';
+import 'package:iboard_app/providers/ad_full_carousel_provider.dart';
 import 'package:iboard_app/widgets/debug_fullad_time_widget.dart';
 import 'package:provider/provider.dart';
 import 'package:logger/logger.dart';
@@ -10,10 +10,10 @@ class FullscreenAdsPage extends StatefulWidget {
   const FullscreenAdsPage({super.key});
 
   @override
-  _FullscreenAdsPageState createState() => _FullscreenAdsPageState();
+  FullscreenAdsPageState createState() => FullscreenAdsPageState();
 }
 
-class _FullscreenAdsPageState extends State<FullscreenAdsPage> {
+class FullscreenAdsPageState extends State<FullscreenAdsPage> {
   final Logger _logger = Logger();
   bool _hasInitialized = false;
 
@@ -54,24 +54,6 @@ class _FullscreenAdsPageState extends State<FullscreenAdsPage> {
       }
     } catch (e) {
       _logger.e('❌ 初始化全屏广告失败: $e');
-    }
-  }
-
-  ///2，检查并更新全屏广告数据（当数据发生变化时）
-  void _checkAndUpdateFullscreenAds() {
-    try {
-      final advertisementProvider = context.read<AdvertisementProvider>();
-      final fullscreenAdProvider = context.read<FullscreenAdProvider>();
-
-      final fullAds = advertisementProvider.fullCarouselAdvertisements;
-
-      // 只有当数据真正发生变化时才更新
-      if (fullAds.isNotEmpty &&
-          fullAds.length != fullscreenAdProvider.fullscreenAds.length) {
-        fullscreenAdProvider.updateFullscreenAds(fullAds);
-      }
-    } catch (e) {
-      _logger.e('❌ 检查全屏广告数据变化失败: $e');
     }
   }
 

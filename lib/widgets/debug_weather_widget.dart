@@ -4,15 +4,15 @@ import 'package:iboard_app/utils/weather_icon_util.dart';
 import 'package:iboard_app/widgets/weather_icon_widget.dart';
 import 'package:logger/logger.dart';
 
-/// 天气图标调试工具组件
+/// 天氣圖標調試工具組件
 class WeatherDebugWidget extends StatefulWidget {
   const WeatherDebugWidget({super.key});
 
   @override
-  _WeatherDebugWidgetState createState() => _WeatherDebugWidgetState();
+  WeatherDebugWidgetState createState() => WeatherDebugWidgetState();
 }
 
-class _WeatherDebugWidgetState extends State<WeatherDebugWidget> {
+class WeatherDebugWidgetState extends State<WeatherDebugWidget> {
   final Logger _logger = Logger();
   Map<String, dynamic> _debugInfo = {};
   bool _isLoading = true;
@@ -23,23 +23,23 @@ class _WeatherDebugWidgetState extends State<WeatherDebugWidget> {
     _checkWeatherIconsStatus();
   }
 
-  ///0，测试单个资源文件是否可用
+  ///0，測試單個資源文件是否可用
   Future<bool> _testAssetAvailability(String assetPath) async {
     try {
       await rootBundle.load(assetPath);
-      // _logger.d('✅ 资源文件可用: $assetPath');
+      // _logger.d('✅ 資源文件可用: $assetPath');
       return true;
     } catch (e) {
-      // _logger.w('❌ 资源文件不可用: $assetPath, 错误: $e');
+      // _logger.w('❌ 資源文件不可用: $assetPath, 錯誤: $e');
       return false;
     }
   }
 
-  ///1.1，检查基本资源信息
+  ///1.1，檢查基本資源信息
   Future<void> _checkBasicResourceInfo(Map<String, dynamic> debugInfo) async {
     final resourceInfo = <String, dynamic>{};
 
-    // 测试一些关键的资源路径
+    // 測試一些關鍵的資源路徑
     final testPaths = [
       'assets/images/hko/pic50.png',
       'assets/images/hko/temp.png',
@@ -53,30 +53,31 @@ class _WeatherDebugWidgetState extends State<WeatherDebugWidget> {
       if (isAvailable) availableTestPaths++;
     }
 
-    debugInfo['资源路径测试'] = {
-      '测试路径数量': testPaths.length,
-      '可用路径数量': availableTestPaths,
-      '路径测试详情': resourceInfo,
-      '建议': availableTestPaths == 0
-          ? '❌ 所有测试路径都无法访问，请检查pubspec.yaml中的assets配置'
+    debugInfo['資源路徑測試'] = {
+      '測試路徑數量': testPaths.length,
+      '可用路徑數量': availableTestPaths,
+      '路徑測試詳情': resourceInfo,
+      '建議': availableTestPaths == 0
+          ? '❌ 所有測試路徑都無法訪問，請檢查pubspec.yaml中的assets配置'
           : availableTestPaths < testPaths.length
-              ? '⚠️ 部分资源路径无法访问'
-              : '✅ 资源路径配置正常'
+              ? '⚠️ 部分資源路徑無法訪問'
+              : '✅ 資源路徑配置正常'
     };
   }
 
-  ///1，检查天气图标状态
+  ///1，檢查天氣圖標狀態
   Future<void> _checkWeatherIconsStatus() async {
+    if (!mounted) return;
     setState(() {
       _isLoading = true;
     });
 
     final debugInfo = <String, dynamic>{};
 
-    // 首先检查基本的资源路径可用性
+    // 首先檢查基本的資源路徑可用性
     await _checkBasicResourceInfo(debugInfo);
 
-    // 基本天气图标（pic系列）
+    // 基本天氣圖標（pic系列）
     final weatherIconCodes = [
       50,
       51,
@@ -109,7 +110,7 @@ class _WeatherDebugWidgetState extends State<WeatherDebugWidget> {
       93
     ];
 
-    // 台风警告图标
+    // 颱風警告圖標
     final typhoonWarningCodes = [
       '1',
       '3',
@@ -121,7 +122,7 @@ class _WeatherDebugWidgetState extends State<WeatherDebugWidget> {
       '10'
     ];
 
-    // 天气警告图标
+    // 天氣警告圖標
     final weatherWarningTypes = [
       'cold',
       'hot',
@@ -137,23 +138,23 @@ class _WeatherDebugWidgetState extends State<WeatherDebugWidget> {
       'tsunami'
     ];
 
-    // 温湿度图标
+    // 溫濕度圖標
     final utilityIcons = ['temp', 'hum', 'uv', 'lightning'];
 
     await _checkBasicWeatherIcons(debugInfo, weatherIconCodes);
     await _checkTyphoonWarningIcons(debugInfo, typhoonWarningCodes);
     await _checkWeatherWarningIcons(debugInfo, weatherWarningTypes);
     await _checkUtilityIcons(debugInfo, utilityIcons);
-
+    if (!mounted) return;
     setState(() {
       _debugInfo = debugInfo;
       _isLoading = false;
     });
 
-    // _logger.i('🌤️ 天气图标调试信息: $_debugInfo');
+    // _logger.i('🌤️ 天氣圖標調試信息: $_debugInfo');
   }
 
-  ///2，检查基本天气图标
+  ///2，檢查基本天氣圖標
   Future<void> _checkBasicWeatherIcons(
       Map<String, dynamic> debugInfo, List<int> iconCodes) async {
     final basicIconsInfo = <String, dynamic>{};
@@ -338,45 +339,46 @@ class _WeatherDebugWidgetState extends State<WeatherDebugWidget> {
   ///8，清理图标缓存
   void _clearIconCache() {
     WeatherIconUtil.clearCache();
-    // _logger.i('🗑️ 天气图标缓存已清理');
-
+    // _logger.i('🗑️ 天氣圖標緩存已清理');
+    if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(
-        content: Text('天气图标缓存已清理'),
+        content: SelectableText('天氣圖標緩存已清理'),
         backgroundColor: Colors.green,
       ),
     );
   }
 
-  ///9，预加载常用图标
+  ///9，預加載常用圖標
   Future<void> _preloadCommonIcons() async {
-    // _logger.i('🔄 开始预加载常用天气图标');
+    // _logger.i('🔄 開始預加載常用天氣圖標');
 
     try {
       await WeatherIconUtil.preloadCommonIcons();
-      // _logger.i('✅ 天气图标预加载完成');
-
+      // _logger.i('✅ 天氣圖標預加載完成');
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('常用天气图标预加载完成'),
+          content: SelectableText('常用天氣圖標預加載完成'),
           backgroundColor: Colors.green,
         ),
       );
 
-      // 刷新调试信息
+      // 刷新調試信息
       await _checkWeatherIconsStatus();
     } catch (e) {
-      _logger.e('❌ 预加载天气图标失败', error: e);
+      _logger.e('❌ 預加載天氣圖標失敗', error: e);
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('预加载失败: $e'),
+          content: SelectableText('預加載失敗: $e'),
           backgroundColor: Colors.red,
         ),
       );
     }
   }
 
-  ///10，构建调试信息卡片
+  ///10，構建調試信息卡片
   Widget _buildDebugCard(String title, Map<String, dynamic> data) {
     return Card(
       margin: const EdgeInsets.all(8),
@@ -385,7 +387,7 @@ class _WeatherDebugWidgetState extends State<WeatherDebugWidget> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
+            SelectableText(
               title,
               style: const TextStyle(
                 fontSize: 18,
@@ -395,18 +397,18 @@ class _WeatherDebugWidgetState extends State<WeatherDebugWidget> {
             ),
             const SizedBox(height: 8),
             ...data.entries
-                .where((entry) => entry.key != '详细信息')
+                .where((entry) => entry.key != '詳細信息')
                 .map((entry) => Padding(
                       padding: const EdgeInsets.symmetric(vertical: 2),
                       child: Row(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text(
+                          SelectableText(
                             '${entry.key}: ',
                             style: const TextStyle(fontWeight: FontWeight.w600),
                           ),
                           Expanded(
-                            child: Text(
+                            child: SelectableText(
                               entry.value.toString(),
                               style: TextStyle(
                                 color: _getTextColor(entry.key, entry.value),
@@ -416,15 +418,14 @@ class _WeatherDebugWidgetState extends State<WeatherDebugWidget> {
                           ),
                         ],
                       ),
-                    ))
-                ,
+                    )),
           ],
         ),
       ),
     );
   }
 
-  ///11，构建图标展示网格
+  ///11，構建圖標展示網格
   Widget _buildIconGrid(String title, Map<String, dynamic> detailsData) {
     return Card(
       margin: const EdgeInsets.all(8),
@@ -433,8 +434,8 @@ class _WeatherDebugWidgetState extends State<WeatherDebugWidget> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
-              '$title - 图标展示',
+            SelectableText(
+              '$title - 圖標展示',
               style: const TextStyle(
                 fontSize: 18,
                 fontWeight: FontWeight.bold,
@@ -517,13 +518,13 @@ class _WeatherDebugWidgetState extends State<WeatherDebugWidget> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('天气图标调试工具'),
+        title: const SelectableText('天氣圖標調試工具'),
         backgroundColor: Colors.blue[100],
         actions: [
           IconButton(
             icon: const Icon(Icons.refresh),
             onPressed: _checkWeatherIconsStatus,
-            tooltip: '刷新状态',
+            tooltip: '刷新狀態',
           ),
         ],
       ),
@@ -534,7 +535,7 @@ class _WeatherDebugWidgetState extends State<WeatherDebugWidget> {
                 children: [
                   CircularProgressIndicator(),
                   SizedBox(height: 16),
-                  Text('正在检查天气图标状态...'),
+                  SelectableText('正在檢查天氣圖標狀態...'),
                 ],
               ),
             )
@@ -542,41 +543,41 @@ class _WeatherDebugWidgetState extends State<WeatherDebugWidget> {
               padding: const EdgeInsets.all(16),
               child: Column(
                 children: [
-                  // 资源路径测试信息
-                  if (_debugInfo['资源路径测试'] != null)
-                    _buildDebugCard('资源路径测试', _debugInfo['资源路径测试']),
+                  // 資源路徑測試信息
+                  if (_debugInfo['資源路徑測試'] != null)
+                    _buildDebugCard('資源路徑測試', _debugInfo['資源路徑測試']),
 
-                  // 统计信息卡片
-                  if (_debugInfo['基本天气图标'] != null)
-                    _buildDebugCard('基本天气图标', _debugInfo['基本天气图标']),
+                  // 統計信息卡片
+                  if (_debugInfo['基本天氣圖標'] != null)
+                    _buildDebugCard('基本天氣圖標', _debugInfo['基本天氣圖標']),
 
-                  if (_debugInfo['台风警告图标'] != null)
-                    _buildDebugCard('台风警告图标', _debugInfo['台风警告图标']),
+                  if (_debugInfo['颱風警告圖標'] != null)
+                    _buildDebugCard('颱風警告圖標', _debugInfo['颱風警告圖標']),
 
-                  if (_debugInfo['天气警告图标'] != null)
-                    _buildDebugCard('天气警告图标', _debugInfo['天气警告图标']),
+                  if (_debugInfo['天氣警告圖標'] != null)
+                    _buildDebugCard('天氣警告圖標', _debugInfo['天氣警告圖標']),
 
-                  if (_debugInfo['工具图标'] != null)
-                    _buildDebugCard('工具图标', _debugInfo['工具图标']),
-
-                  const SizedBox(height: 20),
-
-                  // 图标展示网格
-                  if (_debugInfo['基本天气图标']?['详细信息'] != null)
-                    _buildIconGrid('基本天气图标', _debugInfo['基本天气图标']['详细信息']),
-
-                  if (_debugInfo['台风警告图标']?['详细信息'] != null)
-                    _buildIconGrid('台风警告图标', _debugInfo['台风警告图标']['详细信息']),
-
-                  if (_debugInfo['天气警告图标']?['详细信息'] != null)
-                    _buildIconGrid('天气警告图标', _debugInfo['天气警告图标']['详细信息']),
-
-                  if (_debugInfo['工具图标']?['详细信息'] != null)
-                    _buildIconGrid('工具图标', _debugInfo['工具图标']['详细信息']),
+                  if (_debugInfo['工具圖標'] != null)
+                    _buildDebugCard('工具圖標', _debugInfo['工具圖標']),
 
                   const SizedBox(height: 20),
 
-                  // 操作按钮
+                  // 圖標展示網格
+                  if (_debugInfo['基本天氣圖標']?['詳細信息'] != null)
+                    _buildIconGrid('基本天氣圖標', _debugInfo['基本天氣圖標']['詳細信息']),
+
+                  if (_debugInfo['颱風警告圖標']?['詳細信息'] != null)
+                    _buildIconGrid('颱風警告圖標', _debugInfo['颱風警告圖標']['詳細信息']),
+
+                  if (_debugInfo['天氣警告圖標']?['詳細信息'] != null)
+                    _buildIconGrid('天氣警告圖標', _debugInfo['天氣警告圖標']['詳細信息']),
+
+                  if (_debugInfo['工具圖標']?['詳細信息'] != null)
+                    _buildIconGrid('工具圖標', _debugInfo['工具圖標']['詳細信息']),
+
+                  const SizedBox(height: 20),
+
+                  // 操作按鈕
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                     children: [
@@ -586,7 +587,7 @@ class _WeatherDebugWidgetState extends State<WeatherDebugWidget> {
                           backgroundColor: Colors.blue,
                           foregroundColor: Colors.white,
                         ),
-                        child: const Text('预加载常用图标'),
+                        child: const SelectableText('預加載常用圖標'),
                       ),
                       ElevatedButton(
                         onPressed: _clearIconCache,
@@ -594,14 +595,14 @@ class _WeatherDebugWidgetState extends State<WeatherDebugWidget> {
                           backgroundColor: Colors.orange,
                           foregroundColor: Colors.white,
                         ),
-                        child: const Text('清理图标缓存'),
+                        child: const SelectableText('清理圖標緩存'),
                       ),
                     ],
                   ),
 
                   const SizedBox(height: 20),
 
-                  // 全部重新检查按钮
+                  // 全部重新檢查按鈕
                   SizedBox(
                     width: double.infinity,
                     child: ElevatedButton(
@@ -611,7 +612,7 @@ class _WeatherDebugWidgetState extends State<WeatherDebugWidget> {
                         foregroundColor: Colors.white,
                         padding: const EdgeInsets.symmetric(vertical: 12),
                       ),
-                      child: const Text('重新检查所有图标'),
+                      child: const SelectableText('重新檢查所有圖標'),
                     ),
                   ),
                 ],

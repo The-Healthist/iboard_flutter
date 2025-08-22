@@ -22,16 +22,16 @@ class TopAdWidget extends StatefulWidget {
   });
 
   @override
-  _TopAdWidgetState createState() => _TopAdWidgetState();
+  TopAdWidgetState createState() => TopAdWidgetState();
 }
 
-class _TopAdWidgetState extends State<TopAdWidget> {
+class TopAdWidgetState extends State<TopAdWidget> {
   final Logger _logger = Logger();
   VideoPlayerController? _videoController;
   bool _isLoading = true;
   String? _localFilePath;
   String? _error;
-  bool _isManuallyPaused = false; // 添加手动暂停标记
+  bool isManuallyPaused = false; // 添加手动暂停标记
   bool _isDownloading = false; // 添加下载状态标记
   int _retryCount = 0; // 添加重试计数
   static const int _maxRetries = 3; // 最大重试次数
@@ -57,7 +57,7 @@ class _TopAdWidgetState extends State<TopAdWidget> {
     if (!isRetry) {
       _retryCount = 0;
     }
-    
+
     setState(() {
       _isLoading = true;
       _isDownloading = false;
@@ -75,15 +75,15 @@ class _TopAdWidgetState extends State<TopAdWidget> {
       setState(() {
         _isDownloading = true;
       });
-      
+
       // Assuming FileModel is compatible with fileManager.getFile
       final File? downloadedFile =
           await widget.fileManager.getFile(widget.ad.file);
-      
+
       setState(() {
         _isDownloading = false;
       });
-      
+
       if (downloadedFile != null) {
         _localFilePath = downloadedFile.path;
       } else {
@@ -153,6 +153,7 @@ class _TopAdWidgetState extends State<TopAdWidget> {
     }
 
     try {
+      if (!mounted) return;
       _advertisementProvider ??= context.read<AdvertisementProvider>();
       _videoController =
           await _advertisementProvider!.videoPoolManager.getController(
@@ -198,7 +199,7 @@ class _TopAdWidgetState extends State<TopAdWidget> {
     if (_videoController != null) {
       final success = await _videoController!.safePause();
       if (success) {
-        _isManuallyPaused = true;
+        isManuallyPaused = true;
         // _logger.i('📱 手动暂停顶部广告视频播放 - ${widget.ad.title}');
       } else {
         _logger.w('⚠️ 暂停视频播放失败');
@@ -213,7 +214,7 @@ class _TopAdWidgetState extends State<TopAdWidget> {
       if (_videoController!.safeState == VideoControllerState.paused) {
         final success = await _videoController!.safePlay();
         if (success) {
-          _isManuallyPaused = false;
+          isManuallyPaused = false;
           // _logger.i('📱 恢复顶部广告视频播放 - ${widget.ad.title}');
         } else {
           _logger.w('⚠️ 恢复视频播放失败');
@@ -339,7 +340,8 @@ class _TopAdWidgetState extends State<TopAdWidget> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            const Icon(Icons.warning_amber_outlined, color: Colors.orange, size: 40),
+            const Icon(Icons.warning_amber_outlined,
+                color: Colors.orange, size: 40),
             const SizedBox(height: 8),
             const Text(
               '廣告內容載入失敗',
@@ -358,7 +360,8 @@ class _TopAdWidgetState extends State<TopAdWidget> {
               style: ElevatedButton.styleFrom(
                 backgroundColor: Colors.orange,
                 foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
               ),
               child: const Text('立即重試', style: TextStyle(fontSize: 12)),
             ),

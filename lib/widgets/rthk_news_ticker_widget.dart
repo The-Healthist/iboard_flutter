@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:logger/logger.dart';
 import 'package:provider/provider.dart';
 import 'package:iboard_app/providers/rthk_news_provider.dart';
-import 'package:iboard_app/providers/ad_fullscreen_provider.dart';
+import 'package:iboard_app/providers/ad_full_carousel_provider.dart';
 
 class RthkNewsTickerWidget extends StatefulWidget {
   final double height;
@@ -14,10 +15,10 @@ class RthkNewsTickerWidget extends StatefulWidget {
   });
 
   @override
-  _RthkNewsTickerWidgetState createState() => _RthkNewsTickerWidgetState();
+  RthkNewsTickerWidgetState createState() => RthkNewsTickerWidgetState();
 }
 
-class _RthkNewsTickerWidgetState extends State<RthkNewsTickerWidget>
+class RthkNewsTickerWidgetState extends State<RthkNewsTickerWidget>
     with SingleTickerProviderStateMixin {
   late AnimationController _controller;
   late ScrollController _scrollController;
@@ -27,6 +28,7 @@ class _RthkNewsTickerWidgetState extends State<RthkNewsTickerWidget>
 
   bool _isPaused = false;
   double _totalContentWidth = 0;
+  final Logger logger = Logger();
 
   @override
   void initState() {
@@ -131,7 +133,8 @@ class _RthkNewsTickerWidgetState extends State<RthkNewsTickerWidget>
       if (!mounted) return;
 
       _totalContentWidth = _calculateTotalWidth(_newsTexts);
-
+      // 打印总宽度
+      logger.i('总宽度: $_totalContentWidth');
       _scrollController.jumpTo(0);
 
       setState(() {});

@@ -6,7 +6,6 @@ import 'package:iboard_app/providers/announcement_provider.dart';
 import 'package:iboard_app/providers/weather_provider.dart';
 import 'package:iboard_app/providers/arrear_provider.dart';
 import 'package:iboard_app/providers/app_data_provider.dart';
-import 'package:logger/logger.dart';
 
 /// 定时更新调试组件
 /// 显示各个定时更新任务的倒计时和上次更新时间
@@ -14,12 +13,11 @@ class DebugUpdateTimeWidget extends StatefulWidget {
   const DebugUpdateTimeWidget({super.key});
 
   @override
-  _DebugUpdateTimeWidgetState createState() => _DebugUpdateTimeWidgetState();
+  DebugUpdateTimeWidgetState createState() => DebugUpdateTimeWidgetState();
 }
 
-class _DebugUpdateTimeWidgetState extends State<DebugUpdateTimeWidget> {
+class DebugUpdateTimeWidgetState extends State<DebugUpdateTimeWidget> {
   Timer? _updateTimer;
-  final Logger _logger = Logger();
 
   // 存储各个Provider的更新间隔时间 - 从实际配置中获取
   int _arrearUpdateInterval = 1; // 默认值，将从AppDataProvider获取
@@ -52,7 +50,7 @@ class _DebugUpdateTimeWidgetState extends State<DebugUpdateTimeWidget> {
   ///1.5，初始化上次更新时间
   void _initializeLastUpdateTimes() {
     final now = DateTime.now();
-    
+
     // 初始化上次更新时间 - 这里可以根据实际情况从Provider或缓存中获取
     _lastArrearUpdate = now.subtract(const Duration(minutes: 1));
     _lastAdvertisementUpdate = now.subtract(const Duration(minutes: 2));
@@ -68,7 +66,8 @@ class _DebugUpdateTimeWidgetState extends State<DebugUpdateTimeWidget> {
   }
 
   void _updateIntervalsFromSettings() {
-    final appDataProvider = Provider.of<AppDataProvider>(context, listen: false);
+    final appDataProvider =
+        Provider.of<AppDataProvider>(context, listen: false);
     final deviceSettings = appDataProvider.deviceSettings;
     if (deviceSettings != null) {
       setState(() {
@@ -250,7 +249,7 @@ class _DebugUpdateTimeWidgetState extends State<DebugUpdateTimeWidget> {
     return "${hours}h${minutes}m";
   }
 
-    ///8，从缓存获取上次更新时间
+  ///8，从缓存获取上次更新时间
   DateTime? _getLastUpdateTimeFromCache(String type) {
     // 返回真实的上次更新时间
     switch (type) {
@@ -398,82 +397,82 @@ class _DebugUpdateTimeWidgetState extends State<DebugUpdateTimeWidget> {
   Widget build(BuildContext context) {
     return Consumer5<ArrearProvider, AdvertisementProvider,
         AnnouncementProvider, WeatherProvider, AppDataProvider>(
-        builder: (
-          context,
-          arrearProvider,
-          advertisementProvider,
-          announcementProvider,
-          weatherProvider,
-          appDataProvider,
-          child,
-        ) {
-          return Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: Colors.black.withOpacity(0.8),
-              borderRadius: BorderRadius.circular(8),
-              border: Border.all(color: Colors.blue, width: 2),
-            ),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // 标题
-                const Text(
-                  '⏰ 定时更新调试',
-                  style: TextStyle(
-                    color: Colors.blue,
-                    fontSize: 14,
-                    fontWeight: FontWeight.bold,
-                  ),
+      builder: (
+        context,
+        arrearProvider,
+        advertisementProvider,
+        announcementProvider,
+        weatherProvider,
+        appDataProvider,
+        child,
+      ) {
+        return Container(
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: Colors.black.withOpacity(0.8),
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(color: Colors.blue, width: 2),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // 标题
+              const Text(
+                '⏰ 定时更新调试',
+                style: TextStyle(
+                  color: Colors.blue,
+                  fontSize: 14,
+                  fontWeight: FontWeight.bold,
                 ),
-                const SizedBox(height: 8),
+              ),
+              const SizedBox(height: 8),
 
-                // 更新任务列表
-                ..._buildUpdateTasksList(
-                  arrearProvider,
-                  advertisementProvider,
-                  announcementProvider,
-                  weatherProvider,
-                  appDataProvider,
-                ),
-                const SizedBox(height: 8),
+              // 更新任务列表
+              ..._buildUpdateTasksList(
+                arrearProvider,
+                advertisementProvider,
+                announcementProvider,
+                weatherProvider,
+                appDataProvider,
+              ),
+              const SizedBox(height: 8),
 
-                // 系统状态信息
-                const Text(
-                  '🖥️ 系统状态:',
-                  style: TextStyle(
-                    color: Colors.yellow,
-                    fontSize: 11,
-                    fontWeight: FontWeight.bold,
-                  ),
+              // 系统状态信息
+              const Text(
+                '🖥️ 系统状态:',
+                style: TextStyle(
+                  color: Colors.yellow,
+                  fontSize: 11,
+                  fontWeight: FontWeight.bold,
                 ),
-                const SizedBox(height: 2),
-                Text(
-                  '登录: ${appDataProvider.isLoggedIn ? "✅已登录" : "❌未登录"}',
-                  style: const TextStyle(
-                    color: Colors.white70,
-                    fontSize: 10,
-                  ),
+              ),
+              const SizedBox(height: 2),
+              Text(
+                '登录: ${appDataProvider.isLoggedIn ? "✅已登录" : "❌未登录"}',
+                style: const TextStyle(
+                  color: Colors.white70,
+                  fontSize: 10,
                 ),
-                Text(
-                  'Token: ${appDataProvider.token != null ? "✅有效" : "❌无效"}',
-                  style: const TextStyle(
-                    color: Colors.white70,
-                    fontSize: 10,
-                  ),
+              ),
+              Text(
+                'Token: ${appDataProvider.token != null ? "✅有效" : "❌无效"}',
+                style: const TextStyle(
+                  color: Colors.white70,
+                  fontSize: 10,
                 ),
-                Text(
-                  '设备设置: ${appDataProvider.deviceSettings != null ? "✅已加载" : "❌未加载"}',
-                  style: const TextStyle(
-                    color: Colors.white70,
-                    fontSize: 10,
-                  ),
+              ),
+              Text(
+                '设备设置: ${appDataProvider.deviceSettings != null ? "✅已加载" : "❌未加载"}',
+                style: const TextStyle(
+                  color: Colors.white70,
+                  fontSize: 10,
                 ),
-              ],
-            ),
-          );
-        },
-      );
+              ),
+            ],
+          ),
+        );
+      },
+    );
   }
 }

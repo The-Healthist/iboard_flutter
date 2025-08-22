@@ -2,13 +2,9 @@ import 'dart:typed_data';
 import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'package:qr_flutter/qr_flutter.dart';
-import 'package:logger/logger.dart';
 
-/// 二维码生成工具类
-/// 提供本地生成二维码的功能，支持自定义尺寸和样式
 class QrCodeUtil {
   static final QrCodeUtil _instance = QrCodeUtil._internal();
-  final Logger _logger = Logger();
 
   factory QrCodeUtil() {
     return _instance;
@@ -36,8 +32,6 @@ class QrCodeUtil {
         embeddedImage: null,
         embeddedImageStyle: null,
         errorCorrectionLevel: errorCorrectionLevel,
-        color: foregroundColor,
-        emptyColor: backgroundColor,
       );
 
       // 创建图片记录器
