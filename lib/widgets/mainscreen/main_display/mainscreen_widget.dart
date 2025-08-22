@@ -24,13 +24,38 @@ class MainScreenWidgetState extends State<MainScreenWidget> {
   final Logger _logger = Logger();
   // Set default to all
   AnnouncementTypeUi _selectedAnnouncementType = AnnouncementTypeUi.all;
-  // 当前选中的楼层与单位
+  // 当前选中的楼座、楼层与单位
+  String? _selectedBlock;
   String? _selectedBuilding;
   String? _selectedFloor;
   // 是否显示查询结果
   bool _showArrearResults = false;
   // 当前功能选项: 通告列表、欠費查詢、電子繳費等
   String _selectedFunction = '通告列表';
+
+  @override
+  void initState() {
+    super.initState();
+    // 确保数据已加载 - 使用与欠费查询相同的数据源
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final provider = Provider.of<ArrearProvider>(context, listen: false);
+
+      if (!provider.hasData) {
+        provider.loadFromCache();
+      }
+
+      // 同步Provider的楼座选择状态
+      if (provider.selectedBlock != null) {
+        _selectedBlock = provider.selectedBlock;
+      }
+      if (provider.selectedFloor != null) {
+        _selectedBuilding = provider.selectedFloor;
+      }
+      if (provider.selectedUnit != null) {
+        _selectedFloor = provider.selectedUnit;
+      }
+    });
+  }
 
   ///1, 構建功能按鈕
   Widget _buildFunctionButton(
@@ -275,6 +300,12 @@ class MainScreenWidgetState extends State<MainScreenWidget> {
       ),
       child: Column(
         children: [
+          // 楼座选择器（只有当有多个非空名称的楼座时才显示）
+          if (provider.shouldShowBlockSelector) ...[
+            _buildArrearBlockSelector(provider),
+            const SizedBox(height: 10),
+          ],
+
           // 樓層選擇器
           _buildArrearBuildingSelector(provider),
 
@@ -282,6 +313,73 @@ class MainScreenWidgetState extends State<MainScreenWidget> {
 
           // 單位選擇器
           _buildArrearFloorSelector(provider),
+        ],
+      ),
+    );
+  }
+
+  ///6.1, 構建樓座選擇器
+  Widget _buildArrearBlockSelector(ArrearProvider provider) {
+    final blocks = provider.blocks;
+
+    return SizedBox(
+      width: double.infinity,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            '選擇樓座',
+            style: TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.w600,
+              color: Colors.black87,
+            ),
+          ),
+          const SizedBox(height: 12),
+          Wrap(
+            alignment: WrapAlignment.start,
+            spacing: 8,
+            runSpacing: 8,
+            children: blocks.map((block) {
+              final isSelected = _selectedBlock == block;
+              return GestureDetector(
+                onTap: () {
+                  setState(() {
+                    _selectedBlock = block;
+                    _selectedBuilding = null; // 重置樓層選擇
+                    _selectedFloor = null; // 重置單位選擇
+                    _showArrearResults = false; // 重置查詢結果
+                    // 设置楼座
+                    provider.setSelectedBlock(block);
+                  });
+                },
+                child: Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                  decoration: BoxDecoration(
+                    color: isSelected
+                        ? Theme.of(context).primaryColor
+                        : Colors.grey.shade100,
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(
+                      color: isSelected
+                          ? Theme.of(context).primaryColor
+                          : Colors.grey.shade300,
+                      width: 1,
+                    ),
+                  ),
+                  child: Text(
+                    '${block}座',
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w500,
+                      color: isSelected ? Colors.white : Colors.black87,
+                    ),
+                  ),
+                ),
+              );
+            }).toList(),
+          ),
         ],
       ),
     );
@@ -305,55 +403,72 @@ class MainScreenWidgetState extends State<MainScreenWidget> {
             ),
           ),
           const SizedBox(height: 12),
-          Wrap(
-            alignment: WrapAlignment.start, // 確保左對齊
-            spacing: 8,
-            runSpacing: 8,
-            children: buildings.map((building) {
-              final isSelected = _selectedBuilding == building;
-              // 检查该楼层是否有其他分摊费用
-              // final hasOtherFees = provider.hasOtherFeesForFloor(building);
-              return GestureDetector(
-                onTap: () {
-                  setState(() {
-                    _selectedBuilding = building;
-                    _selectedFloor = null; // 重置單位選擇
-                    _showArrearResults = false; // 重置查詢結果
-                    // 设置楼层（不是buildingId）
-                    provider.setSelectedFloor(building);
-                  });
-                },
-                child: Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                  decoration: BoxDecoration(
-                    color: isSelected
-                        ? Theme.of(context).primaryColor
-                        // : hasOtherFees
-                        //     ? Colors.purple.shade100 // 有其他分摊费用的楼层使用淡紫色背景
-                        : Colors.grey.shade100,
-                    borderRadius: BorderRadius.circular(8),
-                    border: Border.all(
-                      color: isSelected
-                          ? Theme.of(context).primaryColor
-                          // : hasOtherFees
-                          //     ? Colors.purple.shade300 // 有其他分摊费用的楼层使用淡紫色边框
-                          : Colors.grey.shade300,
-                      width: 1,
-                    ),
-                  ),
-                  child: Text(
-                    building,
-                    style: TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w500,
-                      color: isSelected ? Colors.white : Colors.black87,
-                    ),
+          // 如果没有楼层数据，显示相应提示
+          if (buildings.isEmpty) ...[
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Theme.of(context).colorScheme.primary.withOpacity(0.10),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: Colors.grey.shade200),
+              ),
+              child: Center(
+                child: Text(
+                  provider.blocks.length > 1 ? '請先選擇樓座' : '暫無樓層數據',
+                  style: TextStyle(
+                    fontSize: 14,
+                    color: Colors.grey.shade600,
+                    fontWeight: FontWeight.w500,
                   ),
                 ),
-              );
-            }).toList(),
-          ),
+              ),
+            ),
+          ] else ...[
+            Wrap(
+              alignment: WrapAlignment.start, // 確保左對齊
+              spacing: 8,
+              runSpacing: 8,
+              children: buildings.map((building) {
+                final isSelected = _selectedBuilding == building;
+                return GestureDetector(
+                  onTap: () {
+                    setState(() {
+                      _selectedBuilding = building;
+                      _selectedFloor = null; // 重置單位選擇
+                      _showArrearResults = false; // 重置查詢結果
+                      // 设置楼层（不是buildingId）
+                      provider.setSelectedFloor(building);
+                    });
+                  },
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 16, vertical: 12),
+                    decoration: BoxDecoration(
+                      color: isSelected
+                          ? Theme.of(context).primaryColor
+                          : Colors.grey.shade100,
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(
+                        color: isSelected
+                            ? Theme.of(context).primaryColor
+                            : Colors.grey.shade300,
+                        width: 1,
+                      ),
+                    ),
+                    child: Text(
+                      building,
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w500,
+                        color: isSelected ? Colors.white : Colors.black87,
+                      ),
+                    ),
+                  ),
+                );
+              }).toList(),
+            ),
+          ],
         ],
       ),
     );
@@ -460,13 +575,8 @@ class MainScreenWidgetState extends State<MainScreenWidget> {
 
   ///9, 構建查詢按鈕
   Widget _buildArrearQueryButton(ArrearProvider provider) {
-    // 判斷當前是否可以查詢，同時檢查選中的單元是否屬於該樓層
-    final floors = _selectedBuilding != null
-        ? provider.getFloors(_selectedBuilding!)
-        : <String>[];
-    final bool hasValidSelection = _selectedBuilding != null &&
-        _selectedFloor != null &&
-        floors.contains(_selectedFloor);
+    // 判斷當前是否可以查詢
+    final bool hasValidSelection = _hasValidArrearSelection(provider);
     final bool canQuery =
         hasValidSelection && _hasDataForSelectedFeeType(provider);
 
@@ -494,7 +604,7 @@ class MainScreenWidgetState extends State<MainScreenWidget> {
             Text(
               // 無效選擇時強制提示先選擇樓層和單元
               (!hasValidSelection)
-                  ? '請先選擇樓層和單位'
+                  ? _getInvalidSelectionText(provider)
                   : _getQueryButtonText(provider),
               style: const TextStyle(
                 fontSize: 14, // 保持原有文字大小
@@ -505,7 +615,7 @@ class MainScreenWidgetState extends State<MainScreenWidget> {
             Text(
               // 根據狀態顯示不同的英文提示
               (!hasValidSelection)
-                  ? 'Please Select Floor and Unit'
+                  ? _getInvalidSelectionEnglishText(provider)
                   : 'Query Payment Records',
               style: const TextStyle(
                 fontSize: 10,
@@ -516,6 +626,45 @@ class MainScreenWidgetState extends State<MainScreenWidget> {
         ),
       ),
     );
+  }
+
+  ///9.0, 检查欠费查询选择是否有效
+  bool _hasValidArrearSelection(ArrearProvider provider) {
+    // 如果有多个楼座，必须选择楼座
+    if (provider.blocks.length > 1 && _selectedBlock == null) {
+      return false;
+    }
+
+    // 必须选择楼层和单位
+    return _selectedBuilding != null && _selectedFloor != null;
+  }
+
+  ///9.1, 获取无效选择的提示文本
+  String _getInvalidSelectionText(ArrearProvider provider) {
+    if (provider.blocks.length > 1 && _selectedBlock == null) {
+      return '請先選擇樓座';
+    }
+    if (_selectedBuilding == null) {
+      return '請先選擇樓層';
+    }
+    if (_selectedFloor == null) {
+      return '請先選擇單位';
+    }
+    return '請先選擇樓層和單位';
+  }
+
+  ///9.2, 获取无效选择的英文提示文本
+  String _getInvalidSelectionEnglishText(ArrearProvider provider) {
+    if (provider.blocks.length > 1 && _selectedBlock == null) {
+      return 'Please Select Block';
+    }
+    if (_selectedBuilding == null) {
+      return 'Please Select Floor';
+    }
+    if (_selectedFloor == null) {
+      return 'Please Select Unit';
+    }
+    return 'Please Select Floor and Unit';
   }
 
   ///9.1, 检查选中的费用类型是否有数据
@@ -697,7 +846,7 @@ class MainScreenWidgetState extends State<MainScreenWidget> {
                   size: 24),
               const SizedBox(width: 8),
               Text(
-                '  $_selectedBuilding$_selectedFloor單位',
+                '  ${provider.currentUnitDisplayName ?? '未知單位'}',
                 style: const TextStyle(
                   fontSize: 18,
                   fontWeight: FontWeight.w600,
@@ -891,44 +1040,56 @@ class MainScreenWidgetState extends State<MainScreenWidget> {
               decoration: BoxDecoration(
                 borderRadius: BorderRadius.circular(8),
                 border: Border.all(color: Colors.grey.shade300),
-                color: Colors.grey.shade50, // 使用浅灰色背景替代图片
+                color: Colors.white, // 改为白色背景，让图片更清晰
               ),
-              child: const Center(
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(
-                      Icons.store,
-                      size: 64,
-                      color: Colors.grey,
-                    ),
-                    SizedBox(height: 16),
-                    Text(
-                      '便利服務',
-                      style: TextStyle(
-                        fontSize: 18,
-                        color: Colors.black87,
-                        fontWeight: FontWeight.w500,
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(8), // 保持圆角
+                child: Image.asset(
+                  'assets/images/convenient_services.png',
+                  width: double.infinity, // 宽度填满容器
+                  height: double.infinity, // 高度填满容器
+                  fit: BoxFit.cover, // 填满容器，不保持比例
+                  errorBuilder: (context, error, stackTrace) {
+                    // 如果图片加载失败，显示备用内容
+                    return const Center(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(
+                            Icons.store,
+                            size: 64,
+                            color: Colors.grey,
+                          ),
+                          SizedBox(height: 16),
+                          Text(
+                            '便利服務',
+                            style: TextStyle(
+                              fontSize: 18,
+                              color: Colors.black87,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                          SizedBox(height: 4),
+                          Text(
+                            'Convenient Services',
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: Color(0xFF757575),
+                              fontWeight: FontWeight.normal,
+                            ),
+                          ),
+                          SizedBox(height: 8),
+                          Text(
+                            '該大廈尚未開通此功能',
+                            style: TextStyle(
+                              fontSize: 14,
+                              color: Colors.grey,
+                            ),
+                          ),
+                        ],
                       ),
-                    ),
-                    SizedBox(height: 4),
-                    Text(
-                      'Convenient Services',
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: Color(0xFF757575),
-                        fontWeight: FontWeight.normal,
-                      ),
-                    ),
-                    SizedBox(height: 8),
-                    Text(
-                      '該大廈尚未開通此功能',
-                      style: TextStyle(
-                        fontSize: 14,
-                        color: Colors.grey,
-                      ),
-                    ),
-                  ],
+                    );
+                  },
                 ),
               ),
             ),

@@ -51,6 +51,7 @@ class ArrearTableWidgetState extends State<ArrearTableWidget> {
       if (!provider.hasData) {
         provider.loadFromCache();
       }
+
       // 如果在轮播模式下，启动自动翻页
       if (widget.isInCarouselMode && provider.hasData) {
         _startAutoPagination();
@@ -70,6 +71,7 @@ class ArrearTableWidgetState extends State<ArrearTableWidget> {
           }
           _lastDataVersion = provider.currentDataVersion;
         }
+
         // 监听媒体暂停状态 - 仅在轮播模式下生效
         if (widget.isInCarouselMode) {
           final carouselStateProvider = context.watch<CarouselStateProvider>();
@@ -310,17 +312,17 @@ class ArrearTableWidgetState extends State<ArrearTableWidget> {
     );
   }
 
-  ///3, 构建表格数据（仅包含物业管理费用）
+  ///3, 构建表格数据（合并所有楼座数据）
   List<Map<String, dynamic>> _buildTableData(ArrearProvider provider) {
     final List<Map<String, dynamic>> tableData = [];
 
-    // 仅从物业管理费用数据构建表格数据
+    // 从物业管理费用数据构建表格数据，合并所有楼座
     if (provider.managementFeeData != null) {
       for (final block in provider.managementFeeData!.blocks) {
         for (final floor in block.floors) {
           for (final unit in floor.units) {
             final Map<String, dynamic> rowData = {
-              '單位': '${floor.name}${unit.name}',
+              '單位': _formatUnitDisplay(block.name, floor.name, unit.name),
             };
 
             // 添加费用数据
@@ -335,6 +337,18 @@ class ArrearTableWidgetState extends State<ArrearTableWidget> {
     }
 
     return tableData;
+  }
+
+  ///3.1, 格式化单位显示（楼座+楼层+单元）
+  String _formatUnitDisplay(
+      String blockName, String floorName, String unitName) {
+    if (blockName.isEmpty) {
+      // 如果楼座名称为空，只显示楼层+单元
+      return '${floorName}${unitName}';
+    } else {
+      // 显示楼座+楼层+单元，例如：01座01A
+      return '${blockName}座${floorName}${unitName}';
+    }
   }
 
   ///4, 构建状态芯片 - 優化尺寸以節省空間

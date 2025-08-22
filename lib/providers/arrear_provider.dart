@@ -24,6 +24,7 @@ class ArrearProvider extends ChangeNotifier {
   OtherFeeModel? _otherFeeData; // 其他分摊费用数据
 
   String? _selectedBuildingId; // 实际存储的是ismartId，用于API调用
+  String? _selectedBlock; // 新增：选中的楼座
   String? _selectedFloor; // 存储用户选择的楼层，用于UI显示和数据筛选
   String? _selectedUnit;
 
@@ -78,6 +79,7 @@ class ArrearProvider extends ChangeNotifier {
   bool get isLoading => _isLoading;
   String? get error => _error;
   String? get selectedBuildingId => _selectedBuildingId;
+  String? get selectedBlock => _selectedBlock; // 新增
   String? get selectedFloor => _selectedFloor;
   String? get selectedUnit => _selectedUnit;
 
@@ -96,15 +98,58 @@ class ArrearProvider extends ChangeNotifier {
   ///2, 获取其他分摊费用数据
   OtherFeeModel? get otherFeeData => _otherFeeData;
 
-  ///3, 获取合并后的楼层列表（用于UI显示）
+  ///3, 获取所有楼座列表
+  List<String> get blocks {
+    final blockNames = <String>{};
+
+    // 从物业管理费用数据中获取楼座
+    if (_managementFeeData != null) {
+      for (final block in _managementFeeData!.blocks) {
+        // 只添加非空的楼座名称
+        if (block.name.isNotEmpty) {
+          blockNames.add(block.name);
+        }
+      }
+    }
+
+    // 从其他分摊费用数据中获取楼座
+    if (_otherFeeData != null) {
+      for (final block in _otherFeeData!.blocks) {
+        // 只添加非空的楼座名称
+        if (block.name.isNotEmpty) {
+          blockNames.add(block.name);
+        }
+      }
+    }
+
+    // 排序：数字楼座在前，字母楼座在后
+    return blockNames.toList()
+      ..sort((a, b) {
+        final aIsNumber = a.isNotEmpty && RegExp(r'^[0-9]').hasMatch(a[0]);
+        final bIsNumber = b.isNotEmpty && RegExp(r'^[0-9]').hasMatch(b[0]);
+
+        if (aIsNumber && !bIsNumber) return -1;
+        if (!aIsNumber && bIsNumber) return 1;
+
+        return a.compareTo(b);
+      });
+  }
+
+  ///4, 获取合并后的楼层列表（用于UI显示）
   List<String> get buildings {
     final floors = <String>{};
 
     // 从物业管理费用数据中获取楼层
     if (_managementFeeData != null) {
       for (final block in _managementFeeData!.blocks) {
-        for (final floor in block.floors) {
-          floors.add(floor.name);
+        // 如果选择了特定楼座，只显示该楼座的数据
+        // 如果楼座名称为空，也包含在内（作为默认楼座）
+        if (_selectedBlock == null ||
+            block.name == _selectedBlock ||
+            block.name.isEmpty) {
+          for (final floor in block.floors) {
+            floors.add(floor.name);
+          }
         }
       }
     }
@@ -112,8 +157,14 @@ class ArrearProvider extends ChangeNotifier {
     // 从其他分摊费用数据中获取楼层
     if (_otherFeeData != null) {
       for (final block in _otherFeeData!.blocks) {
-        for (final floor in block.floors) {
-          floors.add(floor.name);
+        // 如果选择了特定楼座，只显示该楼座的数据
+        // 如果楼座名称为空，也包含在内（作为默认楼座）
+        if (_selectedBlock == null ||
+            block.name == _selectedBlock ||
+            block.name.isEmpty) {
+          for (final floor in block.floors) {
+            floors.add(floor.name);
+          }
         }
       }
     }
@@ -134,17 +185,23 @@ class ArrearProvider extends ChangeNotifier {
       });
   }
 
-  ///4, 获取指定楼层的所有单位
+  ///5, 获取指定楼层的所有单位
   List<String> getFloors(String selectedFloor) {
     final units = <String>{};
 
     // 从物业管理费用数据中获取单位
     if (_managementFeeData != null) {
       for (final block in _managementFeeData!.blocks) {
-        for (final floor in block.floors) {
-          if (floor.name == selectedFloor) {
-            for (final unit in floor.units) {
-              units.add(unit.name);
+        // 如果选择了特定楼座，只显示该楼座的数据
+        // 如果楼座名称为空，也包含在内（作为默认楼座）
+        if (_selectedBlock == null ||
+            block.name == _selectedBlock ||
+            block.name.isEmpty) {
+          for (final floor in block.floors) {
+            if (floor.name == selectedFloor) {
+              for (final unit in floor.units) {
+                units.add(unit.name);
+              }
             }
           }
         }
@@ -154,10 +211,16 @@ class ArrearProvider extends ChangeNotifier {
     // 从其他分摊费用数据中获取单位
     if (_otherFeeData != null) {
       for (final block in _otherFeeData!.blocks) {
-        for (final floor in block.floors) {
-          if (floor.name == selectedFloor) {
-            for (final unit in floor.units) {
-              units.add(unit.name);
+        // 如果选择了特定楼座，只显示该楼座的数据
+        // 如果楼座名称为空，也包含在内（作为默认楼座）
+        if (_selectedBlock == null ||
+            block.name == _selectedBlock ||
+            block.name.isEmpty) {
+          for (final floor in block.floors) {
+            if (floor.name == selectedFloor) {
+              for (final unit in floor.units) {
+                units.add(unit.name);
+              }
             }
           }
         }
@@ -188,12 +251,15 @@ class ArrearProvider extends ChangeNotifier {
     // 获取物业管理费用
     if (_managementFeeData != null) {
       for (final block in _managementFeeData!.blocks) {
-        for (final floor in block.floors) {
-          if (floor.name == selectedFloor) {
-            for (final unit in floor.units) {
-              if (unit.name == selectedUnit) {
-                for (final bill in unit.bills) {
-                  result[bill.period] = bill.value;
+        // 如果选择了特定楼座，只显示该楼座的数据
+        if (_selectedBlock == null || block.name == _selectedBlock) {
+          for (final floor in block.floors) {
+            if (floor.name == selectedFloor) {
+              for (final unit in floor.units) {
+                if (unit.name == selectedUnit) {
+                  for (final bill in unit.bills) {
+                    result[bill.period] = bill.value;
+                  }
                 }
               }
             }
@@ -205,14 +271,17 @@ class ArrearProvider extends ChangeNotifier {
     // 获取其他分摊费用
     if (_otherFeeData != null) {
       for (final block in _otherFeeData!.blocks) {
-        for (final floor in block.floors) {
-          if (floor.name == selectedFloor) {
-            for (final unit in floor.units) {
-              if (unit.name == selectedUnit) {
-                for (final bill in unit.bills) {
-                  // 为其他费用添加前缀以区分
-                  final key = '${bill.period} (${bill.itemId ?? "分攤費用"})';
-                  result[key] = bill.value;
+        // 如果选择了特定楼座，只显示该楼座的数据
+        if (_selectedBlock == null || block.name == _selectedBlock) {
+          for (final floor in block.floors) {
+            if (floor.name == selectedFloor) {
+              for (final unit in floor.units) {
+                if (unit.name == selectedUnit) {
+                  for (final bill in unit.bills) {
+                    // 为其他费用添加前缀以区分
+                    final key = '${bill.period} (${bill.itemId ?? "分攤費用"})';
+                    result[key] = bill.value;
+                  }
                 }
               }
             }
@@ -232,12 +301,15 @@ class ArrearProvider extends ChangeNotifier {
     if (feeType == FeeType.management && _managementFeeData != null) {
       // 获取物业管理费用
       for (final block in _managementFeeData!.blocks) {
-        for (final floor in block.floors) {
-          if (floor.name == selectedFloor) {
-            for (final unit in floor.units) {
-              if (unit.name == selectedUnit) {
-                for (final bill in unit.bills) {
-                  result[bill.period] = bill.value;
+        // 如果选择了特定楼座，只显示该楼座的数据
+        if (_selectedBlock == null || block.name == _selectedBlock) {
+          for (final floor in block.floors) {
+            if (floor.name == selectedFloor) {
+              for (final unit in floor.units) {
+                if (unit.name == selectedUnit) {
+                  for (final bill in unit.bills) {
+                    result[bill.period] = bill.value;
+                  }
                 }
               }
             }
@@ -247,12 +319,15 @@ class ArrearProvider extends ChangeNotifier {
     } else if (feeType == FeeType.other && _otherFeeData != null) {
       // 获取其他分摊费用
       for (final block in _otherFeeData!.blocks) {
-        for (final floor in block.floors) {
-          if (floor.name == selectedFloor) {
-            for (final unit in floor.units) {
-              if (unit.name == selectedUnit) {
-                for (final bill in unit.bills) {
-                  result[bill.period] = bill.value;
+        // 如果选择了特定楼座，只显示该楼座的数据
+        if (_selectedBlock == null || block.name == _selectedBlock) {
+          for (final floor in block.floors) {
+            if (floor.name == selectedFloor) {
+              for (final unit in floor.units) {
+                if (unit.name == selectedUnit) {
+                  for (final bill in unit.bills) {
+                    result[bill.period] = bill.value;
+                  }
                 }
               }
             }
@@ -272,11 +347,14 @@ class ArrearProvider extends ChangeNotifier {
     if (feeType == FeeType.management && _managementFeeData != null) {
       // 获取物业管理费用
       for (final block in _managementFeeData!.blocks) {
-        for (final floor in block.floors) {
-          if (floor.name == selectedFloor) {
-            for (final unit in floor.units) {
-              if (unit.name == selectedUnit) {
-                result.addAll(unit.bills);
+        // 如果选择了特定楼座，只显示该楼座的数据
+        if (_selectedBlock == null || block.name == _selectedBlock) {
+          for (final floor in block.floors) {
+            if (floor.name == selectedFloor) {
+              for (final unit in floor.units) {
+                if (unit.name == selectedUnit) {
+                  result.addAll(unit.bills);
+                }
               }
             }
           }
@@ -285,11 +363,14 @@ class ArrearProvider extends ChangeNotifier {
     } else if (feeType == FeeType.other && _otherFeeData != null) {
       // 获取其他分摊费用
       for (final block in _otherFeeData!.blocks) {
-        for (final floor in block.floors) {
-          if (floor.name == selectedFloor) {
-            for (final unit in floor.units) {
-              if (unit.name == selectedUnit) {
-                result.addAll(unit.bills);
+        // 如果选择了特定楼座，只显示该楼座的数据
+        if (_selectedBlock == null || block.name == _selectedBlock) {
+          for (final floor in block.floors) {
+            if (floor.name == selectedFloor) {
+              for (final unit in floor.units) {
+                if (unit.name == selectedUnit) {
+                  result.addAll(unit.bills);
+                }
               }
             }
           }
@@ -323,11 +404,14 @@ class ArrearProvider extends ChangeNotifier {
     if (_otherFeeData == null) return false;
 
     for (final block in _otherFeeData!.blocks) {
-      for (final floorData in block.floors) {
-        if (floorData.name == floor) {
-          for (final unitData in floorData.units) {
-            if (unitData.name == unit) {
-              return unitData.bills.isNotEmpty;
+      // 如果选择了特定楼座，只检查该楼座的数据
+      if (_selectedBlock == null || block.name == _selectedBlock) {
+        for (final floorData in block.floors) {
+          if (floorData.name == floor) {
+            for (final unitData in floorData.units) {
+              if (unitData.name == unit) {
+                return unitData.bills.isNotEmpty;
+              }
             }
           }
         }
@@ -341,12 +425,15 @@ class ArrearProvider extends ChangeNotifier {
     if (_otherFeeData == null) return false;
 
     for (final block in _otherFeeData!.blocks) {
-      for (final floorData in block.floors) {
-        if (floorData.name == floor) {
-          // 检查该楼层下是否有任何单位有其他分摊费用
-          for (final unitData in floorData.units) {
-            if (unitData.bills.isNotEmpty) {
-              return true;
+      // 如果选择了特定楼座，只检查该楼座的数据
+      if (_selectedBlock == null || block.name == _selectedBlock) {
+        for (final floorData in block.floors) {
+          if (floorData.name == floor) {
+            // 检查该楼层下是否有任何单位有其他分摊费用
+            for (final unitData in floorData.units) {
+              if (unitData.bills.isNotEmpty) {
+                return true;
+              }
             }
           }
         }
@@ -369,10 +456,13 @@ class ArrearProvider extends ChangeNotifier {
     if (_otherFeeData == null) return true;
 
     for (final block in _otherFeeData!.blocks) {
-      for (final floor in block.floors) {
-        for (final unit in floor.units) {
-          if (unit.bills.isNotEmpty) {
-            return false; // 找到有费用的单位，返回false
+      // 如果选择了特定楼座，只检查该楼座的数据
+      if (_selectedBlock == null || block.name == _selectedBlock) {
+        for (final floor in block.floors) {
+          for (final unit in floor.units) {
+            if (unit.bills.isNotEmpty) {
+              return false; // 找到有费用的单位，返回false
+            }
           }
         }
       }
@@ -401,9 +491,9 @@ class ArrearProvider extends ChangeNotifier {
         _logger.i('✅ 从缓存加载其他分摊费用数据成功');
       }
 
-      // 自动选择第一个楼层（仅用于UI显示）
-      if (buildings.isNotEmpty && _selectedFloor == null) {
-        setSelectedFloor(buildings[0]);
+      // 自动选择第一个楼座（如果有多个）
+      if (blocks.isNotEmpty && _selectedBlock == null) {
+        setSelectedBlock(blocks[0]);
       }
 
       notifyListeners();
@@ -594,29 +684,41 @@ class ArrearProvider extends ChangeNotifier {
   ///18, 设置楼宇ismartId
   void setSelectedBuildingId(String? buildingId) {
     _selectedBuildingId = buildingId;
+    _selectedBlock = null; // 重置楼座选择
     _selectedFloor = null;
     _selectedUnit = null;
     _logger.i('设置楼宇ismartId: $buildingId');
 
     if (buildingId != null) {
-      final floorList = buildings;
-      if (floorList.isNotEmpty) {
-        _selectedFloor = floorList[0];
-        _logger.i('自动选择第一个楼层: ${floorList[0]}');
-
-        // 然后为这个楼层选择第一个单位
-        final units = getFloors(_selectedFloor!);
-        if (units.isNotEmpty) {
-          _selectedUnit = units[0];
-          _logger.i('自动选择第一个单位: ${units[0]}');
-        }
+      // 自动选择第一个楼座（如果有多个）
+      final blockList = blocks;
+      if (blockList.isNotEmpty) {
+        setSelectedBlock(blockList[0]);
       }
     }
 
     notifyListeners();
   }
 
-  ///19, 设置选中的楼层
+  ///19, 设置选中的楼座
+  void setSelectedBlock(String? block) {
+    _selectedBlock = block;
+    _selectedFloor = null;
+    _selectedUnit = null;
+    _logger.i('🔍 [setSelectedBlock] 设置楼座: "$block"');
+
+    if (block != null) {
+      // 自动选择第一个楼层
+      final floorList = buildings;
+      if (floorList.isNotEmpty) {
+        setSelectedFloor(floorList[0]);
+      }
+    }
+
+    notifyListeners();
+  }
+
+  ///20, 设置选中的楼层
   void setSelectedFloor(String? floor) {
     _selectedFloor = floor;
     _selectedUnit = null;
@@ -637,7 +739,7 @@ class ArrearProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  ///20, 设置选中的单元
+  ///21, 设置选中的单元
   void setSelectedUnit(String? unit) {
     _selectedUnit = unit;
     _logger.i('🔍 [setSelectedUnit] 设置单元: "$unit"');
@@ -746,24 +848,63 @@ class ArrearProvider extends ChangeNotifier {
     // 从物业管理费用数据构建表格数据
     if (_managementFeeData != null) {
       for (final block in _managementFeeData!.blocks) {
-        for (final floor in block.floors) {
-          for (final unit in floor.units) {
-            final Map<String, dynamic> rowData = {
-              '單位': '${floor.name}${unit.name}',
-            };
+        // 如果选择了特定楼座，只显示该楼座的数据
+        if (_selectedBlock == null || block.name == _selectedBlock) {
+          for (final floor in block.floors) {
+            for (final unit in floor.units) {
+              final Map<String, dynamic> rowData = {
+                '單位': _formatUnitDisplay(block.name, floor.name, unit.name),
+              };
 
-            // 添加费用数据
-            for (final bill in unit.bills) {
-              rowData[bill.period] = bill.value;
+              // 添加费用数据
+              for (final bill in unit.bills) {
+                rowData[bill.period] = bill.value;
+              }
+
+              tableData.add(rowData);
             }
-
-            tableData.add(rowData);
           }
         }
       }
     }
 
     return tableData;
+  }
+
+  ///32, 格式化单位显示（楼座+楼层+单元）
+  String _formatUnitDisplay(
+      String blockName, String floorName, String unitName) {
+    if (blockName.isEmpty) {
+      // 如果楼座名称为空，只显示楼层+单元
+      return '${floorName}${unitName}';
+    } else {
+      // 显示楼座+楼层+单元
+      return '${blockName}座${floorName}${unitName}';
+    }
+  }
+
+  ///33, 获取当前选中单位的完整显示名称
+  String? get currentUnitDisplayName {
+    if (_selectedFloor == null || _selectedUnit == null) {
+      return null;
+    }
+    // 如果选中的楼座名称为空，不显示楼座号
+    final blockName = _selectedBlock ?? '';
+    return _formatUnitDisplay(blockName, _selectedFloor!, _selectedUnit!);
+  }
+
+  ///34, 获取当前选中楼座的显示名称
+  String? get currentBlockDisplayName {
+    if (_selectedBlock == null || _selectedBlock!.isEmpty) {
+      return null;
+    }
+    return '${_selectedBlock}座';
+  }
+
+  ///35, 检查是否应该显示楼座选择器
+  bool get shouldShowBlockSelector {
+    // 只有当有多个非空名称的楼座时才显示选择器
+    return blocks.length > 1;
   }
 
   ///29, 创建欠费表单Widget（缓存版本）
