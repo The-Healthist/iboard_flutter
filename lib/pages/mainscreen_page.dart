@@ -410,6 +410,13 @@ class AnnouncementPageState extends State<AnnouncementPage> {
     final apiNoticeStayDuration = carouselStateProvider.noticeStayDuration;
     final delayBeforeNotice = carouselStateProvider.noActivityTimeout;
 
+    // 即使没有通告数据也要初始化轮播组件，确保主屏幕能正常显示
+    if (carouselAnnouncements.isEmpty) {
+      _logger.w('⚠️ 通告数据为空，使用空列表初始化轮播组件');
+    } else {
+      _logger.i('✅ 通告轮播数据初始化: ${carouselAnnouncements.length} 个通告');
+    }
+
     // 初始化通告轮播
     announcementCarouselProvider.initializeMidWidgets(
       carouselAnnouncements: carouselAnnouncements,
@@ -455,6 +462,8 @@ class AnnouncementPageState extends State<AnnouncementPage> {
         announcementCarouselProvider.jumpToAnnouncementIndex(0);
       },
     );
+
+    _logger.i('✅ 中部轮播初始化完成');
   }
 
   ///9，初始化顶部轮播
@@ -462,10 +471,10 @@ class AnnouncementPageState extends State<AnnouncementPage> {
     final advertisementProvider =
         Provider.of<AdvertisementProvider>(context, listen: false);
     final topAdProvider = context.read<TopAdCarouselProvider>();
-    
+
     // 優先使用輪播專用的緩存數據
     List<AdModel> topAds = advertisementProvider.topCarouselAdvertisements;
-    
+
     // 如果輪播數據為空，則使用舊的廣告數據作為後備
     if (topAds.isEmpty) {
       topAds = advertisementProvider.topAdvertisements;
@@ -580,15 +589,19 @@ class AnnouncementPageState extends State<AnnouncementPage> {
       if (mounted) {
         // Ensure widget is still in the tree
 
-        // 检查新的通告数据是否有效
-        if (currentCarouselAnnouncements.isNotEmpty ||
-            _previousAnnouncementsForBuild == null) {
-          // 只有当新数据非空或首次初始化时才更新
+        // 检查新的通告数据是否有效，或者是否从有数据变为无数据
+        final bool shouldUpdate = currentCarouselAnnouncements.isNotEmpty ||
+            _previousAnnouncementsForBuild == null ||
+            (_previousAnnouncementsForBuild != null &&
+                _previousAnnouncementsForBuild!.isNotEmpty &&
+                currentCarouselAnnouncements.isEmpty);
+
+        if (shouldUpdate) {
           try {
             _initializeMidWidgets();
             _previousAnnouncementsForBuild =
                 List.from(currentCarouselAnnouncements); // 更新存储的轮播通告列表
-            // _logger.i('通告轮播更新成功: ${currentCarouselAnnouncements.length} 个通告');
+            _logger.i('通告轮播更新成功: ${currentCarouselAnnouncements.length} 个通告');
           } catch (e) {
             _logger.e('初始化中部轮播失败，保持现有状态', error: e);
             // 不更新 _previousAnnouncementsForBuild，保持现有状态

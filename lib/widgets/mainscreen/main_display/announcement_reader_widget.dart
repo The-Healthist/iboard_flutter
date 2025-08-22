@@ -7,17 +7,24 @@ import 'package:flutter_pdfview/flutter_pdfview.dart';
 import 'package:video_player/video_player.dart';
 import 'package:logger/logger.dart';
 import 'package:provider/provider.dart';
+import 'package:iboard_app/widgets/carousel_widget.dart'; // 添加輪播組件導入
 
 class AnnouncementReaderWidget extends StatefulWidget {
   final AnnouncementModel announcement;
   final FileManager fileManager;
   final VoidCallback? onHomeButtonPressed;
 
+  // 新增：視頻播放進度回調
+  final Function(Duration)? onVideoProgressChanged;
+  final Duration? initialPlaybackPosition;
+
   const AnnouncementReaderWidget({
     super.key,
     required this.announcement,
     required this.fileManager,
     this.onHomeButtonPressed,
+    this.onVideoProgressChanged,
+    this.initialPlaybackPosition,
   });
 
   @override
@@ -32,10 +39,18 @@ class AnnouncementReaderWidgetState extends State<AnnouncementReaderWidget> {
   String? _localFilePath;
   String? _error;
 
+  // 新增：記錄視頻播放進度
+  Duration? _savedPlaybackPosition;
+
   @override
   void initState() {
     super.initState();
     _loadFile();
+
+    // 如果有初始播放位置，設置它
+    if (widget.initialPlaybackPosition != null) {
+      _savedPlaybackPosition = widget.initialPlaybackPosition;
+    }
   }
 
   Future<void> _loadFile() async {
@@ -76,7 +91,7 @@ class AnnouncementReaderWidgetState extends State<AnnouncementReaderWidget> {
         }
       }
     } else {
-              if (mounted) {
+      if (mounted) {
         setState(() {
           _isLoading = false;
         });
@@ -101,42 +116,51 @@ class AnnouncementReaderWidgetState extends State<AnnouncementReaderWidget> {
         return;
       }
 
-      setState(() {
-        _isLoading = false;
-      });
-      newVideoController.play();
-      newVideoController.setLooping(true);
-    }).catchError((error, stackTrace) {
-      _logger.e('Error initializing video player',
-          error: error, stackTrace: stackTrace);
-      if (!mounted || _videoController != newVideoController) {
-        newVideoController.dispose();
-        return;
+      // 如果有保存的播放位置，設置它
+      if (_savedPlaybackPosition != null) {
+        newVideoController.seekTo(_savedPlaybackPosition!);
+        debugPrint(
+            '[AnnouncementReader] 設置初始播放位置: ${_savedPlaybackPosition!.inMilliseconds}ms');
       }
 
-      setState(() {
-        _error = 'Could not play video.';
-        _isLoading = false;
-      });
+      // 設置播放進度監聽器
+      newVideoController.addListener(_onVideoProgressChanged);
 
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
+    }).catchError((error) {
+      if (mounted) {
+        setState(() {
+          _error = 'Video initialization failed: $error';
+          _isLoading = false;
+        });
+      }
     });
+  }
+
+  /// 新增：視頻播放進度變化監聽器
+  void _onVideoProgressChanged() {
+    if (_videoController != null &&
+        _videoController!.value.isInitialized &&
+        widget.onVideoProgressChanged != null) {
+      try {
+        final position = _videoController!.value.position;
+        widget.onVideoProgressChanged!(position);
+      } catch (e) {
+        debugPrint('[AnnouncementReader] 報告播放進度失敗: $e');
+      }
+    }
   }
 
   @override
   void dispose() {
-    if (_videoController != null) {
-      try {
-        // 暂停播放
-        if (_videoController!.value.isInitialized &&
-            _videoController!.value.isPlaying) {
-          _videoController!.pause();
-        }
-        // 释放资源
-        _videoController!.dispose();
-      } finally {
-        _videoController = null;
-      }
-    }
+    // 清理視頻控制器
+    _videoController?.removeListener(_onVideoProgressChanged);
+    _videoController?.dispose();
+    _videoController = null;
     super.dispose();
   }
 
@@ -167,7 +191,8 @@ class AnnouncementReaderWidgetState extends State<AnnouncementReaderWidget> {
           children: [
             const Icon(Icons.error_outline, color: Colors.red, size: 60),
             const SizedBox(height: 16),
-            Text(_error!, style: const TextStyle(color: Colors.red, fontSize: 18)),
+            Text(_error!,
+                style: const TextStyle(color: Colors.red, fontSize: 18)),
             const SizedBox(height: 16),
             ElevatedButton(onPressed: _loadFile, child: const Text('Retry'))
           ],
@@ -176,7 +201,31 @@ class AnnouncementReaderWidgetState extends State<AnnouncementReaderWidget> {
     }
 
     if (_localFilePath == null) {
-      return const Center(child: Text('File not available.'));
+      return const Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.file_download_outlined, color: Colors.grey, size: 48),
+            SizedBox(height: 16),
+            Text(
+              '文件暫不可用',
+              style: TextStyle(
+                fontSize: 18,
+                color: Colors.grey,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+            SizedBox(height: 8),
+            Text(
+              '正在嘗試下載...',
+              style: TextStyle(
+                fontSize: 14,
+                color: Colors.grey,
+              ),
+            ),
+          ],
+        ),
+      );
     }
 
     final mimeType = widget.announcement.file.mimeType.toLowerCase();
@@ -230,34 +279,125 @@ class AnnouncementReaderWidgetState extends State<AnnouncementReaderWidget> {
       contentWidget = Center(child: Text('Unsupported file type: $mimeType'));
     }
 
-    return Stack(
-      children: [
-        contentWidget,
-        if (widget.onHomeButtonPressed != null)
-          Positioned(
-            top: 16,
-            right: 16,
-            child: Material(
-              color: Colors.transparent,
-              child: InkWell(
-                onTap: widget.onHomeButtonPressed,
-                borderRadius: BorderRadius.circular(20),
-                child: Container(
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    color: Colors.black.withOpacity(0.6),
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                  child: const Icon(
-                    Icons.home,
-                    color: Colors.white,
-                    size: 24,
+    // 使用NotificationListener監聽媒體暫停和恢復通知
+    return NotificationListener<Notification>(
+      onNotification: (notification) {
+        if (notification is MediaPauseNotification) {
+          // 防抖動執行，避免重複調用
+          Future.delayed(const Duration(milliseconds: 50), () {
+            if (mounted && _videoController != null) {
+              _pauseVideo();
+            }
+          });
+          return true; // 阻止通知繼續傳遞
+        } else if (notification is MediaResumeNotification) {
+          // 防抖動執行，避免重複調用
+          Future.delayed(const Duration(milliseconds: 50), () {
+            if (mounted && _videoController != null) {
+              _resumeVideo();
+            }
+          });
+          return true; // 阻止通知繼續傳遞
+        }
+        return false; // 其他通知繼續傳遞
+      },
+      child: Stack(
+        children: [
+          contentWidget,
+          if (widget.onHomeButtonPressed != null)
+            Positioned(
+              top: 16,
+              right: 16,
+              child: Material(
+                color: Colors.transparent,
+                child: InkWell(
+                  onTap: widget.onHomeButtonPressed,
+                  borderRadius: BorderRadius.circular(20),
+                  child: Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: Colors.black.withOpacity(0.6),
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    child: const Icon(
+                      Icons.home,
+                      color: Colors.white,
+                      size: 24,
+                    ),
                   ),
                 ),
               ),
             ),
-          ),
-      ],
+        ],
+      ),
     );
+  }
+
+  /// 暫停視頻播放
+  void _pauseVideo() {
+    if (_videoController != null && _videoController!.value.isInitialized) {
+      try {
+        if (_videoController!.value.isPlaying) {
+          // 記錄當前播放位置
+          _savedPlaybackPosition = _videoController!.value.position;
+
+          // 通過回調報告播放進度
+          if (widget.onVideoProgressChanged != null) {
+            widget.onVideoProgressChanged!(_savedPlaybackPosition!);
+          }
+
+          _videoController!.pause();
+          _logger.d(
+              '📱 通告視頻已暫停，保存播放位置: ${_savedPlaybackPosition?.inMilliseconds}ms - ${widget.announcement.title}');
+        }
+      } catch (e) {
+        _logger.e('暫停視頻失敗: $e');
+      }
+    }
+  }
+
+  /// 恢復視頻播放
+  void _resumeVideo() {
+    if (_videoController != null && _videoController!.value.isInitialized) {
+      try {
+        if (!_videoController!.value.isPlaying) {
+          // 如果有保存的播放位置，先跳轉到該位置
+          if (_savedPlaybackPosition != null) {
+            _videoController!.seekTo(_savedPlaybackPosition!);
+            _logger.d(
+                '📱 通告視頻恢復，跳轉到保存位置: ${_savedPlaybackPosition?.inMilliseconds}ms - ${widget.announcement.title}');
+          }
+          _videoController!.play();
+          _logger.d('📱 通告視頻已恢復播放 - ${widget.announcement.title}');
+        }
+      } catch (e) {
+        _logger.e('恢復視頻失敗: $e');
+      }
+    }
+  }
+
+  /// 獲取當前視頻播放進度（用於外部記錄）
+  Duration? get currentPlaybackPosition {
+    if (_videoController != null && _videoController!.value.isInitialized) {
+      return _videoController!.value.position;
+    }
+    return _savedPlaybackPosition;
+  }
+
+  /// 設置視頻播放進度（用於外部恢復）
+  void setPlaybackPosition(Duration position) {
+    if (_videoController != null && _videoController!.value.isInitialized) {
+      try {
+        _videoController!.seekTo(position);
+        _savedPlaybackPosition = position;
+        _logger.d(
+            '📱 通告視頻設置播放位置: ${position.inMilliseconds}ms - ${widget.announcement.title}');
+      } catch (e) {
+        _logger.e('設置視頻播放位置失敗: $e');
+      }
+    } else {
+      // 如果視頻控制器還沒準備好，先保存位置
+      _savedPlaybackPosition = position;
+    }
   }
 }

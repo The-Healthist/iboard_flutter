@@ -251,6 +251,7 @@ class HomePageState extends State<HomePage> {
               '設備設置狀態: ${appDataProvider.deviceSettings != null ? '已加載' : '未加載'}');
           _logger.i('數據源: ${appDataProvider.isLoggedIn ? '最新登錄數據' : '緩存備用數據'}');
 
+          // 在 _initializeDeviceId 方法中，優化初始化順序和錯誤處理
           // 如果有设备设置数据（无论是从登录还是缓存获取），就启动应用
           if (appDataProvider.deviceSettings != null) {
             // 启动定时登录任务（12小时一次）
@@ -261,12 +262,65 @@ class HomePageState extends State<HomePage> {
             appDataProvider.startPeriodicHealthCheck();
             _logger.i('健康檢查定時任務已啟動');
 
-            // 初始化轮播广告数据（优先调用新的API接口）
+            // ===== 統一輪播數據初始化區塊 =====
             try {
+              // 1. 首先初始化所有基礎數據
               await advertisementProvider.initializeCarouselAdvertisements();
-              _logger.i('✅ 輪播廣告數據初始化完成');
+              
+              // 2. 確保欠費數據先初始化完成
+              await appDataProvider.initGetArrearData();
+              _logger.i('✅ 欠費數據初始化完成');
+              
+              // 3. 設置Provider引用
+              final topAdCarouselProvider = Provider.of<TopAdCarouselProvider>(context, listen: false);
+              final fullscreenAdProvider = Provider.of<FullscreenAdProvider>(context, listen: false);
+              final announcementCarouselProvider = Provider.of<AnnouncementCarouselProvider>(context, listen: false);
+              
+              advertisementProvider.setCarouselProviders(
+                topAdCarouselProvider: topAdCarouselProvider,
+                fullscreenAdProvider: fullscreenAdProvider,
+              );
+              
+              // 設置通告輪播提供者的依賴引用
+              announcementCarouselProvider.setAppDataProvider(appDataProvider);
+              announcementCarouselProvider.setArrearProvider(arrearProvider);
+              
+              // 設置通告提供者的輪播提供者引用
+              announcementProvider.setCarouselProvider(announcementCarouselProvider);
+              
+              // 4. 最後初始化通告輪播數據（此時所有依賴都已準備好）
+              final carouselAnnouncements = announcementProvider.getCarouselAnnouncements();
+              if (carouselAnnouncements.isNotEmpty) {
+                announcementCarouselProvider.updateCarouselList(carouselAnnouncements);
+                _logger.i('✅ 通告輪播數據從緩存初始化完成: ${carouselAnnouncements.length} 個通告');
+              } else {
+                // 如果緩存中沒有數據，先初始化空輪播組件（確保主屏幕可用）
+                announcementCarouselProvider.updateCarouselList([]);
+                _logger.i('⚠️ 緩存中暫無通告數據，已初始化空輪播組件（包含主屏幕）');
+                
+                // 然後異步獲取通告數據
+                announcementProvider.fetchNotices().then((_) {
+                  final freshCarouselAnnouncements = announcementProvider.getCarouselAnnouncements();
+                  if (freshCarouselAnnouncements.isNotEmpty) {
+                    announcementCarouselProvider.updateCarouselList(freshCarouselAnnouncements);
+                    _logger.i('✅ 通告輪播數據從網絡異步更新完成: ${freshCarouselAnnouncements.length} 個通告');
+                  }
+                }).catchError((e) {
+                  _logger.e('異步獲取通告數據失敗: $e');
+                });
+              }
+              
+              _logger.i('🎯 所有輪播數據初始化完成，確保內容正常顯示');
             } catch (e) {
-              _logger.e('輪播廣告數據初始化失敗，將使用緩存數據: $e');
+              _logger.e('輪播數據初始化過程中發生錯誤: $e');
+              // 即使部分初始化失敗，也要確保基本的輪播組件可用
+              try {
+                final announcementCarouselProvider = Provider.of<AnnouncementCarouselProvider>(context, listen: false);
+                announcementCarouselProvider.updateCarouselList([]);
+                _logger.i('🔧 錯誤恢復：已初始化基本輪播組件');
+              } catch (recoveryError) {
+                _logger.e('錯誤恢復失敗: $recoveryError');
+              }
             }
 
             // 启动广告定时更新
@@ -281,7 +335,6 @@ class HomePageState extends State<HomePage> {
             announcementProvider.startPeriodicUpdate();
             _logger.i('通告定時更新已啟動');
 
-            // 启动欠费数据定时更新
             final deviceSettings = appDataProvider.deviceSettings;
             final arrearUpdateInterval =
                 deviceSettings?.arrearageUpdateDuration ?? 1;

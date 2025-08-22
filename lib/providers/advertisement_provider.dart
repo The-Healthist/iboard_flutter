@@ -475,20 +475,20 @@ class AdvertisementProvider extends ChangeNotifier {
       if (e.toString().contains('SocketException') ||
           e.toString().contains('Connection timed out') ||
           e.toString().contains('ClientException')) {
-        errorMessage = '网络连接失败，使用缓存的广告数据继续轮播';
+        errorMessage = '網絡連線失敗，使用快取的廣告資料繼續輪播';
         isNetworkError = true;
-        _logger.w('网络连接问题检测到，保持现有数据: $e');
+        _logger.w('網絡連線問題檢測到，保持現有資料: $e');
       } else if (e.toString().contains('TimeoutException') ||
-          e.toString().contains('请求超时')) {
-        errorMessage = '请求超时，使用缓存的广告数据继续轮播';
+          e.toString().contains('請求超時')) {
+        errorMessage = '請求超時，使用快取的廣告資料繼續輪播';
         isNetworkError = true;
-        _logger.w('请求超时检测到，保持现有数据: $e');
+        _logger.w('請求超時檢測到，保持現有資料: $e');
       } else if (e.toString().contains('FormatException')) {
-        errorMessage = '服务器返回数据格式错误，保持现有广告数据';
-        _logger.w('数据格式错误检测到，保持现有数据: $e');
+        errorMessage = '伺服器返回資料格式錯誤，保持現有廣告資料';
+        _logger.w('資料格式錯誤檢測到，保持現有資料: $e');
       } else {
-        errorMessage = '发生未知错误，保持现有广告数据: $e';
-        _logger.w('未知错误检测到，保持现有数据: $e');
+        errorMessage = '發生未知錯誤，保持現有廣告資料: $e';
+        _logger.w('未知錯誤檢測到，保持現有資料: $e');
       }
 
       _error = errorMessage;

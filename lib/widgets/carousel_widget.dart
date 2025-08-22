@@ -186,14 +186,16 @@ class _CarouselWidgetState extends State<CarouselWidget>
     _widgets = List.from(widget.initialWidgets);
     _pageController = PageController(initialPage: 0);
     widget.controller?._attach(this);
-    // 初始化widget map和keys（如果initialWidgets由旧接口提供）
+
+    // 始终初始化widget map和keys
+    _widgetMap.clear();
+    _widgetKeys = [];
     if (widget.initialWidgets.isNotEmpty) {
-      _widgetMap.clear();
-      _widgetKeys = [];
       for (var i = 0; i < widget.initialWidgets.length; i++) {
-        final k = 'legacy_$i';
-        _widgetMap[k] = widget.initialWidgets[i];
-        _widgetKeys.add(k);
+        // 使用唯一且可预测的键
+        final key = widget.initialWidgets[i].key?.toString() ?? 'legacy_$i';
+        _widgetMap[key] = widget.initialWidgets[i];
+        _widgetKeys.add(key);
       }
     }
 
@@ -525,12 +527,28 @@ class _CarouselWidgetState extends State<CarouselWidget>
         width: double.infinity,
         height: widget.height,
         child: const Center(
-          child: Text(
-            'No content available',
-            style: TextStyle(
-              fontSize: 16,
-              color: Colors.grey,
-            ),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(Icons.info_outline, color: Colors.grey, size: 48),
+              SizedBox(height: 16),
+              Text(
+                '正在初始化輪播組件...',
+                style: TextStyle(
+                  fontSize: 18,
+                  color: Colors.grey,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+              SizedBox(height: 8),
+              Text(
+                '請稍候',
+                style: TextStyle(
+                  fontSize: 14,
+                  color: Colors.grey,
+                ),
+              ),
+            ],
           ),
         ),
       );

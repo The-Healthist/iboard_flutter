@@ -66,7 +66,7 @@ class AnnouncementProvider extends ChangeNotifier {
     }
   }
 
-  ///2，从SharedPreferences缓存加载通告数据
+  ///2，從SharedPreferences緩存加載通告數據
   Future<void> _loadAnnouncementsFromCache() async {
     try {
       final prefs = await SharedPreferences.getInstance();
@@ -81,10 +81,43 @@ class AnnouncementProvider extends ChangeNotifier {
 
         _announcements = cachedAnnouncements;
         _updateCarouselAnnouncements(); // 更新轮播通告数组
+
+        // 如果已經設置了輪播Provider引用，立即更新
+        if (_announcementCarouselProvider != null) {
+          _announcementCarouselProvider!
+              .updateCarouselList(_carouselAnnouncements);
+          _logger.i(
+              '📢 緩存加載完成，已更新輪播Provider: ${_carouselAnnouncements.length} 個通告');
+        }
+
+        notifyListeners();
+      } else {
+        // 缓存中没有数据，也要更新轮播提供者（使用空列表）
+        _announcements = [];
+        _updateCarouselAnnouncements();
+
+        if (_announcementCarouselProvider != null) {
+          _announcementCarouselProvider!
+              .updateCarouselList(_carouselAnnouncements);
+          _logger.i('📢 緩存中無數據，已更新輪播Provider（空列表）');
+        }
+
         notifyListeners();
       }
     } catch (e) {
       _logger.e('从缓存加载通告数据失败', error: e);
+
+      // 即使加载失败，也要确保轮播提供者被通知
+      _announcements = [];
+      _updateCarouselAnnouncements();
+
+      if (_announcementCarouselProvider != null) {
+        _announcementCarouselProvider!
+            .updateCarouselList(_carouselAnnouncements);
+        _logger.i('📢 緩存加載失敗，已更新輪播Provider（空列表）');
+      }
+
+      notifyListeners();
     }
   }
 
@@ -331,6 +364,15 @@ class AnnouncementProvider extends ChangeNotifier {
     if (_appDataProvider.token == null) {
       _error = "Authentication token is missing. Cannot fetch notices.";
       _logger.w(_error);
+
+      // 即使没有token，也要确保轮播提供者被通知
+      if (_announcementCarouselProvider != null) {
+        _announcementCarouselProvider!
+            .updateCarouselList(_carouselAnnouncements);
+        _logger.i(
+            '📢 Token缺失，已通知輪播Provider使用現有數據: ${_carouselAnnouncements.length} 個通告');
+      }
+
       notifyListeners();
       return;
     }
@@ -355,8 +397,11 @@ class AnnouncementProvider extends ChangeNotifier {
       if (!hasChanges) {
         _logger.i('通告数据无变化，跳过更新与通知');
         _error = null;
+        _isLoading = false;
+        notifyListeners();
         return;
       }
+
       await _smartUpdateAnnouncements(fetchedAnnouncements);
       if (_announcementCarouselProvider != null) {
         _announcementCarouselProvider!
@@ -406,19 +451,28 @@ class AnnouncementProvider extends ChangeNotifier {
       if (e.toString().contains('SocketException') ||
           e.toString().contains('Connection timed out') ||
           e.toString().contains('ClientException')) {
-        errorMessage = '网络连接失败，使用缓存的通告数据继续轮播';
+        errorMessage = '網絡連線失敗，使用快取的通告資料繼續輪播';
       } else if (e.toString().contains('TimeoutException') ||
-          e.toString().contains('请求超时')) {
-        errorMessage = '请求超时，使用缓存的通告数据继续轮播';
+          e.toString().contains('請求超時')) {
+        errorMessage = '請求超時，使用快取的通告資料繼續輪播';
       } else if (e.toString().contains('FormatException')) {
-        errorMessage = '服务器返回数据格式错误，保持现有通告数据';
+        errorMessage = '伺服器返回資料格式錯誤，保持現有通告資料';
       } else {
-        errorMessage = '发生未知错误，保持现有通告数据: $e';
+        errorMessage = '發生未知錯誤，保持現有通告資料: $e';
       }
 
       _error = errorMessage;
     } finally {
       _isLoading = false;
+
+      // 确保轮播提供者被通知（即使有错误）
+      if (_announcementCarouselProvider != null) {
+        _announcementCarouselProvider!
+            .updateCarouselList(_carouselAnnouncements);
+        _logger
+            .i('📢 通告获取完成，已通知輪播Provider: ${_carouselAnnouncements.length} 個通告');
+      }
+
       notifyListeners();
     }
   }

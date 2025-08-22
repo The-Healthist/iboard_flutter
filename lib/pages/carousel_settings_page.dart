@@ -8,6 +8,7 @@ import 'package:iboard_app/providers/ad_full_carousel_provider.dart';
 import 'package:iboard_app/providers/ad_top_carousel_provider.dart';
 import 'package:iboard_app/widgets/debug_fullscreen_ad_widget.dart';
 import 'package:provider/provider.dart';
+import 'package:shared_preferences/shared_preferences.dart'; // 添加SharedPreferences導入
 
 class CarouselSettingsPage extends StatefulWidget {
   const CarouselSettingsPage({super.key});
@@ -17,6 +18,8 @@ class CarouselSettingsPage extends StatefulWidget {
 }
 
 class CarouselSettingsPageState extends State<CarouselSettingsPage> {
+  bool _isClearing = false; // 添加清理狀態標記
+
   @override
   Widget build(BuildContext context) {
     return PopScope(
@@ -71,16 +74,30 @@ class CarouselSettingsPageState extends State<CarouselSettingsPage> {
                           color: Colors.grey.shade800,
                         ),
                       ),
-                      // Spacer(),
-                      // IconButton(
-                      //   onPressed: () async {
-                      //     await DebugCacheUtil.testCarouselOrderPersistence();
-                      //     await DebugCacheUtil.checkAllCarouselOrders();
-                      //     await DebugCacheUtil.checkRawDataCache();
-                      //   },
-                      //   icon: Icon(Icons.bug_report, color: Colors.blue),
-                      //   tooltip: '调试缓存',
-                      // ),
+                      const Spacer(),
+                      // 添加清空緩存按鈕
+                      ElevatedButton.icon(
+                        onPressed: _isClearing ? null : _clearAllCache,
+                        icon: _isClearing
+                            ? const SizedBox(
+                                width: 16,
+                                height: 16,
+                                child:
+                                    CircularProgressIndicator(strokeWidth: 2),
+                              )
+                            : const Icon(Icons.clear_all, size: 18),
+                        label: Text(
+                          _isClearing ? '清理中...' : '清空緩存',
+                          style: const TextStyle(fontSize: 14),
+                        ),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.red.shade100,
+                          foregroundColor: Colors.red.shade800,
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 12, vertical: 8),
+                          minimumSize: const Size(0, 36),
+                        ),
+                      ),
                     ],
                   ),
                 ),
@@ -146,6 +163,68 @@ class CarouselSettingsPageState extends State<CarouselSettingsPage> {
         ),
       ),
     );
+  }
+
+  ///1，清空所有輪播緩存數據
+  Future<void> _clearAllCache() async {
+    setState(() {
+      _isClearing = true;
+    });
+
+    try {
+      final prefs = await SharedPreferences.getInstance();
+
+      // 清空通告緩存數據
+      await prefs.remove('announcements_data');
+
+      // 清空廣告緩存數據
+      await prefs.remove('advertisements_data');
+      await prefs.remove('top_carousel_advertisements');
+      await prefs.remove('full_carousel_advertisements');
+
+      // 清空Provider中的數據
+      if (mounted) {
+        final announcementProvider = context.read<AnnouncementProvider>();
+        final advertisementProvider = context.read<AdvertisementProvider>();
+        final announcementCarouselProvider =
+            context.read<AnnouncementCarouselProvider>();
+        final topAdCarouselProvider = context.read<TopAdCarouselProvider>();
+        final fullscreenAdProvider = context.read<FullscreenAdProvider>();
+
+        // 清空輪播Provider的數據
+        announcementCarouselProvider.updateCarouselList([]);
+        topAdCarouselProvider.clearCarouselList();
+        fullscreenAdProvider.clearCarouselList();
+      }
+
+      // 顯示成功提示
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: const Text('✅ 輪播緩存數據已清空'),
+            backgroundColor: Colors.green,
+            duration: const Duration(seconds: 2),
+          ),
+        );
+      }
+    } catch (e) {
+      // 顯示錯誤提示
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('❌ 清空緩存失敗: $e'),
+            backgroundColor: Colors.red,
+            duration: const Duration(seconds: 3),
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isClearing = false;
+        });
+      }
+    }
   }
 
   ///2，构建通告轮播设置组件

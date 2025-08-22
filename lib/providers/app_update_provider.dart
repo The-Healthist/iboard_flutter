@@ -280,7 +280,7 @@ class AppUpdateProvider with ChangeNotifier {
       _downloadUrl = downloadUrl;
 
       _logger.i('🌐 遠程版本: $_remoteVersion');
-      _logger.i('📝 更新描述: $description');
+
       _logger.i('🔗 下載鏈接: $downloadUrl');
 
       // 检查是否需要更新

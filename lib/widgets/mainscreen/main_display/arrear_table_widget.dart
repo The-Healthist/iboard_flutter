@@ -53,7 +53,8 @@ class ArrearTableWidgetState extends State<ArrearTableWidget> {
       }
 
       // 如果在轮播模式下，启动自动翻页
-      if (widget.isInCarouselMode && provider.hasData) {
+      if (widget.isInCarouselMode) {
+        // 无论是否有数据都要启动自动翻页，确保轮播逻辑正常
         _startAutoPagination();
       }
     });
@@ -545,7 +546,7 @@ class ArrearTableWidgetState extends State<ArrearTableWidget> {
       _totalPages = (tableData.length / _itemsPerPage).ceil();
 
       if (_totalPages <= 1) {
-        // 只有一页，直接通知完成
+        // 只有一页或无数据，延迟后通知完成，让轮播继续
         Future.delayed(const Duration(seconds: 5), () {
           if (widget.onPaginationComplete != null) {
             widget.onPaginationComplete!(_totalPages);
@@ -591,14 +592,17 @@ class ArrearTableWidgetState extends State<ArrearTableWidget> {
             widget.onPaginationComplete!(_totalPages);
           }
         } else {
-          // 没有新数据，正常重置到第一页
+          // 没有新数据，重置到第一页并继续轮播
           setState(() {
             _currentPage = 1;
           });
 
-          if (widget.onPaginationComplete != null) {
-            widget.onPaginationComplete!(_totalPages);
-          }
+          // 延迟后通知完成，让轮播继续
+          Future.delayed(const Duration(seconds: 2), () {
+            if (widget.onPaginationComplete != null) {
+              widget.onPaginationComplete!(_totalPages);
+            }
+          });
         }
       }
     });

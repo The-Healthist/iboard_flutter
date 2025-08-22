@@ -458,17 +458,18 @@ class CarouselStateProvider extends ChangeNotifier {
       if (wasInFullscreenAd) {
         _lastFullscreenAdEndTime = DateTime.now();
 
-        // 立即更新媒体状态，确保顶部广告组件能立即响应状态变化
-        _updateMediaStateBasedOnCurrentState();
+        // 重要修复：确保顶部广告能正确恢复播放
+        // 不要立即更新媒体状态，让顶部广告Provider自己处理恢复逻辑
+        // _updateMediaStateBasedOnCurrentState(); // 注释掉这行
 
         // 记录日志
-        // print('🎵 [STATE] 从全屏广告状态退出，立即更新媒体状态');
+        // print('🎵 [STATE] 从全屏广告状态退出，顶部广告将自动恢复');
       }
 
       // 通知FullAdvertisementCarouselProvider退出全屏广告模式
       _onExitFullscreenAdMode?.call();
 
-      // 更新媒體狀態
+      // 更新媒體狀態 - 在退出全屏广告后更新
       _updateMediaStateBasedOnCurrentState();
 
       _startDefaultStateTimer();

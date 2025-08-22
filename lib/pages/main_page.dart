@@ -66,25 +66,11 @@ class MainPageState extends State<MainPage> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) {
         final announcementProvider = context.read<AnnouncementProvider>();
-        final advertisementProvider = context.read<AdvertisementProvider>();
         final announcementCarouselProvider =
             context.read<AnnouncementCarouselProvider>();
-        final topAdCarouselProvider = context.read<TopAdCarouselProvider>();
-        final fullscreenAdProvider = context.read<FullscreenAdProvider>();
-        final arrearProvider =
-            context.read<ArrearProvider>(); // 获取ArrearProvider实例
 
         // 设置通告轮播Provider引用
         announcementProvider.setCarouselProvider(announcementCarouselProvider);
-
-        // 设置ArrearProvider引用
-        announcementCarouselProvider.setArrearProvider(arrearProvider);
-
-        // 设置广告轮播Provider引用
-        advertisementProvider.setCarouselProviders(
-          topAdCarouselProvider: topAdCarouselProvider,
-          fullscreenAdProvider: fullscreenAdProvider,
-        );
       }
     });
   }
