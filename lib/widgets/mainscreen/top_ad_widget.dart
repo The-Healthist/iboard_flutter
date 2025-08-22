@@ -16,10 +16,10 @@ class TopAdWidget extends StatefulWidget {
   final FileManager fileManager;
 
   const TopAdWidget({
-    Key? key,
+    super.key,
     required this.ad,
     required this.fileManager,
-  }) : super(key: key);
+  });
 
   @override
   _TopAdWidgetState createState() => _TopAdWidgetState();
@@ -257,7 +257,7 @@ class _TopAdWidgetState extends State<TopAdWidget> {
       final state = _videoController!.safeState;
       if (isMediaPaused && state == VideoControllerState.playing) {
         // 延迟100ms执行，避免频繁调用
-        Future.delayed(Duration(milliseconds: 100), () {
+        Future.delayed(const Duration(milliseconds: 100), () {
           if (mounted &&
               _videoController != null &&
               _videoController!.safeState == VideoControllerState.playing) {
@@ -267,7 +267,7 @@ class _TopAdWidgetState extends State<TopAdWidget> {
         });
       } else if (!isMediaPaused && state == VideoControllerState.paused) {
         // 延迟100ms执行，避免频繁调用
-        Future.delayed(Duration(milliseconds: 100), () {
+        Future.delayed(const Duration(milliseconds: 100), () {
           if (mounted &&
               _videoController != null &&
               _videoController!.safeState == VideoControllerState.paused) {
@@ -283,7 +283,7 @@ class _TopAdWidgetState extends State<TopAdWidget> {
       onNotification: (notification) {
         if (notification is MediaPauseNotification) {
           // 防抖动执行，避免重复调用
-          Future.delayed(Duration(milliseconds: 50), () {
+          Future.delayed(const Duration(milliseconds: 50), () {
             if (mounted &&
                 _videoController != null &&
                 _videoController!.safeState == VideoControllerState.playing) {
@@ -294,7 +294,7 @@ class _TopAdWidgetState extends State<TopAdWidget> {
           return true; // 阻止通知继续传递
         } else if (notification is MediaResumeNotification) {
           // 防抖动执行，避免重复调用
-          Future.delayed(Duration(milliseconds: 50), () {
+          Future.delayed(const Duration(milliseconds: 50), () {
             if (mounted &&
                 _videoController != null &&
                 _videoController!.safeState == VideoControllerState.paused) {
@@ -339,18 +339,18 @@ class _TopAdWidgetState extends State<TopAdWidget> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(Icons.warning_amber_outlined, color: Colors.orange, size: 40),
+            const Icon(Icons.warning_amber_outlined, color: Colors.orange, size: 40),
             const SizedBox(height: 8),
-            Text(
+            const Text(
               '廣告內容載入失敗',
               textAlign: TextAlign.center,
-              style: const TextStyle(color: Colors.grey, fontSize: 16),
+              style: TextStyle(color: Colors.grey, fontSize: 16),
             ),
             const SizedBox(height: 4),
-            Text(
+            const Text(
               '將在下個週期重新嘗試',
               textAlign: TextAlign.center,
-              style: const TextStyle(color: Colors.grey, fontSize: 12),
+              style: TextStyle(color: Colors.grey, fontSize: 12),
             ),
             const SizedBox(height: 8),
             ElevatedButton(
@@ -410,7 +410,7 @@ class _TopAdWidgetState extends State<TopAdWidget> {
                   });
                 }
               });
-              return Center(child: Text('Could not display ad image.'));
+              return const Center(child: Text('Could not display ad image.'));
             },
           ),
         );

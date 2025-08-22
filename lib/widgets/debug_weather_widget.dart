@@ -6,7 +6,7 @@ import 'package:logger/logger.dart';
 
 /// 天气图标调试工具组件
 class WeatherDebugWidget extends StatefulWidget {
-  const WeatherDebugWidget({Key? key}) : super(key: key);
+  const WeatherDebugWidget({super.key});
 
   @override
   _WeatherDebugWidgetState createState() => _WeatherDebugWidgetState();
@@ -243,7 +243,7 @@ class _WeatherDebugWidgetState extends State<WeatherDebugWidget> {
         // 图标不存在
       }
 
-      warningIconsInfo['$warningType'] = {
+      warningIconsInfo[warningType] = {
         '状态': isAvailable ? '✅ 可用' : '❌ 缺失',
         '路径': iconPath,
         '文件名': iconPath.split('/').last,
@@ -417,7 +417,7 @@ class _WeatherDebugWidgetState extends State<WeatherDebugWidget> {
                         ],
                       ),
                     ))
-                .toList(),
+                ,
           ],
         ),
       ),

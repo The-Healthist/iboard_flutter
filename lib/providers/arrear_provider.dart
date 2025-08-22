@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:iboard_app/models/arrear_model.dart';
 import 'package:iboard_app/http/api_client.dart';
+import 'package:iboard_app/widgets/mainscreen/main_display/arrear_table_widget.dart'; // Added import for ArrearTableWidget
 import 'package:iboard_app/providers/app_data_provider.dart';
 import 'package:logger/logger.dart';
 import 'package:shared_preferences/shared_preferences.dart';

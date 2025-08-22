@@ -133,8 +133,6 @@ class AnnouncementReaderWidgetState extends State<AnnouncementReaderWidget> {
         }
         // 释放资源
         _videoController!.dispose();
-      } catch (e) {
-
       } finally {
         _videoController = null;
       }
@@ -167,11 +165,11 @@ class AnnouncementReaderWidgetState extends State<AnnouncementReaderWidget> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(Icons.error_outline, color: Colors.red, size: 60),
-            SizedBox(height: 16),
-            Text(_error!, style: TextStyle(color: Colors.red, fontSize: 18)),
-            SizedBox(height: 16),
-            ElevatedButton(onPressed: _loadFile, child: Text('Retry'))
+            const Icon(Icons.error_outline, color: Colors.red, size: 60),
+            const SizedBox(height: 16),
+            Text(_error!, style: const TextStyle(color: Colors.red, fontSize: 18)),
+            const SizedBox(height: 16),
+            ElevatedButton(onPressed: _loadFile, child: const Text('Retry'))
           ],
         ),
       );
@@ -209,7 +207,7 @@ class AnnouncementReaderWidgetState extends State<AnnouncementReaderWidget> {
           errorBuilder: (context, error, stackTrace) {
             _logger.e('Error displaying image',
                 error: error, stackTrace: stackTrace);
-            return Center(child: Text('Could not display image.'));
+            return const Center(child: Text('Could not display image.'));
           },
         ),
       );

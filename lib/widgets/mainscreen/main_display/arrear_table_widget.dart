@@ -12,12 +12,12 @@ class ArrearTableWidget extends StatefulWidget {
   final Function(int totalPages)? onPaginationStart; // 轮播模式下翻页开始回调
 
   const ArrearTableWidget({
-    Key? key,
+    super.key,
     this.onHomeButtonPressed,
     this.isInCarouselMode = false, // 默认不在轮播模式
     this.onPaginationComplete,
     this.onPaginationStart,
-  }) : super(key: key);
+  });
 
   @override
   ArrearTableWidgetState createState() => ArrearTableWidgetState();
@@ -180,11 +180,11 @@ class ArrearTableWidgetState extends State<ArrearTableWidget> {
     return LayoutBuilder(
       builder: (context, constraints) {
         // 動態計算每頁顯示的行數，增加顯示行數以減少空白
-        final double outerPadding = 16 * 2; // 上下margin
-        final double titleHeight = 56; // 标题区域高度
-        final double paginationHeight = 56; // 分页栏高度
-        final double rowHeight = 40; // 減少每行高度從48到40
-        final double headerHeight = 44; // 表头高度
+        const double outerPadding = 16 * 2; // 上下margin
+        const double titleHeight = 56; // 标题区域高度
+        const double paginationHeight = 56; // 分页栏高度
+        const double rowHeight = 40; // 減少每行高度從48到40
+        const double headerHeight = 44; // 表头高度
 
         final double screenHeight = MediaQuery.of(context).size.height;
         final double mainAreaHeight = screenHeight * 14 / 24;
@@ -240,11 +240,11 @@ class ArrearTableWidgetState extends State<ArrearTableWidget> {
                     horizontal: 16, vertical: 10), // 減少垂直padding
                 child: Row(
                   children: [
-                    Expanded(
+                    const Expanded(
                       flex: 2,
                       child: Text(
                         '單位',
-                        style: const TextStyle(
+                        style: TextStyle(
                           color: Colors.white,
                           fontWeight: FontWeight.w600,
                           fontSize: 14,
@@ -409,11 +409,11 @@ class ArrearTableWidgetState extends State<ArrearTableWidget> {
     if (_itemsPerPage == 20) {
       final double screenHeight = MediaQuery.of(context).size.height;
       final double mainAreaHeight = screenHeight * 14 / 24;
-      final double outerPadding = 16 * 2;
-      final double titleHeight = 56;
-      final double paginationHeight = 56;
-      final double rowHeight = 40;
-      final double headerHeight = 44;
+      const double outerPadding = 16 * 2;
+      const double titleHeight = 56;
+      const double paginationHeight = 56;
+      const double rowHeight = 40;
+      const double headerHeight = 44;
       final double availableHeight = mainAreaHeight -
           outerPadding -
           titleHeight -
@@ -513,11 +513,11 @@ class ArrearTableWidgetState extends State<ArrearTableWidget> {
       // 重新计算每页项数，确保总页数准确
       final screenHeight = MediaQuery.of(context).size.height;
       final double mainAreaHeight = screenHeight * 14 / 24;
-      final double outerPadding = 16 * 2;
-      final double titleHeight = 56;
-      final double paginationHeight = 56;
-      final double rowHeight = 40;
-      final double headerHeight = 44;
+      const double outerPadding = 16 * 2;
+      const double titleHeight = 56;
+      const double paginationHeight = 56;
+      const double rowHeight = 40;
+      const double headerHeight = 44;
       final double availableHeight = mainAreaHeight -
           outerPadding -
           titleHeight -
@@ -532,7 +532,7 @@ class ArrearTableWidgetState extends State<ArrearTableWidget> {
 
       if (_totalPages <= 1) {
         // 只有一页，直接通知完成
-        Future.delayed(Duration(seconds: 5), () {
+        Future.delayed(const Duration(seconds: 5), () {
           if (widget.onPaginationComplete != null) {
             widget.onPaginationComplete!(_totalPages);
           }

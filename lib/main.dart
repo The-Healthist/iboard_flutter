@@ -126,7 +126,7 @@ void main() {
             },
           ),
         ],
-        child: MyApp(),
+        child: const MyApp(),
       ),
     );
   }, (error, stack) {
@@ -136,6 +136,8 @@ void main() {
 }
 
 class MyApp extends StatelessWidget {
+  const MyApp({super.key});
+
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
@@ -144,19 +146,21 @@ class MyApp extends StatelessWidget {
         primarySwatch: Colors.blue,
         useMaterial3: true,
       ),
-      home: HomePage(),
+      home: const HomePage(),
       routes: {
-        '/main': (context) => MainPage(),
-        '/announcement': (context) => AnnouncementPage(),
-        '/fullscreen-ads': (context) => FullscreenAdsPage(),
-        '/settings': (context) => SettingsPage(),
-        '/carousel-settings': (context) => CarouselSettingsPage(),
+        '/main': (context) => const MainPage(),
+        '/announcement': (context) => const AnnouncementPage(),
+        '/fullscreen-ads': (context) => const FullscreenAdsPage(),
+        '/settings': (context) => const SettingsPage(),
+        '/carousel-settings': (context) => const CarouselSettingsPage(),
       },
     );
   }
 }
 
 class HomePage extends StatefulWidget {
+  const HomePage({super.key});
+
   @override
   _HomePageState createState() => _HomePageState();
 }
@@ -275,7 +279,7 @@ class _HomePageState extends State<HomePage> {
                 deviceSettings?.arrearageUpdateDuration ?? 1;
             arrearProvider.startPeriodicUpdate(
                 updateIntervalMinutes: arrearUpdateInterval);
-            print('欠费数据定时更新已启动，间隔: ${arrearUpdateInterval}分钟');
+            print('欠费数据定时更新已启动，间隔: $arrearUpdateInterval分钟');
 
             // 初始化欠费数据
             try {
@@ -421,7 +425,7 @@ class _HomePageState extends State<HomePage> {
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
                       if (_isInitializing)
-                        Column(
+                        const Column(
                           children: [
                             CircularProgressIndicator(),
                             SizedBox(height: 16),
@@ -429,7 +433,7 @@ class _HomePageState extends State<HomePage> {
                           ],
                         )
                       else if (appDataProvider.isLoading)
-                        Column(
+                        const Column(
                           children: [
                             CircularProgressIndicator(),
                             SizedBox(height: 16),
@@ -439,23 +443,23 @@ class _HomePageState extends State<HomePage> {
                       else if (!appDataProvider.isLoggedIn)
                         Column(
                           children: [
-                            Icon(
+                            const Icon(
                               Icons.error_outline,
                               size: 60,
                               color: Colors.orange,
                             ),
-                            SizedBox(height: 16),
-                            Text(
+                            const SizedBox(height: 16),
+                            const Text(
                               '設備未登錄',
                               style: TextStyle(
                                 fontSize: 18,
                                 fontWeight: FontWeight.bold,
                               ),
                             ),
-                            SizedBox(height: 16),
+                            const SizedBox(height: 16),
                             ElevatedButton(
                               onPressed: _retryInitialization,
-                              child: Text('重新嘗試'),
+                              child: const Text('重新嘗試'),
                             ),
                           ],
                         )
@@ -487,7 +491,7 @@ class _HomePageState extends State<HomePage> {
                                       ? Colors.orange
                                       : Colors.green,
                             ),
-                            SizedBox(height: 16),
+                            const SizedBox(height: 16),
                             Text(
                               appDataProvider.isLoggedIn
                                   ? '設備已登錄'
@@ -500,7 +504,7 @@ class _HomePageState extends State<HomePage> {
                                               null)
                                       ? '離線模式（使用緩存數據）'
                                       : '設備已登錄',
-                              style: TextStyle(
+                              style: const TextStyle(
                                 fontSize: 18,
                                 fontWeight: FontWeight.bold,
                               ),
@@ -512,7 +516,7 @@ class _HomePageState extends State<HomePage> {
                                         appDataProvider.error ?? '')) &&
                                 appDataProvider.deviceSettings != null)
                               Padding(
-                                padding: EdgeInsets.only(top: 8),
+                                padding: const EdgeInsets.only(top: 8),
                                 child: Text(
                                   '網絡連接中斷或數據格式錯誤，正在使用緩存數據',
                                   style: TextStyle(

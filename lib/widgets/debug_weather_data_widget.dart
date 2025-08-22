@@ -1,15 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:iboard_app/providers/weather_provider.dart';
-import 'package:iboard_app/models/weather_forecast_model.dart';
-import 'package:iboard_app/models/current_weather_model.dart';
-import 'package:iboard_app/models/weather_warning_model.dart';
 import 'package:logger/logger.dart';
 import 'package:intl/intl.dart';
 
 /// 天气数据调试工具组件
 class WeatherDataDebugWidget extends StatefulWidget {
-  const WeatherDataDebugWidget({Key? key}) : super(key: key);
+  const WeatherDataDebugWidget({super.key});
 
   @override
   _WeatherDataDebugWidgetState createState() => _WeatherDataDebugWidgetState();
@@ -453,20 +450,20 @@ class _WeatherDataDebugWidgetState extends State<WeatherDataDebugWidget> {
                   // 说明信息
                   Card(
                     color: Colors.grey[50],
-                    child: Padding(
-                      padding: const EdgeInsets.all(16),
+                    child: const Padding(
+                      padding: EdgeInsets.all(16),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          const Text(
+                          Text(
                             '说明',
                             style: TextStyle(
                               fontSize: 16,
                               fontWeight: FontWeight.bold,
                             ),
                           ),
-                          const SizedBox(height: 8),
-                          const Text(
+                          SizedBox(height: 8),
+                          Text(
                             '• 此工具用于调试天气数据的持久化存储状态\n'
                             '• 可以查看缓存中的数据状态和错误信息\n'
                             '• 支持手动刷新数据和清除缓存\n'

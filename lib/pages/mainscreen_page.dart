@@ -22,9 +22,10 @@ import 'package:iboard_app/widgets/mainscreen/main_display/arrear_table_widget.d
 import 'package:iboard_app/pages/settings_page.dart';
 import 'package:logger/logger.dart';
 import 'package:provider/provider.dart';
+import 'package:iboard_app/providers/arrear_provider.dart';
 
 class AnnouncementPage extends StatefulWidget {
-  const AnnouncementPage({Key? key}) : super(key: key);
+  const AnnouncementPage({super.key});
 
   @override
   _AnnouncementPageState createState() => _AnnouncementPageState();
@@ -54,6 +55,7 @@ class _AnnouncementPageState extends State<AnnouncementPage> {
   // ArrearDisplayWidget已删除，功能整合到MainScreenWidget
   final GlobalKey<ArrearTableWidgetState> _arrearTableKey =
       GlobalKey<ArrearTableWidgetState>();
+  late ArrearProvider _arrearProvider;
 
   ///1， 根据当前应用状态更新轮播暂停状态
   void _updateCarouselStateBasedOnAppState(AppState appState) {
@@ -128,6 +130,12 @@ class _AnnouncementPageState extends State<AnnouncementPage> {
           Provider.of<AdvertisementProvider>(context, listen: false);
       advertisementProvider.fetchAdvertisements();
     });
+
+    // 初始化 _arrearProvider
+    _arrearProvider = Provider.of<ArrearProvider>(context, listen: false);
+    // 将 _arrearProvider 传递给 AnnouncementCarouselProvider
+    final announcementCarouselProvider = Provider.of<AnnouncementCarouselProvider>(context, listen: false);
+    announcementCarouselProvider.setArrearProvider(_arrearProvider);
   }
 
   ///2.1，初始化RTHK新闻
@@ -484,10 +492,6 @@ class _AnnouncementPageState extends State<AnnouncementPage> {
     final carouselStateProvider = context.read<CarouselStateProvider>();
     final announcementCarouselProvider =
         context.read<AnnouncementCarouselProvider>();
-    final arrearProvider = context.read<ArrearProvider>();
-    
-    // 设置ArrearProvider引用
-    announcementCarouselProvider.setArrearProvider(arrearProvider);
 
     // 使用轮播专用通告数组 - 只包含緊急和一般通告
     List<AnnouncementModel> carouselAnnouncements =
@@ -583,7 +587,7 @@ class _AnnouncementPageState extends State<AnnouncementPage> {
 
       Navigator.push(
         context,
-        MaterialPageRoute(builder: (context) => SettingsPage()),
+        MaterialPageRoute(builder: (context) => const SettingsPage()),
       );
     } else {
       // 设置5秒后重置计数器
@@ -727,7 +731,7 @@ class _AnnouncementPageState extends State<AnnouncementPage> {
             // 上部區域 - 6/24 比例
             Expanded(
               flex: 6,
-              child: Container(
+              child: SizedBox(
                   width: double.infinity,
                   child: Consumer<TopAdCarouselProvider>(
                       builder: (context, topAdProvider, child) {
@@ -796,7 +800,7 @@ class _AnnouncementPageState extends State<AnnouncementPage> {
 
                         if (announcementCarouselProvider.isShowingArrearTable) {
                           // _logger.i('📊 [MainScreenPage Overlay] 显示欠费总览覆盖层');
-                          return Container(
+                          return SizedBox(
                             width: double.infinity,
                             height: double.infinity,
                             child: ArrearTableWidget(
@@ -828,7 +832,7 @@ class _AnnouncementPageState extends State<AnnouncementPage> {
             // 底部區域 - 4/24 比例 (天气和二维码轮播区域)
             Expanded(
               flex: 4,
-              child: Container(
+              child: SizedBox(
                 width: double.infinity,
                 child: Column(
                   children: [
@@ -848,8 +852,8 @@ class _AnnouncementPageState extends State<AnnouncementPage> {
                       ),
                     ),
                     // 底部轮播 - 7/8 比例
-                    Expanded(
-                      child: const BottomDisplayWidget(),
+                    const Expanded(
+                      child: BottomDisplayWidget(),
                     ),
                   ],
                 ),
@@ -859,7 +863,7 @@ class _AnnouncementPageState extends State<AnnouncementPage> {
             Container(
               width: double.infinity,
               height: 20,
-              padding: EdgeInsets.symmetric(horizontal: 8),
+              padding: const EdgeInsets.symmetric(horizontal: 8),
               child: Center(
                 child: GestureDetector(
                   onTap: _handleDeviceIdClick,

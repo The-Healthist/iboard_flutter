@@ -8,7 +8,7 @@ import 'package:provider/provider.dart';
 /// 全屏广告时间调试组件
 /// 显示当前广告剩余时间和全屏状态总时间
 class DebugFullAdTimeWidget extends StatefulWidget {
-  const DebugFullAdTimeWidget({Key? key}) : super(key: key);
+  const DebugFullAdTimeWidget({super.key});
 
   @override
   _DebugFullAdTimeWidgetState createState() => _DebugFullAdTimeWidgetState();
@@ -123,7 +123,7 @@ class _DebugFullAdTimeWidgetState extends State<DebugFullAdTimeWidget> {
   List<Widget> _buildCarouselList(FullscreenAdProvider fullscreenProvider) {
     if (fullscreenProvider.fullscreenAds.isEmpty) {
       return [
-        Text(
+        const Text(
           '📋 轮播列表: 无广告',
           style: TextStyle(
             color: Colors.yellow,
@@ -136,7 +136,7 @@ class _DebugFullAdTimeWidgetState extends State<DebugFullAdTimeWidget> {
     List<Widget> widgets = [
       Text(
         '📋 轮播顺序 (${fullscreenProvider.fullscreenAds.length}个):',
-        style: TextStyle(
+        style: const TextStyle(
           color: Colors.yellow,
           fontSize: 11,
           fontWeight: FontWeight.bold,
@@ -191,7 +191,7 @@ class _DebugFullAdTimeWidgetState extends State<DebugFullAdTimeWidget> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 // 标题
-                Text(
+                const Text(
                   '🎬 全屏广告调试',
                   style: TextStyle(
                     color: Colors.orange,
@@ -208,7 +208,7 @@ class _DebugFullAdTimeWidgetState extends State<DebugFullAdTimeWidget> {
                 // 当前广告信息
                 Text(
                   '当前: ${_getCurrentAdInfo(fullscreenProvider)}',
-                  style: TextStyle(
+                  style: const TextStyle(
                     color: Colors.white,
                     fontSize: 12,
                   ),
@@ -218,7 +218,7 @@ class _DebugFullAdTimeWidgetState extends State<DebugFullAdTimeWidget> {
                 // 当前广告剩余时间
                 Text(
                   '剩余: ${_getCurrentAdRemainingTime(fullscreenProvider)}',
-                  style: TextStyle(
+                  style: const TextStyle(
                     color: Colors.green,
                     fontSize: 12,
                     fontWeight: FontWeight.bold,
@@ -229,7 +229,7 @@ class _DebugFullAdTimeWidgetState extends State<DebugFullAdTimeWidget> {
                 // 全屏状态信息
                 Text(
                   _getFullscreenStateInfo(stateProvider, fullscreenProvider),
-                  style: TextStyle(
+                  style: const TextStyle(
                     color: Colors.cyan,
                     fontSize: 12,
                   ),

@@ -34,12 +34,12 @@ class AdvertisementProvider extends ChangeNotifier {
   FullscreenAdProvider? _fullscreenAdProvider;
 
   List<AdModel> _advertisements = [];
-  List<AdModel> _topCarouselAdvertisements = []; // 顶部广告轮播列表（后台排序）
-  List<AdModel> _fullCarouselAdvertisements = []; // 全屏广告轮播列表（后台排序）
+  List<AdModel> _topCarouselAdvertisements = [];
+  List<AdModel> _fullCarouselAdvertisements = [];
   bool _isLoading = false;
   String? _error;
-  Timer? _updateTimer; // 定时更新定时器
-  bool _isPeriodicUpdateActive = false; // 是否正在进行定期更新
+  Timer? _updateTimer;
+  bool _isPeriodicUpdateActive = false;
 
   // Getters
   List<AdModel> get advertisements => _advertisements;
@@ -64,7 +64,6 @@ class AdvertisementProvider extends ChangeNotifier {
 
   AdvertisementProvider(
       this._apiClient, this._appDataProvider, this._fileManager) {
-    _logger.i('AdvertisementProvider initialized.');
     _loadAdvertisementsFromCache(); // 启动时从缓存加载数据
     _loadCarouselAdvertisementsFromCache(); // 加载轮播广告数据
 
@@ -86,7 +85,6 @@ class AdvertisementProvider extends ChangeNotifier {
   }) {
     _topAdCarouselProvider = topAdCarouselProvider;
     _fullscreenAdProvider = fullscreenAdProvider;
-    _logger.i('設置廣告輪播Provider引用');
   }
 
   ///1，保存广告数据到SharedPreferences缓存
@@ -97,7 +95,6 @@ class AdvertisementProvider extends ChangeNotifier {
           advertisements.map((ad) => ad.toJson()).toList();
       final jsonString = json.encode(adsJson);
       await prefs.setString(_advertisementsDataKey, jsonString);
-      _logger.i('💾 廣告數據已保存到緩存: ${advertisements.length}個廣告');
     } catch (e) {
       _logger.e('保存广告数据到缓存失败', error: e);
     }
@@ -112,7 +109,6 @@ class AdvertisementProvider extends ChangeNotifier {
           advertisements.map((ad) => ad.toJson()).toList();
       final jsonString = json.encode(adsJson);
       await prefs.setString(_topCarouselAdvertisementsKey, jsonString);
-      // _logger.i('💾 顶部广告轮播数据已保存到缓存: ${advertisements.length}个广告');
     } catch (e) {
       _logger.e('保存頂部廣告輪播數據到緩存失敗', error: e);
     }
@@ -127,7 +123,6 @@ class AdvertisementProvider extends ChangeNotifier {
           advertisements.map((ad) => ad.toJson()).toList();
       final jsonString = json.encode(adsJson);
       await prefs.setString(_fullCarouselAdvertisementsKey, jsonString);
-      _logger.i('💾 全屏廣告輪播數據已保存到緩存: ${advertisements.length}個廣告');
     } catch (e) {
       _logger.e('保存全屏廣告輪播數據到緩存失敗', error: e);
     }
@@ -145,7 +140,6 @@ class AdvertisementProvider extends ChangeNotifier {
             .toList();
 
         _advertisements = cachedAds;
-        _logger.i('📂 從緩存加載廣告數據成功: ${cachedAds.length}個廣告');
         notifyListeners();
       } else {
         _logger.w('緩存中沒有找到廣告數據');
@@ -167,13 +161,10 @@ class AdvertisementProvider extends ChangeNotifier {
             .toList();
 
         _topCarouselAdvertisements = cachedAds;
-        // _logger.i('📂 从缓存加载顶部广告轮播数据成功: ${cachedAds.length}个广告');
         notifyListeners();
-      } else {
-        // _logger.w('缓存中没有找到顶部广告轮播数据');
       }
     } catch (e) {
-      // _logger.e('从缓存加载顶部广告轮播数据失败', error: e);
+      _logger.e('从缓存加载顶部广告轮播数据失败', error: e);
     }
   }
 
@@ -189,10 +180,8 @@ class AdvertisementProvider extends ChangeNotifier {
             .toList();
 
         _fullCarouselAdvertisements = cachedAds;
-        _logger.i('📂 從緩存加載全屏廣告輪播數據成功: ${cachedAds.length}個廣告');
+
         notifyListeners();
-      } else {
-        _logger.w('緩存中沒有找到全屏廣告輪播數據');
       }
     } catch (e) {
       _logger.e('從緩存加載全屏廣告輪播數據失敗', error: e);
@@ -212,13 +201,46 @@ class AdvertisementProvider extends ChangeNotifier {
       await prefs.remove(_advertisementsDataKey);
       await prefs.remove(_topCarouselAdvertisementsKey);
       await prefs.remove(_fullCarouselAdvertisementsKey);
-      _logger.i('廣告數據緩存已清除');
     } catch (e) {
       _logger.e('清除廣告數據緩存失敗', error: e);
     }
   }
 
-  ///4，检查数据是否真的发生了变化
+  ///4，检查顶部广告轮播数据是否发生了变化
+  bool _hasTopCarouselDataChanged(List<AdModel> newTopCarouselAds) {
+    if (_topCarouselAdvertisements.length != newTopCarouselAds.length) {
+      return true;
+    }
+
+    // 判断广告list是否变化(只需要比对id即可比对顺序和数据是否对的上)
+    for (int i = 0; i < _topCarouselAdvertisements.length; i++) {
+      final old = _topCarouselAdvertisements[i];
+      final newer = newTopCarouselAds[i];
+      if (old.id != newer.id) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  ///5，检查全屏广告轮播数据是否发生了变化
+  bool _hasFullCarouselDataChanged(List<AdModel> newFullCarouselAds) {
+    if (_fullCarouselAdvertisements.length != newFullCarouselAds.length) {
+      return true;
+    }
+
+    // 判断广告list是否变化(只需要比对id即可比对顺序和数据是否对的上)
+    for (int i = 0; i < _fullCarouselAdvertisements.length; i++) {
+      final old = _fullCarouselAdvertisements[i];
+      final newer = newFullCarouselAds[i];
+      if (old.id != newer.id) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  ///6，检查数据是否真的发生了变化
   bool _hasDataChanged(List<AdModel> newAdvertisements) {
     if (_advertisements.length != newAdvertisements.length) {
       return true;
@@ -267,7 +289,6 @@ class AdvertisementProvider extends ChangeNotifier {
   /// 开始定期更新广告数据
   void startPeriodicUpdate() {
     if (_isPeriodicUpdateActive) {
-      _logger.i('Periodic advertisement update is already active.');
       return;
     }
 
@@ -276,9 +297,6 @@ class AdvertisementProvider extends ChangeNotifier {
         _appDataProvider.deviceSettings?.advertisementUpdateDuration ??
             5; // 默认5分钟
     final updateIntervalSeconds = updateIntervalMinutes * 60; // 转换为秒
-    _logger.i(
-        'Starting periodic advertisement update with interval: ${updateIntervalMinutes} minutes (${updateIntervalSeconds}s)');
-
     _isPeriodicUpdateActive = true;
 
     // 立即执行一次更新
@@ -288,7 +306,6 @@ class AdvertisementProvider extends ChangeNotifier {
     _updateTimer =
         Timer.periodic(Duration(seconds: updateIntervalSeconds), (timer) {
       if (_isPeriodicUpdateActive) {
-        _logger.i('Performing periodic advertisement update...');
         fetchAdvertisements();
       } else {
         timer.cancel();
@@ -303,13 +320,10 @@ class AdvertisementProvider extends ChangeNotifier {
       _updateTimer = null;
     }
     _isPeriodicUpdateActive = false;
-    _logger.i('Periodic advertisement update stopped.');
   }
 
   /// 重新初始化Provider（当依赖变化时调用）
   void reinitialize() {
-    _logger.i('AdvertisementProvider reinitializing...');
-
     // 停止现有的定时更新
     stopPeriodicUpdate();
 
@@ -320,7 +334,6 @@ class AdvertisementProvider extends ChangeNotifier {
     // 如果AppDataProvider已登录，重新启动定时更新
     Future.delayed(const Duration(milliseconds: 100), () {
       if (_appDataProvider.isLoggedIn) {
-        _logger.i('重新初始化完成，重啟廣告定時更新');
         startPeriodicUpdate();
       }
     });
@@ -342,8 +355,6 @@ class AdvertisementProvider extends ChangeNotifier {
         final File expectedFile =
             File('${fileManagerCacheDir.path}/$expectedFileName');
         if (await expectedFile.exists()) {
-          _logger.i(
-              'Found cached advertisement file in FileManager cache: $expectedFileName');
           return true;
         }
 
@@ -353,8 +364,6 @@ class AdvertisementProvider extends ChangeNotifier {
             final String basename =
                 entity.path.split('/').last.split('\\').last;
             if (basename.startsWith(md5)) {
-              _logger.i(
-                  'Found cached advertisement file with MD5 prefix: $basename');
               return true;
             }
           }
@@ -372,15 +381,10 @@ class AdvertisementProvider extends ChangeNotifier {
   /// 使用 FileManager 预下载文件
   Future<void> _predownloadFile(AdModel ad) async {
     try {
-      _logger.i(
-          'Pre-downloading advertisement file using FileManager: ${ad.title}');
-
       // 使用 FileManager 下载文件
       final File? downloadedFile = await _fileManager.getFile(ad.file);
 
       if (downloadedFile != null) {
-        _logger.i(
-            'Advertisement file downloaded successfully via FileManager: ${ad.title}');
       } else {
         _logger.w(
             'Failed to download advertisement file via FileManager: ${ad.title}');
@@ -407,7 +411,7 @@ class AdvertisementProvider extends ChangeNotifier {
                 entity.path.split('/').last.split('\\').last;
             if (basename.startsWith(md5)) {
               await entity.delete();
-              _logger.i('Deleted cached advertisement file: $basename');
+
               break; // 找到并删除第一个匹配的文件即可
             }
           }
@@ -418,13 +422,12 @@ class AdvertisementProvider extends ChangeNotifier {
     }
   }
 
-  ///5，智能对比更新广告列表
+  ///7，智能对比更新广告列表
   Future<void> _smartUpdateAdvertisements(
       List<AdModel> newAdvertisements) async {
     try {
       // 检查数据是否真的发生了变化
       if (!_hasDataChanged(newAdvertisements)) {
-        _logger.i('广告数据没有变化，跳过更新操作');
         return;
       }
 
@@ -573,20 +576,39 @@ class AdvertisementProvider extends ChangeNotifier {
       final List<AdModel> newFullCarouselAds = fullCarouselData
           .map((jsonItem) => AdModel.fromJson(jsonItem))
           .toList();
-      // 更新轮播广告列表（后台已排序）
-      _topCarouselAdvertisements = List<AdModel>.from(newTopCarouselAds);
-      _fullCarouselAdvertisements = List<AdModel>.from(newFullCarouselAds);
+      // 检查顶部广告轮播数据是否变化
+      final bool hasTopCarouselChanges =
+          _hasTopCarouselDataChanged(newTopCarouselAds);
+      if (hasTopCarouselChanges) {
+        _logger.i('检测到顶部广告轮播数据变化，开始更新...');
+        _topCarouselAdvertisements = List<AdModel>.from(newTopCarouselAds);
+        await _saveTopCarouselAdvertisementsToCache(_topCarouselAdvertisements);
 
-      // 保存轮播广告数据到缓存
-      await _saveTopCarouselAdvertisementsToCache(_topCarouselAdvertisements);
-      await _saveFullCarouselAdvertisementsToCache(_fullCarouselAdvertisements);
-
-      // 通知轮播Provider更新数据
-      if (_topAdCarouselProvider != null) {
-        _topAdCarouselProvider!.updateCarouselList(_topCarouselAdvertisements);
+        // 通知轮播Provider更新数据
+        if (_topAdCarouselProvider != null) {
+          _topAdCarouselProvider!
+              .updateCarouselList(_topCarouselAdvertisements);
+        }
+      } else {
+        _logger.i('顶部广告轮播数据无变化，跳过更新操作');
       }
-      if (_fullscreenAdProvider != null) {
-        _fullscreenAdProvider!.updateCarouselList(_fullCarouselAdvertisements);
+
+      // 检查全屏广告轮播数据是否变化
+      final bool hasFullCarouselChanges =
+          _hasFullCarouselDataChanged(newFullCarouselAds);
+      if (hasFullCarouselChanges) {
+        _logger.i('检测到全屏广告轮播数据变化，开始更新...');
+        _fullCarouselAdvertisements = List<AdModel>.from(newFullCarouselAds);
+        await _saveFullCarouselAdvertisementsToCache(
+            _fullCarouselAdvertisements);
+
+        // 通知轮播Provider更新数据
+        if (_fullscreenAdProvider != null) {
+          _fullscreenAdProvider!
+              .updateCarouselList(_fullCarouselAdvertisements);
+        }
+      } else {
+        _logger.i('全屏广告轮播数据无变化，跳过更新操作');
       }
 
       _logger.i(
@@ -701,7 +723,7 @@ class AdvertisementProvider extends ChangeNotifier {
     }
   }
 
-  ///6，更新视频池管理器（私有方法）
+  ///8，更新视频池管理器（私有方法）
   Future<void> _updateVideoPool() async {
     try {
       // 提取顶部广告中的视频文件路径
@@ -740,12 +762,12 @@ class AdvertisementProvider extends ChangeNotifier {
     }
   }
 
-  ///7，获取视频池状态信息（调试用）
+  ///9，获取视频池状态信息（调试用）
   Map<String, dynamic> getVideoPoolStatus() {
     return _videoPoolManager.getPoolStatus();
   }
 
-  ///8，强制清理特定视频的控制器
+  ///10，强制清理特定视频的控制器
   Future<void> forceRemoveVideoController({
     required String filePath,
     required VideoType videoType,
@@ -763,10 +785,10 @@ class AdvertisementProvider extends ChangeNotifier {
     }
   }
 
-  ///9，获取视频池管理器实例（供组件使用）
+  ///11，获取视频池管理器实例（供组件使用）
   EnhancedVideoPoolManager get videoPoolManager => _videoPoolManager;
 
-  ///10，调试方法：打印视频池状态
+  ///12，调试方法：打印视频池状态
   void debugPrintVideoPoolStatus() {
     _videoPoolManager.debugPrintPoolStatus();
   }

@@ -18,13 +18,13 @@ class FullAdWidget extends StatefulWidget {
   final VoidCallback? onVideoDisposed; // 视频资源释放完成回调
 
   const FullAdWidget({
-    Key? key,
+    super.key,
     required this.ad,
     required this.fileManager,
     this.initialVideoPosition,
     this.onVideoProgressChanged,
     this.onVideoDisposed,
-  }) : super(key: key);
+  });
 
   @override
   State<FullAdWidget> createState() => _FullAdWidgetState();
@@ -247,7 +247,7 @@ class _FullAdWidgetState extends State<FullAdWidget> {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
+    return SizedBox(
       width: double.infinity,
       height: double.infinity,
       child: Stack(
@@ -297,7 +297,7 @@ class _FullAdWidgetState extends State<FullAdWidget> {
 
         if (snapshot.hasData && snapshot.data != null) {
           final localFile = snapshot.data!;
-          return Container(
+          return SizedBox(
             width: double.infinity,
             height: double.infinity,
             child: Image.file(
@@ -353,7 +353,7 @@ class _FullAdWidgetState extends State<FullAdWidget> {
         width: double.infinity,
         height: double.infinity,
         color: Colors.black,
-        child: Center(
+        child: const Center(
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
@@ -381,13 +381,13 @@ class _FullAdWidgetState extends State<FullAdWidget> {
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Icon(
+              const Icon(
                 Icons.error_outline,
                 size: 80,
                 color: Colors.red,
               ),
-              SizedBox(height: 20),
-              Text(
+              const SizedBox(height: 20),
+              const Text(
                 '视频加载失败',
                 style: TextStyle(
                   color: Colors.white,
@@ -395,19 +395,19 @@ class _FullAdWidgetState extends State<FullAdWidget> {
                   fontWeight: FontWeight.bold,
                 ),
               ),
-              SizedBox(height: 10),
+              const SizedBox(height: 10),
               Text(
                 _errorMessage!,
-                style: TextStyle(
+                style: const TextStyle(
                   color: Colors.white70,
                   fontSize: 16,
                 ),
                 textAlign: TextAlign.center,
               ),
-              SizedBox(height: 20),
+              const SizedBox(height: 20),
               ElevatedButton(
                 onPressed: _initializeVideo,
-                child: Text('重试'),
+                child: const Text('重试'),
               ),
             ],
           ),
@@ -440,13 +440,13 @@ class _FullAdWidgetState extends State<FullAdWidget> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(
+            const Icon(
               Icons.play_circle_outline,
               size: 100,
               color: Colors.white,
             ),
-            SizedBox(height: 20),
-            Text(
+            const SizedBox(height: 20),
+            const Text(
               '視頻廣告',
               style: TextStyle(
                 color: Colors.white,
@@ -454,10 +454,10 @@ class _FullAdWidgetState extends State<FullAdWidget> {
                 fontWeight: FontWeight.bold,
               ),
             ),
-            SizedBox(height: 10),
+            const SizedBox(height: 10),
             Text(
               widget.ad.title,
-              style: TextStyle(
+              style: const TextStyle(
                 color: Colors.white70,
                 fontSize: 16,
               ),
@@ -488,12 +488,12 @@ class _FullAdWidgetState extends State<FullAdWidget> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(
+            const Icon(
               Icons.ads_click,
               size: 120,
               color: Colors.white,
             ),
-            SizedBox(height: 30),
+            const SizedBox(height: 30),
             Text(
               widget.ad.title,
               style: TextStyle(
@@ -502,7 +502,7 @@ class _FullAdWidgetState extends State<FullAdWidget> {
                 color: Colors.white,
                 shadows: [
                   Shadow(
-                    offset: Offset(2, 2),
+                    offset: const Offset(2, 2),
                     blurRadius: 4,
                     color: Colors.black.withOpacity(0.3),
                   ),
@@ -510,7 +510,7 @@ class _FullAdWidgetState extends State<FullAdWidget> {
               ),
               textAlign: TextAlign.center,
             ),
-            SizedBox(height: 20),
+            const SizedBox(height: 20),
             Text(
               widget.ad.description,
               style: TextStyle(

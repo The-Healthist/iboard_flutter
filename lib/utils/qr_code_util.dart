@@ -65,7 +65,7 @@ class QrCodeUtil {
         // _logger.e('❌ 二维码生成失败: byteData为null');
         return null;
       }
-    } catch (e, stackTrace) {
+    } catch (e) {
       // _logger.e('❌ 二维码生成异常: $e\n$stackTrace');
       return null;
     }

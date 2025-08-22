@@ -6,7 +6,7 @@ import 'package:provider/provider.dart';
 /// RTHK新闻调试组件
 /// 显示RTHK新闻的更新倒计时和列表信息
 class DebugRthkNewsWidget extends StatefulWidget {
-  const DebugRthkNewsWidget({Key? key}) : super(key: key);
+  const DebugRthkNewsWidget({super.key});
 
   @override
   _DebugRthkNewsWidgetState createState() => _DebugRthkNewsWidgetState();
@@ -56,7 +56,7 @@ class _DebugRthkNewsWidgetState extends State<DebugRthkNewsWidget> {
 
     final minutes = remaining.inMinutes;
     final seconds = remaining.inSeconds % 60;
-    return '${minutes}:${seconds.toString().padLeft(2, '0')}';
+    return '$minutes:${seconds.toString().padLeft(2, '0')}';
   }
 
   ///3, 获取最后更新时间显示
@@ -255,7 +255,7 @@ class _DebugRthkNewsWidgetState extends State<DebugRthkNewsWidget> {
                   ],
                 ),
               );
-            }).toList(),
+            }),
           ],
         ),
       ),

@@ -11,6 +11,8 @@ import 'package:iboard_app/widgets/carousel_widget.dart'; // 导入通知类
 import 'package:provider/provider.dart';
 
 class SettingsPage extends StatefulWidget {
+  const SettingsPage({super.key});
+
   @override
   _SettingsPageState createState() => _SettingsPageState();
 }
@@ -157,7 +159,7 @@ class _SettingsPageState extends State<SettingsPage> {
                 // 頂部標題區域
                 Container(
                   width: double.infinity,
-                  padding: EdgeInsets.all(20),
+                  padding: const EdgeInsets.all(20),
                   decoration: BoxDecoration(
                     color: Colors.white,
                     boxShadow: [
@@ -165,7 +167,7 @@ class _SettingsPageState extends State<SettingsPage> {
                         color: Colors.grey.withOpacity(0.1),
                         spreadRadius: 1,
                         blurRadius: 3,
-                        offset: Offset(0, 2),
+                        offset: const Offset(0, 2),
                       ),
                     ],
                   ),
@@ -173,15 +175,15 @@ class _SettingsPageState extends State<SettingsPage> {
                     children: [
                       IconButton(
                         onPressed: _exitSettingsPage, // 使用新的退出方法
-                        icon: Icon(Icons.arrow_back, size: 28),
+                        icon: const Icon(Icons.arrow_back, size: 28),
                       ),
-                      SizedBox(width: 16),
+                      const SizedBox(width: 16),
                       Icon(
                         Icons.settings,
                         size: 32,
                         color: Colors.blue.shade600,
                       ),
-                      SizedBox(width: 16),
+                      const SizedBox(width: 16),
                       Text(
                         '設置',
                         style: TextStyle(
@@ -197,14 +199,14 @@ class _SettingsPageState extends State<SettingsPage> {
                 Expanded(
                   child: Container(
                     width: double.infinity,
-                    padding: EdgeInsets.all(20),
+                    padding: const EdgeInsets.all(20),
                     child: Column(
                       children: [
-                        SizedBox(height: 40),
+                        const SizedBox(height: 40),
                         // 設置項目占位符
                         Container(
                           width: double.infinity,
-                          padding: EdgeInsets.all(24),
+                          padding: const EdgeInsets.all(24),
                           decoration: BoxDecoration(
                             color: Colors.white,
                             borderRadius: BorderRadius.circular(12),
@@ -213,7 +215,7 @@ class _SettingsPageState extends State<SettingsPage> {
                                 color: Colors.grey.withOpacity(0.1),
                                 spreadRadius: 1,
                                 blurRadius: 6,
-                                offset: Offset(0, 2),
+                                offset: const Offset(0, 2),
                               ),
                             ],
                           ),
@@ -224,7 +226,7 @@ class _SettingsPageState extends State<SettingsPage> {
                                 size: 80,
                                 color: Colors.blue.shade400,
                               ),
-                              SizedBox(height: 20),
+                              const SizedBox(height: 20),
                               Text(
                                 '設置內容區域',
                                 style: TextStyle(
@@ -233,7 +235,7 @@ class _SettingsPageState extends State<SettingsPage> {
                                   color: Colors.grey.shade700,
                                 ),
                               ),
-                              SizedBox(height: 16),
+                              const SizedBox(height: 16),
                               Text(
                                 '這裡將顯示各種設置選項',
                                 style: TextStyle(
@@ -245,29 +247,29 @@ class _SettingsPageState extends State<SettingsPage> {
                             ],
                           ),
                         ),
-                        SizedBox(height: 30),
+                        const SizedBox(height: 30),
                         // 示例設置選項
                         _buildSettingsItem(
                           icon: Icons.schedule,
                           title: '時間設定',
                           subtitle: '查看設備資訊和系統時間參數設置',
-                          onTap: () => _navigateToSubPage(TimeSettingsPage()),
+                          onTap: () => _navigateToSubPage(const TimeSettingsPage()),
                         ),
-                        SizedBox(height: 16),
+                        const SizedBox(height: 16),
                         _buildSettingsItem(
                           icon: Icons.display_settings,
                           title: '顯示設置',
                           subtitle: '調整螢幕顯示參數',
                           onTap: _navigateToCarouselSettings,
                         ),
-                        SizedBox(height: 16),
+                        const SizedBox(height: 16),
                         _buildSettingsItem(
                           icon: Icons.network_wifi,
                           title: '網絡設置',
                           subtitle: '配置網絡連接',
                           onTap: () {},
                         ),
-                        SizedBox(height: 16),
+                        const SizedBox(height: 16),
                         _buildVersionUpdateItem(),
                       ],
                     ),
@@ -296,13 +298,13 @@ class _SettingsPageState extends State<SettingsPage> {
             color: Colors.grey.withOpacity(0.1),
             spreadRadius: 1,
             blurRadius: 3,
-            offset: Offset(0, 1),
+            offset: const Offset(0, 1),
           ),
         ],
       ),
       child: ListTile(
         leading: Container(
-          padding: EdgeInsets.all(8),
+          padding: const EdgeInsets.all(8),
           decoration: BoxDecoration(
             color: Colors.blue.shade50,
             borderRadius: BorderRadius.circular(8),
@@ -315,7 +317,7 @@ class _SettingsPageState extends State<SettingsPage> {
         ),
         title: Text(
           title,
-          style: TextStyle(
+          style: const TextStyle(
             fontSize: 16,
             fontWeight: FontWeight.w600,
           ),
@@ -350,13 +352,13 @@ class _SettingsPageState extends State<SettingsPage> {
                 color: Colors.grey.withOpacity(0.1),
                 spreadRadius: 1,
                 blurRadius: 3,
-                offset: Offset(0, 1),
+                offset: const Offset(0, 1),
               ),
             ],
           ),
           child: ListTile(
             leading: Container(
-              padding: EdgeInsets.all(8),
+              padding: const EdgeInsets.all(8),
               decoration: BoxDecoration(
                 color: Colors.blue.shade50,
                 borderRadius: BorderRadius.circular(8),
@@ -367,7 +369,7 @@ class _SettingsPageState extends State<SettingsPage> {
                 size: 24,
               ),
             ),
-            title: Text(
+            title: const Text(
               '版本更新',
               style: TextStyle(
                 fontSize: 16,
@@ -394,14 +396,14 @@ class _SettingsPageState extends State<SettingsPage> {
                           : Colors.blue.shade600,
                       foregroundColor: Colors.white,
                       padding:
-                          EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                      minimumSize: Size(80, 32), // 稍微增加按钮宽度以容纳loading
+                          const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                      minimumSize: const Size(80, 32), // 稍微增加按钮宽度以容纳loading
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(16),
                       ),
                     ),
                     child: updateProvider.isInstalling
-                        ? Row(
+                        ? const Row(
                             mainAxisSize: MainAxisSize.min,
                             children: [
                               SizedBox(
@@ -423,14 +425,14 @@ class _SettingsPageState extends State<SettingsPage> {
                               ),
                             ],
                           )
-                        : Text(
+                        : const Text(
                             '更新',
                             style: TextStyle(
                                 fontSize: 12, fontWeight: FontWeight.w500),
                           ),
                   )
                 : Container(
-                    padding: EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                     decoration: BoxDecoration(
                       color: Colors.grey.shade50,
                       borderRadius: BorderRadius.circular(16),
@@ -447,7 +449,7 @@ class _SettingsPageState extends State<SettingsPage> {
                   ),
             onTap: updateProvider.hasLocalApk
                 ? null // 有更新时不允许整行点击，只能点击按钮
-                : () => _navigateToSubPage(TimeSettingsPage()),
+                : () => _navigateToSubPage(const TimeSettingsPage()),
           ),
         );
       },

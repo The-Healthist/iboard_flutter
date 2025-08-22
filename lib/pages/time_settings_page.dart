@@ -8,13 +8,34 @@ import 'package:provider/provider.dart';
 import 'package:flutter/foundation.dart'; // 导入kDebugMode
 
 class TimeSettingsPage extends StatefulWidget {
-  const TimeSettingsPage({Key? key}) : super(key: key);
+  const TimeSettingsPage({super.key});
 
   @override
   _TimeSettingsPageState createState() => _TimeSettingsPageState();
 }
 
 class _TimeSettingsPageState extends State<TimeSettingsPage> {
+  bool _isLoading = false;
+
+  Future<void> _refreshData() async {
+    setState(() {
+      _isLoading = true;
+    });
+
+    try {
+      final appDataProvider = Provider.of<AppDataProvider>(context, listen: false);
+      await appDataProvider.initialize();
+    } catch (e) {
+      // 处理错误，例如显示SnackBar
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('刷新失败: $e')),
+      );
+    } finally {
+      setState(() {
+        _isLoading = false;
+      });
+    }
+  }
   @override
   Widget build(BuildContext context) {
     return WillPopScope(
@@ -32,7 +53,7 @@ class _TimeSettingsPageState extends State<TimeSettingsPage> {
 
           return Scaffold(
             backgroundColor: Colors.grey.shade50,
-            body: Container(
+            body: SizedBox(
               width: double.infinity,
               height: double.infinity,
               child: SafeArea(
@@ -41,7 +62,7 @@ class _TimeSettingsPageState extends State<TimeSettingsPage> {
                     // 顶部标题区域
                     Container(
                       width: double.infinity,
-                      padding: EdgeInsets.all(20),
+                      padding: const EdgeInsets.all(20),
                       decoration: BoxDecoration(
                         color: Colors.white,
                         boxShadow: [
@@ -49,7 +70,7 @@ class _TimeSettingsPageState extends State<TimeSettingsPage> {
                             color: Colors.grey.withOpacity(0.05),
                             spreadRadius: 1,
                             blurRadius: 3,
-                            offset: Offset(0, 2),
+                            offset: const Offset(0, 2),
                           ),
                         ],
                       ),
@@ -60,15 +81,15 @@ class _TimeSettingsPageState extends State<TimeSettingsPage> {
                               // 直接返回，不恢复轮播
                               Navigator.pop(context);
                             },
-                            icon: Icon(Icons.arrow_back, size: 28),
+                            icon: const Icon(Icons.arrow_back, size: 28),
                           ),
-                          SizedBox(width: 16),
+                          const SizedBox(width: 16),
                           Icon(
                             Icons.schedule,
                             size: 32,
                             color: Colors.blue.shade600,
                           ),
-                          SizedBox(width: 16),
+                          const SizedBox(width: 16),
                           Text(
                             '時間設定',
                             style: TextStyle(
@@ -77,7 +98,26 @@ class _TimeSettingsPageState extends State<TimeSettingsPage> {
                               color: Colors.grey.shade800,
                             ),
                           ),
-                          Spacer(),
+                          const Spacer(),
+                          IconButton(
+                            onPressed: _isLoading ? null : _refreshData,
+                            icon: _isLoading
+                                ? SizedBox(
+                                    width: 24,
+                                    height: 24,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                      color: Colors.blue.shade600,
+                                    ),
+                                  )
+                                : Icon(
+                                    Icons.refresh,
+                                    color: Colors.blue.shade600,
+                                    size: 28,
+                                  ),
+                            tooltip: '手动刷新设备信息和设置',
+                          ),
+                          const SizedBox(width: 8), // 添加间距
                           IconButton(
                             onPressed: () {
                               Navigator.push(
@@ -102,15 +142,15 @@ class _TimeSettingsPageState extends State<TimeSettingsPage> {
                     // 主要内容区域
                     Expanded(
                       child: SingleChildScrollView(
-                        padding: EdgeInsets.all(20),
+                        padding: const EdgeInsets.all(20),
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             // 设备基本信息卡片
                             Container(
                               width: double.infinity,
-                              margin: EdgeInsets.only(top: 8),
-                              padding: EdgeInsets.all(24),
+                              margin: const EdgeInsets.only(top: 8),
+                              padding: const EdgeInsets.all(24),
                               decoration: BoxDecoration(
                                 color: Colors.white,
                                 borderRadius: BorderRadius.circular(8),
@@ -119,7 +159,7 @@ class _TimeSettingsPageState extends State<TimeSettingsPage> {
                                     color: Colors.grey.withOpacity(0.05),
                                     spreadRadius: 1,
                                     blurRadius: 3,
-                                    offset: Offset(0, 2),
+                                    offset: const Offset(0, 2),
                                   ),
                                 ],
                               ),
@@ -129,7 +169,7 @@ class _TimeSettingsPageState extends State<TimeSettingsPage> {
                                   Row(
                                     children: [
                                       Container(
-                                        padding: EdgeInsets.all(10),
+                                        padding: const EdgeInsets.all(10),
                                         decoration: BoxDecoration(
                                           color: Colors.blue.shade50,
                                           borderRadius:
@@ -141,7 +181,7 @@ class _TimeSettingsPageState extends State<TimeSettingsPage> {
                                           size: 24,
                                         ),
                                       ),
-                                      SizedBox(width: 16),
+                                      const SizedBox(width: 16),
                                       Text(
                                         '設備信息',
                                         style: TextStyle(
@@ -152,9 +192,9 @@ class _TimeSettingsPageState extends State<TimeSettingsPage> {
                                       ),
                                     ],
                                   ),
-                                  SizedBox(height: 24),
+                                  const SizedBox(height: 24),
                                   _buildInfoRow('設備ID', deviceId ?? '未获取'),
-                                  SizedBox(height: 12),
+                                  const SizedBox(height: 12),
                                   _buildInfoRow(
                                     '登錄狀態',
                                     isLoggedIn ? '已登錄' : '未登錄',
@@ -163,21 +203,21 @@ class _TimeSettingsPageState extends State<TimeSettingsPage> {
                                         : Colors.red.shade700,
                                   ),
                                   if (settingsModel?.building != null) ...[
-                                    SizedBox(height: 12),
+                                    const SizedBox(height: 12),
                                     _buildInfoRow(
                                         '地區', settingsModel!.building.location),
-                                    SizedBox(height: 12),
+                                    const SizedBox(height: 12),
                                     _buildInfoRow(
                                         '建築物', settingsModel.building.name),
-                                    SizedBox(height: 12),
+                                    const SizedBox(height: 12),
                                     _buildInfoRow('iSmart ID',
                                         settingsModel.building.ismartId),
-                                    SizedBox(height: 12),
+                                    const SizedBox(height: 12),
                                     _buildInfoRow('位置信息',
                                         settingsModel.building.location),
                                   ],
                                   if (error != null) ...[
-                                    SizedBox(height: 12),
+                                    const SizedBox(height: 12),
                                     _buildInfoRow(
                                         '錯誤信息', error, Colors.red.shade700),
                                   ],
@@ -186,15 +226,15 @@ class _TimeSettingsPageState extends State<TimeSettingsPage> {
                             ),
 
                             // 版本信息卡片
-                            SizedBox(height: 24),
+                            const SizedBox(height: 24),
                             _buildVersionInfoCard(context),
 
                             // 时间设置卡片
                             if (deviceSettings != null) ...[
-                              SizedBox(height: 24),
+                              const SizedBox(height: 24),
                               Container(
                                 width: double.infinity,
-                                padding: EdgeInsets.all(24),
+                                padding: const EdgeInsets.all(24),
                                 decoration: BoxDecoration(
                                   color: Colors.white,
                                   borderRadius: BorderRadius.circular(8),
@@ -203,7 +243,7 @@ class _TimeSettingsPageState extends State<TimeSettingsPage> {
                                       color: Colors.grey.withOpacity(0.05),
                                       spreadRadius: 1,
                                       blurRadius: 3,
-                                      offset: Offset(0, 2),
+                                      offset: const Offset(0, 2),
                                     ),
                                   ],
                                 ),
@@ -213,7 +253,7 @@ class _TimeSettingsPageState extends State<TimeSettingsPage> {
                                     Row(
                                       children: [
                                         Container(
-                                          padding: EdgeInsets.all(10),
+                                          padding: const EdgeInsets.all(10),
                                           decoration: BoxDecoration(
                                             color: Colors.blue.shade50,
                                             borderRadius:
@@ -225,7 +265,7 @@ class _TimeSettingsPageState extends State<TimeSettingsPage> {
                                             size: 24,
                                           ),
                                         ),
-                                        SizedBox(width: 16),
+                                        const SizedBox(width: 16),
                                         Text(
                                           '時間設置',
                                           style: TextStyle(
@@ -236,62 +276,62 @@ class _TimeSettingsPageState extends State<TimeSettingsPage> {
                                         ),
                                       ],
                                     ),
-                                    SizedBox(height: 24),
+                                    const SizedBox(height: 24),
                                     _buildTimeSettingRow(
                                       '欠費更新間隔',
                                       '${deviceSettings.arrearageUpdateDuration}分鐘',
                                     ),
-                                    SizedBox(height: 12),
+                                    const SizedBox(height: 12),
                                     _buildTimeSettingRow(
                                       '通告更新間隔',
                                       '${deviceSettings.noticeUpdateDuration}分鐘',
                                     ),
-                                    SizedBox(height: 12),
+                                    const SizedBox(height: 12),
                                     _buildTimeSettingRow(
                                       '廣告更新間隔',
                                       '${deviceSettings.advertisementUpdateDuration}分鐘',
                                     ),
-                                    SizedBox(height: 12),
+                                    const SizedBox(height: 12),
                                     _buildTimeSettingRow(
                                       '廣告播放時長',
                                       '${deviceSettings.advertisementPlayDuration}秒',
                                     ),
-                                    SizedBox(height: 12),
+                                    const SizedBox(height: 12),
                                     _buildTimeSettingRow(
                                       '通告播放時長',
                                       '${deviceSettings.noticePlayDuration}秒',
                                     ),
-                                    SizedBox(height: 12),
+                                    const SizedBox(height: 12),
                                     _buildTimeSettingRow(
                                       '空閒時長',
                                       '${deviceSettings.spareDuration}秒',
                                     ),
-                                    SizedBox(height: 12),
+                                    const SizedBox(height: 12),
                                     _buildTimeSettingRow(
                                       '通告停留時長',
                                       '${deviceSettings.noticeStayDuration}秒',
                                     ),
-                                    SizedBox(height: 12),
+                                    const SizedBox(height: 12),
                                     _buildTimeSettingRow(
                                       '應用更新時間',
                                       '${deviceSettings.appUpdateDuration}秒',
                                     ),
-                                    SizedBox(height: 12),
+                                    const SizedBox(height: 12),
                                     _buildTimeSettingRow(
                                       '底部輪播時間',
                                       '${deviceSettings.bottomCarouselDuration}秒',
                                     ),
-                                    SizedBox(height: 12),
+                                    const SizedBox(height: 12),
                                     _buildTimeSettingRow(
                                       '付款表格一頁顯示',
                                       '${deviceSettings.paymentTableOnePageDuration}秒',
                                     ),
-                                    SizedBox(height: 12),
+                                    const SizedBox(height: 12),
                                     _buildTimeSettingRow(
                                       '正常到通告轉換',
                                       '${deviceSettings.normalToAnnouncementCarouselDuration}秒',
                                     ),
-                                    SizedBox(height: 12),
+                                    const SizedBox(height: 12),
                                     _buildTimeSettingRow(
                                       '通告到廣告轉換',
                                       '${deviceSettings.announcementCarouselToFullAdsCarouselDuration}秒',
@@ -300,10 +340,10 @@ class _TimeSettingsPageState extends State<TimeSettingsPage> {
                                 ),
                               ),
                             ] else ...[
-                              SizedBox(height: 24),
+                              const SizedBox(height: 24),
                               Container(
                                 width: double.infinity,
-                                padding: EdgeInsets.all(24),
+                                padding: const EdgeInsets.all(24),
                                 decoration: BoxDecoration(
                                   color: Colors.white,
                                   borderRadius: BorderRadius.circular(8),
@@ -312,7 +352,7 @@ class _TimeSettingsPageState extends State<TimeSettingsPage> {
                                       color: Colors.grey.withOpacity(0.05),
                                       spreadRadius: 1,
                                       blurRadius: 3,
-                                      offset: Offset(0, 2),
+                                      offset: const Offset(0, 2),
                                     ),
                                   ],
                                 ),
@@ -323,7 +363,7 @@ class _TimeSettingsPageState extends State<TimeSettingsPage> {
                                       size: 64,
                                       color: Colors.grey.shade400,
                                     ),
-                                    SizedBox(height: 16),
+                                    const SizedBox(height: 16),
                                     Text(
                                       '請先登錄設備以查看時間設定',
                                       style: TextStyle(
@@ -342,10 +382,10 @@ class _TimeSettingsPageState extends State<TimeSettingsPage> {
 
                     // 在debug模式下显示定时更新调试窗口
                     if (kDebugMode) ...[
-                      SizedBox(height: 24),
+                      const SizedBox(height: 24),
                       Container(
                         width: double.infinity,
-                        padding: EdgeInsets.all(24),
+                        padding: const EdgeInsets.all(24),
                         decoration: BoxDecoration(
                           color: Colors.blue.shade50,
                           borderRadius: BorderRadius.circular(8),
@@ -361,7 +401,7 @@ class _TimeSettingsPageState extends State<TimeSettingsPage> {
                                   color: Colors.blue.shade600,
                                   size: 24,
                                 ),
-                                SizedBox(width: 16),
+                                const SizedBox(width: 16),
                                 Text(
                                   '定时更新调试信息',
                                   style: TextStyle(
@@ -372,7 +412,7 @@ class _TimeSettingsPageState extends State<TimeSettingsPage> {
                                 ),
                               ],
                             ),
-                            SizedBox(height: 16),
+                            const SizedBox(height: 16),
                             // 调试窗口
                             const DebugUpdateTimeWidget(),
                           ],
@@ -393,7 +433,7 @@ class _TimeSettingsPageState extends State<TimeSettingsPage> {
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Container(
+        SizedBox(
           width: 140, // 扩大宽度，与时间设置保持一致
           child: Text(
             '$label:',
@@ -422,7 +462,7 @@ class _TimeSettingsPageState extends State<TimeSettingsPage> {
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Container(
+        SizedBox(
           width: 140,
           child: Text(
             '$label:',
@@ -453,7 +493,7 @@ class _TimeSettingsPageState extends State<TimeSettingsPage> {
       builder: (context, updateProvider, child) {
         return Container(
           width: double.infinity,
-          padding: EdgeInsets.all(24),
+          padding: const EdgeInsets.all(24),
           decoration: BoxDecoration(
             color: Colors.white,
             borderRadius: BorderRadius.circular(8),
@@ -462,7 +502,7 @@ class _TimeSettingsPageState extends State<TimeSettingsPage> {
                 color: Colors.grey.withOpacity(0.05),
                 spreadRadius: 1,
                 blurRadius: 3,
-                offset: Offset(0, 2),
+                offset: const Offset(0, 2),
               ),
             ],
           ),
@@ -473,7 +513,7 @@ class _TimeSettingsPageState extends State<TimeSettingsPage> {
               Row(
                 children: [
                   Container(
-                    padding: EdgeInsets.all(10),
+                    padding: const EdgeInsets.all(10),
                     decoration: BoxDecoration(
                       color: Colors.green.shade50,
                       borderRadius: BorderRadius.circular(8),
@@ -484,7 +524,7 @@ class _TimeSettingsPageState extends State<TimeSettingsPage> {
                       size: 24,
                     ),
                   ),
-                  SizedBox(width: 16),
+                  const SizedBox(width: 16),
                   Expanded(
                     child: Text(
                       '版本信息',
@@ -521,21 +561,21 @@ class _TimeSettingsPageState extends State<TimeSettingsPage> {
                   ),
                 ],
               ),
-              SizedBox(height: 24),
+              const SizedBox(height: 24),
 
               // 当前版本信息 - 使用统一的行样式
               _buildInfoRow('當前版本', updateProvider.currentVersion ?? '獲取中...'),
 
               // 最新版本信息
               if (updateProvider.hasUpdate) ...[
-                SizedBox(height: 12),
+                const SizedBox(height: 12),
                 _buildInfoRow('最新版本', updateProvider.remoteVersion ?? '未知',
                     Colors.green.shade700),
               ],
 
               // APK下载状态
               if (updateProvider.hasUpdate) ...[
-                SizedBox(height: 12),
+                const SizedBox(height: 12),
                 _buildInfoRow(
                     'APK狀態',
                     updateProvider.hasLocalApk ? '下載成功' : '未下載',
@@ -546,24 +586,24 @@ class _TimeSettingsPageState extends State<TimeSettingsPage> {
 
               // 更新描述
               if (updateProvider.updateDescription != null) ...[
-                SizedBox(height: 12),
+                const SizedBox(height: 12),
                 _buildInfoRow('更新內容', updateProvider.updateDescription!),
               ],
 
               // 错误信息
               if (updateProvider.error != null) ...[
-                SizedBox(height: 12),
+                const SizedBox(height: 12),
                 _buildInfoRow(
                     '錯誤信息', updateProvider.error!, Colors.red.shade700),
               ],
 
               // 状态提示
               if (updateProvider.currentVersion != null) ...[
-                SizedBox(height: 20),
+                const SizedBox(height: 20),
                 if (updateProvider.hasUpdate && updateProvider.hasLocalApk) ...[
                   Container(
                     width: double.infinity,
-                    padding: EdgeInsets.all(12),
+                    padding: const EdgeInsets.all(12),
                     decoration: BoxDecoration(
                       color: Colors.blue.shade50,
                       borderRadius: BorderRadius.circular(8),
@@ -576,7 +616,7 @@ class _TimeSettingsPageState extends State<TimeSettingsPage> {
                           color: Colors.blue.shade600,
                           size: 20,
                         ),
-                        SizedBox(width: 8),
+                        const SizedBox(width: 8),
                         Expanded(
                           child: Text(
                             '新版本已下載到應用緩存，請到設置頁面進行更新',
@@ -593,7 +633,7 @@ class _TimeSettingsPageState extends State<TimeSettingsPage> {
                 ] else if (!updateProvider.hasUpdate) ...[
                   Container(
                     width: double.infinity,
-                    padding: EdgeInsets.all(12),
+                    padding: const EdgeInsets.all(12),
                     decoration: BoxDecoration(
                       color: Colors.green.shade50,
                       borderRadius: BorderRadius.circular(8),
@@ -606,7 +646,7 @@ class _TimeSettingsPageState extends State<TimeSettingsPage> {
                           color: Colors.green.shade600,
                           size: 20,
                         ),
-                        SizedBox(width: 8),
+                        const SizedBox(width: 8),
                         Text(
                           '當前已是最新版本',
                           style: TextStyle(

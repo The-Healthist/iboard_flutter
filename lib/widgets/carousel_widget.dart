@@ -11,8 +11,24 @@ class MediaResumeNotification extends Notification {}
 class CarouselController {
   _CarouselWidgetState? _state;
 
+  // Pending update storage when controller is detached. Applied on next attach.
+  Map<String, Widget>? _pendingWidgetMap;
+  List<String>? _pendingOrderedKeys;
+
   void _attach(_CarouselWidgetState state) {
     _state = state;
+
+    // Apply any pending smart update when attaching
+    if (_pendingWidgetMap != null && _pendingOrderedKeys != null) {
+      try {
+        _state?.smartUpdateCarousel(_pendingWidgetMap!, _pendingOrderedKeys!);
+      } catch (e) {
+        // ignore errors applying pending update
+      } finally {
+        _pendingWidgetMap = null;
+        _pendingOrderedKeys = null;
+      }
+    }
   }
 
   void _detach() {
@@ -21,13 +37,34 @@ class CarouselController {
 
   /// Set the carousel array with a new list of widgets
   void setCarouselArray(List<Widget> widgets) {
-    _state?.setCarouselArray(widgets);
+    if (_state != null) {
+      _state!.setCarouselArray(widgets);
+      return;
+    }
+
+    // If detached, store as a pending full-replacement smart update
+    final Map<String, Widget> map = {};
+    final List<String> keys = [];
+    for (var i = 0; i < widgets.length; i++) {
+      final k = 'legacy_$i';
+      map[k] = widgets[i];
+      keys.add(k);
+    }
+    _pendingWidgetMap = map;
+    _pendingOrderedKeys = keys;
   }
-  
+
   /// Smart update carousel widgets with minimal disruption
   /// Uses widget keys to identify and preserve existing widgets
-  void smartUpdateCarousel(Map<String, Widget> widgetMap, List<String> orderedKeys) {
-    _state?.smartUpdateCarousel(widgetMap, orderedKeys);
+  void smartUpdateCarousel(
+      Map<String, Widget> widgetMap, List<String> orderedKeys) {
+    if (_state != null) {
+      _state!.smartUpdateCarousel(widgetMap, orderedKeys);
+    } else {
+      // Cache pending smart update to apply when attached
+      _pendingWidgetMap = Map<String, Widget>.from(widgetMap);
+      _pendingOrderedKeys = List<String>.from(orderedKeys);
+    }
   }
 
   /// Clear all widgets from the carousel
@@ -114,7 +151,7 @@ class CarouselWidget extends StatefulWidget {
   final CarouselController? controller;
 
   const CarouselWidget({
-    Key? key,
+    super.key,
     this.initialWidgets = const [],
     this.autoPlayDuration,
     this.animationDuration = const Duration(milliseconds: 300),
@@ -124,7 +161,7 @@ class CarouselWidget extends StatefulWidget {
     this.onPageChanged,
     this.height,
     this.controller,
-  }) : super(key: key);
+  });
 
   @override
   State<CarouselWidget> createState() => _CarouselWidgetState();
@@ -134,12 +171,12 @@ class _CarouselWidgetState extends State<CarouselWidget>
     with TickerProviderStateMixin {
   late PageController _pageController;
   late List<Widget> _widgets;
-  
+
   // 新增：使用Map管理widgets，实现智能更新
   final Map<String, Widget> _widgetMap = {};
   List<String> _widgetKeys = [];
   String? _currentWidgetKey;
-  
+
   int _currentIndex = 0;
   Timer? _autoPlayTimer;
   bool _isAnimating = false;
@@ -150,6 +187,18 @@ class _CarouselWidgetState extends State<CarouselWidget>
     _widgets = List.from(widget.initialWidgets);
     _pageController = PageController(initialPage: 0);
     widget.controller?._attach(this);
+    // 初始化widget map和keys（如果initialWidgets由旧接口提供）
+    if (widget.initialWidgets.isNotEmpty) {
+      _widgetMap.clear();
+      _widgetKeys = [];
+      for (var i = 0; i < widget.initialWidgets.length; i++) {
+        final k = 'legacy_$i';
+        _widgetMap[k] = widget.initialWidgets[i];
+        _widgetKeys.add(k);
+      }
+      _currentWidgetKey = _widgetKeys.isNotEmpty ? _widgetKeys[0] : null;
+    }
+
     _startAutoPlay();
   }
 
@@ -197,7 +246,7 @@ class _CarouselWidgetState extends State<CarouselWidget>
       _widgetMap.clear();
       _widgetKeys.clear();
       _currentWidgetKey = null;
-      
+
       if (_widgets.isEmpty) {
         _currentIndex = 0;
       } else {
@@ -207,7 +256,7 @@ class _CarouselWidgetState extends State<CarouselWidget>
 
     if (_widgets.isNotEmpty && _pageController.hasClients) {
       // Jump to the preserved index without animation to avoid interrupting media playback
-      
+
       _pageController.jumpToPage(_currentIndex);
     }
 
@@ -217,23 +266,27 @@ class _CarouselWidgetState extends State<CarouselWidget>
       widget.onPageChanged!(_widgets.isEmpty ? -1 : _currentIndex);
     }
   }
-  
+
   /// Smart update carousel with minimal disruption
   /// This method intelligently updates widgets by:
   /// 1. Preserving existing widgets that haven't changed
   /// 2. Only adding/removing/reordering as needed
   /// 3. Maintaining current viewing position
-  void smartUpdateCarousel(Map<String, Widget> newWidgetMap, List<String> newOrderedKeys) {
+  void smartUpdateCarousel(
+      Map<String, Widget> newWidgetMap, List<String> newOrderedKeys) {
+    debugPrint(
+        '[Carousel] smartUpdateCarousel called: newKeys=${newOrderedKeys.length}, currentKeys=${_widgetKeys.length}, hasClients=${_pageController.hasClients}');
+
     if (newOrderedKeys.isEmpty) {
       clearCarouselArray();
       return;
     }
-    
+
     // 记录当前正在查看的widget的key
     if (_widgetKeys.isNotEmpty && _currentIndex < _widgetKeys.length) {
       _currentWidgetKey = _widgetKeys[_currentIndex];
     }
-    
+
     setState(() {
       // 智能更新Map：只更新变化的部分
       // 1. 添加新的widgets
@@ -242,18 +295,19 @@ class _CarouselWidgetState extends State<CarouselWidget>
           _widgetMap[key] = widget;
         }
       });
-      
+
       // 2. 删除不再需要的widgets
       _widgetMap.removeWhere((key, value) => !newWidgetMap.containsKey(key));
-      
+
       // 3. 更新顺序
       _widgetKeys = List.from(newOrderedKeys);
-      
+
       // 4. 根据新顺序生成widget列表
       _widgets = _widgetKeys.map((key) => _widgetMap[key]!).toList();
-      
+
       // 5. 智能定位：尝试保持在当前widget
-      if (_currentWidgetKey != null && _widgetKeys.contains(_currentWidgetKey)) {
+      if (_currentWidgetKey != null &&
+          _widgetKeys.contains(_currentWidgetKey)) {
         // 当前widget还存在，定位到它
         _currentIndex = _widgetKeys.indexOf(_currentWidgetKey!);
       } else if (_currentIndex >= _widgets.length) {
@@ -262,17 +316,28 @@ class _CarouselWidgetState extends State<CarouselWidget>
       }
       // 否则保持当前索引不变
     });
-    
-    // 使用jumpToPage避免动画，保持流畅
-    if (_widgets.isNotEmpty && _pageController.hasClients) {
-      if (_pageController.page?.round() != _currentIndex) {
 
-        _pageController.jumpToPage(_currentIndex);
+    // 使用jumpToPage避免动画，保持流畅
+    if (_widgets.isNotEmpty) {
+      if (_pageController.hasClients) {
+        if ((_pageController.page?.round() ?? -1) != _currentIndex) {
+          debugPrint('[Carousel] jumping to preserved index $_currentIndex');
+          _pageController.jumpToPage(_currentIndex);
+        }
+      } else {
+        // 如果控制器尚未准备好，延迟到下一帧执行跳转
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted && _pageController.hasClients) {
+            debugPrint(
+                '[Carousel] post-frame jumping to preserved index $_currentIndex');
+            _pageController.jumpToPage(_currentIndex);
+          }
+        });
       }
     }
-    
+
     _restartAutoPlay();
-    
+
     if (widget.onPageChanged != null) {
       widget.onPageChanged!(_widgets.isEmpty ? -1 : _currentIndex);
     }
@@ -295,7 +360,6 @@ class _CarouselWidgetState extends State<CarouselWidget>
   /// Delete a widget at the specified index
   void delete(int index) {
     if (index < 0 || index >= _widgets.length) {
-
       return;
     }
 
@@ -388,7 +452,6 @@ class _CarouselWidgetState extends State<CarouselWidget>
           _isAnimating = false;
         });
       }
-
     });
   }
 
@@ -423,14 +486,14 @@ class _CarouselWidgetState extends State<CarouselWidget>
           _isAnimating = false;
         });
       }
-
     });
   }
 
   /// Jump to a specific index without animation
   void jumpToIndex(int index) {
-    if (index < 0 || index >= _widgets.length || !_pageController.hasClients)
+    if (index < 0 || index >= _widgets.length || !_pageController.hasClients) {
       return;
+    }
 
     setState(() {
       _currentIndex = index;
@@ -460,7 +523,6 @@ class _CarouselWidgetState extends State<CarouselWidget>
     if (context.mounted) {
       // 使用通知机制通知所有子组件
       MediaPauseNotification().dispatch(context);
-
     }
   }
 
@@ -470,14 +532,13 @@ class _CarouselWidgetState extends State<CarouselWidget>
     if (context.mounted) {
       // 使用通知机制通知所有子组件
       MediaResumeNotification().dispatch(context);
-
     }
   }
 
   @override
   Widget build(BuildContext context) {
     if (_widgets.isEmpty) {
-      return Container(
+      return SizedBox(
         width: double.infinity,
         height: widget.height,
         child: const Center(
@@ -492,39 +553,45 @@ class _CarouselWidgetState extends State<CarouselWidget>
       );
     }
 
-    return Container(
+    return SizedBox(
       width: double.infinity,
       height: widget.height,
       child: Column(
         children: [
           Expanded(
-            child: PageView.builder(
-              controller: _pageController,
-              physics: widget.allowManualSwipe
-                  ? const PageScrollPhysics()
-                  : const NeverScrollableScrollPhysics(),
-              onPageChanged: (index) {
-                setState(() {
-                  _currentIndex = index;
-                });
-
-                if (widget.onPageChanged != null) {
-                  widget.onPageChanged!(index);
-                }
-
-                _restartAutoPlay();
+            child: NotificationListener<ScrollNotification>(
+              onNotification: (notification) {
+                // 监听页面视图的attach/detach等事件，方便调试
+                return false;
               },
-              itemCount: _widgets.length,
-              itemBuilder: (context, index) {
-                // 使用key包装widget以保持状态
-                if (_widgetKeys.isNotEmpty && index < _widgetKeys.length) {
-                  return KeyedSubtree(
-                    key: ValueKey(_widgetKeys[index]),
-                    child: _widgets[index],
-                  );
-                }
-                return _widgets[index];
-              },
+              child: PageView.builder(
+                controller: _pageController,
+                physics: widget.allowManualSwipe
+                    ? const PageScrollPhysics()
+                    : const NeverScrollableScrollPhysics(),
+                onPageChanged: (index) {
+                  setState(() {
+                    _currentIndex = index;
+                  });
+
+                  if (widget.onPageChanged != null) {
+                    widget.onPageChanged!(index);
+                  }
+
+                  _restartAutoPlay();
+                },
+                itemCount: _widgets.length,
+                itemBuilder: (context, index) {
+                  // 使用key包装widget以保持状态
+                  if (_widgetKeys.isNotEmpty && index < _widgetKeys.length) {
+                    return KeyedSubtree(
+                      key: ValueKey(_widgetKeys[index]),
+                      child: _widgets[index],
+                    );
+                  }
+                  return _widgets[index];
+                },
+              ),
             ),
           ),
           if (widget.showIndicators && _widgets.length > 1)

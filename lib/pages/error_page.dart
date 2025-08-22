@@ -1,20 +1,17 @@
 import 'package:flutter/material.dart';
-import 'package:logger/logger.dart';
 
 class ErrorPage extends StatelessWidget {
   final String errorMessage;
   final VoidCallback onRetry;
 
   const ErrorPage({
-    Key? key,
+    super.key,
     required this.errorMessage,
     required this.onRetry,
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {
-    final Logger _logger = Logger();
-
     return Scaffold(
       body: SafeArea(
         child: Container(
@@ -26,12 +23,12 @@ class ErrorPage extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
               // 错误图标
-              Icon(
+              const Icon(
                 Icons.error_outline,
                 size: 80,
                 color: Colors.redAccent,
               ),
-              SizedBox(height: 30),
+              const SizedBox(height: 30),
 
               // 错误标题
               Text(
@@ -41,7 +38,7 @@ class ErrorPage extends StatelessWidget {
                       color: Colors.redAccent,
                     ),
               ),
-              SizedBox(height: 20),
+              const SizedBox(height: 20),
 
               // 错误描述
               Container(
@@ -54,7 +51,7 @@ class ErrorPage extends StatelessWidget {
                       ),
                 ),
               ),
-              SizedBox(height: 30),
+              const SizedBox(height: 30),
 
               // 重新加载按钮
               ElevatedButton(
@@ -63,13 +60,14 @@ class ErrorPage extends StatelessWidget {
                   onRetry();
                 },
                 style: ElevatedButton.styleFrom(
-                  padding: EdgeInsets.symmetric(horizontal: 30, vertical: 15),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 30, vertical: 15),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(30),
                   ),
                   backgroundColor: Theme.of(context).primaryColor,
                 ),
-                child: Text(
+                child: const Text(
                   '重新加载',
                   style: TextStyle(
                     fontSize: 18,
@@ -79,7 +77,7 @@ class ErrorPage extends StatelessWidget {
                 ),
               ),
 
-              SizedBox(height: 20),
+              const SizedBox(height: 20),
 
               // 返回主页按钮
               TextButton(

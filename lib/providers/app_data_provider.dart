@@ -21,7 +21,7 @@ class AppDataProvider extends ChangeNotifier {
   SettingsModel? _settingsModel;
   String? _deviceId;
   String _baseUrl; // Should be initialized, e.g., from a config
-  String? _fallbackUrl; // 备用服务器地址
+  final String? _fallbackUrl; // 备用服务器地址
   CarouselStateProvider? _carouselStateProvider; // 添加对CarouselStateProvider的引用
   ArrearProvider? _arrearProvider; // 添加对ArrearProvider的引用
 
@@ -89,8 +89,8 @@ class AppDataProvider extends ChangeNotifier {
 
   ///1, 切换到备用服务器
   void _switchToFallbackServer() {
-    if (_fallbackUrl != null && _fallbackUrl!.isNotEmpty) {
-      _baseUrl = _fallbackUrl!;
+    if (_fallbackUrl != null && _fallbackUrl.isNotEmpty) {
+      _baseUrl = _fallbackUrl;
       _apiClient = ApiClient(
         baseUrl: _baseUrl,
         onNeedsTokenRefresh: _handleTokenRefresh,
@@ -413,31 +413,43 @@ class AppDataProvider extends ChangeNotifier {
 
       // 检查是否有字段被修正为默认值
       final corrections = <String>[];
-      if (settings.arrearageUpdateDuration == 0)
+      if (settings.arrearageUpdateDuration == 0) {
         corrections.add('arrearageUpdateDuration: 0 -> 30');
-      if (settings.noticeUpdateDuration == 0)
+      }
+      if (settings.noticeUpdateDuration == 0) {
         corrections.add('noticeUpdateDuration: 0 -> 5');
-      if (settings.advertisementUpdateDuration == 0)
+      }
+      if (settings.advertisementUpdateDuration == 0) {
         corrections.add('advertisementUpdateDuration: 0 -> 10');
-      if (settings.appUpdateDuration == 0)
+      }
+      if (settings.appUpdateDuration == 0) {
         corrections.add('appUpdateDuration: 0 -> 60');
-      if (settings.advertisementPlayDuration == 0)
+      }
+      if (settings.advertisementPlayDuration == 0) {
         corrections.add('advertisementPlayDuration: 0 -> 10');
-      if (settings.noticePlayDuration == 0)
+      }
+      if (settings.noticePlayDuration == 0) {
         corrections.add('noticePlayDuration: 0 -> 15');
-      if (settings.spareDuration == 0)
+      }
+      if (settings.spareDuration == 0) {
         corrections.add('spareDuration: 0 -> 30');
-      if (settings.noticeStayDuration == 0)
+      }
+      if (settings.noticeStayDuration == 0) {
         corrections.add('noticeStayDuration: 0 -> 5');
-      if (settings.bottomCarouselDuration == 0)
+      }
+      if (settings.bottomCarouselDuration == 0) {
         corrections.add('bottomCarouselDuration: 0 -> 10');
-      if (settings.paymentTableOnePageDuration == 0)
+      }
+      if (settings.paymentTableOnePageDuration == 0) {
         corrections.add('paymentTableOnePageDuration: 0 -> 10');
-      if (settings.normalToAnnouncementCarouselDuration == 0)
+      }
+      if (settings.normalToAnnouncementCarouselDuration == 0) {
         corrections.add('normalToAnnouncementCarouselDuration: 0 -> 5');
-      if (settings.announcementCarouselToFullAdsCarouselDuration == 0)
+      }
+      if (settings.announcementCarouselToFullAdsCarouselDuration == 0) {
         corrections
             .add('announcementCarouselToFullAdsCarouselDuration: 0 -> 5');
+      }
       // 将验证后的设置保存到缓存
       await _saveSettingsToCache(validatedSettings);
 
@@ -993,8 +1005,7 @@ class AppDataProvider extends ChangeNotifier {
     if (_arrearProvider != null && !(_arrearProvider!.isDisposed)) {
       try {
         // 确保我们有有效的楼宇ID
-        final buildingIsmartId =
-            _settingsModel != null ? _settingsModel!.building.ismartId : null;
+        final buildingIsmartId = _settingsModel?.building.ismartId;
         if (buildingIsmartId != null && buildingIsmartId.isNotEmpty) {
           // 设置楼宇ID到ArrearProvider
           _arrearProvider!.setSelectedBuildingId(buildingIsmartId);
@@ -1379,8 +1390,8 @@ class AppDataProvider extends ChangeNotifier {
     _isPeriodicLoginActive = true;
 
     // 设置定时器进行周期性登录
-    _loginTimer =
-        Timer.periodic(Duration(hours: _loginIntervalHours), (timer) async {
+    _loginTimer = Timer.periodic(const Duration(hours: _loginIntervalHours),
+        (timer) async {
       if (_isPeriodicLoginActive && _deviceId != null) {
         final loginSuccess = await _safeLogin(context: '定时登录');
         if (loginSuccess) {
@@ -1412,7 +1423,7 @@ class AppDataProvider extends ChangeNotifier {
 
     // 设置定时器进行周期性健康检查
     _healthCheckTimer = Timer.periodic(
-        Duration(minutes: _healthCheckIntervalMinutes), (timer) async {
+        const Duration(minutes: _healthCheckIntervalMinutes), (timer) async {
       if (_isPeriodicHealthCheckActive && isLoggedIn) {
         await performHealthCheck();
       } else {
@@ -1451,7 +1462,7 @@ class AppDataProvider extends ChangeNotifier {
     try {
       final startTime = DateTime.now();
 
-      final result = await _apiClient.healthTest();
+      await _apiClient.healthTest();
 
       final endTime = DateTime.now();
       final duration = endTime.difference(startTime);
@@ -1499,7 +1510,7 @@ class AppDataProvider extends ChangeNotifier {
       await _registerNewDevice(_deviceId!);
     } catch (e) {
       _logger.e('设备注册测试失败', error: e);
-      throw e;
+      rethrow;
     }
   }
 

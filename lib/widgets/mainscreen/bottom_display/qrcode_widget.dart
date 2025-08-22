@@ -10,9 +10,9 @@ class QrcodeWidget extends StatefulWidget {
   final double? containerHeight; // 可选的容器高度参数
 
   const QrcodeWidget({
-    Key? key,
+    super.key,
     this.containerHeight,
-  }) : super(key: key);
+  });
 
   @override
   _QrcodeWidgetState createState() => _QrcodeWidgetState();

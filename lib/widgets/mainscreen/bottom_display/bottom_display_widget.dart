@@ -3,10 +3,9 @@ import 'package:provider/provider.dart';
 import 'package:iboard_app/providers/weather_provider.dart';
 import 'package:iboard_app/widgets/mainscreen/bottom_display/weather_widget.dart';
 import 'package:iboard_app/widgets/mainscreen/bottom_display/qrcode_widget.dart';
-import 'package:logger/logger.dart';
 
 class BottomDisplayWidget extends StatefulWidget {
-  const BottomDisplayWidget({Key? key}) : super(key: key);
+  const BottomDisplayWidget({super.key});
 
   @override
   _BottomDisplayWidgetState createState() => _BottomDisplayWidgetState();
@@ -93,9 +92,8 @@ class _WeatherForecastOnlyWidget extends StatelessWidget {
   final double containerHeight;
 
   const _WeatherForecastOnlyWidget({
-    Key? key,
     required this.containerHeight,
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {

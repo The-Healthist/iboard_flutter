@@ -11,7 +11,7 @@ import 'package:logger/logger.dart';
 import 'dart:async';
 
 class TimerDebugWidget extends StatefulWidget {
-  const TimerDebugWidget({Key? key}) : super(key: key);
+  const TimerDebugWidget({super.key});
 
   @override
   State<TimerDebugWidget> createState() => _TimerDebugWidgetState();
@@ -20,10 +20,10 @@ class TimerDebugWidget extends StatefulWidget {
 class _TimerDebugWidgetState extends State<TimerDebugWidget> {
   final Logger _logger = Logger();
   Timer? _updateTimer;
-  List<Map<String, dynamic>> _debugInfo = [];
+  final List<Map<String, dynamic>> _debugInfo = [];
   bool _isLoading = false;
-  Map<String, Map<String, dynamic>> _manualUpdateResults = {}; // 存储手动更新结果
-  Set<String> _updatingTasks = {}; // 跟踪正在更新的任务
+  final Map<String, Map<String, dynamic>> _manualUpdateResults = {}; // 存储手动更新结果
+  final Set<String> _updatingTasks = {}; // 跟踪正在更新的任务
 
   @override
   void initState() {
@@ -114,7 +114,7 @@ class _TimerDebugWidgetState extends State<TimerDebugWidget> {
         'manualUpdateButton': Column(
           children: [
             _buildManualUpdateButton('manual_login', '手动登录', _manualLogin),
-            SizedBox(height: 8),
+            const SizedBox(height: 8),
             _buildManualUpdateButton(
                 'health_check', '健康检查', _manualHealthCheck),
           ],
@@ -161,7 +161,7 @@ class _TimerDebugWidgetState extends State<TimerDebugWidget> {
     List<String> content = [];
     content
         .add('定时更新状态: ${provider.isPeriodicUpdateActive ? '✅ 运行中' : '❌ 已停止'}');
-    content.add('更新间隔: ${updateInterval}分钟 (${updateInterval * 60}秒)');
+    content.add('更新间隔: $updateInterval分钟 (${updateInterval * 60}秒)');
     content.add('设备设置状态: ${deviceSettings != null ? '✅ 已加载' : '❌ 未加载'}');
     content.add('登录状态: ${appDataProvider.isLoggedIn ? '✅ 已登录' : '❌ 未登录'}');
     content.add('广告总数: ${provider.advertisements.length}');
@@ -189,7 +189,7 @@ class _TimerDebugWidgetState extends State<TimerDebugWidget> {
     List<String> content = [];
     content
         .add('定时更新状态: ${provider.isPeriodicUpdateActive ? '✅ 运行中' : '❌ 已停止'}');
-    content.add('更新间隔: ${updateInterval}分钟 (${updateInterval * 60}秒)');
+    content.add('更新间隔: $updateInterval分钟 (${updateInterval * 60}秒)');
     content.add('设备设置状态: ${deviceSettings != null ? '✅ 已加载' : '❌ 未加载'}');
     content.add('登录状态: ${appDataProvider.isLoggedIn ? '✅ 已登录' : '❌ 未登录'}');
     content.add('通告总数: ${provider.announcements.length}');
@@ -246,7 +246,7 @@ class _TimerDebugWidgetState extends State<TimerDebugWidget> {
     List<String> content = [];
     content
         .add('定时更新状态: ${provider.isPeriodicUpdateActive ? '✅ 运行中' : '❌ 已停止'}');
-    content.add('更新间隔: ${updateInterval}分钟 (${updateInterval * 60}秒)');
+    content.add('更新间隔: $updateInterval分钟 (${updateInterval * 60}秒)');
     content.add('数据状态: ${provider.hasData ? '✅ 有数据' : '❌ 无数据'}');
     content.add('记录总数: ${provider.hasData ? '有数据' : '无数据'}');
     content.add('楼宇数量: ${provider.buildings.length}');
@@ -880,7 +880,7 @@ class _TimerDebugWidgetState extends State<TimerDebugWidget> {
                                         style: const TextStyle(fontSize: 14),
                                       ),
                                     ))
-                                .toList(),
+                                ,
                             // 显示手动更新按钮（如果有的话）
                             if (info['manualUpdateButton'] != null)
                               info['manualUpdateButton'] as Widget,

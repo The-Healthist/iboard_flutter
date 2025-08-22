@@ -607,7 +607,7 @@ class CarouselStateProvider extends ChangeNotifier {
       if (_currentState.currentAppState == AppState.defaultState) {
         // Announcement carousel timer expired log
         print(
-            '⏰ 通告輪播計時器到期 (${announcementCarouselToFullAdsCarouselDuration}秒)，切換到全屏廣告');
+            '⏰ 通告輪播計時器到期 ($announcementCarouselToFullAdsCarouselDuration秒)，切換到全屏廣告');
         enterFullscreenAd();
       }
     });

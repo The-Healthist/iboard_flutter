@@ -1,23 +1,17 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:iboard_app/providers/rthk_news_provider.dart';
-import 'package:iboard_app/widgets/debug_rthk_news_widget.dart';
 import 'package:iboard_app/providers/ad_fullscreen_provider.dart';
-import 'package:logger/logger.dart';
 
-/// 优化后的香港电台新闻跑马灯组件
-/// 使用ScrollController和AnimationController实现水平连续滚动
-/// 结合渐变遮罩避免文字溢出和布局错乱
-/// 确保新闻标题完整显示，不被截断
 class RthkNewsTickerWidget extends StatefulWidget {
   final double height;
   final double width;
 
   const RthkNewsTickerWidget({
-    Key? key,
+    super.key,
     required this.height,
     required this.width,
-  }) : super(key: key);
+  });
 
   @override
   _RthkNewsTickerWidgetState createState() => _RthkNewsTickerWidgetState();
@@ -25,8 +19,6 @@ class RthkNewsTickerWidget extends StatefulWidget {
 
 class _RthkNewsTickerWidgetState extends State<RthkNewsTickerWidget>
     with SingleTickerProviderStateMixin {
-  final Logger _logger = Logger();
-
   late AnimationController _controller;
   late ScrollController _scrollController;
 
@@ -87,14 +79,14 @@ class _RthkNewsTickerWidgetState extends State<RthkNewsTickerWidget>
     _controller.duration = Duration(seconds: durationSeconds);
 
 // 定义监听器变量
-    void _animationListener() {
+    void animationListener() {
       if (!_isPaused) {
         final offset = _controller.value * maxScrollExtent;
         _scrollController.jumpTo(offset);
       }
     }
 
-    void _animationStatusListener(AnimationStatus status) {
+    void animationStatusListener(AnimationStatus status) {
       if (status == AnimationStatus.completed) {
         _controller.reset();
         _controller.forward();
@@ -102,13 +94,13 @@ class _RthkNewsTickerWidgetState extends State<RthkNewsTickerWidget>
     }
 
 // 先移除已有监听器
-    _controller.removeListener(_animationListener);
-    _controller.removeStatusListener(_animationStatusListener);
+    _controller.removeListener(animationListener);
+    _controller.removeStatusListener(animationStatusListener);
 
 // 添加监听器
-    _controller.addListener(_animationListener);
-    _controller.addStatusListener(_animationStatusListener);
-    _controller.addStatusListener(_animationStatusListener);
+    _controller.addListener(animationListener);
+    _controller.addStatusListener(animationStatusListener);
+    _controller.addStatusListener(animationStatusListener);
     _controller.forward();
   }
 

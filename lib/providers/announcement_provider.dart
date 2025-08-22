@@ -19,7 +19,7 @@ class AnnouncementProvider extends ChangeNotifier {
   final ApiClient _apiClient;
   final AppDataProvider
       _appDataProvider; // To access token and deviceId if needed
-  final FileManager _fileManager; // 添加 FileManager 实例
+  final FileManager _fileManager;
 
   // 轮播Provider引用
   AnnouncementCarouselProvider? _announcementCarouselProvider;
@@ -61,7 +61,6 @@ class AnnouncementProvider extends ChangeNotifier {
           announcements.map((announcement) => announcement.toJson()).toList();
       final jsonString = json.encode(announcementsJson);
       await prefs.setString(_announcementsDataKey, jsonString);
-
     } catch (e) {
       _logger.e('保存通告数据到缓存失败', error: e);
     }
@@ -94,7 +93,6 @@ class AnnouncementProvider extends ChangeNotifier {
     try {
       final prefs = await SharedPreferences.getInstance();
       await prefs.remove(_announcementsDataKey);
-
     } catch (e) {
       _logger.e('清除通告数据缓存失败', error: e);
     }
@@ -187,7 +185,7 @@ class AnnouncementProvider extends ChangeNotifier {
         final File expectedFile =
             File('${fileManagerCacheDir.path}/$expectedFileName');
         if (await expectedFile.exists()) {
-                return true;
+          return true;
         }
 
         // 兼容性检查：检查是否有任何以 MD5 开头的文件
@@ -196,7 +194,7 @@ class AnnouncementProvider extends ChangeNotifier {
             final String basename =
                 entity.path.split('/').last.split('\\').last;
             if (basename.startsWith(md5)) {
-                        return true;
+              return true;
             }
           }
         }
@@ -214,10 +212,6 @@ class AnnouncementProvider extends ChangeNotifier {
   Future<void> _predownloadFile(AnnouncementModel announcement) async {
     try {
       // 使用 FileManager 下载文件
-      final File? downloadedFile =
-          await _fileManager.getFile(announcement.file);
-
-
     } catch (e) {
       _logger.e(
           'Error pre-downloading announcement file: ${announcement.title}',

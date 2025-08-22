@@ -13,14 +13,14 @@ class WeatherIconWidget extends StatefulWidget {
   final Widget? errorWidget;
 
   const WeatherIconWidget({
-    Key? key,
+    super.key,
     required this.iconCode,
     this.width,
     this.height,
     this.fit = BoxFit.contain,
     this.placeholder,
     this.errorWidget,
-  }) : super(key: key);
+  });
 
   @override
   _WeatherIconWidgetState createState() => _WeatherIconWidgetState();
@@ -131,12 +131,12 @@ class WeatherWarningIconWidget extends StatelessWidget {
   final BoxFit fit;
 
   const WeatherWarningIconWidget({
-    Key? key,
+    super.key,
     required this.warningType,
     this.width,
     this.height,
     this.fit = BoxFit.contain,
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -164,12 +164,12 @@ class TyphoonWarningIconWidget extends StatelessWidget {
   final BoxFit fit;
 
   const TyphoonWarningIconWidget({
-    Key? key,
+    super.key,
     required this.warningCode,
     this.width,
     this.height,
     this.fit = BoxFit.contain,
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {

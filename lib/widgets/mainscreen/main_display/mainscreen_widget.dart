@@ -10,10 +10,10 @@ class MainScreenWidget extends StatefulWidget {
   final VoidCallback? onArrearTableTap; // 添加欠费总览回调
 
   const MainScreenWidget({
-    Key? key,
+    super.key,
     this.onAnnouncementTap,
     this.onArrearTableTap,
-  }) : super(key: key);
+  });
 
   @override
   MainScreenWidgetState createState() => MainScreenWidgetState();
@@ -341,7 +341,7 @@ class MainScreenWidgetState extends State<MainScreenWidget> {
                     ),
                   ),
                   child: Text(
-                    '$building',
+                    building,
                     style: TextStyle(
                       fontSize: 14,
                       fontWeight: FontWeight.w500,
@@ -695,7 +695,7 @@ class MainScreenWidgetState extends State<MainScreenWidget> {
                   size: 24),
               const SizedBox(width: 8),
               Text(
-                '  ${_selectedBuilding}${_selectedFloor}單位',
+                '  $_selectedBuilding$_selectedFloor單位',
                 style: const TextStyle(
                   fontSize: 18,
                   fontWeight: FontWeight.w600,
@@ -909,16 +909,16 @@ class MainScreenWidgetState extends State<MainScreenWidget> {
                         fontWeight: FontWeight.w500,
                       ),
                     ),
-                    const SizedBox(height: 4),
+                    SizedBox(height: 4),
                     Text(
                       'Convenient Services',
                       style: TextStyle(
                         fontSize: 12,
-                        color: const Color(0xFF757575),
+                        color: Color(0xFF757575),
                         fontWeight: FontWeight.normal,
                       ),
                     ),
-                    const SizedBox(height: 8),
+                    SizedBox(height: 8),
                     Text(
                       '該大廈尚未開通此功能',
                       style: TextStyle(
@@ -938,7 +938,7 @@ class MainScreenWidgetState extends State<MainScreenWidget> {
 
   ///27, 構建費用類型選擇器
   Widget _buildFeeTypeSelector(ArrearProvider provider) {
-    return Container(
+    return SizedBox(
       width: double.infinity,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -1022,7 +1022,7 @@ class MainScreenWidgetState extends State<MainScreenWidget> {
         children: [
           Text(
             chineseTitle,
-            style: TextStyle(
+            style: const TextStyle(
               fontSize: 14,
               fontWeight: FontWeight.w600,
             ),
@@ -1030,7 +1030,7 @@ class MainScreenWidgetState extends State<MainScreenWidget> {
           const SizedBox(height: 1),
           Text(
             englishTitle,
-            style: TextStyle(
+            style: const TextStyle(
               fontSize: 10,
               fontWeight: FontWeight.normal,
             ),

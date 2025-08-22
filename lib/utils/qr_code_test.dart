@@ -5,7 +5,7 @@ import 'package:logger/logger.dart';
 /// 二维码生成工具测试页面
 /// 用于验证二维码生成功能是否正常工作
 class QrCodeTestPage extends StatefulWidget {
-  const QrCodeTestPage({Key? key}) : super(key: key);
+  const QrCodeTestPage({super.key});
 
   @override
   _QrCodeTestPageState createState() => _QrCodeTestPageState();
@@ -272,7 +272,7 @@ class _QrCodeTestPageState extends State<QrCodeTestPage> {
         // URL测试
         _buildMethodTestItem(
           title: 'URL测试',
-          content: Column(
+          content: const Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(

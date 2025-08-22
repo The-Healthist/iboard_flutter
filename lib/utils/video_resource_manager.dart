@@ -94,7 +94,7 @@ class VideoResourceManager {
             _logger.d('📱 视频已完全停止，开始释放资源');
 
             // 延迟一小段时间确保MediaCodec状态稳定
-            Future.delayed(Duration(milliseconds: 50), () {
+            Future.delayed(const Duration(milliseconds: 50), () {
               try {
                 controller.dispose();
                 _logger.i('✅ 视频控制器已安全释放');
@@ -116,7 +116,7 @@ class VideoResourceManager {
 
       // 如果视频已经停止，直接触发释放
       if (!controller.value.isPlaying && !controller.value.isBuffering) {
-        Future.delayed(Duration(milliseconds: 10), () {
+        Future.delayed(const Duration(milliseconds: 10), () {
           if (!completer.isCompleted) {
             try {
               controller.dispose();
@@ -156,7 +156,7 @@ class VideoResourceManager {
         // 等待暂停状态确认
         int attempts = 0;
         while (controller.value.isPlaying && attempts < 10) {
-          await Future.delayed(Duration(milliseconds: 50));
+          await Future.delayed(const Duration(milliseconds: 50));
           attempts++;
         }
 
@@ -179,7 +179,7 @@ class VideoResourceManager {
         // 等待播放状态确认
         int attempts = 0;
         while (!controller.value.isPlaying && attempts < 10) {
-          await Future.delayed(Duration(milliseconds: 50));
+          await Future.delayed(const Duration(milliseconds: 50));
           attempts++;
         }
 

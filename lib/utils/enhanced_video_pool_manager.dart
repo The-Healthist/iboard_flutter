@@ -285,7 +285,7 @@ class EnhancedVideoPoolManager {
   String _generateKey(String filePath, VideoType videoType, bool isNetwork) {
     final typePrefix = videoType == VideoType.topAd ? 'top' : 'full';
     final networkPrefix = isNetwork ? 'net' : 'file';
-    return '${typePrefix}_${networkPrefix}:$filePath';
+    return '${typePrefix}_$networkPrefix:$filePath';
   }
 
   ///9，获取显示用的键（用于日志）
@@ -351,7 +351,7 @@ class EnhancedVideoPoolManager {
         }
 
         // 等待一小段时间确保状态稳定
-        await Future.delayed(Duration(milliseconds: 100));
+        await Future.delayed(const Duration(milliseconds: 100));
 
         // 释放资源
         controller.dispose();
@@ -413,7 +413,7 @@ class EnhancedVideoPoolManager {
   ///17，打印当前池的详细状态（调试用）
   void debugPrintPoolStatus() {
     // _logger.i('🔍 [增强视频池] 当前池状态:');
-    _logger.i('📊 池大小: ${_controllerPool.length}/${_maxPoolSize}');
+    _logger.i('📊 池大小: ${_controllerPool.length}/$_maxPoolSize');
 
     if (_controllerPool.isEmpty) {
       _logger.i('📂 池为空');
@@ -437,7 +437,7 @@ class EnhancedVideoPoolManager {
       final valid = _isControllerValid(controller) ? '有效' : '无效';
       final timeDiff = DateTime.now().difference(lastUsed).inSeconds;
 
-      _logger.i('📱 $displayKey: $status, $valid, ${timeDiff}秒前使用');
+      _logger.i('📱 $displayKey: $status, $valid, $timeDiff秒前使用');
     }
   }
 }

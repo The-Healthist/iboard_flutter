@@ -295,7 +295,7 @@ class AppUpdateProvider with ChangeNotifier {
         if (autoDownload && !_hasLocalApk) {
           print('🚀 自动开始下载更新包...');
           // 延迟一点时间确保UI更新完成
-          Future.delayed(Duration(milliseconds: 500), () async {
+          Future.delayed(const Duration(milliseconds: 500), () async {
             await downloadApk();
           });
         }
@@ -344,7 +344,7 @@ class AppUpdateProvider with ChangeNotifier {
       // 获取下载目录
       final downloadDir = await _getDownloadDirectory();
       final fileName =
-          'iboard_v${_remoteVersionNumber}_${_remoteBuildNumber}.apk';
+          'iboard_v${_remoteVersionNumber}_$_remoteBuildNumber.apk';
       final filePath = '${downloadDir.path}/$fileName';
 
       print('📁 下载路径: $filePath');
@@ -390,7 +390,7 @@ class AppUpdateProvider with ChangeNotifier {
       // 验证文件是否下载成功
       if (await file.exists()) {
         final fileSize = await file.length();
-        print('✅ APK下载成功: $filePath (${fileSize} bytes)');
+        print('✅ APK下载成功: $filePath ($fileSize bytes)');
         _localApkPath = filePath;
         _hasLocalApk = true;
         _downloadProgress = 100;
@@ -480,7 +480,7 @@ class AppUpdateProvider with ChangeNotifier {
     try {
       final downloadDir = await _getDownloadDirectory();
       final fileName =
-          'iboard_v${_remoteVersionNumber}_${_remoteBuildNumber}.apk';
+          'iboard_v${_remoteVersionNumber}_$_remoteBuildNumber.apk';
       final filePath = '${downloadDir.path}/$fileName';
 
       final file = File(filePath);
@@ -621,13 +621,13 @@ class AppUpdateProvider with ChangeNotifier {
       print('❌ 打开浏览器失败: $e');
       // 降级方案：显示下载链接让用户手动复制
       _error = '无法自动打开浏览器，请手动复制以下链接下载：\n$url';
-      throw e;
+      rethrow;
     }
   }
 
   ///12. 定期检查下载文件夹
   void _startCheckingDownloadFolder() {
-    Timer.periodic(Duration(seconds: 5), (timer) async {
+    Timer.periodic(const Duration(seconds: 5), (timer) async {
       try {
         final found = await _checkDownloadFolderForApk();
         if (found || !_useSystemDownloader) {
@@ -650,7 +650,7 @@ class AppUpdateProvider with ChangeNotifier {
 
       final files = downloadDir.listSync();
       final fileName =
-          'iboard_v${_remoteVersionNumber}_${_remoteBuildNumber}.apk';
+          'iboard_v${_remoteVersionNumber}_$_remoteBuildNumber.apk';
 
       for (final file in files) {
         if (file is File && file.path.contains(fileName)) {

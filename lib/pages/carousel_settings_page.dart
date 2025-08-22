@@ -10,7 +10,7 @@ import 'package:iboard_app/widgets/debug_fullscreen_ad_widget.dart';
 import 'package:provider/provider.dart';
 
 class CarouselSettingsPage extends StatefulWidget {
-  const CarouselSettingsPage({Key? key}) : super(key: key);
+  const CarouselSettingsPage({super.key});
 
   @override
   _CarouselSettingsPageState createState() => _CarouselSettingsPageState();
@@ -26,7 +26,7 @@ class _CarouselSettingsPageState extends State<CarouselSettingsPage> {
       },
       child: Scaffold(
         backgroundColor: Colors.grey.shade50,
-        body: Container(
+        body: SizedBox(
           width: double.infinity,
           height: double.infinity,
           child: SafeArea(
@@ -35,7 +35,7 @@ class _CarouselSettingsPageState extends State<CarouselSettingsPage> {
                 // 顶部标题区域
                 Container(
                   width: double.infinity,
-                  padding: EdgeInsets.all(20),
+                  padding: const EdgeInsets.all(20),
                   decoration: BoxDecoration(
                     color: Colors.white,
                     boxShadow: [
@@ -43,7 +43,7 @@ class _CarouselSettingsPageState extends State<CarouselSettingsPage> {
                         color: Colors.grey.withOpacity(0.05),
                         spreadRadius: 1,
                         blurRadius: 3,
-                        offset: Offset(0, 2),
+                        offset: const Offset(0, 2),
                       ),
                     ],
                   ),
@@ -54,15 +54,15 @@ class _CarouselSettingsPageState extends State<CarouselSettingsPage> {
                           // 直接返回，不恢复轮播
                           Navigator.pop(context);
                         },
-                        icon: Icon(Icons.arrow_back, size: 28),
+                        icon: const Icon(Icons.arrow_back, size: 28),
                       ),
-                      SizedBox(width: 16),
+                      const SizedBox(width: 16),
                       Icon(
                         Icons.view_carousel,
                         size: 32,
                         color: Colors.blue.shade600,
                       ),
-                      SizedBox(width: 16),
+                      const SizedBox(width: 16),
                       Text(
                         '輪播順序顯示',
                         style: TextStyle(
@@ -88,14 +88,14 @@ class _CarouselSettingsPageState extends State<CarouselSettingsPage> {
                 // 主要内容区域
                 Expanded(
                   child: SingleChildScrollView(
-                    padding: EdgeInsets.all(20),
+                    padding: const EdgeInsets.all(20),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         // 说明文字
                         Container(
                           width: double.infinity,
-                          padding: EdgeInsets.all(16),
+                          padding: const EdgeInsets.all(16),
                           decoration: BoxDecoration(
                             color: Colors.blue.shade50,
                             borderRadius: BorderRadius.circular(8),
@@ -108,7 +108,7 @@ class _CarouselSettingsPageState extends State<CarouselSettingsPage> {
                                 color: Colors.blue.shade600,
                                 size: 20,
                               ),
-                              SizedBox(width: 12),
+                              const SizedBox(width: 12),
                               Expanded(
                                 child: Text(
                                   '輪播順序由後台統一管理，此頁面僅供查看當前輪播順序。如需調整順序，請聯繫管理員在後台進行設置。',
@@ -122,17 +122,17 @@ class _CarouselSettingsPageState extends State<CarouselSettingsPage> {
                           ),
                         ),
 
-                        SizedBox(height: 24),
+                        const SizedBox(height: 24),
 
                         // 通告轮播设置
                         _buildAnnouncementCarouselSettings(),
 
-                        SizedBox(height: 24),
+                        const SizedBox(height: 24),
 
                         // 顶部广告轮播设置
                         _buildTopAdCarouselSettings(),
 
-                        SizedBox(height: 24),
+                        const SizedBox(height: 24),
 
                         // 全屏广告轮播设置
                         _buildFullscreenAdCarouselSettings(),
@@ -156,7 +156,7 @@ class _CarouselSettingsPageState extends State<CarouselSettingsPage> {
 
         return Container(
           width: double.infinity,
-          padding: EdgeInsets.all(24),
+          padding: const EdgeInsets.all(24),
           decoration: BoxDecoration(
             color: Colors.white,
             borderRadius: BorderRadius.circular(8),
@@ -165,7 +165,7 @@ class _CarouselSettingsPageState extends State<CarouselSettingsPage> {
                 color: Colors.grey.withOpacity(0.05),
                 spreadRadius: 1,
                 blurRadius: 3,
-                offset: Offset(0, 2),
+                offset: const Offset(0, 2),
               ),
             ],
           ),
@@ -175,7 +175,7 @@ class _CarouselSettingsPageState extends State<CarouselSettingsPage> {
               Row(
                 children: [
                   Container(
-                    padding: EdgeInsets.all(10),
+                    padding: const EdgeInsets.all(10),
                     decoration: BoxDecoration(
                       color: Colors.green.shade50,
                       borderRadius: BorderRadius.circular(8),
@@ -186,7 +186,7 @@ class _CarouselSettingsPageState extends State<CarouselSettingsPage> {
                       size: 24,
                     ),
                   ),
-                  SizedBox(width: 16),
+                  const SizedBox(width: 16),
                   Text(
                     '通告輪播順序',
                     style: TextStyle(
@@ -195,7 +195,7 @@ class _CarouselSettingsPageState extends State<CarouselSettingsPage> {
                       color: Colors.grey.shade800,
                     ),
                   ),
-                  Spacer(),
+                  const Spacer(),
                   Text(
                     '${announcements.length} 個通告',
                     style: TextStyle(
@@ -205,11 +205,11 @@ class _CarouselSettingsPageState extends State<CarouselSettingsPage> {
                   ),
                 ],
               ),
-              SizedBox(height: 16),
+              const SizedBox(height: 16),
               if (announcements.isEmpty)
                 Center(
                   child: Padding(
-                    padding: EdgeInsets.all(20),
+                    padding: const EdgeInsets.all(20),
                     child: Text(
                       '暫無通告數據',
                       style: TextStyle(
@@ -240,7 +240,7 @@ class _CarouselSettingsPageState extends State<CarouselSettingsPage> {
 
         return Container(
           width: double.infinity,
-          padding: EdgeInsets.all(24),
+          padding: const EdgeInsets.all(24),
           decoration: BoxDecoration(
             color: Colors.white,
             borderRadius: BorderRadius.circular(8),
@@ -249,7 +249,7 @@ class _CarouselSettingsPageState extends State<CarouselSettingsPage> {
                 color: Colors.grey.withOpacity(0.05),
                 spreadRadius: 1,
                 blurRadius: 3,
-                offset: Offset(0, 2),
+                offset: const Offset(0, 2),
               ),
             ],
           ),
@@ -259,7 +259,7 @@ class _CarouselSettingsPageState extends State<CarouselSettingsPage> {
               Row(
                 children: [
                   Container(
-                    padding: EdgeInsets.all(10),
+                    padding: const EdgeInsets.all(10),
                     decoration: BoxDecoration(
                       color: Colors.blue.shade50,
                       borderRadius: BorderRadius.circular(8),
@@ -270,7 +270,7 @@ class _CarouselSettingsPageState extends State<CarouselSettingsPage> {
                       size: 24,
                     ),
                   ),
-                  SizedBox(width: 16),
+                  const SizedBox(width: 16),
                   Text(
                     '頂部廣告輪播順序',
                     style: TextStyle(
@@ -279,7 +279,7 @@ class _CarouselSettingsPageState extends State<CarouselSettingsPage> {
                       color: Colors.grey.shade800,
                     ),
                   ),
-                  Spacer(),
+                  const Spacer(),
                   Text(
                     '${topAds.length} 個廣告',
                     style: TextStyle(
@@ -289,11 +289,11 @@ class _CarouselSettingsPageState extends State<CarouselSettingsPage> {
                   ),
                 ],
               ),
-              SizedBox(height: 16),
+              const SizedBox(height: 16),
               if (topAds.isEmpty)
                 Center(
                   child: Padding(
-                    padding: EdgeInsets.all(20),
+                    padding: const EdgeInsets.all(20),
                     child: Text(
                       '暫無頂部廣告數據',
                       style: TextStyle(
@@ -324,7 +324,7 @@ class _CarouselSettingsPageState extends State<CarouselSettingsPage> {
 
         return Container(
           width: double.infinity,
-          padding: EdgeInsets.all(24),
+          padding: const EdgeInsets.all(24),
           decoration: BoxDecoration(
             color: Colors.white,
             borderRadius: BorderRadius.circular(8),
@@ -333,7 +333,7 @@ class _CarouselSettingsPageState extends State<CarouselSettingsPage> {
                 color: Colors.grey.withOpacity(0.05),
                 spreadRadius: 1,
                 blurRadius: 3,
-                offset: Offset(0, 2),
+                offset: const Offset(0, 2),
               ),
             ],
           ),
@@ -343,7 +343,7 @@ class _CarouselSettingsPageState extends State<CarouselSettingsPage> {
               Row(
                 children: [
                   Container(
-                    padding: EdgeInsets.all(10),
+                    padding: const EdgeInsets.all(10),
                     decoration: BoxDecoration(
                       color: Colors.orange.shade50,
                       borderRadius: BorderRadius.circular(8),
@@ -354,7 +354,7 @@ class _CarouselSettingsPageState extends State<CarouselSettingsPage> {
                       size: 24,
                     ),
                   ),
-                  SizedBox(width: 16),
+                  const SizedBox(width: 16),
                   Text(
                     '全屏廣告輪播順序',
                     style: TextStyle(
@@ -363,7 +363,7 @@ class _CarouselSettingsPageState extends State<CarouselSettingsPage> {
                       color: Colors.grey.shade800,
                     ),
                   ),
-                  Spacer(),
+                  const Spacer(),
                   Text(
                     '${fullscreenAds.length} 個廣告',
                     style: TextStyle(
@@ -371,7 +371,7 @@ class _CarouselSettingsPageState extends State<CarouselSettingsPage> {
                       color: Colors.grey.shade600,
                     ),
                   ),
-                  SizedBox(width: 8),
+                  const SizedBox(width: 8),
                   ElevatedButton.icon(
                     onPressed: () {
                       Navigator.push(
@@ -393,11 +393,11 @@ class _CarouselSettingsPageState extends State<CarouselSettingsPage> {
                   ),
                 ],
               ),
-              SizedBox(height: 16),
+              const SizedBox(height: 16),
               if (fullscreenAds.isEmpty)
                 Center(
                   child: Padding(
-                    padding: EdgeInsets.all(20),
+                    padding: const EdgeInsets.all(20),
                     child: Text(
                       '暫無全屏廣告數據',
                       style: TextStyle(
@@ -426,7 +426,7 @@ class _CarouselSettingsPageState extends State<CarouselSettingsPage> {
     required Widget Function(T, int) itemBuilder,
   }) {
     return Container(
-      constraints: BoxConstraints(maxHeight: 300),
+      constraints: const BoxConstraints(maxHeight: 300),
       child: ListView.builder(
         shrinkWrap: true,
         itemCount: items.length,
@@ -434,7 +434,7 @@ class _CarouselSettingsPageState extends State<CarouselSettingsPage> {
           final item = items[index];
           return Container(
             key: ValueKey('${item.hashCode}_$index'),
-            margin: EdgeInsets.only(bottom: 8),
+            margin: const EdgeInsets.only(bottom: 8),
             child: itemBuilder(item, index),
           );
         },
@@ -445,7 +445,7 @@ class _CarouselSettingsPageState extends State<CarouselSettingsPage> {
   ///6，构建通告列表项
   Widget _buildAnnouncementListItem(AnnouncementModel announcement, int index) {
     return Container(
-      padding: EdgeInsets.all(12),
+      padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
         color: Colors.grey.shade50,
         borderRadius: BorderRadius.circular(6),
@@ -471,7 +471,7 @@ class _CarouselSettingsPageState extends State<CarouselSettingsPage> {
               ),
             ),
           ),
-          SizedBox(width: 12),
+          const SizedBox(width: 12),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -486,7 +486,7 @@ class _CarouselSettingsPageState extends State<CarouselSettingsPage> {
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                 ),
-                SizedBox(height: 4),
+                const SizedBox(height: 4),
                 Text(
                   'ID: ${announcement.id} | 類型: ${announcement.uiType.name}',
                   style: TextStyle(
@@ -512,7 +512,7 @@ class _CarouselSettingsPageState extends State<CarouselSettingsPage> {
     MaterialColor typeColor = type == '頂部' ? Colors.blue : Colors.orange;
 
     return Container(
-      padding: EdgeInsets.all(12),
+      padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
         color: Colors.grey.shade50,
         borderRadius: BorderRadius.circular(6),
@@ -538,7 +538,7 @@ class _CarouselSettingsPageState extends State<CarouselSettingsPage> {
               ),
             ),
           ),
-          SizedBox(width: 12),
+          const SizedBox(width: 12),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -553,7 +553,7 @@ class _CarouselSettingsPageState extends State<CarouselSettingsPage> {
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                 ),
-                SizedBox(height: 4),
+                const SizedBox(height: 4),
                 Text(
                   'ID: ${ad.id} | 時長: ${ad.duration}s | 類型: ${ad.display.name}',
                   style: TextStyle(

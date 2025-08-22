@@ -19,11 +19,11 @@ class WeatherWidget extends StatefulWidget {
   final double? containerHeight;
 
   const WeatherWidget({
-    Key? key,
+    super.key,
     this.showOnlyLeft = false,
     this.showOnlyRight = false,
     this.containerHeight,
-  }) : super(key: key);
+  });
 
   @override
   _WeatherWidgetState createState() => _WeatherWidgetState();
@@ -198,14 +198,14 @@ class _WeatherWidgetState extends State<WeatherWidget> {
             width: iconSize,
             height: iconSize,
             errorBuilder: (context, error, stackTrace) {
-              return Icon(
+              return const Icon(
                 Icons.warning,
                 size: iconSize,
                 color: Colors.orange,
               );
             },
           ),
-          SizedBox(width: iconSize * 0.25),
+          const SizedBox(width: iconSize * 0.25),
           Flexible(
             child: Text(
               warningInfo.name.isNotEmpty ? warningInfo.name : warningCode,

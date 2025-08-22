@@ -8,7 +8,7 @@ import 'dart:io';
 
 /// 二维码调试工具组件
 class QrDebugWidget extends StatefulWidget {
-  const QrDebugWidget({Key? key}) : super(key: key);
+  const QrDebugWidget({super.key});
 
   @override
   _QrDebugWidgetState createState() => _QrDebugWidgetState();
@@ -365,7 +365,7 @@ class _QrDebugWidgetState extends State<QrDebugWidget> {
                         ],
                       ),
                     ))
-                .toList(),
+                ,
           ],
         ),
       ),

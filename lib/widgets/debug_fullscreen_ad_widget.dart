@@ -9,7 +9,7 @@ import 'package:logger/logger.dart';
 // foundation.dart import removed as kDebugMode is no longer used
 
 class FullscreenAdDebugWidget extends StatefulWidget {
-  const FullscreenAdDebugWidget({Key? key}) : super(key: key);
+  const FullscreenAdDebugWidget({super.key});
 
   @override
   State<FullscreenAdDebugWidget> createState() =>
@@ -20,7 +20,7 @@ class _FullscreenAdDebugWidgetState extends State<FullscreenAdDebugWidget> {
   final Logger _logger = Logger();
   final FileManager _fileManager = FileManager();
 
-  List<Map<String, dynamic>> _debugInfo = [];
+  final List<Map<String, dynamic>> _debugInfo = [];
   bool _isLoading = false;
 
   @override

@@ -2,6 +2,7 @@ import 'dart:async'; // Added import for Timer
 
 import 'package:flutter/foundation.dart' show listEquals;
 import 'package:flutter/material.dart';
+import 'dart:developer'; // Added for log function
 import 'package:iboard_app/models/announcement_model.dart';
 import 'package:iboard_app/pages/fullscreen_ads_page.dart';
 import 'package:iboard_app/pages/mainscreen_page.dart';
@@ -11,15 +12,18 @@ import 'package:iboard_app/providers/announcement_carousel_provider.dart'; // Ad
 import 'package:iboard_app/providers/advertisement_provider.dart'; // Added import for AdvertisementProvider
 import 'package:iboard_app/providers/ad_top_carousel_provider.dart'; // Added import for TopAdCarouselProvider
 import 'package:iboard_app/providers/ad_fullscreen_provider.dart'; // Added import for FullscreenAdProvider
+import 'package:iboard_app/providers/arrear_provider.dart'; // Added import for ArrearProvider
 
 import 'package:provider/provider.dart';
 
 class MainPage extends StatefulWidget {
+  const MainPage({super.key});
+
   @override
-  _MainPageState createState() => _MainPageState();
+  MainPageState createState() => MainPageState();
 }
 
-class _MainPageState extends State<MainPage> {
+class MainPageState extends State<MainPage> {
   Timer? _mainTimer;
   List<AnnouncementModel>?
       _previousAnnouncementsForBuild; // Added state variable
@@ -66,10 +70,11 @@ class _MainPageState extends State<MainPage> {
             context.read<AnnouncementCarouselProvider>();
         final topAdCarouselProvider = context.read<TopAdCarouselProvider>();
         final fullscreenAdProvider = context.read<FullscreenAdProvider>();
+        final arrearProvider = context.read<ArrearProvider>(); // 获取ArrearProvider实例
 
         // 设置通告轮播Provider引用
         announcementProvider.setCarouselProvider(announcementCarouselProvider);
-        
+
         // 设置ArrearProvider引用
         announcementCarouselProvider.setArrearProvider(arrearProvider);
 
@@ -102,12 +107,12 @@ class _MainPageState extends State<MainPage> {
                 horizontal: MediaQuery.of(context).size.width * 0.05,
                 vertical: MediaQuery.of(context).size.height * 0.05,
               ),
-              child: Container(
+              child: SizedBox(
                 width: MediaQuery.of(context).size.width * 0.9,
                 height: MediaQuery.of(context).size.height * 0.9,
                 child: ClipRRect(
                   borderRadius: BorderRadius.circular(8),
-                  child: FullscreenAdsPage(),
+                  child: const FullscreenAdsPage(),
                 ),
               ),
             ));
@@ -134,7 +139,7 @@ class _MainPageState extends State<MainPage> {
       });
 
       // Fullscreen ad dialog closed log (always available)
-      // print('Fullscreen ad dialog closed');
+      log('Fullscreen ad dialog closed');
     });
   }
 

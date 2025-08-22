@@ -171,24 +171,18 @@ class ApiClient {
       }
     } else {
       _logger.w(
-          '$apiName failed (Status: ${response.statusCode}), Body: $decodedBody');
+          '$apiName 失敗 (狀態: ${response.statusCode}), 響應體: $decodedBody');
       dynamic errorData;
       try {
         errorData = decodedBody.isNotEmpty ? json.decode(decodedBody) : null;
       } catch (_) {
         errorData =
-            decodedBody; // If error response is not JSON, use the raw body
+            decodedBody; // 如果錯誤響應不是 JSON，則使用原始響應體
       }
-      // Do not throw ApiException for 401 here if it's handled by _sendRequest retry logic.
-      // The _sendRequest will throw if retry fails or is not applicable.
-      // However, _handleResponse is also called by the login method directly after _sendRequest.
-      // So, if it's a 401 and it wasn't retried (e.g. login call itself, or refresh failed), it should be thrown.
-      // The current _sendRequest logic re-throws or throws original if refresh fails.
-      // This means _handleResponse will receive the final response (either success, or failure after retry attempt).
       throw ApiException(
         statusCode: response.statusCode,
         message:
-            'API request $apiName failed with status code ${response.statusCode}',
+            'API 請求 $apiName 失敗，狀態碼為 ${response.statusCode}',
         errorData: errorData,
       );
     }
@@ -205,25 +199,23 @@ class ApiClient {
       // _logger.i('Starting new token refresh process via onNeedsTokenRefresh.');
       onNeedsTokenRefresh!().then((newToken) {
         if (newToken != null && newToken.isNotEmpty) {
-          // _logger.i(
-          //     'Token refresh process completed successfully with a new token.');
           completer.complete(newToken);
         } else {
           _logger.w(
-              'Token refresh process completed but no new token was returned.');
-          completer.complete(null); // Resolve with null if no token
+              '令牌刷新過程完成但未返回新令牌。');
+          completer.complete(null); // 如果沒有令牌，則解析為 null
         }
       }).catchError((e, stackTrace) {
-        _logger.e('Token refresh process failed execution.',
+        _logger.e('令牌刷新過程執行失敗。',
             error: e, stackTrace: stackTrace);
-        completer.completeError(e); // Propagate error
+        completer.completeError(e); // 傳播錯誤
       }).whenComplete(() {
         _isRefreshingToken =
-            false; // Allow new refresh attempts after this one completes or fails
+            false; // 允許在此操作完成或失敗後進行新的刷新嘗試
       });
     } else {
       _logger
-          .i('Token refresh already in progress, returning existing future.');
+          .i('令牌刷新已在進行中，返回現有 Future。');
     }
     return _tokenRefreshFuture!;
   }
@@ -232,81 +224,74 @@ class ApiClient {
     Future<http.Response> Function() requestFunction, {
     required String apiNameForLog,
     bool isLoginRequest = false,
-    bool isHealthTestRequest = false, // New flag for healthTest itself
-    int maxRetries = 0, // 0 means no retry
-    Duration retryDelay = const Duration(seconds: 0),
+    bool isHealthTestRequest = false,
   }) async {
-    // Section 1: Pre-flight health check (if applicable)
+    // 區塊 1: 預檢健康檢查 (如果適用)
     if (!isLoginRequest &&
         !isHealthTestRequest &&
         _token != null &&
         _token!.isNotEmpty) {
-      // _logger.i('Performing pre-request health check for $apiNameForLog.');
       try {
-        // healthTest() itself calls _sendRequest with isHealthTestRequest = true
+        // healthTest() 本身會呼叫 _sendRequest 並將 isHealthTestRequest 設為 true
         await healthTest();
-        // _logger.i('Pre-request health check successful for $apiNameForLog.');
       } on ApiException catch (e) {
         if (e.statusCode == 401) {
           _logger.w(
-              'Pre-request health check for $apiNameForLog failed with 401. Attempting token refresh.');
+              '為 $apiNameForLog 進行的預檢健康檢查因 401 失敗。嘗試刷新令牌。');
           if (onNeedsTokenRefresh == null) {
             _logger.w(
-                'onNeedsTokenRefresh is null, cannot refresh token. Rethrowing 401 from health check.');
-            throw e;
+                'onNeedsTokenRefresh 為空，無法刷新令牌。重新拋出健康檢查的 401 錯誤。');
+            rethrow;
           }
 
           try {
             final newToken = await _initiateAndGetTokenRefreshFuture();
             if (newToken != null && newToken.isNotEmpty) {
-              // _logger.i(
-              //     'Token refreshed successfully via health check for $apiNameForLog. Main request will proceed.');
-              // Optionally, re-run healthTest to confirm, but adds latency.
+              // 令牌透過 $apiNameForLog 的健康檢查成功刷新。主請求將繼續。
+              // 可選：重新運行 healthTest 以確認，但會增加延遲。
               // await healthTest();
             } else {
               _logger.w(
-                  'Token refresh after health check 401 for $apiNameForLog did not yield a new token. Rethrowing original 401 from health check.');
+                  '為 $apiNameForLog 進行的 401 健康檢查後，令牌刷新未產生新令牌。重新拋出原始的 401 錯誤。');
               throw ApiException(
                   statusCode: e.statusCode,
                   message:
-                      'Failed to refresh token after health check 401 (no new token).',
+                      '健康檢查 401 後刷新令牌失敗 (無新令牌)。',
                   errorData: e.errorData);
             }
           } catch (refreshError) {
             _logger.e(
-                'Error awaiting token refresh after health check 401 for $apiNameForLog.',
+                '為 $apiNameForLog 處理 401 健康檢查後等待令牌刷新時出錯。',
                 error: refreshError);
             throw ApiException(
                 statusCode: e.statusCode,
                 message:
-                    'Token refresh process failed after health check 401: $refreshError',
+                    '健康檢查 401 後令牌刷新過程失敗: $refreshError',
                 errorData: e.errorData);
           }
         } else {
-          // Non-401 ApiException from health check
-          // For server-side issues like 500 errors, we'll allow the main request to proceed
-          // rather than failing completely. This prevents server issues from blocking all requests.
+          // 來自健康檢查的非 401 ApiException
+          // 對於 500 錯誤等服務器端問題，我們將允許主請求繼續，而不是完全失敗。
+          // 這可以防止服務器問題阻止所有請求。
           _logger.w(
-              'Pre-request health check for $apiNameForLog failed with non-401 ApiException (Status: ${e.statusCode}). Allowing main request to proceed. Error: ${e.message}');
-          // Don't throw for non-401 errors, let the main request proceed
+              '為 $apiNameForLog 進行的預檢健康檢查因非 401 ApiException 失敗 (狀態: ${e.statusCode})。允許主請求繼續。錯誤: ${e.message}');
+          // 對於非 401 錯誤，不拋出，讓主請求繼續
         }
       } catch (otherError) {
-        // Catch other non-ApiException errors from healthTest()
-        // For unexpected errors, we'll also allow the main request to proceed
+        // 捕獲來自 healthTest() 的其他非 ApiException 錯誤
+        // 對於意外錯誤，我們也將允許主請求繼續
         _logger.w(
-            'Pre-request health check for $apiNameForLog failed with an unexpected error. Allowing main request to proceed. Error: $otherError');
-        // Don't throw for unexpected errors, let the main request proceed
+            '為 $apiNameForLog 進行的預檢健康檢查因意外錯誤失敗。允許主請求繼續。錯誤: $otherError');
+        // 對於意外錯誤，不拋出，讓主請求繼續
       }
     }
 
-    // Section 2: Execute the main request with timeout and retry
+    // 區塊 2: 執行帶有超時和重試的主請求
     http.Response? response;
     Exception? lastException;
 
     for (int attempt = 1; attempt <= _maxRetryAttempts; attempt++) {
       try {
-        // _logger.i('$apiNameForLog - 嘗試第 $attempt/$_maxRetryAttempts 次請求');
-
         // 應用超時到請求函數
         response = await requestFunction().timeout(
           _requestTimeout,
@@ -317,8 +302,6 @@ class ApiClient {
         );
 
         // 如果請求成功，跳出重試循環
-        // _logger.i(
-        //     '$apiNameForLog - 第 $attempt 次請求成功 (狀態碼: ${response.statusCode})');
         break;
       } catch (e, stackTrace) {
         lastException = e is Exception ? e : Exception(e.toString());
@@ -330,7 +313,7 @@ class ApiClient {
         if (e.toString().contains('Failed host lookup') ||
             e.toString().contains('No address associated with hostname')) {
           errorType = 'DNS解析失敗';
-          userFriendlyMessage = '🌐 無法連接到伺服器,請檢查網絡連接或聯繫管理員';
+          userFriendlyMessage = '🌐 無法連接到伺服器，請檢查網絡連接或聯繫管理員';
         } else if (e.toString().contains('SocketException')) {
           errorType = 'Socket連接錯誤';
           userFriendlyMessage = '🔌 網絡連接異常，請檢查您的網絡設置';
@@ -367,38 +350,37 @@ class ApiClient {
       }
     }
 
-    // 如果response仍然為null，說明所有重試都失敗了
+    // 如果 response 仍然為 null，說明所有重試都失敗了
     if (response == null) {
       throw lastException ?? Exception('請求失敗，未知錯誤 - $apiNameForLog');
     }
 
-    // Section 3: Handle 401 for the main request (retry logic)
+    // 區塊 3: 處理主請求的 401 (重試邏輯)
     if (response.statusCode == 401 && !isLoginRequest) {
       _logger.w(
-          'Received 401 for actual request $apiNameForLog. Attempting token refresh.');
+          '為實際請求 $apiNameForLog 收到 401。嘗試刷新令牌。');
       if (onNeedsTokenRefresh == null) {
         _logger.w(
-            'onNeedsTokenRefresh is null, cannot refresh token for $apiNameForLog. Original 401 will be processed by _handleResponse.');
-        return response; // Let _handleResponse deal with the 401
+            'onNeedsTokenRefresh 為空，無法為 $apiNameForLog 刷新令牌。原始 401 將由 _handleResponse 處理。');
+        return response; // 讓 _handleResponse 處理 401
       }
 
       try {
         final newToken = await _initiateAndGetTokenRefreshFuture();
         if (newToken != null && newToken.isNotEmpty) {
-          // _logger.i(
-          //     'Token refreshed successfully for $apiNameForLog. Retrying original request.');
+          // 令牌為 $apiNameForLog 成功刷新。重試原始請求。
           response =
-              await requestFunction(); // Retry the original request function
+              await requestFunction(); // 重試原始請求函數
         } else {
           _logger.w(
-              'Token refresh for $apiNameForLog did not yield a new token. Original 401 response will be processed.');
-          // Let the original 401 response be returned to _handleResponse
+              '為 $apiNameForLog 刷新令牌未產生新令牌。原始 401 響應將被處理。');
+          // 讓原始 401 響應返回給 _handleResponse
         }
       } catch (refreshError) {
         _logger.e(
-            'Error awaiting token refresh for $apiNameForLog during main request 401 handling.',
+            '為 $apiNameForLog 處理主請求 401 時等待令牌刷新出錯。',
             error: refreshError);
-        // Let the original 401 response be returned to _handleResponse
+        // 讓原始 401 響應返回給 _handleResponse
       }
     }
     return response!;
@@ -879,7 +861,6 @@ class ApiClient {
     final Map<String, String> headers =
         _getHeaders(requiresAuth: true, contentType: 'application/json');
 
-    _logger.i('獲取物業管理費用狀態，樓宇ID: $buildingId');
     final http.Response response = await _sendRequest(
         () => http.post(url, headers: headers, body: requestBody),
         apiNameForLog: 'getManagementFeeStatus');
@@ -910,7 +891,6 @@ class ApiClient {
     final Map<String, String> headers =
         _getHeaders(requiresAuth: true, contentType: 'application/json');
 
-    _logger.i('獲取物業其他費用狀態，樓宇ID: $buildingId');
     final http.Response response = await _sendRequest(
         () => http.post(url, headers: headers, body: requestBody),
         apiNameForLog: 'getOtherFeeStatus');

@@ -7,6 +7,8 @@ import 'package:provider/provider.dart';
 import 'package:logger/logger.dart';
 
 class FullscreenAdsPage extends StatefulWidget {
+  const FullscreenAdsPage({super.key});
+
   @override
   _FullscreenAdsPageState createState() => _FullscreenAdsPageState();
 }
@@ -121,7 +123,7 @@ class _FullscreenAdsPageState extends State<FullscreenAdsPage> {
               return Stack(
                 children: [
                   // 全屏广告内容
-                  Container(
+                  SizedBox(
                     width: double.infinity,
                     height: double.infinity,
                     child: currentAdWidget,
@@ -138,7 +140,7 @@ class _FullscreenAdsPageState extends State<FullscreenAdsPage> {
             return Stack(
               children: [
                 // 全屏广告内容
-                Container(
+                SizedBox(
                   width: double.infinity,
                   height: double.infinity,
                   child: fullscreenAdProvider.adWidgets.first,
@@ -165,16 +167,16 @@ class _FullscreenAdsPageState extends State<FullscreenAdsPage> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(
+            const Icon(
               Icons.error_outline,
               size: 80,
               color: Colors.red,
             ),
-            SizedBox(height: 20),
+            const SizedBox(height: 20),
             SelectableText.rich(
               TextSpan(
                 children: [
-                  TextSpan(
+                  const TextSpan(
                     text: '廣告載入失敗\n',
                     style: TextStyle(
                       fontSize: 24,
@@ -184,7 +186,7 @@ class _FullscreenAdsPageState extends State<FullscreenAdsPage> {
                   ),
                   TextSpan(
                     text: error,
-                    style: TextStyle(
+                    style: const TextStyle(
                       fontSize: 16,
                       color: Colors.red,
                     ),
@@ -205,7 +207,7 @@ class _FullscreenAdsPageState extends State<FullscreenAdsPage> {
       width: double.infinity,
       height: double.infinity,
       color: Colors.black,
-      child: Center(
+      child: const Center(
         child: CircularProgressIndicator(color: Colors.white),
       ),
     );
@@ -227,7 +229,7 @@ class _FullscreenAdsPageState extends State<FullscreenAdsPage> {
           ],
         ),
       ),
-      child: Center(
+      child: const Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
@@ -283,12 +285,12 @@ class _FullscreenAdsPageState extends State<FullscreenAdsPage> {
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Icon(
+                const Icon(
                   Icons.ads_click,
                   size: 120,
                   color: Colors.white,
                 ),
-                SizedBox(height: 30),
+                const SizedBox(height: 30),
                 Text(
                   '全屏廣告展示區域',
                   style: TextStyle(
@@ -297,7 +299,7 @@ class _FullscreenAdsPageState extends State<FullscreenAdsPage> {
                     color: Colors.white,
                     shadows: [
                       Shadow(
-                        offset: Offset(2, 2),
+                        offset: const Offset(2, 2),
                         blurRadius: 4,
                         color: Colors.black.withOpacity(0.3),
                       ),
@@ -305,7 +307,7 @@ class _FullscreenAdsPageState extends State<FullscreenAdsPage> {
                   ),
                   textAlign: TextAlign.center,
                 ),
-                SizedBox(height: 20),
+                const SizedBox(height: 20),
                 Text(
                   '暫無全屏廣告內容',
                   style: TextStyle(
