@@ -101,3 +101,4 @@ This symbol does not apply on my command line because "&" is not supported.
 我的接口中的字段notice,对应本项目中的announcement.
 将我项目中的会出现在app中的中文全部使用繁体中文,英文不变.
 减少注释的内容,只在关键的方法会生成注释.
+你可以在agent模式下直接修改我的代码文件.

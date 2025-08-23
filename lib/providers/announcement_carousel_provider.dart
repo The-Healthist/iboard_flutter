@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:iboard_app/managers/file_manager.dart';
 import 'package:iboard_app/models/announcement_model.dart';
 import 'package:iboard_app/widgets/carousel_widget.dart' as custom_carousel;
@@ -687,7 +688,12 @@ class AnnouncementCarouselProvider extends ChangeNotifier {
     // 暂停轮播中的媒体内容
     _midCarouselController.pauseAllMedia();
 
-    notifyListeners();
+    // 使用 WidgetsBinding.instance.addPostFrameCallback 延迟通知
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (hasListeners) {
+        notifyListeners();
+      }
+    });
   }
 
   /// 新增：暂停所有定时器的方法
@@ -1267,6 +1273,13 @@ class AnnouncementCarouselProvider extends ChangeNotifier {
       // 重新初始化视频播放进度缓存
       _initializeVideoProgressCache();
 
+      // 使用 WidgetsBinding.instance.addPostFrameCallback 延迟通知
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (hasListeners) {
+          notifyListeners();
+        }
+      });
+
       debugPrint('[AnnouncementCarousel] 强制恢复完成');
     } catch (e) {
       debugPrint('[AnnouncementCarousel] 强制恢复失败: $e');
@@ -1338,9 +1351,9 @@ class AnnouncementCarouselProvider extends ChangeNotifier {
 
         basicWidgetMap[arrearTableKey] = _widgetCache[arrearTableKey]!;
         basicOrderedKeys.add(arrearTableKey);
-        debugPrint('[AnnouncementCarousel] 基本內容創建：缴費表單widget創建成功');
+        debugPrint('[AnnouncementCarousel] 基本內容創建：缴费表单widget創建成功');
       } catch (e) {
-        debugPrint('[AnnouncementCarousel] 基本內容創建：缴費表單widget創建失敗: $e');
+        debugPrint('[AnnouncementCarousel] 基本內容創建：缴费表单widget創建失败: $e');
         // 創建一個簡單的備用widget
         _widgetCache[arrearTableKey] = Container(
           width: double.infinity,
@@ -1366,7 +1379,12 @@ class AnnouncementCarouselProvider extends ChangeNotifier {
             '[AnnouncementCarousel] 基本內容恢復完成：${_midCarouselController.widgetCount} widgets');
       }
 
-      notifyListeners();
+      // 使用 WidgetsBinding.instance.addPostFrameCallback 延迟通知
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (hasListeners) {
+          notifyListeners();
+        }
+      });
     } catch (e) {
       debugPrint('[AnnouncementCarousel] 严重错误：无法创建基本内容: $e');
     }

@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:iboard_app/managers/file_manager.dart';
 import 'package:iboard_app/models/ad_model.dart';
 import 'package:iboard_app/widgets/carousel_widget.dart' as custom_carousel;
@@ -75,7 +76,13 @@ class TopAdCarouselProvider extends ChangeNotifier {
       // 首次創建或緩存為空時才更新
       _smartUpdateWidgets();
     }
-    notifyListeners();
+
+    // 使用 WidgetsBinding.instance.addPostFrameCallback 延迟通知
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (hasListeners) {
+        notifyListeners();
+      }
+    });
   }
 
   ///1a，檢查兩個廣告列表是否相等
@@ -267,7 +274,12 @@ class TopAdCarouselProvider extends ChangeNotifier {
     // 暫停輪播中的媒體內容
     _topCarouselController.pauseAllMedia();
 
-    notifyListeners();
+    // 使用 WidgetsBinding.instance.addPostFrameCallback 延迟通知
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (hasListeners) {
+        notifyListeners();
+      }
+    });
   }
 
   /// 恢復頂部輪播
@@ -326,13 +338,24 @@ class TopAdCarouselProvider extends ChangeNotifier {
       }
     }
 
-    notifyListeners();
+    // 使用 WidgetsBinding.instance.addPostFrameCallback 延迟通知
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (hasListeners) {
+        notifyListeners();
+      }
+    });
   }
 
   /// 更新輪播暫停狀態
   void updateCarouselPauseState(bool isPaused) {
     _isTopCarouselPaused = isPaused;
-    notifyListeners();
+
+    // 使用 WidgetsBinding.instance.addPostFrameCallback 延迟通知
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (hasListeners) {
+        notifyListeners();
+      }
+    });
   }
 
   /// 從全屏廣告狀態退出後恢復頂部廣告
@@ -413,7 +436,13 @@ class TopAdCarouselProvider extends ChangeNotifier {
     _debugTimer?.cancel();
     _topCarouselController.pauseAllMedia();
     _isTopCarouselPaused = true;
-    notifyListeners();
+
+    // 使用 WidgetsBinding.instance.addPostFrameCallback 延迟通知
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (hasListeners) {
+        notifyListeners();
+      }
+    });
   }
 
   /// 從設置頁面恢復所有計時器
@@ -430,7 +459,12 @@ class TopAdCarouselProvider extends ChangeNotifier {
     // 重新啟動調試定時器
     startDebugTimer();
 
-    notifyListeners();
+    // 使用 WidgetsBinding.instance.addPostFrameCallback 延迟通知
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (hasListeners) {
+        notifyListeners();
+      }
+    });
   }
 
   bool get mounted => _mounted;
