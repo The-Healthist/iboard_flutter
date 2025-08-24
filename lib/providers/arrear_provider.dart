@@ -7,6 +7,7 @@ import 'package:logger/logger.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:convert';
 import 'dart:async';
+import 'package:iboard_app/widgets/mainscreen/main_display/arrear_other_table_widget.dart'; // Added import for ArrearOtherTableWidget
 
 // 费用类型枚举
 enum FeeType { management, other }
@@ -963,5 +964,71 @@ class ArrearProvider extends ChangeNotifier {
   void markUpdateApplied() {
     _hasPendingUpdate = false;
     _logger.i('✅ 欠费数据更新已应用');
+  }
+
+  ///36, 获取其他费用表格数据（缓存版本）
+  List<Map<String, dynamic>> getOtherTableData() {
+    final List<Map<String, dynamic>> tableData = [];
+
+    // 从其他分摊费用数据构建表格数据
+    if (_otherFeeData != null) {
+      for (final block in _otherFeeData!.blocks) {
+        // 如果选择了特定楼座，只显示该楼座的数据
+        if (_selectedBlock == null || block.name == _selectedBlock) {
+          for (final floor in block.floors) {
+            for (final unit in floor.units) {
+              final Map<String, dynamic> rowData = {
+                '單位': _formatUnitDisplay(block.name, floor.name, unit.name),
+              };
+
+              // 添加费用数据
+              for (final bill in unit.bills) {
+                rowData[bill.period] = bill.value;
+              }
+
+              tableData.add(rowData);
+            }
+          }
+        }
+      }
+    }
+
+    return tableData;
+  }
+
+  ///37, 创建其他费用表单Widget（缓存版本）
+  Widget createArrearOtherTableWidget({
+    required VoidCallback? onHomeButtonPressed,
+    required bool isInCarouselMode,
+    required Function(int totalPages)? onPaginationComplete,
+    required Function(int totalPages)? onPaginationStart,
+  }) {
+    final dataVersion = _currentDataVersion ?? 'initial';
+    final key = 'other_fee_table_$dataVersion';
+
+    // 检查缓存中是否已有此Widget
+    if (_widgetCache.containsKey(key)) {
+      _logger.i('💾 使用缓存的其他费用表单Widget: $key');
+      return _widgetCache[key]!;
+    }
+
+    // 创建新的Widget并缓存
+    final widget = ArrearOtherTableWidget(
+      key: ValueKey(key),
+      onHomeButtonPressed: onHomeButtonPressed,
+      isInCarouselMode: isInCarouselMode,
+      onPaginationComplete: onPaginationComplete,
+      onPaginationStart: onPaginationStart,
+    );
+
+    // 缓存Widget和数据
+    _widgetCache[key] = widget;
+    _cachedTableData[key] = getOtherTableData();
+
+    // 清理旧缓存（保留最新的2个版本）
+    _cleanupOldCache();
+
+    _logger.i('🆕 创建新的其他费用表单Widget: $key');
+    return widget;
   }
 }

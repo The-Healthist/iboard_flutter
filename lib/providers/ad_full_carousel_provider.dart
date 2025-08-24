@@ -5,7 +5,8 @@ import 'package:iboard_app/models/ad_model.dart';
 import 'package:iboard_app/widgets/full_ad_widget.dart';
 import 'package:logger/logger.dart';
 import 'package:iboard_app/providers/app_data_provider.dart';
-// import 'package:video_player/video_player.dart'; // 未使用的导入
+import 'package:iboard_app/utils/enhanced_video_pool_manager.dart';
+import 'package:video_player/video_player.dart';
 
 /// 简化版全屏广告Provider
 /// 参考顶部广告轮播逻辑实现
@@ -187,56 +188,25 @@ class FullscreenAdProvider extends ChangeNotifier {
     final fileManager = _fileManagerCache[key]!;
     fileManager.getFile(ad.file);
 
-    // 获取视频播放进度
-    Duration? initialPosition;
+    // 使用 EnhancedVideoPoolManager 获取控制器
+    Future<VideoPlayerController?> controllerFuture = Future.value(null);
     if (ad.file.mimeType.startsWith('video/')) {
-      initialPosition = getVideoProgress(ad.id.toString());
-      // 如果没有保存的进度，或者进度超过广告总时长，则从头开始
-      if (initialPosition == null || initialPosition >= ad.durationObject) {
-        initialPosition = null;
-      }
+      controllerFuture = EnhancedVideoPoolManager().getController(
+        filePath: ad.file.url,
+        videoType: VideoType.fullAd,
+        isNetwork: ad.file.url.startsWith('http'),
+        autoPlay: false,
+        looping: false,
+      );
     }
 
     return FullAdWidget(
       key: ValueKey(key),
       ad: ad,
       fileManager: fileManager,
-      initialVideoPosition: initialPosition,
+      controllerFuture: controllerFuture, // 传入异步控制器
+      initialVideoPosition: null,
       onVideoProgressChanged: (adId, position) {
-        if (_currentAdIndex < fullscreenAds.length &&
-            fullscreenAds[_currentAdIndex].id.toString() == adId) {
-          final currentAd = getCurrentAd();
-          if (currentAd != null) {
-            // 对于视频广告，保存播放进度
-            if (currentAd.file.mimeType.startsWith('video/')) {
-              saveVideoProgress(adId, position);
-            }
-            // 对于图片广告，保存显示时间
-            else if (currentAd.file.mimeType.startsWith('image/')) {
-              saveVideoProgress(adId, position);
-            }
-          }
-        }
-      },
-    );
-  }
-
-  ///8, 创建单个广告Widget
-  Widget _createSingleAdWidget(AdModel ad, int index) {
-    final FileManager fileManager = FileManager();
-    fileManager.getFile(ad.file);
-
-    // 对于全屏广告，视频始终从头开始播放，不使用保存的进度
-    Duration? initialPosition;
-
-    return FullAdWidget(
-      key: ValueKey('fullscreen_ad_${ad.id}_$index'),
-      ad: ad,
-      fileManager: fileManager,
-      initialVideoPosition: initialPosition,
-      onVideoProgressChanged: (adId, position) {
-        // 对于全屏广告，不需要保存视频进度
-        // 只在需要时保存图片广告的显示时间
         if (_currentAdIndex < fullscreenAds.length &&
             fullscreenAds[_currentAdIndex].id.toString() == adId) {
           final currentAd = getCurrentAd();
@@ -246,7 +216,48 @@ class FullscreenAdProvider extends ChangeNotifier {
           }
         }
       },
-      // onVideoDisposed: () => _logger.i('🎬 全屏广告 ${ad.id} 资源已释放'),
+    );
+  }
+
+  ///8, 创建单个广告Widget
+  Widget _createSingleAdWidget(AdModel ad, int index) {
+    final key = 'fullscreen_ad_${ad.id}_$index';
+
+    // 重用或创建FileManager
+    if (!_fileManagerCache.containsKey(key)) {
+      _fileManagerCache[key] = FileManager();
+    }
+    final fileManager = _fileManagerCache[key]!;
+    fileManager.getFile(ad.file);
+
+    // 使用 EnhancedVideoPoolManager 获取控制器
+    Future<VideoPlayerController?> controllerFuture = Future.value(null);
+    if (ad.file.mimeType.startsWith('video/')) {
+      controllerFuture = EnhancedVideoPoolManager().getController(
+        filePath: ad.file.url,
+        videoType: VideoType.fullAd,
+        isNetwork: ad.file.url.startsWith('http'),
+        autoPlay: false,
+        looping: false,
+      );
+    }
+
+    return FullAdWidget(
+      key: ValueKey(key),
+      ad: ad,
+      fileManager: fileManager,
+      controllerFuture: controllerFuture, // 传入异步控制器
+      initialVideoPosition: null,
+      onVideoProgressChanged: (adId, position) {
+        if (_currentAdIndex < fullscreenAds.length &&
+            fullscreenAds[_currentAdIndex].id.toString() == adId) {
+          final currentAd = getCurrentAd();
+          if (currentAd != null &&
+              currentAd.file.mimeType.startsWith('image/')) {
+            saveVideoProgress(adId, position);
+          }
+        }
+      },
     );
   }
 
@@ -266,6 +277,15 @@ class FullscreenAdProvider extends ChangeNotifier {
       }
 
       _createAdWidgets();
+
+      // 尝试强制播放当前广告
+      final currentWidget = getCurrentWidget();
+      if (currentWidget is FullAdWidget) {
+        _logger.i('🎬 强制尝试播放当前全屏广告');
+        // 可以在这里添加额外的播放逻辑，例如通过 Provider 强制刷新
+        notifyListeners();
+      }
+
       startFullscreenAdTimer(_currentAdIndex);
       startDebugTimer();
       _currentStateStartTime = DateTime.now();

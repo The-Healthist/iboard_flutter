@@ -204,6 +204,10 @@ class HomePageState extends State<HomePage> {
           final arrearProvider =
               Provider.of<ArrearProvider>(context, listen: false);
           appDataProvider.setArrearProvider(arrearProvider);
+          // 设置预加载回调
+          carouselStateProvider.setPreloadFullscreenAdCallback(() async {
+            // 新的Provider没有预加载方法
+          });
 
           // 初始化天气数据（不需要登录，公开API）
           try {
@@ -454,6 +458,27 @@ class HomePageState extends State<HomePage> {
     } else {
       return '❌ 初始化失败\n\n错误信息: $error\n\n请联系管理员';
     }
+  }
+
+  ///2，设置全屏广告预加载回调
+  void _setupFullscreenAdPreloadCallback() {
+    final stateProvider = context.read<CarouselStateProvider>();
+    final fullAdProvider = context.read<FullscreenAdProvider>();
+
+    // 设置预加载回调
+    stateProvider.setPreloadFullscreenAdCallback(() async {
+      // 新的Provider没有预加载方法
+    });
+
+    // 设置进入全屏广告模式回调
+    stateProvider.setEnterFullscreenAdModeCallback(() {
+      fullAdProvider.enterFullscreenMode();
+    });
+
+    // 设置退出全屏广告模式回调
+    stateProvider.setExitFullscreenAdModeCallback(() {
+      fullAdProvider.exitFullscreenMode();
+    });
   }
 
   @override

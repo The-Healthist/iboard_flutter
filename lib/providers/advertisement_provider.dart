@@ -543,6 +543,24 @@ class AdvertisementProvider extends ChangeNotifier {
     }
   }
 
+  ///10，强制清理特定视频的控制器
+  Future<void> forceRemoveVideoController({
+    required String filePath,
+    required VideoType videoType,
+  }) async {
+    try {
+      await _videoPoolManager.forceRemoveController(
+        filePath: filePath,
+        videoType: videoType,
+        isNetwork: false,
+      );
+      _logger.i(
+          '🗑️ [广告Provider] 强制移除视频控制器: ${videoType == VideoType.topAd ? '顶部' : '全屏'}:$filePath');
+    } catch (e) {
+      _logger.e('❌ [广告Provider] 强制移除视频控制器失败: $e');
+    }
+  }
+
   ///8，更新视频池管理器（私有方法）
   Future<void> _updateVideoPool() async {
     try {
@@ -576,7 +594,7 @@ class AdvertisementProvider extends ChangeNotifier {
 
       final status = _videoPoolManager.getPoolStatus();
       _logger.i(
-          '✅ [广告Provider] 视频池更新完成 - 总数:${status['totalSize']}, 使用中:${status['inUse']}, 可用:${status['available']}');
+          '✅ [广告Provider] 视频池更新完成 - 总数:${status['totalControllers']}, 控制器:${status['controllers']}');
     } catch (e) {
       _logger.e('❌ [广告Provider] 更新视频池失败: $e');
     }
@@ -585,24 +603,6 @@ class AdvertisementProvider extends ChangeNotifier {
   ///9，获取视频池状态信息（调试用）
   Map<String, dynamic> getVideoPoolStatus() {
     return _videoPoolManager.getPoolStatus();
-  }
-
-  ///10，强制清理特定视频的控制器
-  Future<void> forceRemoveVideoController({
-    required String filePath,
-    required VideoType videoType,
-  }) async {
-    try {
-      await _videoPoolManager.forceRemoveController(
-        filePath: filePath,
-        videoType: videoType,
-        isNetwork: false,
-      );
-      _logger.i(
-          '🗑️ [广告Provider] 强制移除视频控制器: ${videoType == VideoType.topAd ? '顶部' : '全屏'}:$filePath');
-    } catch (e) {
-      _logger.e('❌ [广告Provider] 强制移除视频控制器失败: $e');
-    }
   }
 
   ///11，获取视频池管理器实例（供组件使用）

@@ -192,6 +192,7 @@ class CarouselStateProvider extends ChangeNotifier {
   VoidCallback? _onCloseFullscreenAd; // 關閉全屏廣告的回調
   VoidCallback? _onEnterFullscreenAdMode; // 进入全屏广告模式的回调（通知FullAdProvider）
   VoidCallback? _onExitFullscreenAdMode; // 退出全屏广告模式的回调（通知FullAdProvider）
+  VoidCallback? _onPreloadFullscreenAd; // 全屏广告预加载回调
 
   // Provider引用
   AnnouncementCarouselProvider? _announcementCarouselProvider; // 通告轮播Provider引用
@@ -277,6 +278,11 @@ class CarouselStateProvider extends ChangeNotifier {
   /// 设置退出全屏广告模式回调
   void setExitFullscreenAdModeCallback(VoidCallback? callback) {
     _onExitFullscreenAdMode = callback;
+  }
+
+  /// 设置全屏广告预加载回调
+  void setPreloadFullscreenAdCallback(VoidCallback? callback) {
+    _onPreloadFullscreenAd = callback;
   }
 
   /// 設置通告轮播下一个回调
@@ -368,6 +374,9 @@ class CarouselStateProvider extends ChangeNotifier {
   ///4， 切換到全屏廣告狀態
   void enterFullscreenAd() {
     if (_currentState.canTransitionTo(AppState.fullscreenAd)) {
+      // 预加载全屏广告
+      _onPreloadFullscreenAd?.call();
+
       _clearAllTimers();
 
       // 暂停通告轮播定时器

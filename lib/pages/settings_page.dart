@@ -4,7 +4,7 @@ import 'package:iboard_app/providers/announcement_carousel_provider.dart';
 import 'package:iboard_app/providers/ad_full_carousel_provider.dart';
 import 'package:iboard_app/providers/state_provider.dart';
 import 'package:iboard_app/providers/ad_top_carousel_provider.dart';
-
+import 'package:iboard_app/providers/arrear_provider.dart'; // 新增导入
 import 'package:iboard_app/providers/app_update_provider.dart'; // 导入更新Provider
 import 'package:iboard_app/widgets/carousel_widget.dart'; // 导入通知类
 
@@ -130,6 +130,58 @@ class SettingsPageState extends State<SettingsPage> {
     });
 
     Navigator.pop(context);
+  }
+
+  ///9, 显示其他欠费表单的调试方法
+  void _showOtherFeeTableDebug() {
+    final arrearProvider = context.read<ArrearProvider>();
+
+    // 检查是否有其他费用数据
+    if (arrearProvider.hasOtherFeeData) {
+      showDialog(
+        context: context,
+        builder: (BuildContext context) {
+          return Dialog(
+            child: Container(
+              width: MediaQuery.of(context).size.width * 0.9,
+              height: MediaQuery.of(context).size.height * 0.8,
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                children: [
+                  Text(
+                    '其他費用表單調試',
+                    style: TextStyle(
+                      fontSize: 20,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.blue.shade600,
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  Expanded(
+                    child: arrearProvider.createArrearOtherTableWidget(
+                      onHomeButtonPressed: () {
+                        Navigator.of(context).pop();
+                      },
+                      isInCarouselMode: false,
+                      onPaginationComplete: null,
+                      onPaginationStart: null,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          );
+        },
+      );
+    } else {
+      // 如果没有其他费用数据，显示提示
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('暫無其他費用數據'),
+          backgroundColor: Colors.orange,
+        ),
+      );
+    }
   }
 
   @override
@@ -269,6 +321,13 @@ class SettingsPageState extends State<SettingsPage> {
                           title: '網絡設置',
                           subtitle: '配置網絡連接',
                           onTap: () {},
+                        ),
+                        const SizedBox(height: 16),
+                        _buildSettingsItem(
+                          icon: Icons.table_chart,
+                          title: '其他費用表單調試',
+                          subtitle: '顯示其他費用表單的調試視圖',
+                          onTap: _showOtherFeeTableDebug,
                         ),
                         const SizedBox(height: 16),
                         _buildVersionUpdateItem(),
