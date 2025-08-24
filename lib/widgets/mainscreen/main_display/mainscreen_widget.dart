@@ -328,7 +328,7 @@ class MainScreenWidgetState extends State<MainScreenWidget> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           const Text(
-            '選擇樓座',
+            '選擇座數',
             style: TextStyle(
               fontSize: 16,
               fontWeight: FontWeight.w600,

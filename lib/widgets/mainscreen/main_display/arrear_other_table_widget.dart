@@ -230,19 +230,8 @@ class ArrearOtherTableWidgetState extends State<ArrearOtherTableWidget> {
                     const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
                 child: Row(
                   children: [
-                    const Expanded(
-                      flex: 2,
-                      child: Text(
-                        '單位',
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontWeight: FontWeight.w600,
-                          fontSize: 14,
-                        ),
-                      ),
-                    ),
                     ..._getTableHeaders(tableData).map((header) => Expanded(
-                          flex: 2,
+                          flex: header == '單位' ? 1 : 2,
                           child: Text(
                             header,
                             style: const TextStyle(
@@ -265,28 +254,26 @@ class ArrearOtherTableWidgetState extends State<ArrearOtherTableWidget> {
                     ),
                     child: Row(
                       children: [
-                        Expanded(
-                          flex: 2,
-                          child: Padding(
-                            padding: const EdgeInsets.symmetric(
-                              vertical: 10,
-                              horizontal: 16,
-                            ),
-                            child: Text(
-                              record['單位']?.toString() ?? '-',
-                              style: const TextStyle(
-                                fontWeight: FontWeight.w500,
-                                color: Colors.black87,
-                                fontSize: 13,
-                              ),
-                            ),
-                          ),
-                        ),
                         ..._getTableHeaders(tableData).map((header) => Expanded(
-                              flex: 2,
-                              child: Center(
-                                child: _buildStatusChip(record[header]),
-                              ),
+                              flex: header == '單位' ? 1 : 2,
+                              child: header == '單位'
+                                  ? Padding(
+                                      padding: const EdgeInsets.symmetric(
+                                        vertical: 10,
+                                        horizontal: 16,
+                                      ),
+                                      child: Text(
+                                        record[header]?.toString() ?? '-',
+                                        style: const TextStyle(
+                                          fontWeight: FontWeight.w500,
+                                          color: Colors.black87,
+                                          fontSize: 13,
+                                        ),
+                                      ),
+                                    )
+                                  : Center(
+                                      child: _buildStatusChip(record[header]),
+                                    ),
                             )),
                       ],
                     ),
@@ -309,16 +296,17 @@ class ArrearOtherTableWidgetState extends State<ArrearOtherTableWidget> {
       for (final block in provider.otherFeeData!.blocks) {
         for (final floor in block.floors) {
           for (final unit in floor.units) {
-            final Map<String, dynamic> rowData = {
-              '單位': _formatUnitDisplay(block.name, floor.name, unit.name),
-            };
-
-            // 添加费用数据
             for (final bill in unit.bills) {
-              rowData[bill.period] = bill.value;
-            }
+              final Map<String, dynamic> rowData = {
+                '單位': _formatUnitDisplay(block.name, floor.name, unit.name),
+                '費用': bill.value,
+                '類型': bill.itemId ?? '其他費用',
+                '費用明細': bill.remark ?? '-',
+                '日期': bill.period,
+              };
 
-            tableData.add(rowData);
+              tableData.add(rowData);
+            }
           }
         }
       }
@@ -362,7 +350,6 @@ class ArrearOtherTableWidgetState extends State<ArrearOtherTableWidget> {
   ///5, 获取状态颜色
   Color _getStatusColor(dynamic value) {
     if (value == null) return Colors.grey.shade100;
-    if (value == '已付') return Colors.green.shade100;
     if (value is num && value < 0) return Colors.red.shade100;
     return Colors.grey.shade100;
   }
@@ -370,7 +357,6 @@ class ArrearOtherTableWidgetState extends State<ArrearOtherTableWidget> {
   ///6, 获取状态文字颜色
   Color _getStatusTextColor(dynamic value) {
     if (value == null) return Colors.grey.shade800;
-    if (value == '已付') return Colors.green.shade800;
     if (value is num && value < 0) return Colors.red.shade800;
     return Colors.grey.shade800;
   }
@@ -385,8 +371,8 @@ class ArrearOtherTableWidgetState extends State<ArrearOtherTableWidget> {
   List<String> _getTableHeaders(List<Map<String, dynamic>> tableData) {
     if (tableData.isEmpty) return [];
 
-    final firstRecord = tableData.first;
-    return firstRecord.keys.where((key) => key != '單位').toList();
+    // 固定顺序的表头，包括单位列
+    return ['單位', '費用', '類型', '費用明細', '日期'];
   }
 
   ///9, 获取分页数据
@@ -564,15 +550,10 @@ class ArrearOtherTableWidgetState extends State<ArrearOtherTableWidget> {
             widget.onPaginationComplete!(_totalPages);
           }
         } else {
-          setState(() {
-            _currentPage = 1;
-          });
-
-          Future.delayed(const Duration(seconds: 2), () {
-            if (widget.onPaginationComplete != null) {
-              widget.onPaginationComplete!(_totalPages);
-            }
-          });
+          // 修改：不返回第一页，而是继续停留在最后一页
+          if (widget.onPaginationComplete != null) {
+            widget.onPaginationComplete!(_totalPages);
+          }
         }
       }
     });

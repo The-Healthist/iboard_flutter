@@ -11,20 +11,20 @@ import 'dart:io';
 class FullAdWidget extends StatefulWidget {
   final AdModel ad;
   final FileManager fileManager;
-  final Duration? initialVideoPosition; // 初始视频播放位置
   final Function(String adId, Duration position)?
       onVideoProgressChanged; // 视频进度变化回掉
   final VoidCallback? onVideoDisposed; // 视频资源释放完成回掉
   final Future<VideoPlayerController?> controllerFuture; // 异步控制器
+  final Duration? initialPlaybackPosition; // 初始播放位置
 
   const FullAdWidget({
     super.key,
     required this.ad,
     required this.fileManager,
     required this.controllerFuture,
-    this.initialVideoPosition,
     this.onVideoProgressChanged,
     this.onVideoDisposed,
+    this.initialPlaybackPosition,
   });
 
   @override
@@ -46,24 +46,83 @@ class _FullAdWidgetState extends State<FullAdWidget> {
   @override
   void initState() {
     super.initState();
-    // _logger
-    //     .i('🎬 初始化全屏广告: "${widget.ad.title}" - 类型: ${widget.ad.file.mimeType}');
+    // 仅在视频类型时初始化
     if (widget.ad.file.mimeType.startsWith('video/')) {
-      _initializeVideo();
+      // 延迟初始化，避免阻塞构建
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) {
+          _initializeVideoPlayer();
+        }
+      });
+    }
+  }
+
+  /// 初始化视频播放器
+  Future<void> _initializeVideoPlayer() async {
+    if (_videoController != null || !mounted) return;
+
+    setState(() {
+      _isLoadingVideo = true;
+      _errorMessage = null;
+    });
+
+    try {
+      // 尝试从FileManager获取本地缓存的视频文件
+      final File? localFile = await widget.fileManager.getFile(widget.ad.file);
+      if (!mounted) return;
+
+      if (localFile == null || !await localFile.exists()) {
+        throw Exception('视频文件未缓存');
+      }
+
+      // 记录当前文件信息
+      _currentFilePath = localFile.path;
+      _isNetworkVideo = widget.ad.file.url.startsWith('http');
+
+      // 使用传入的异步控制器
+      _videoController = await widget.controllerFuture;
+
+      // 确保视频控制器初始化
+      if (_videoController != null) {
+        // 添加进度监听器
+        _videoController!.addListener(_onVideoProgressChanged);
+
+        // 如果有初始播放位置，则跳转到该位置
+        if (widget.initialPlaybackPosition != null) {
+          await _videoController!.seekTo(widget.initialPlaybackPosition!);
+        } else {
+          await _videoController!.seekTo(Duration.zero);
+        }
+
+        if (_videoController!.value.isInitialized) {
+          // 明確循环设置，确保全屏始终循环
+          _videoController!.setLooping(true);
+          // 明确自动播放
+          await _videoController!.play();
+        }
+
+        setState(() {
+          _isVideoInitialized = true;
+          _isLoadingVideo = false;
+        });
+      } else {
+        throw Exception('无法获取视频控制器');
+      }
+    } catch (e) {
+      _logger.e('❌ 視頻初始化失败: $e');
+
+      if (mounted) {
+        setState(() {
+          _isLoadingVideo = false;
+          _errorMessage = '視頻加載失败: $e';
+          _isVideoInitialized = false;
+        });
+      }
     }
   }
 
   @override
-  void didChangeDependencies() {
-    super.didChangeDependencies();
-    // 在组件依赖变化时保存Provider引用，确保dispose时可以安全使用
-    _advertisementProvider ??= context.read<AdvertisementProvider>();
-  }
-
-  @override
   void dispose() {
-    // _logger.i('🔄 开始释放全屏广告Widget资源');
-
     // 释放视频控制器到池中
     if (_videoController != null && _currentFilePath != null) {
       // 移除监听器
@@ -77,14 +136,12 @@ class _FullAdWidgetState extends State<FullAdWidget> {
               .releaseController(
             filePath: _currentFilePath!,
             videoType: VideoType.fullAd,
-            isNetwork: _isNetworkVideo,
           )
               .then((_) {
             // 通知视频资源已释放
             if (widget.onVideoDisposed != null) {
               widget.onVideoDisposed!();
             }
-            // _logger.i('✅ 全屏广告视频控制器已释放到增強池中');
           });
         } else {
           _logger.w('⚠️ AdvertisementProvider引用为空，无法释放视频控制器');
@@ -96,7 +153,6 @@ class _FullAdWidgetState extends State<FullAdWidget> {
     }
 
     super.dispose();
-    // _logger.i('✅ 全屏广告Widget资源释放完成');
   }
 
   ///1，视频播放进度变化监听器
@@ -115,94 +171,7 @@ class _FullAdWidgetState extends State<FullAdWidget> {
     }
   }
 
-  ///2，初始化视频
-  Future<void> _initializeVideo() async {
-    if (_isLoadingVideo || !mounted) return;
-
-    setState(() {
-      _isLoadingVideo = true;
-      _errorMessage = null;
-    });
-
-    try {
-      // 安全释放现有控制器
-      await _releaseExistingController();
-
-      // 尝试从FileManager获取本地缓存的视频文件
-      final File? localFile = await widget.fileManager.getFile(widget.ad.file);
-      if (!mounted) return;
-
-      if (localFile == null || !await localFile.exists()) {
-        throw Exception('视频文件未缓存');
-      }
-
-      // 记录当前文件信息
-      _currentFilePath = localFile.path;
-      _isNetworkVideo = widget.ad.file.url.startsWith('http');
-
-      // 获取异步控制器
-      _videoController = await widget.controllerFuture;
-
-      // 确保视频控制器初始化并播放
-      if (_videoController != null) {
-        await _videoController!.initialize();
-        await _videoController!.play();
-
-        // 添加错误监听
-        _videoController!.addListener(() {
-          if (_videoController!.value.hasError) {
-            _logger.e('视频播放错误: ${_videoController!.value.errorDescription}');
-            setState(() {
-              _errorMessage = '视频播放出现错误';
-            });
-          }
-        });
-
-        setState(() {
-          _isVideoInitialized = true;
-          _isLoadingVideo = false;
-        });
-
-        // 如果有初始播放位置，跳转到该位置
-        if (widget.initialVideoPosition != null &&
-            widget.initialVideoPosition!.inMilliseconds > 0) {
-          await _videoController!.seekTo(widget.initialVideoPosition!);
-        }
-
-        // 添加进度监听器
-        _videoController!.addListener(_onVideoProgressChanged);
-      }
-    } catch (e) {
-      _logger.e('❌ 視頻初始化失敗: $e');
-
-      // 安全释放资源
-      await _releaseExistingController();
-
-      if (mounted) {
-        setState(() {
-          _isLoadingVideo = false;
-          _errorMessage = '視頻加載失敗: $e';
-          _isVideoInitialized = false;
-        });
-      }
-    }
-  }
-
-  // 新增安全释放控制器的方法
-  Future<void> _releaseExistingController() async {
-    if (_videoController != null && _currentFilePath != null) {
-      _videoController!.removeListener(_onVideoProgressChanged);
-
-      _advertisementProvider ??= context.read<AdvertisementProvider>();
-      await _advertisementProvider!.videoPoolManager.releaseController(
-        filePath: _currentFilePath!,
-        videoType: VideoType.fullAd,
-        isNetwork: _isNetworkVideo,
-      );
-
-      _videoController = null;
-    }
-  }
+  // 移除 _releaseExistingController 方法，不再需要频繁释放和重新创建控制器
 
   @override
   Widget build(BuildContext context) {
@@ -369,7 +338,7 @@ class _FullAdWidgetState extends State<FullAdWidget> {
               ),
               const SizedBox(height: 20),
               ElevatedButton(
-                onPressed: _initializeVideo,
+                onPressed: _initializeVideoPlayer,
                 child: const SelectableText('重試'),
               ),
             ],

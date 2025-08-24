@@ -7,7 +7,6 @@ import 'package:iboard_app/widgets/carousel_widget.dart' as custom_carousel;
 import 'package:iboard_app/widgets/mainscreen/main_display/announcement_reader_widget.dart';
 import 'package:iboard_app/widgets/mainscreen/main_display/mainscreen_widget.dart';
 import 'package:iboard_app/widgets/mainscreen/main_display/arrear_table_widget.dart';
-// import 'package:iboard_app/widgets/mainscreen/main_display/arrear_other_table_widget.dart'; // 删除未使用的导入
 // import 'package:shared_preferences/shared_preferences.dart'; // 已删除，不再使用
 // import 'dart:convert';
 import 'package:iboard_app/providers/app_data_provider.dart';
@@ -207,79 +206,38 @@ class AnnouncementCarouselProvider extends ChangeNotifier {
     }
 
     // 3. 欠费总览widget（使用数据版本作为key）- 確保創建
-    // 删除未使用的 arrearDataVersion 变量
-    // final arrearDataVersion = _arrearProvider?.currentDataVersion ?? 'default';
-    // 删除未使用的 arrearTableKey 变量
-    // final arrearTableKey = 'arrear_table_$arrearDataVersion';
-
-    // 注释掉管理费用表单的创建
-    // try {
-    //   if (!_widgetCache.containsKey(arrearTableKey) ||
-    //       _arrearProvider?.hasPendingUpdate == true) {
-    //     if (_arrearProvider != null) {
-    //       _widgetCache[arrearTableKey] =
-    //           _arrearProvider!.createArrearTableWidget(
-    //         onHomeButtonPressed: () {
-    //           jumpToAnnouncementIndex(0);
-    //         },
-    //         isInCarouselMode: true,
-    //         onPaginationComplete: (int totalPages) {
-    //           _isArrearPaginationActive = false;
-    //           _goToNextCarouselItem();
-    //         },
-    //         onPaginationStart: (int totalPages) {
-    //           _isArrearPaginationActive = true;
-    //           _extendCurrentNoticeStayTime(totalPages);
-    //         },
-    //       );
-
-    //       // 清理旧的欠费表单缓存
-    //       _widgetCache.removeWhere((key, value) =>
-    //           key.startsWith('arrear_table_') && key != arrearTableKey);
-
-    //       // 标记更新已应用
-    //       _arrearProvider!.markUpdateApplied();
-    //     } else {
-    //       // 如果没有ArrearProvider，創建一個簡單的備用widget
-    //       _widgetCache[arrearTableKey] = Container(
-    //         child: const Center(
-    //           child: Text('欠費數據載入中...', style: TextStyle(fontSize: 18)),
-    //         ),
-    //       );
-    //     }
-    //   }
-
-    //   widgetMap[arrearTableKey] = _widgetCache[arrearTableKey]!;
-    //   orderedKeys.add(arrearTableKey);
-    //   usedKeys.add(arrearTableKey);
-    // } catch (e) {
-    //   _widgetCache[arrearTableKey] = Container(
-    //     child: const Center(
-    //       child: Text('欠費數據暫不可用', style: TextStyle(fontSize: 18)),
-    //     ),
-    //   );
-    //   widgetMap[arrearTableKey] = _widgetCache[arrearTableKey]!;
-    //   orderedKeys.add(arrearTableKey);
-    //   usedKeys.add(arrearTableKey);
-    // }
-
-    // 4. 其他费用表格widget（使用数据版本作为key）- 確保創建
-    final otherFeeDataVersion =
-        _arrearProvider?.currentDataVersion ?? 'default';
-    final otherFeeTableKey = 'other_fee_table_$otherFeeDataVersion';
+    final arrearDataVersion = _arrearProvider?.currentDataVersion ?? 'default';
+    final arrearTableKey = 'other_fee_table_$arrearDataVersion';
 
     try {
-      if (!_widgetCache.containsKey(otherFeeTableKey) ||
+      if (!_widgetCache.containsKey(arrearTableKey) ||
           _arrearProvider?.hasPendingUpdate == true) {
         if (_arrearProvider != null) {
-          _widgetCache[otherFeeTableKey] = _createArrearOtherTableWidget();
+          _widgetCache[arrearTableKey] =
+              _arrearProvider!.createArrearOtherTableWidget(
+            onHomeButtonPressed: () {
+              jumpToAnnouncementIndex(0);
+            },
+            isInCarouselMode: true,
+            onPaginationComplete: (int totalPages) {
+              _isArrearPaginationActive = false;
+              _goToNextCarouselItem();
+            },
+            onPaginationStart: (int totalPages) {
+              _isArrearPaginationActive = true;
+              _extendCurrentNoticeStayTime(totalPages);
+            },
+          );
 
           // 清理旧的其他费用表单缓存
           _widgetCache.removeWhere((key, value) =>
-              key.startsWith('other_fee_table_') && key != otherFeeTableKey);
+              key.startsWith('other_fee_table_') && key != arrearTableKey);
+
+          // 标记更新已应用
+          _arrearProvider!.markUpdateApplied();
         } else {
           // 如果没有ArrearProvider，創建一個簡單的備用widget
-          _widgetCache[otherFeeTableKey] = Container(
+          _widgetCache[arrearTableKey] = Container(
             child: const Center(
               child: Text('其他費用數據載入中...', style: TextStyle(fontSize: 18)),
             ),
@@ -287,18 +245,18 @@ class AnnouncementCarouselProvider extends ChangeNotifier {
         }
       }
 
-      widgetMap[otherFeeTableKey] = _widgetCache[otherFeeTableKey]!;
-      orderedKeys.add(otherFeeTableKey);
-      usedKeys.add(otherFeeTableKey);
+      widgetMap[arrearTableKey] = _widgetCache[arrearTableKey]!;
+      orderedKeys.add(arrearTableKey);
+      usedKeys.add(arrearTableKey);
     } catch (e) {
-      _widgetCache[otherFeeTableKey] = Container(
+      _widgetCache[arrearTableKey] = Container(
         child: const Center(
           child: Text('其他費用數據暫不可用', style: TextStyle(fontSize: 18)),
         ),
       );
-      widgetMap[otherFeeTableKey] = _widgetCache[otherFeeTableKey]!;
-      orderedKeys.add(otherFeeTableKey);
-      usedKeys.add(otherFeeTableKey);
+      widgetMap[arrearTableKey] = _widgetCache[arrearTableKey]!;
+      orderedKeys.add(arrearTableKey);
+      usedKeys.add(arrearTableKey);
     }
 
     // 清理不再使用的緩存
@@ -606,34 +564,8 @@ class AnnouncementCarouselProvider extends ChangeNotifier {
 
         // 计算下一个索引，跳过主屏幕（索引0）
         _currentNoticeIndex++;
-
-        // 获取所有费用表单和通告的 keys
-        final feeTableKeys = _widgetCache.keys
-            .where((key) => key.startsWith('other_fee_table_'))
-            .toList();
-
-        final hasAnnouncements = _carouselAnnouncements.isNotEmpty;
-
-        // 如果已经超出所有 widget 的范围
         if (_currentNoticeIndex >= _midCarouselController.widgetCount) {
-          // 如果有通告，则返回第一个通告
-          if (hasAnnouncements) {
-            _currentNoticeIndex = 1;
-          }
-          // 如果没有通告但有费用表单，则切换到第一个费用表单
-          else if (feeTableKeys.isNotEmpty) {
-            // 没有通告时，优先展示其他费用表单
-            final otherFeeTableKey = _widgetCache.keys.firstWhere(
-              (key) => key.startsWith('other_fee_table_'),
-              orElse: () => feeTableKeys.first,
-            );
-            _currentNoticeIndex =
-                _widgetCache.keys.toList().indexOf(otherFeeTableKey);
-          }
-          // 如果什么都没有，则重置到主屏幕
-          else {
-            _currentNoticeIndex = 0;
-          }
+          _currentNoticeIndex = 1; // 回到第一个内容，跳过主屏幕
         }
 
         // 检查是否切换到欠费总览（最后一个索引）
@@ -775,31 +707,7 @@ class AnnouncementCarouselProvider extends ChangeNotifier {
               // 不是欠费总览，正常切换到下一个内容
               _currentNoticeIndex++;
               if (_currentNoticeIndex >= _midCarouselController.widgetCount) {
-                // 获取所有费用表单和通告的 keys
-                final feeTableKeys = _widgetCache.keys
-                    .where((key) => key.startsWith('other_fee_table_'))
-                    .toList();
-
-                final hasAnnouncements = _carouselAnnouncements.isNotEmpty;
-
-                // 如果有通告，则返回第一个通告
-                if (hasAnnouncements) {
-                  _currentNoticeIndex = 1;
-                }
-                // 如果没有通告但有费用表单，则切换到第一个费用表单
-                else if (feeTableKeys.isNotEmpty) {
-                  // 没有通告时，优先展示其他费用表单
-                  final otherFeeTableKey = _widgetCache.keys.firstWhere(
-                    (key) => key.startsWith('other_fee_table_'),
-                    orElse: () => feeTableKeys.first,
-                  );
-                  _currentNoticeIndex =
-                      _widgetCache.keys.toList().indexOf(otherFeeTableKey);
-                }
-                // 如果什么都没有，则重置到主屏幕
-                else {
-                  _currentNoticeIndex = 0;
-                }
+                _currentNoticeIndex = 1; // 回到第一个内容，跳过主屏幕
               }
               _midCarouselController.jumpToIndex(_currentNoticeIndex);
               _scheduleNextCarousel(apiNoticeStayDuration);
@@ -832,31 +740,7 @@ class AnnouncementCarouselProvider extends ChangeNotifier {
             // 切换到下一个内容
             _currentNoticeIndex++;
             if (_currentNoticeIndex >= _midCarouselController.widgetCount) {
-              // 获取所有费用表单和通告的 keys
-              final feeTableKeys = _widgetCache.keys
-                  .where((key) => key.startsWith('other_fee_table_'))
-                  .toList();
-
-              final hasAnnouncements = _carouselAnnouncements.isNotEmpty;
-
-              // 如果有通告，则返回第一个通告
-              if (hasAnnouncements) {
-                _currentNoticeIndex = 1;
-              }
-              // 如果没有通告但有费用表单，则切换到第一个费用表单
-              else if (feeTableKeys.isNotEmpty) {
-                // 没有通告时，优先展示其他费用表单
-                final otherFeeTableKey = _widgetCache.keys.firstWhere(
-                  (key) => key.startsWith('other_fee_table_'),
-                  orElse: () => feeTableKeys.first,
-                );
-                _currentNoticeIndex =
-                    _widgetCache.keys.toList().indexOf(otherFeeTableKey);
-              }
-              // 如果什么都没有，则重置到主屏幕
-              else {
-                _currentNoticeIndex = 0;
-              }
+              _currentNoticeIndex = 1; // 回到第一个内容，跳过主屏幕
             }
             _midCarouselController.jumpToIndex(_currentNoticeIndex);
           }
@@ -1233,34 +1117,8 @@ class AnnouncementCarouselProvider extends ChangeNotifier {
     try {
       // 切换到下一个内容
       _currentNoticeIndex++;
-
-      // 获取所有费用表单和通告的 keys
-      final feeTableKeys = _widgetCache.keys
-          .where((key) => key.startsWith('other_fee_table_'))
-          .toList();
-
-      final hasAnnouncements = _carouselAnnouncements.isNotEmpty;
-
-      // 如果已经超出所有 widget 的范围
       if (_currentNoticeIndex >= _midCarouselController.widgetCount) {
-        // 如果有通告，则返回第一个通告
-        if (hasAnnouncements) {
-          _currentNoticeIndex = 1;
-        }
-        // 如果没有通告但有费用表单，则切换到第一个费用表单
-        else if (feeTableKeys.isNotEmpty) {
-          // 没有通告时，优先展示其他费用表单
-          final otherFeeTableKey = _widgetCache.keys.firstWhere(
-            (key) => key.startsWith('other_fee_table_'),
-            orElse: () => feeTableKeys.first,
-          );
-          _currentNoticeIndex =
-              _widgetCache.keys.toList().indexOf(otherFeeTableKey);
-        }
-        // 如果什么都没有，则重置到主屏幕
-        else {
-          _currentNoticeIndex = 0;
-        }
+        _currentNoticeIndex = 1; // 回到第一个内容，跳过主屏幕
       }
 
       // 跳转到下一个内容
@@ -1479,42 +1337,6 @@ class AnnouncementCarouselProvider extends ChangeNotifier {
         _videoPlaybackPositions[i] = Duration.zero;
       }
     }
-  }
-
-  /// 新增：创建其他费用表格Widget（辅助方法）
-  Widget _createArrearOtherTableWidget() {
-    return Container(
-      width: double.infinity,
-      height: double.infinity,
-      color: Colors.grey.shade50,
-      child: _arrearProvider != null
-          ? _arrearProvider!.createArrearOtherTableWidget(
-              onHomeButtonPressed: () {
-                // 点击主页按钮时，跳转回主屏幕（索引0）
-                jumpToAnnouncementIndex(0);
-              },
-              isInCarouselMode: true,
-              onPaginationComplete: (int totalPages) {
-                // 其他费用总览翻页完成
-                _isArrearPaginationActive = false;
-                // 然后切换到下一个通告
-                _goToNextCarouselItem();
-              },
-              onPaginationStart: (int totalPages) {
-                // 其他费用总览开始翻页，动态延长当前通告停留时间，并标记分页中
-                _isArrearPaginationActive = true;
-                _extendCurrentNoticeStayTime(totalPages);
-              },
-            )
-          : Container(
-              width: double.infinity,
-              height: double.infinity,
-              color: Colors.grey.shade50,
-              child: const Center(
-                child: Text('其他費用數據暫不可用', style: TextStyle(fontSize: 18)),
-              ),
-            ),
-    );
   }
 
   @override

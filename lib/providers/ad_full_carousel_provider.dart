@@ -57,6 +57,12 @@ class FullscreenAdProvider extends ChangeNotifier {
   // 标记是否有待更新的Widget
   bool _pendingWidgetUpdate = false;
 
+  // 新增：视频控制器缓存
+  final Map<String, VideoPlayerController> _videoControllerCache = {};
+
+  // 新增：视频播放进度缓存
+  final Map<String, Duration> _videoProgressCache = {};
+
   // Getters
   List<AdModel> get fullscreenAds => _fullscreenAds;
   List<Widget> get adWidgets => _adWidgets;
@@ -70,7 +76,7 @@ class FullscreenAdProvider extends ChangeNotifier {
   Duration get expectedAdElapsedTime => _expectedAdElapsedTime; //预计已播放时间
   Duration get expectendAdNeedAdd => _expectendAdNeedAdd; //预计需要添加的已播放时间
   Duration get adDuration => _adDuration;
-  Map<String, Duration> get videoProgressMap => _videoProgressMap;
+  Map<String, Duration> get videoProgressMap => _videoProgressCache;
 
   /// 获取全屏广告播放时间（秒）
   int get fullscreenAdDuration =>
@@ -177,7 +183,7 @@ class FullscreenAdProvider extends ChangeNotifier {
     // 它直接管理_adWidgets列表，通过getCurrentWidget()获取当前显示的Widget
   }
 
-  ///7b, 创建缓存的广告Widget
+  ///7b, 创建缓存的广告Widget（改进版）
   Widget _createCachedAdWidget(AdModel ad, int index) {
     final key = 'fullscreen_ad_${ad.id}';
 
@@ -188,33 +194,55 @@ class FullscreenAdProvider extends ChangeNotifier {
     final fileManager = _fileManagerCache[key]!;
     fileManager.getFile(ad.file);
 
-    // 使用 EnhancedVideoPoolManager 获取控制器
+    // 检查是否已有缓存的控制器
     Future<VideoPlayerController?> controllerFuture = Future.value(null);
     if (ad.file.mimeType.startsWith('video/')) {
-      controllerFuture = EnhancedVideoPoolManager().getController(
-        filePath: ad.file.url,
-        videoType: VideoType.fullAd,
-        isNetwork: ad.file.url.startsWith('http'),
-        autoPlay: false,
-        looping: false,
-      );
+      // 尝试从缓存中获取控制器，如果不存在则创建
+      if (_videoControllerCache.containsKey(key)) {
+        // 如果缓存的控制器存在，重置其状态并再次Play（确保不会卡首帧）
+        final cachedController = _videoControllerCache[key]!;
+        controllerFuture = Future.sync(() async {
+          try {
+            await cachedController.pause();
+            await cachedController.seekTo(Duration.zero);
+            await cachedController.setLooping(true);
+            await cachedController.play();
+          } catch (e) {
+            _logger.w('⚠️ 重置并播放控制器时出错: $e');
+          }
+          return cachedController;
+        });
+      } else {
+        // 创建新的控制器
+        controllerFuture = EnhancedVideoPoolManager().getController(
+          filePath: ad.file.url,
+          videoType: VideoType.fullAd,
+          isNetwork: ad.file.url.startsWith('http'),
+          autoPlay: true,
+          looping: true,
+          onError: () {
+            _logger.e('全屏广告视频控制器初始化失败: ${ad.title}');
+          },
+        );
+
+        // 缓存新创建的控制器
+        controllerFuture.then((controller) {
+          if (controller != null) {
+            _videoControllerCache[key] = controller;
+          }
+        });
+      }
     }
 
     return FullAdWidget(
       key: ValueKey(key),
       ad: ad,
       fileManager: fileManager,
-      controllerFuture: controllerFuture, // 传入异步控制器
-      initialVideoPosition: null,
+      controllerFuture: controllerFuture,
+      // 始终从头开始播放
+      initialPlaybackPosition: Duration.zero,
       onVideoProgressChanged: (adId, position) {
-        if (_currentAdIndex < fullscreenAds.length &&
-            fullscreenAds[_currentAdIndex].id.toString() == adId) {
-          final currentAd = getCurrentAd();
-          if (currentAd != null &&
-              currentAd.file.mimeType.startsWith('image/')) {
-            saveVideoProgress(adId, position);
-          }
-        }
+        saveVideoProgress(adId, position);
       },
     );
   }
@@ -238,7 +266,10 @@ class FullscreenAdProvider extends ChangeNotifier {
         videoType: VideoType.fullAd,
         isNetwork: ad.file.url.startsWith('http'),
         autoPlay: false,
-        looping: false,
+        looping: true,
+        onError: () {
+          _logger.e('全屏广告视频控制器初始化失败: ${ad.title}');
+        },
       );
     }
 
@@ -247,7 +278,6 @@ class FullscreenAdProvider extends ChangeNotifier {
       ad: ad,
       fileManager: fileManager,
       controllerFuture: controllerFuture, // 传入异步控制器
-      initialVideoPosition: null,
       onVideoProgressChanged: (adId, position) {
         if (_currentAdIndex < fullscreenAds.length &&
             fullscreenAds[_currentAdIndex].id.toString() == adId) {
@@ -354,7 +384,7 @@ class FullscreenAdProvider extends ChangeNotifier {
     }
   }
 
-  ///11, 切换到下一个广告（私有方法） - 添加视频切换延迟
+  ///10, 切换到下一个广告（私有方法）- 添加视频切换延迟
   void _nextAd() {
     if (fullscreenAds.isEmpty || _isPaused || !_isActive) {
       _logger.w(
@@ -379,6 +409,24 @@ class FullscreenAdProvider extends ChangeNotifier {
     _expectedAdElapsedTime = Duration.zero;
     _currentAdPauseTime = null;
 
+    // 清除当前广告的视频进度
+    clearVideoProgress(fullscreenAds[_currentAdIndex].id.toString());
+
+    // 尝试释放之前的控制器
+    final previousAdId = fullscreenAds[
+            (_currentAdIndex - 1 + fullscreenAds.length) % fullscreenAds.length]
+        .id
+        .toString();
+    final previousKey = 'fullscreen_ad_$previousAdId';
+    if (_videoControllerCache.containsKey(previousKey)) {
+      try {
+        _videoControllerCache[previousKey]?.pause();
+        _videoControllerCache[previousKey]?.seekTo(Duration.zero);
+      } catch (e) {
+        _logger.w('⚠️ 释放前一个控制器时出错: $e');
+      }
+    }
+
     notifyListeners();
 
     // 添加小延迟，让前一个视频有时间完全释放资源
@@ -389,7 +437,7 @@ class FullscreenAdProvider extends ChangeNotifier {
     });
   }
 
-  ///25, 验证并修正广告索引
+  ///24, 验证并修正广告索引
   void _validateAndFixIndex() {
     if (fullscreenAds.isEmpty) {
       _currentAdIndex = 0;
@@ -615,19 +663,19 @@ class FullscreenAdProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  ///19, 记录视频播放进度
+  ///24，记录视频播放进度
   void saveVideoProgress(String adId, Duration position) {
-    _videoProgressMap[adId] = position;
+    _videoProgressCache[adId] = position;
   }
 
-  ///20, 获取视频播放进度
+  ///25，获取视频播放进度
   Duration? getVideoProgress(String adId) {
-    return _videoProgressMap[adId];
+    return _videoProgressCache[adId];
   }
 
-  ///21, 清除特定视频的播放进度
+  ///26，清除特定视频的播放进度
   void clearVideoProgress(String adId) {
-    _videoProgressMap.remove(adId);
+    _videoProgressCache.remove(adId);
   }
 
   ///22, 获取当前播放的广告模型
@@ -653,6 +701,13 @@ class FullscreenAdProvider extends ChangeNotifier {
     // 清理缓存
     _widgetCache.clear();
     _fileManagerCache.clear();
+
+    // 释放所有缓存的视频控制器
+    _videoControllerCache.forEach((key, controller) {
+      controller.dispose();
+    });
+    _videoControllerCache.clear();
+    _videoProgressCache.clear();
 
     super.dispose();
   }

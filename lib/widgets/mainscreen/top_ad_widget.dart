@@ -147,7 +147,6 @@ class TopAdWidgetState extends State<TopAdWidget> {
       await _advertisementProvider!.videoPoolManager.releaseController(
         filePath: _localFilePath!,
         videoType: VideoType.topAd,
-        isNetwork: false,
       );
       _videoController = null;
     }
@@ -233,7 +232,6 @@ class TopAdWidgetState extends State<TopAdWidget> {
           _advertisementProvider!.videoPoolManager.releaseController(
             filePath: _localFilePath!,
             videoType: VideoType.topAd,
-            isNetwork: false,
           );
         } else {
           _logger.w('⚠️ AdvertisementProvider引用为空，无法释放视频控制器');

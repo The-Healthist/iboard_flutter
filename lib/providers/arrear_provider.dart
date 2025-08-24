@@ -977,16 +977,17 @@ class ArrearProvider extends ChangeNotifier {
         if (_selectedBlock == null || block.name == _selectedBlock) {
           for (final floor in block.floors) {
             for (final unit in floor.units) {
-              final Map<String, dynamic> rowData = {
-                '單位': _formatUnitDisplay(block.name, floor.name, unit.name),
-              };
-
-              // 添加费用数据
               for (final bill in unit.bills) {
-                rowData[bill.period] = bill.value;
-              }
+                final Map<String, dynamic> rowData = {
+                  '單位': _formatUnitDisplay(block.name, floor.name, unit.name),
+                  '費用': bill.value,
+                  '類型': bill.itemId ?? '其他費用',
+                  '費用明細': bill.remark ?? '-',
+                  '日期': bill.period,
+                };
 
-              tableData.add(rowData);
+                tableData.add(rowData);
+              }
             }
           }
         }
