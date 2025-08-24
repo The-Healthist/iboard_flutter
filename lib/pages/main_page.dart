@@ -114,8 +114,7 @@ class MainPageState extends State<MainPage> {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted) {
           final carouselProvider = context.read<CarouselStateProvider>();
-          final topAdProvider = context.read<TopAdCarouselProvider>();
-
+          carouselProvider.enterManualOperation();
           if (carouselProvider.currentAppState == AppState.fullscreenAd) {
             final announcementCarouselProvider =
                 context.read<AnnouncementCarouselProvider>();
