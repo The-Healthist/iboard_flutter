@@ -103,7 +103,7 @@ class EnhancedVideoPoolManager {
 
         // 定期打印池状态（每5个控制器打印一次）
         if (_controllerPool.length % 5 == 0) {
-          debugPrintPoolStatus();
+          // debugPrintPoolStatus(); // 刪除 debugPrintPoolStatus 方法
         }
       }
 
@@ -232,7 +232,6 @@ class EnhancedVideoPoolManager {
   ) async {
     try {
       if (controller.value.isInitialized) {
-
         // 重置到开头
         await controller.seekTo(Duration.zero);
 
@@ -404,34 +403,8 @@ class EnhancedVideoPoolManager {
     // _logger.i('🗑️ [增强视频池] 管理器已销毁');
   }
 
-  ///17，打印当前池的详细状态（调试用）
-  void debugPrintPoolStatus() {
-    // _logger.i('🔍 [增强视频池] 当前池状态:');
-    _logger.i('📊 池大小: ${_controllerPool.length}/$_maxPoolSize');
-
-    if (_controllerPool.isEmpty) {
-      _logger.i('📂 池为空');
-      return;
-    }
-
-    for (final entry in _controllerPool.entries) {
-      final key = entry.key;
-      final controller = entry.value;
-      final isInUse = _isInUse[key] ?? false;
-      final lastUsed = _lastUsed[key] ?? DateTime.now();
-      // 从key中解析出videoType和filePath
-      final parts = key.split(':');
-      final typePrefix = parts[0]; // 'top_file' 或 'full_file' 等
-      final filePath = parts[1];
-      final videoType =
-          typePrefix.startsWith('top') ? VideoType.topAd : VideoType.fullAd;
-      final displayKey = _getDisplayKey(videoType, filePath);
-
-      final status = isInUse ? '使用中' : '空闲';
-      final valid = _isControllerValid(controller) ? '有效' : '无效';
-      final timeDiff = DateTime.now().difference(lastUsed).inSeconds;
-
-      _logger.i('📱 $displayKey: $status, $valid, $timeDiff秒前使用');
-    }
-  }
+  // 刪除 debugPrintPoolStatus 方法
+  // void debugPrintPoolStatus() {
+  //   // 刪除調試輸出
+  // }
 }

@@ -154,9 +154,6 @@ class AnnouncementPageState extends State<AnnouncementPage> {
     final stateProvider = context.read<CarouselStateProvider>();
     final fullAdProvider = context.read<FullscreenAdProvider>();
 
-    // 设置预加载回调
-    stateProvider.setPreloadFullscreenAdCallback(() async {});
-
     // 设置进入全屏广告模式回调
     stateProvider.setEnterFullscreenAdModeCallback(() {
       fullAdProvider.enterFullscreenMode();
@@ -489,9 +486,6 @@ class AnnouncementPageState extends State<AnnouncementPage> {
     } else {
       _logger.w('⚠️ 沒有可用的頂部廣告數據');
     }
-
-    // 啟動頂部廣告調試定時器
-    topAdProvider.startDebugTimer();
   }
 
   ///10，初始化底部轮播

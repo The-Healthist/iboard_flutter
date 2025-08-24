@@ -114,11 +114,9 @@ class MainPageState extends State<MainPage> {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted) {
           final carouselProvider = context.read<CarouselStateProvider>();
-          // 檢查當前是否在全屏廣告狀態，如果是則切換到手動操作狀態
-          if (carouselProvider.currentAppState == AppState.fullscreenAd) {
-            carouselProvider.enterManualOperation();
+          final topAdProvider = context.read<TopAdCarouselProvider>();
 
-            // 通知通告轮播提供者回到主屏幕
+          if (carouselProvider.currentAppState == AppState.fullscreenAd) {
             final announcementCarouselProvider =
                 context.read<AnnouncementCarouselProvider>();
             announcementCarouselProvider.jumpToAnnouncementIndex(0);

@@ -205,11 +205,6 @@ class HomePageState extends State<HomePage> {
               Provider.of<ArrearProvider>(context, listen: false);
           appDataProvider.setArrearProvider(arrearProvider);
 
-          // 设置预加载回调
-          carouselStateProvider.setPreloadFullscreenAdCallback(() {
-            // 新的Provider没有预加载方法
-          });
-
           // 初始化天气数据（不需要登录，公开API）
           try {
             final weatherProvider =
@@ -266,56 +261,69 @@ class HomePageState extends State<HomePage> {
             try {
               // 1. 首先初始化所有基礎數據
               await advertisementProvider.initializeCarouselAdvertisements();
-              
+
               // 2. 確保欠費數據先初始化完成
               await appDataProvider.initGetArrearData();
               _logger.i('✅ 欠費數據初始化完成');
-              
+
               // 3. 設置Provider引用
-              final topAdCarouselProvider = Provider.of<TopAdCarouselProvider>(context, listen: false);
-              final fullscreenAdProvider = Provider.of<FullscreenAdProvider>(context, listen: false);
-              final announcementCarouselProvider = Provider.of<AnnouncementCarouselProvider>(context, listen: false);
-              
+              final topAdCarouselProvider =
+                  Provider.of<TopAdCarouselProvider>(context, listen: false);
+              final fullscreenAdProvider =
+                  Provider.of<FullscreenAdProvider>(context, listen: false);
+              final announcementCarouselProvider =
+                  Provider.of<AnnouncementCarouselProvider>(context,
+                      listen: false);
+
               advertisementProvider.setCarouselProviders(
                 topAdCarouselProvider: topAdCarouselProvider,
                 fullscreenAdProvider: fullscreenAdProvider,
               );
-              
+
               // 設置通告輪播提供者的依賴引用
               announcementCarouselProvider.setAppDataProvider(appDataProvider);
               announcementCarouselProvider.setArrearProvider(arrearProvider);
-              
+
               // 設置通告提供者的輪播提供者引用
-              announcementProvider.setCarouselProvider(announcementCarouselProvider);
-              
+              announcementProvider
+                  .setCarouselProvider(announcementCarouselProvider);
+
               // 4. 最後初始化通告輪播數據（此時所有依賴都已準備好）
-              final carouselAnnouncements = announcementProvider.getCarouselAnnouncements();
+              final carouselAnnouncements =
+                  announcementProvider.getCarouselAnnouncements();
               if (carouselAnnouncements.isNotEmpty) {
-                announcementCarouselProvider.updateCarouselList(carouselAnnouncements);
-                _logger.i('✅ 通告輪播數據從緩存初始化完成: ${carouselAnnouncements.length} 個通告');
+                announcementCarouselProvider
+                    .updateCarouselList(carouselAnnouncements);
+                _logger
+                    .i('✅ 通告輪播數據從緩存初始化完成: ${carouselAnnouncements.length} 個通告');
               } else {
                 // 如果緩存中沒有數據，先初始化空輪播組件（確保主屏幕可用）
                 announcementCarouselProvider.updateCarouselList([]);
                 _logger.i('⚠️ 緩存中暫無通告數據，已初始化空輪播組件（包含主屏幕）');
-                
+
                 // 然後異步獲取通告數據
                 announcementProvider.fetchNotices().then((_) {
-                  final freshCarouselAnnouncements = announcementProvider.getCarouselAnnouncements();
+                  final freshCarouselAnnouncements =
+                      announcementProvider.getCarouselAnnouncements();
                   if (freshCarouselAnnouncements.isNotEmpty) {
-                    announcementCarouselProvider.updateCarouselList(freshCarouselAnnouncements);
-                    _logger.i('✅ 通告輪播數據從網絡異步更新完成: ${freshCarouselAnnouncements.length} 個通告');
+                    announcementCarouselProvider
+                        .updateCarouselList(freshCarouselAnnouncements);
+                    _logger.i(
+                        '✅ 通告輪播數據從網絡異步更新完成: ${freshCarouselAnnouncements.length} 個通告');
                   }
                 }).catchError((e) {
                   _logger.e('異步獲取通告數據失敗: $e');
                 });
               }
-              
+
               _logger.i('🎯 所有輪播數據初始化完成，確保內容正常顯示');
             } catch (e) {
               _logger.e('輪播數據初始化過程中發生錯誤: $e');
               // 即使部分初始化失敗，也要確保基本的輪播組件可用
               try {
-                final announcementCarouselProvider = Provider.of<AnnouncementCarouselProvider>(context, listen: false);
+                final announcementCarouselProvider =
+                    Provider.of<AnnouncementCarouselProvider>(context,
+                        listen: false);
                 announcementCarouselProvider.updateCarouselList([]);
                 _logger.i('🔧 錯誤恢復：已初始化基本輪播組件');
               } catch (recoveryError) {

@@ -119,8 +119,6 @@ class AnnouncementReaderWidgetState extends State<AnnouncementReaderWidget> {
       // 如果有保存的播放位置，設置它
       if (_savedPlaybackPosition != null) {
         newVideoController.seekTo(_savedPlaybackPosition!);
-        debugPrint(
-            '[AnnouncementReader] 設置初始播放位置: ${_savedPlaybackPosition!.inMilliseconds}ms');
       }
 
       // 設置播放進度監聽器
@@ -150,7 +148,7 @@ class AnnouncementReaderWidgetState extends State<AnnouncementReaderWidget> {
         final position = _videoController!.value.position;
         widget.onVideoProgressChanged!(position);
       } catch (e) {
-        debugPrint('[AnnouncementReader] 報告播放進度失敗: $e');
+        // debugPrint('[AnnouncementReader] 報告播放進度失敗: $e');
       }
     }
   }

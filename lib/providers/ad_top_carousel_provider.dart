@@ -73,7 +73,6 @@ class TopAdCarouselProvider extends ChangeNotifier {
       // 如果已有Widget緩存且處於暫停狀態，不重建Widget以保持播放狀態
       _logger.i('🔄 保持現有Widget緩存，避免重建');
     } else {
-      // 首次創建或緩存為空時才更新
       _smartUpdateWidgets();
     }
 
@@ -210,6 +209,7 @@ class TopAdCarouselProvider extends ChangeNotifier {
     }
 
     final ad = topAds[currentIndex];
+    Duration timerDuration; // 計算實際需要的定時器時長
 
     // 重要修复：只有在没有开始时间或索引变化时才重置时间
     if (_currentTopAdStartTime == null || _currentTopAdIndex != currentIndex) {
@@ -217,19 +217,25 @@ class TopAdCarouselProvider extends ChangeNotifier {
       _topAdDuration = ad.durationObject;
       _currentTopAdIndex = currentIndex;
       _topAdElapsedTime = Duration.zero;
+      timerDuration = _topAdDuration; // 新廣告使用完整時長
       _logger
           .d('🔄 重置頂部廣告計時器: 索引=$currentIndex, 時長=${_topAdDuration.inSeconds}s');
     } else {
       // 如果是恢复状态，保持现有的时间设置
       _topAdDuration = ad.durationObject;
       _currentTopAdIndex = currentIndex;
+      final remainingTime = _topAdDuration - _topAdElapsedTime;
+      timerDuration = remainingTime.isNegative
+          ? Duration.zero
+          : remainingTime; // 恢復狀態使用剩餘時長
       _logger.d(
-          '🔄 恢復頂部廣告計時器: 索引=$currentIndex, 已播放=${_topAdElapsedTime.inSeconds}s, 剩餘=${(_topAdDuration - _topAdElapsedTime).inSeconds}s');
+          '🔄 恢復頂部廣告計時器: 索引=$currentIndex, 已播放=${_topAdElapsedTime.inSeconds}s, 剩餘=${timerDuration.inSeconds}s');
     }
 
-    _topTimer = Timer(ad.durationObject, () {
+    // 關鍵修復：使用計算出的定時器時長而不是廣告總時長
+    _topTimer = Timer(timerDuration, () {
       if (_topCarouselController.widgetCount > 1 && !_isTopCarouselPaused) {
-        // 在播放下一個廣告之前檢查是否有待處理的更新（參考全屏廣告邏輯）
+        // 在播放下一個廣告之前檢查是否有待處理的更新
         if (_pendingWidgetUpdate) {
           _logger.i('🔄 執行延遲的Widget更新');
           _smartUpdateWidgets();
@@ -252,8 +258,7 @@ class TopAdCarouselProvider extends ChangeNotifier {
       final rawElapsed =
           _currentTopAdPauseTime!.difference(_currentTopAdStartTime!);
 
-      // 重要修复：不要累加之前的已播放时间，而是直接计算当前这次播放的时间
-      // 这样可以避免多次暂停恢复导致的时间累积错误
+      // 關鍵修復：確保時間累積正確，避免多次暫停恢復時時間計算錯誤
       _topAdElapsedTime = rawElapsed;
 
       // 确保已播放时间不超过广告总时长
@@ -263,6 +268,12 @@ class TopAdCarouselProvider extends ChangeNotifier {
 
       _logger.i(
           '⏸️ 暫停頂部廣告 - 已播放: ${_topAdElapsedTime.inSeconds}s/${_topAdDuration.inSeconds}s');
+
+      // 添加額外的狀態一致性檢查
+      if (_topAdElapsedTime > _topAdDuration) {
+        _logger.w('⚠️ 異常：已播放時間超過廣告總時長');
+        _topAdElapsedTime = _topAdDuration;
+      }
     }
 
     // 設置頂部輪播為暫停狀態
@@ -273,6 +284,11 @@ class TopAdCarouselProvider extends ChangeNotifier {
 
     // 暫停輪播中的媒體內容
     _topCarouselController.pauseAllMedia();
+
+    // 直接切換到下一個廣告
+    if (_topCarouselController.widgetCount > 1) {
+      _topCarouselController.playNext();
+    }
 
     // 使用 WidgetsBinding.instance.addPostFrameCallback 延迟通知
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -292,50 +308,10 @@ class TopAdCarouselProvider extends ChangeNotifier {
     // 關鍵修復：不要重建Widget，直接恢復媒體播放
     _topCarouselController.resumeAllMedia();
 
-    // 計算剩餘播放時間並恢復定時器
+    // 如果有廣告，重新開始計時器
     if (topAds.isNotEmpty) {
-      // 如果 _currentTopAdStartTime 為空，說明需要重新初始化
-      if (_currentTopAdStartTime == null) {
-        // 重新初始化當前廣告的開始時間和時長
-        final currentIndex = _topCarouselController.currentIndex;
-        if (currentIndex < topAds.length) {
-          _currentTopAdStartTime = DateTime.now();
-          _topAdDuration = topAds[currentIndex].durationObject;
-          _currentTopAdIndex = currentIndex;
-          _topAdElapsedTime = Duration.zero;
-
-          // 啟動新的定時器
-          _topTimer = Timer(_topAdDuration, () {
-            if (!_isTopCarouselPaused) {
-              _topCarouselController.playNext();
-              // Note: onPageChanged will handle calling startTopAdTimer for the new page
-            }
-          });
-        }
-      } else {
-        // 原有的恢復邏輯 - 關鍵：從暫停位置繼續
-        final remainingTopTime = _topAdDuration - _topAdElapsedTime;
-        _logger.i(
-            '🔄 恢復頂部廣告 - 剩餘時間: ${remainingTopTime.inSeconds}s (已播放: ${_topAdElapsedTime.inSeconds}s)');
-
-        if (remainingTopTime.inSeconds > 0) {
-          // 重要修复：重新设置开始时间，但保持已播放时间不变
-          // 这样可以从暂停位置继续，而不是重新开始
-          _currentTopAdStartTime = DateTime.now().subtract(_topAdElapsedTime);
-
-          // 继续播放剩余时间
-          _topTimer = Timer(remainingTopTime, () {
-            if (!_isTopCarouselPaused) {
-              _topCarouselController.playNext();
-              // Note: onPageChanged will handle calling startTopAdTimer for the new page
-            }
-          });
-        } else {
-          // 时间已到，直接切换到下一个
-          _topCarouselController.playNext();
-          // Note: onPageChanged will handle calling startTopAdTimer for the new page
-        }
-      }
+      int currentIndex = _topCarouselController.currentIndex;
+      startTopAdTimer(currentIndex);
     }
 
     // 使用 WidgetsBinding.instance.addPostFrameCallback 延迟通知
@@ -361,7 +337,7 @@ class TopAdCarouselProvider extends ChangeNotifier {
   /// 從全屏廣告狀態退出後恢復頂部廣告
   void resumeFromFullscreenAdExit() {
     if (_isTopCarouselPaused) {
-      _logger.i('🔄 從全屏廣告狀態退出，恢復頂部廣告播放');
+      _logger.i('🔄 從全屏廣告狀態退出，重置頂部廣告播放');
 
       // 重置暂停状态
       _isTopCarouselPaused = false;
@@ -369,29 +345,24 @@ class TopAdCarouselProvider extends ChangeNotifier {
       // 恢复媒体播放
       _topCarouselController.resumeAllMedia();
 
-      // 如果当前有广告在播放，重新启动定时器
-      if (topAds.isNotEmpty && _currentTopAdStartTime != null) {
-        final remainingTime = _topAdDuration - _topAdElapsedTime;
+      // 如果有广告，直接从第一个广告重新开始
+      if (topAds.isNotEmpty) {
+        // 重置时间相关状态
+        _currentTopAdStartTime = DateTime.now();
+        _topAdElapsedTime = Duration.zero;
+        final currentIndex = _topCarouselController.currentIndex;
+        _topAdDuration = topAds[currentIndex].durationObject;
 
-        if (remainingTime.inSeconds > 0) {
-          _logger.i('🔄 恢復頂部廣告定時器，剩餘時間: ${remainingTime.inSeconds}s');
-
-          // 重新设置开始时间，保持已播放时间不变
-          _currentTopAdStartTime = DateTime.now().subtract(_topAdElapsedTime);
-
-          _topTimer = Timer(remainingTime, () {
-            if (!_isTopCarouselPaused) {
-              _topCarouselController.playNext();
-            }
-          });
-        } else {
-          // 时间已到，切换到下一个广告
-          _logger.i('🔄 頂部廣告時間已到，切換到下一個');
-          _topCarouselController.playNext();
-        }
+        // 启动新的定时器
+        startTopAdTimer(currentIndex);
       }
 
-      notifyListeners();
+      // 使用 WidgetsBinding.instance.addPostFrameCallback 延迟通知
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (hasListeners) {
+          notifyListeners();
+        }
+      });
     }
   }
 
@@ -409,18 +380,6 @@ class TopAdCarouselProvider extends ChangeNotifier {
         startTopAdTimer(currentIndex);
       }
     }
-  }
-
-  /// 啟動調試定時器 - 每秒輸出頂部廣告的實時狀態（已禁用）
-  void startDebugTimer() {
-    _debugTimer?.cancel();
-    // 禁用頂部廣告調試定時器以減少日誌輸出
-    return;
-  }
-
-  /// 停止調試定時器
-  void stopDebugTimer() {
-    _debugTimer?.cancel();
   }
 
   ///9，處理頁面變化事件
@@ -455,10 +414,6 @@ class TopAdCarouselProvider extends ChangeNotifier {
       int currentIndex = _topCarouselController.currentIndex;
       startTopAdTimer(currentIndex);
     }
-
-    // 重新啟動調試定時器
-    startDebugTimer();
-
     // 使用 WidgetsBinding.instance.addPostFrameCallback 延迟通知
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (hasListeners) {

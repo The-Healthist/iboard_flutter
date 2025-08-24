@@ -71,7 +71,6 @@ class AnnouncementCarouselProvider extends ChangeNotifier {
       // 修复：确保即使没有通告也能正常工作（至少要有主屏幕和缴费表单）
       return _midCarouselController.widgetCount >= 2;
     } catch (e) {
-      debugPrint('[AnnouncementCarousel] 状态验证失败: $e');
       return false;
     }
   }
@@ -98,7 +97,6 @@ class AnnouncementCarouselProvider extends ChangeNotifier {
           _currentNoticeIndex >= 0 &&
           _currentNoticeIndex < _midCarouselController.widgetCount;
     } catch (e) {
-      debugPrint('[AnnouncementCarousel] 健康检查失败: $e');
       return false;
     }
   }
@@ -148,9 +146,7 @@ class AnnouncementCarouselProvider extends ChangeNotifier {
       widgetMap[mainScreenKey] = _widgetCache[mainScreenKey]!;
       orderedKeys.add(mainScreenKey);
       usedKeys.add(mainScreenKey);
-      debugPrint('[AnnouncementCarousel] 主屏幕widget創建成功');
     } catch (e) {
-      debugPrint('[AnnouncementCarousel] 主屏幕widget創建失敗: $e');
       // 創建一個簡單的備用主屏幕widget
       _widgetCache[mainScreenKey] = Container(
         child: const Center(
@@ -200,7 +196,6 @@ class AnnouncementCarouselProvider extends ChangeNotifier {
             ),
           );
         } catch (e) {
-          debugPrint('[AnnouncementCarousel] 通告widget創建失敗: $e');
           continue; // 跳過失敗的通告
         }
       }
@@ -253,10 +248,7 @@ class AnnouncementCarouselProvider extends ChangeNotifier {
       widgetMap[arrearTableKey] = _widgetCache[arrearTableKey]!;
       orderedKeys.add(arrearTableKey);
       usedKeys.add(arrearTableKey);
-      debugPrint('[AnnouncementCarousel] 欠費總覽widget創建成功');
     } catch (e) {
-      debugPrint('[AnnouncementCarousel] 欠費總覽widget創建失敗: $e');
-      // 創建一個簡單的備用widget
       _widgetCache[arrearTableKey] = Container(
         child: const Center(
           child: Text('欠費數據暫不可用', style: TextStyle(fontSize: 18)),
@@ -270,13 +262,8 @@ class AnnouncementCarouselProvider extends ChangeNotifier {
     // 清理不再使用的緩存
     _cleanupUnusedCache(usedKeys);
 
-    // 調試信息：檢查widget映射表
-    debugPrint('[AnnouncementCarousel] 智能更新完成: ${widgetMap.length} widgets');
-    debugPrint('[AnnouncementCarousel] Widget keys: $orderedKeys');
-
     // 確保至少有基本的widgets
     if (widgetMap.isEmpty || orderedKeys.isEmpty) {
-      debugPrint('[AnnouncementCarousel] 警告: 沒有可用的widgets，創建緊急備用widget');
       const emergencyKey = 'emergency_main';
       widgetMap[emergencyKey] = Container(
         child: const Center(
@@ -299,8 +286,6 @@ class AnnouncementCarouselProvider extends ChangeNotifier {
 
     // 修复：确保在没有通告时也有缴费表单widget
     if (_carouselAnnouncements.isEmpty && widgetMap.length < 2) {
-      debugPrint('[AnnouncementCarousel] 无通告数据，确保创建缴费表单widget');
-
       // 强制创建缴费表单widget
       final arrearDataVersion =
           _arrearProvider?.currentDataVersion ?? 'default';
@@ -334,10 +319,7 @@ class AnnouncementCarouselProvider extends ChangeNotifier {
 
           widgetMap[arrearTableKey] = _widgetCache[arrearTableKey]!;
           orderedKeys.add(arrearTableKey);
-          debugPrint('[AnnouncementCarousel] 强制创建缴费表单widget成功');
-        } catch (e) {
-          debugPrint('[AnnouncementCarousel] 强制创建缴费表单widget失败: $e');
-        }
+        } catch (e) {}
       }
     }
 
@@ -352,11 +334,7 @@ class AnnouncementCarouselProvider extends ChangeNotifier {
       }
       // 確保跳轉到正確的索引
       _midCarouselController.jumpToIndex(_currentNoticeIndex);
-      debugPrint(
-          '[AnnouncementCarousel] 跳轉到索引: $_currentNoticeIndex, 總數: ${_midCarouselController.widgetCount}');
-    } else {
-      debugPrint('[AnnouncementCarousel] 嚴重錯誤: 轮播组件仍然没有内容!');
-    }
+    } else {}
 
     notifyListeners();
   }
@@ -411,8 +389,6 @@ class AnnouncementCarouselProvider extends ChangeNotifier {
     required VoidCallback onHomeButtonPressed,
   }) {
     try {
-      debugPrint('[AnnouncementCarousel] 开始初始化中部轮播...');
-
       // 保存主页回调
       _homeButtonCallback = onHomeButtonPressed;
       _noticeDuration = Duration(seconds: apiNoticeStayDuration);
@@ -442,16 +418,13 @@ class AnnouncementCarouselProvider extends ChangeNotifier {
       if (_midCarouselController.widgetCount > 0) {
         _currentNoticeIndex = 0;
         _midCarouselController.jumpToIndex(0);
-        debugPrint('[AnnouncementCarousel] 初始化完成，跳轉到主屏幕');
       } else {
-        debugPrint('[AnnouncementCarousel] 警告：初始化后轮播组件仍无内容');
         // 尝试恢复基本内容
         _ensureBasicContent();
       }
 
       // 修复：确保轮播组件至少有2个widget（主屏幕和缴费表单）
       if (_midCarouselController.widgetCount < 2) {
-        debugPrint('[AnnouncementCarousel] 警告：轮播组件内容不足，尝试恢复基本内容');
         _ensureBasicContent();
       }
 
@@ -475,30 +448,13 @@ class AnnouncementCarouselProvider extends ChangeNotifier {
 
               _midCarouselController.jumpToIndex(_currentNoticeIndex);
 
-              if (_carouselAnnouncements.isNotEmpty) {
-                debugPrint('[AnnouncementCarousel] 通告轮播定时器启动成功 - 有通告数据');
-              } else {
-                debugPrint('[AnnouncementCarousel] 缴费表单轮播定时器启动成功 - 无通告数据');
-              }
-
               // 使用统一的持续轮播方法
               _scheduleNextCarousel(apiNoticeStayDuration);
-            } catch (e) {
-              debugPrint('[AnnouncementCarousel] 轮播定时器启动失败: $e');
-              // 如果启动失败，尝试恢复基本内容
-              _ensureBasicContent();
-            }
+            } catch (e) {}
           }
         });
       }
-
-      debugPrint(
-          '[AnnouncementCarousel] 初始化完成，通告数量: ${_carouselAnnouncements.length}');
-    } catch (e) {
-      debugPrint('[AnnouncementCarousel] 初始化失败: $e');
-      // 即使初始化失败，也要确保有基本内容
-      _ensureBasicContent();
-    }
+    } catch (e) {}
   }
 
   ///2a，调度下一个轮播切换（智能定时器，自适应间隔减少系统调用）
@@ -507,13 +463,11 @@ class AnnouncementCarouselProvider extends ChangeNotifier {
       _midTimer?.cancel();
 
       if (_isMidCarouselPaused) {
-        debugPrint('[AnnouncementCarousel] 轮播已暂停，停止调度');
         return;
       }
 
       // 验证轮播组件状态
       if (!isCarouselHealthy) {
-        debugPrint('[AnnouncementCarousel] 轮播组件状态异常，尝试恢复...');
         _ensureBasicContent();
         return;
       }
@@ -521,7 +475,6 @@ class AnnouncementCarouselProvider extends ChangeNotifier {
       // 修复：确保即使没有通告也能轮播（至少要有主屏幕和缴费表单）
       final currentWidgetCount = _midCarouselController.widgetCount;
       if (currentWidgetCount < 2) {
-        debugPrint('[AnnouncementCarousel] 轮播组件内容不足，尝试恢复基本内容');
         _ensureBasicContent();
         return;
       }
@@ -543,10 +496,7 @@ class AnnouncementCarouselProvider extends ChangeNotifier {
       _midTimer = Timer(Duration(seconds: checkInterval), () {
         _checkAndAdvanceCarousel(apiNoticeStayDuration);
       });
-
-      debugPrint('[AnnouncementCarousel] 轮播调度成功，检查间隔: ${checkInterval}秒');
     } catch (e) {
-      debugPrint('[AnnouncementCarousel] 轮播调度失败: $e');
       // 调度失败时，延迟重试
       Future.delayed(const Duration(seconds: 2), () {
         if (!_isMidCarouselPaused) {
@@ -559,15 +509,12 @@ class AnnouncementCarouselProvider extends ChangeNotifier {
   ///2c，启动欠费总览翻页逻辑
   void _startArrearTablePagination(int apiNoticeStayDuration) {
     try {
-      debugPrint('[AnnouncementCarousel] 启动欠费总览翻页逻辑');
-
       // 标记欠费总览正在活跃
       _isArrearPaginationActive = true;
 
       // 欠费总览会通过回调继续轮播，这里不需要额外调度
       // 翻页完成后会调用 _goToNextCarouselItem 方法
     } catch (e) {
-      debugPrint('[AnnouncementCarousel] 启动欠费总览翻页失败: $e');
       // 如果启动失败，延迟重试
       Future.delayed(const Duration(seconds: 2), () {
         if (!_isMidCarouselPaused) {
@@ -581,7 +528,6 @@ class AnnouncementCarouselProvider extends ChangeNotifier {
   void _checkAndAdvanceCarousel(int apiNoticeStayDuration) {
     try {
       if (_isMidCarouselPaused) {
-        debugPrint('[AnnouncementCarousel] 轮播已暂停，稍后重新检查');
         // 暂停状态，稍后重新检查
         _scheduleNextCarousel(apiNoticeStayDuration);
         return;
@@ -589,7 +535,6 @@ class AnnouncementCarouselProvider extends ChangeNotifier {
 
       // 验证轮播组件状态
       if (!isCarouselHealthy) {
-        debugPrint('[AnnouncementCarousel] 轮播组件状态异常，尝试恢复...');
         _ensureBasicContent();
         return;
       }
@@ -641,9 +586,6 @@ class AnnouncementCarouselProvider extends ChangeNotifier {
           _videoPlaybackPositions[_currentNoticeIndex] = Duration.zero;
         }
 
-        debugPrint(
-            '[AnnouncementCarousel] 轮播切换到索引: $_currentNoticeIndex, 是否欠费总览: $isArrearTable');
-
         // 如果切换到欠费总览，启动翻页逻辑
         if (isArrearTable) {
           // 欠费总览需要特殊处理，启动翻页定时器
@@ -653,7 +595,6 @@ class AnnouncementCarouselProvider extends ChangeNotifier {
           _scheduleNextCarousel(apiNoticeStayDuration);
         }
       } catch (e) {
-        debugPrint('[AnnouncementCarousel] 轮播切换失败: $e');
         // 切换失败时，延迟重试
         Future.delayed(const Duration(seconds: 2), () {
           if (!_isMidCarouselPaused) {
@@ -662,7 +603,6 @@ class AnnouncementCarouselProvider extends ChangeNotifier {
         });
       }
     } catch (e) {
-      debugPrint('[AnnouncementCarousel] 轮播检查失败: $e');
       // 检查失败时，延迟重试
       Future.delayed(const Duration(seconds: 2), () {
         if (!_isMidCarouselPaused) {
@@ -674,8 +614,6 @@ class AnnouncementCarouselProvider extends ChangeNotifier {
 
   ///3，暂停通告轮播
   void pauseMidCarousel() {
-    debugPrint('[AnnouncementCarousel] 🛑 暂停通告轮播 - 进入全屏广告状态');
-
     // 保存暂停状态
     _savePauseState();
 
@@ -709,15 +647,11 @@ class AnnouncementCarouselProvider extends ChangeNotifier {
     // 取消调试定时器
     _debugTimer?.cancel();
     _debugTimer = null;
-
-    debugPrint('[AnnouncementCarousel] 所有定时器已暂停');
   }
 
   ///4，恢复通告轮播
   void resumeMidCarousel(int apiNoticeStayDuration,
       {bool forceJumpToIndex = false}) {
-    debugPrint('[AnnouncementCarousel] ▶️ 恢复通告轮播 - 退出全屏广告状态');
-
     // 显式取消旧的定时器，避免重复启动
     _pauseAllTimers();
 
@@ -744,8 +678,6 @@ class AnnouncementCarouselProvider extends ChangeNotifier {
       if (forceJumpToIndex && _currentNoticeIndex < 1) {
         _currentNoticeIndex = 1; // 从第一个内容开始（通告或缴费表单）
         _midCarouselController.jumpToIndex(_currentNoticeIndex);
-        debugPrint(
-            '[AnnouncementCarousel] 🔄 [恢复] 设置索引到第一个内容: $_currentNoticeIndex');
       }
 
       // 使用視頻播放進度來計算剩餘時間
@@ -834,22 +766,15 @@ class AnnouncementCarouselProvider extends ChangeNotifier {
 
         // 確保剩餘時間不為負數
         if (remaining.inSeconds > 0) {
-          debugPrint(
-              '[AnnouncementCarousel] 根據視頻進度計算剩餘時間: ${remaining.inSeconds}s (總時長: ${totalDuration.inSeconds}s, 已播放: ${currentProgress.inSeconds}s)');
           return remaining;
         } else {
-          debugPrint('[AnnouncementCarousel] 視頻已播放完成，剩餘時間為0');
           return Duration.zero;
         }
       }
-    } catch (e) {
-      debugPrint('[AnnouncementCarousel] 計算視頻剩餘時間失敗: $e');
-    }
+    } catch (e) {}
 
     // 如果無法獲取視頻進度，使用已播放時間計算
     final remainingNoticeTime = _noticeDuration - _noticeElapsedTime;
-    debugPrint(
-        '[AnnouncementCarousel] 使用已播放時間計算，剩餘時間: ${remainingNoticeTime.inSeconds}s (總時長: ${_noticeDuration.inSeconds}s, 已播放: ${_noticeElapsedTime.inSeconds}s)');
     return remainingNoticeTime;
   }
 
@@ -871,8 +796,6 @@ class AnnouncementCarouselProvider extends ChangeNotifier {
             Duration(seconds: apiNoticeStayDuration) - totalElapsed;
 
         if (remaining.inSeconds > 0) {
-          debugPrint(
-              '[AnnouncementCarousel] 使用时间记录计算剩余时间: ${remaining.inSeconds}s');
           return remaining;
         }
       }
@@ -880,18 +803,13 @@ class AnnouncementCarouselProvider extends ChangeNotifier {
       // 最后使用已播放时间记录
       final remainingFromElapsed = _noticeDuration - _noticeElapsedTime;
       if (remainingFromElapsed.inSeconds > 0) {
-        debugPrint(
-            '[AnnouncementCarousel] 使用已播放时间记录计算剩余时间: ${remainingFromElapsed.inSeconds}s');
         return remainingFromElapsed;
       }
 
       // 如果所有方法都失败，返回默认值
-      debugPrint('[AnnouncementCarousel] 无法计算剩余时间，使用默认值: 0s');
       return Duration.zero;
-    } catch (e) {
-      debugPrint('[AnnouncementCarousel] 智能计算剩余时间失败: $e');
-      return Duration.zero;
-    }
+    } catch (e) {}
+    return Duration.zero;
   }
 
   /// 新增：保存暂停状态
@@ -911,25 +829,16 @@ class AnnouncementCarouselProvider extends ChangeNotifier {
         if (totalElapsed >= _noticeDuration) {
           // 通告已经播放完成，应该准备切换到下一个
           _noticeElapsedTime = _noticeDuration;
-          debugPrint(
-              '[AnnouncementCarousel] 📊 [暂停] 通告 - 已播放: ${_noticeElapsedTime.inSeconds}s/${_noticeDuration.inSeconds}s (通告已完成)');
         } else {
           // 通告还在播放中
           _noticeElapsedTime = totalElapsed;
           final remainingNotice = _noticeDuration - _noticeElapsedTime;
-          debugPrint(
-              '[AnnouncementCarousel] 📊 [暂停] 通告 - 已播放: ${_noticeElapsedTime.inSeconds}s/${_noticeDuration.inSeconds}s, 剩余: ${remainingNotice.inSeconds}s');
         }
       }
 
       // 记录当前视频的播放进度
       _recordCurrentVideoProgress();
-
-      debugPrint(
-          '[AnnouncementCarousel] 暂停状态已保存 - 索引: $_currentNoticeIndex, 已播放: ${_noticeElapsedTime.inSeconds}s');
-    } catch (e) {
-      debugPrint('[AnnouncementCarousel] 保存暂停状态失败: $e');
-    }
+    } catch (e) {}
   }
 
   /// 新增：恢复暂停状态
@@ -939,11 +848,7 @@ class AnnouncementCarouselProvider extends ChangeNotifier {
       _currentNoticePauseTime = null;
 
       // 保持已播放时间不变，这样能正确计算剩余时间
-      debugPrint(
-          '[AnnouncementCarousel] 暂停状态已恢复 - 索引: $_currentNoticeIndex, 已播放: ${_noticeElapsedTime.inSeconds}s');
-    } catch (e) {
-      debugPrint('[AnnouncementCarousel] 恢复暂停状态失败: $e');
-    }
+    } catch (e) {}
   }
 
   /// 新增：記錄當前視頻的播放進度
@@ -954,13 +859,8 @@ class AnnouncementCarouselProvider extends ChangeNotifier {
         // 使用已播放時間作為備用方案
         final currentProgress = _noticeElapsedTime;
         _videoPlaybackPositions[_currentNoticeIndex] = currentProgress;
-
-        debugPrint(
-            '[AnnouncementCarousel] 記錄視頻播放進度 - 索引: $_currentNoticeIndex, 進度: ${currentProgress.inSeconds}s');
       }
-    } catch (e) {
-      debugPrint('[AnnouncementCarousel] 記錄視頻播放進度失敗: $e');
-    }
+    } catch (e) {}
   }
 
   /// 新增：獲取當前通告組件（輔助方法）
@@ -972,17 +872,13 @@ class AnnouncementCarouselProvider extends ChangeNotifier {
         // 由於技術限制，暫時返回null
         return null;
       }
-    } catch (e) {
-      debugPrint('[AnnouncementCarousel] 獲取當前通告組件失敗: $e');
-    }
+    } catch (e) {}
     return null;
   }
 
   /// 新增：記錄視頻播放進度
   void recordVideoProgress(int index, Duration position) {
     _videoPlaybackPositions[index] = position;
-    debugPrint(
-        '[AnnouncementCarousel] 記錄視頻播放進度 - 索引: $index, 位置: ${position.inMilliseconds}ms');
   }
 
   /// 新增：獲取視頻播放進度
@@ -1019,8 +915,6 @@ class AnnouncementCarouselProvider extends ChangeNotifier {
       }
     } else {
       // 不满足通告轮播恢复条件
-      debugPrint(
-          '[AnnouncementCarousel] 轮播恢复条件不满足: widgetCount=${_midCarouselController.widgetCount}, paused=$_isMidCarouselPaused');
     }
   }
 
@@ -1239,7 +1133,6 @@ class AnnouncementCarouselProvider extends ChangeNotifier {
       // 重新启动轮播定时器，使用当前API配置的停留时间
       _scheduleNextCarousel(_noticeDuration.inSeconds);
     } catch (e) {
-      debugPrint('[AnnouncementCarousel] 切换到下一个轮播项失败: $e');
       // 切换失败时，延迟重试
       Future.delayed(const Duration(seconds: 2), () {
         if (!_isMidCarouselPaused) {
@@ -1281,9 +1174,7 @@ class AnnouncementCarouselProvider extends ChangeNotifier {
       });
 
       debugPrint('[AnnouncementCarousel] 强制恢复完成');
-    } catch (e) {
-      debugPrint('[AnnouncementCarousel] 强制恢复失败: $e');
-    }
+    } catch (e) {}
   }
 
   ///20，新增：确保基本内容的方法
@@ -1385,9 +1276,7 @@ class AnnouncementCarouselProvider extends ChangeNotifier {
           notifyListeners();
         }
       });
-    } catch (e) {
-      debugPrint('[AnnouncementCarousel] 严重错误：无法创建基本内容: $e');
-    }
+    } catch (e) {}
   }
 
   ///21，新增：诊断轮播组件问题
@@ -1449,7 +1338,6 @@ class AnnouncementCarouselProvider extends ChangeNotifier {
         _videoPlaybackPositions[i] = Duration.zero;
       }
     }
-    debugPrint('[AnnouncementCarousel] 视频播放进度缓存已初始化');
   }
 
   @override

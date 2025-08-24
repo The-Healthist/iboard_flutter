@@ -20,7 +20,7 @@ class FullscreenAdProvider extends ChangeNotifier {
   // 广告数据 - 使用AdvertisementProvider的轮播数据
   List<AdModel> _fullscreenAds = [];
   List<Widget> _adWidgets = [];
-  
+
   // Widget缓存机制 - 避免重建正在播放的Widget
   final Map<String, Widget> _widgetCache = {};
   final Map<String, FileManager> _fileManagerCache = {};
@@ -52,7 +52,7 @@ class FullscreenAdProvider extends ChangeNotifier {
 
   // 视频播放进度记录
   final Map<String, Duration> _videoProgressMap = {};
-  
+
   // 标记是否有待更新的Widget
   bool _pendingWidgetUpdate = false;
 
@@ -142,17 +142,17 @@ class FullscreenAdProvider extends ChangeNotifier {
     }).toList();
     // _logger.i('📺 创建了 ${_adWidgets.length} 个广告Widget');
   }
-  
+
   ///7a, 智能创建广告Widget（使用缓存）
   void _smartCreateAdWidgets() {
     final List<Widget> newWidgets = [];
     final Set<String> usedKeys = {};
-    
+
     for (int i = 0; i < fullscreenAds.length; i++) {
       final ad = fullscreenAds[i];
       final key = 'fullscreen_ad_${ad.id}';
       usedKeys.add(key);
-      
+
       // 检查缓存中是否已有此Widget
       if (_widgetCache.containsKey(key)) {
         // 使用缓存的Widget
@@ -164,41 +164,57 @@ class FullscreenAdProvider extends ChangeNotifier {
         newWidgets.add(widget);
       }
     }
-    
+
     // 清理不再使用的缓存
     _widgetCache.removeWhere((key, value) => !usedKeys.contains(key));
     _fileManagerCache.removeWhere((key, value) => !usedKeys.contains(key));
-    
+
     _adWidgets = newWidgets;
     _pendingWidgetUpdate = false;
-    
+
     // 注意：全屏广告不使用CarouselWidget，所以不需要调用smartUpdateCarousel
     // 它直接管理_adWidgets列表，通过getCurrentWidget()获取当前显示的Widget
   }
-  
+
   ///7b, 创建缓存的广告Widget
   Widget _createCachedAdWidget(AdModel ad, int index) {
     final key = 'fullscreen_ad_${ad.id}';
-    
+
     // 重用或创建FileManager
     if (!_fileManagerCache.containsKey(key)) {
       _fileManagerCache[key] = FileManager();
     }
     final fileManager = _fileManagerCache[key]!;
     fileManager.getFile(ad.file);
-    
+
+    // 获取视频播放进度
+    Duration? initialPosition;
+    if (ad.file.mimeType.startsWith('video/')) {
+      initialPosition = getVideoProgress(ad.id.toString());
+      // 如果没有保存的进度，或者进度超过广告总时长，则从头开始
+      if (initialPosition == null || initialPosition >= ad.durationObject) {
+        initialPosition = null;
+      }
+    }
+
     return FullAdWidget(
       key: ValueKey(key),
       ad: ad,
       fileManager: fileManager,
-      initialVideoPosition: null,
+      initialVideoPosition: initialPosition,
       onVideoProgressChanged: (adId, position) {
         if (_currentAdIndex < fullscreenAds.length &&
             fullscreenAds[_currentAdIndex].id.toString() == adId) {
           final currentAd = getCurrentAd();
-          if (currentAd != null &&
-              currentAd.file.mimeType.startsWith('image/')) {
-            saveVideoProgress(adId, position);
+          if (currentAd != null) {
+            // 对于视频广告，保存播放进度
+            if (currentAd.file.mimeType.startsWith('video/')) {
+              saveVideoProgress(adId, position);
+            }
+            // 对于图片广告，保存显示时间
+            else if (currentAd.file.mimeType.startsWith('image/')) {
+              saveVideoProgress(adId, position);
+            }
           }
         }
       },
@@ -271,8 +287,8 @@ class FullscreenAdProvider extends ChangeNotifier {
     }
 
     if (currentIndex < 0 || currentIndex >= fullscreenAds.length) {
-      _logger.w(
-          '⚠️ 广告索引越界: $currentIndex (有效范围: 0-${fullscreenAds.length - 1})');
+      _logger
+          .w('⚠️ 广告索引越界: $currentIndex (有效范围: 0-${fullscreenAds.length - 1})');
       return;
     }
 
@@ -331,7 +347,7 @@ class FullscreenAdProvider extends ChangeNotifier {
 
     // 额外的安全检查
     _validateAndFixIndex();
-    
+
     // 检查是否有待更新的Widget
     if (_pendingWidgetUpdate) {
       _logger.i('🔄 执行延迟的Widget更新');
@@ -613,7 +629,7 @@ class FullscreenAdProvider extends ChangeNotifier {
 
     _debugTimer?.cancel();
     _debugTimer = null;
-    
+
     // 清理缓存
     _widgetCache.clear();
     _fileManagerCache.clear();

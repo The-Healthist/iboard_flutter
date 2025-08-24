@@ -608,11 +608,6 @@ class AdvertisementProvider extends ChangeNotifier {
   ///11，获取视频池管理器实例（供组件使用）
   EnhancedVideoPoolManager get videoPoolManager => _videoPoolManager;
 
-  ///12，调试方法：打印视频池状态
-  void debugPrintVideoPoolStatus() {
-    _videoPoolManager.debugPrintPoolStatus();
-  }
-
   // Potentially add methods to add/update/delete advertisements if the API supports it
   // and if such functionality is required by the app.
   // For now, focusing on fetching and displaying.

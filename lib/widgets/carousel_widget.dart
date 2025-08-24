@@ -306,15 +306,12 @@ class _CarouselWidgetState extends State<CarouselWidget>
     if (_widgets.isNotEmpty) {
       if (_pageController.hasClients) {
         if ((_pageController.page?.round() ?? -1) != _currentIndex) {
-          debugPrint('[Carousel] jumping to preserved index $_currentIndex');
           _pageController.jumpToPage(_currentIndex);
         }
       } else {
         // 如果控制器尚未准备好，延迟到下一帧执行跳转
         WidgetsBinding.instance.addPostFrameCallback((_) {
           if (mounted && _pageController.hasClients) {
-            debugPrint(
-                '[Carousel] post-frame jumping to preserved index $_currentIndex');
             _pageController.jumpToPage(_currentIndex);
           }
         });
