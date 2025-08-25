@@ -327,18 +327,19 @@ class ArrearOtherTableWidgetState extends State<ArrearOtherTableWidget> {
     }
   }
 
-  ///4, 构建状态芯片
+  ///4, 构建状态芯片 - 優化尺寸以節省空間
   Widget _buildStatusChip(dynamic value) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      padding:
+          const EdgeInsets.symmetric(horizontal: 8, vertical: 4), // 減少padding
       decoration: BoxDecoration(
         color: _getStatusColor(value),
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(12), // 減少圓角
       ),
       child: Text(
         _getStatusText(value),
         style: TextStyle(
-          fontSize: 11,
+          fontSize: 11, // 減少字體大小
           fontWeight: FontWeight.w500,
           color: _getStatusTextColor(value),
         ),
@@ -350,6 +351,7 @@ class ArrearOtherTableWidgetState extends State<ArrearOtherTableWidget> {
   ///5, 获取状态颜色
   Color _getStatusColor(dynamic value) {
     if (value == null) return Colors.grey.shade100;
+    if (value == '已付') return Colors.green.shade100;
     if (value is num && value < 0) return Colors.red.shade100;
     return Colors.grey.shade100;
   }
@@ -357,6 +359,7 @@ class ArrearOtherTableWidgetState extends State<ArrearOtherTableWidget> {
   ///6, 获取状态文字颜色
   Color _getStatusTextColor(dynamic value) {
     if (value == null) return Colors.grey.shade800;
+    if (value == '已付') return Colors.green.shade800;
     if (value is num && value < 0) return Colors.red.shade800;
     return Colors.grey.shade800;
   }
@@ -532,7 +535,9 @@ class ArrearOtherTableWidgetState extends State<ArrearOtherTableWidget> {
     final appDataProvider =
         Provider.of<AppDataProvider>(context, listen: false);
     final deviceSettings = appDataProvider.deviceSettings;
-    final paginationDuration = deviceSettings?.paymentTableOnePageDuration ?? 5;
+    //paymentTableOnePageDuration 乘以 10
+    final paginationDuration =
+        (deviceSettings?.paymentTableOnePageDuration ?? 3) * 5;
 
     _autoPaginationTimer?.cancel();
     _autoPaginationTimer =
@@ -546,11 +551,19 @@ class ArrearOtherTableWidgetState extends State<ArrearOtherTableWidget> {
       } else {
         if (_isWaitingForDataUpdate) {
           _isWaitingForDataUpdate = false;
+          // 回調前重置為第一頁，便於下次顯示從頭開始
+          setState(() {
+            _currentPage = 1;
+          });
           if (widget.onPaginationComplete != null) {
             widget.onPaginationComplete!(_totalPages);
           }
         } else {
-          // 修改：不返回第一页，而是继续停留在最后一页
+          // 没有新数据时，直接回调 onPaginationComplete，让父组件切换下一表
+          // 同時將頁碼重置為第一頁以便返回時從開頭顯示
+          setState(() {
+            _currentPage = 1;
+          });
           if (widget.onPaginationComplete != null) {
             widget.onPaginationComplete!(_totalPages);
           }

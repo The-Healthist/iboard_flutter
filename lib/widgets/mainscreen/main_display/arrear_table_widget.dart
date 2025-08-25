@@ -3,7 +3,6 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:iboard_app/providers/arrear_provider.dart';
 import 'package:iboard_app/providers/state_provider.dart';
-import 'package:iboard_app/providers/app_data_provider.dart';
 
 class ArrearTableWidget extends StatefulWidget {
   final VoidCallback? onHomeButtonPressed; // 添加主頁按鈕回調
@@ -568,10 +567,11 @@ class ArrearTableWidgetState extends State<ArrearTableWidget> {
   ///12, 启动实际的自动翻页逻辑
   void _startActualAutoPagination() {
     // 获取设置中的翻页时间，默认为5秒
-    final appDataProvider =
-        Provider.of<AppDataProvider>(context, listen: false);
-    final deviceSettings = appDataProvider.deviceSettings;
-    final paginationDuration = deviceSettings?.paymentTableOnePageDuration ?? 5;
+    // final appDataProvider =
+    //     Provider.of<AppDataProvider>(context, listen: false);
+    // paymentTableOnePageDuration 乘以 1
+    final paginationDuration = 1;
+    // (deviceSettings?.paymentTableOnePageDuration ?? 3) * 1;
 
     _autoPaginationTimer?.cancel();
     _autoPaginationTimer =
@@ -587,22 +587,23 @@ class ArrearTableWidgetState extends State<ArrearTableWidget> {
         if (_isWaitingForDataUpdate) {
           // 有新数据待更新，在这里切换到新的Widget
           _isWaitingForDataUpdate = false;
+          // 回調前重置為第一頁，便於下次顯示從頭開始
+          setState(() {
+            _currentPage = 1;
+          });
           // 通知AnnouncementCarouselProvider更新欠费表单Widget
           if (widget.onPaginationComplete != null) {
             widget.onPaginationComplete!(_totalPages);
           }
         } else {
-          // 没有新数据，重置到第一页并继续轮播
+          // 没有新数据时，直接回调 onPaginationComplete，让父组件切换下一表
+          // 同時將頁碼重置為第一頁以便返回時從開頭顯示
           setState(() {
             _currentPage = 1;
           });
-
-          // 延迟后通知完成，让轮播继续
-          Future.delayed(const Duration(seconds: 2), () {
-            if (widget.onPaginationComplete != null) {
-              widget.onPaginationComplete!(_totalPages);
-            }
-          });
+          if (widget.onPaginationComplete != null) {
+            widget.onPaginationComplete!(_totalPages);
+          }
         }
       }
     });

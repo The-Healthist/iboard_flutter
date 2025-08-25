@@ -101,6 +101,12 @@ class AnnouncementCarouselProvider extends ChangeNotifier {
     }
   }
 
+  /// 新增：是否為僅管理費用模式（無通告、無其他費用）
+  bool get _onlyManagementTableMode =>
+      _carouselAnnouncements.isEmpty &&
+      (_arrearProvider?.hasManagementFeeData == true) &&
+      !(_arrearProvider?.hasAnyOtherFeeRecords == true);
+
   AnnouncementCarouselProvider() {
     _midCarouselController = custom_carousel.CarouselController();
   }
@@ -158,60 +164,17 @@ class AnnouncementCarouselProvider extends ChangeNotifier {
       usedKeys.add(mainScreenKey);
     }
 
-    // 2. 通告widgets（使用通告ID作为key）- 智能緩存
-    for (final announcement in _carouselAnnouncements) {
-      final key = 'announcement_${announcement.id}';
-
-      // 檢查是否需要更新Widget（新通告或內容變化）
-      if (!_widgetCache.containsKey(key) ||
-          _hasAnnouncementChanged(key, announcement)) {
-        try {
-          // 重用或創建FileManager
-          if (!_fileManagerCache.containsKey(key)) {
-            _fileManagerCache[key] = FileManager();
-          }
-          final fileManager = _fileManagerCache[key]!;
-          fileManager.getFile(announcement.file);
-
-          // 獲取該通告的初始播放進度
-          final widgetIndex = orderedKeys.indexOf(key);
-          final initialPosition =
-              getVideoProgress(widgetIndex) ?? Duration.zero;
-
-          // 創建新Widget並緩存
-          _widgetCache[key] = Center(
-            child: AnnouncementReaderWidget(
-              key: ValueKey(key),
-              announcement: announcement,
-              fileManager: fileManager,
-              onHomeButtonPressed: _homeButtonCallback,
-              onVideoProgressChanged: (Duration position) {
-                // 記錄視頻播放進度
-                final widgetIndex = orderedKeys.indexOf(key);
-                if (widgetIndex >= 0) {
-                  recordVideoProgress(widgetIndex, position);
-                }
-              },
-              initialPlaybackPosition: initialPosition,
-            ),
-          );
-        } catch (e) {
-          continue; // 跳過失敗的通告
-        }
-      }
-
-      widgetMap[key] = _widgetCache[key]!;
-      orderedKeys.add(key);
-      usedKeys.add(key);
-    }
+    // 2.（延後到表單之後加入）通告widgets 會在表單widget加入後再加入，確保索引：1=其他費用, 2=管理費用, 3..=通告
 
     // 3. 欠费总览widget（使用数据版本作为key）- 確保創建
     final arrearDataVersion = _arrearProvider?.currentDataVersion ?? 'default';
     final arrearTableKey = 'other_fee_table_$arrearDataVersion';
 
     try {
-      if (!_widgetCache.containsKey(arrearTableKey) ||
-          _arrearProvider?.hasPendingUpdate == true) {
+      final includeOther = _arrearProvider?.hasAnyOtherFeeRecords == true;
+      if (includeOther &&
+          (!_widgetCache.containsKey(arrearTableKey) ||
+              _arrearProvider?.hasPendingUpdate == true)) {
         if (_arrearProvider != null) {
           _widgetCache[arrearTableKey] =
               _arrearProvider!.createArrearOtherTableWidget(
@@ -228,26 +191,18 @@ class AnnouncementCarouselProvider extends ChangeNotifier {
               _extendCurrentNoticeStayTime(totalPages);
             },
           );
-
-          // 清理旧的其他费用表单缓存
           _widgetCache.removeWhere((key, value) =>
               key.startsWith('other_fee_table_') && key != arrearTableKey);
 
-          // 标记更新已应用
           _arrearProvider!.markUpdateApplied();
-        } else {
-          // 如果没有ArrearProvider，創建一個簡單的備用widget
-          _widgetCache[arrearTableKey] = Container(
-            child: const Center(
-              child: Text('其他費用數據載入中...', style: TextStyle(fontSize: 18)),
-            ),
-          );
         }
       }
 
-      widgetMap[arrearTableKey] = _widgetCache[arrearTableKey]!;
-      orderedKeys.add(arrearTableKey);
-      usedKeys.add(arrearTableKey);
+      if (includeOther && _widgetCache.containsKey(arrearTableKey)) {
+        widgetMap[arrearTableKey] = _widgetCache[arrearTableKey]!;
+        orderedKeys.add(arrearTableKey);
+        usedKeys.add(arrearTableKey);
+      }
     } catch (e) {
       _widgetCache[arrearTableKey] = Container(
         child: const Center(
@@ -257,6 +212,94 @@ class AnnouncementCarouselProvider extends ChangeNotifier {
       widgetMap[arrearTableKey] = _widgetCache[arrearTableKey]!;
       orderedKeys.add(arrearTableKey);
       usedKeys.add(arrearTableKey);
+    }
+
+    // 4. 管理費用（物業管理）widget（使用數據版本作為key）- 確保創建
+    final mgmtDataVersion = _arrearProvider?.currentDataVersion ?? 'default';
+    final mgmtTableKey = 'arrear_table_$mgmtDataVersion';
+    try {
+      final includeMgmt = _arrearProvider?.hasManagementFeeData == true;
+      if (includeMgmt &&
+          (!_widgetCache.containsKey(mgmtTableKey) ||
+              _arrearProvider?.hasPendingUpdate == true)) {
+        if (_arrearProvider != null) {
+          _widgetCache[mgmtTableKey] = _arrearProvider!.createArrearTableWidget(
+            onHomeButtonPressed: () {
+              jumpToAnnouncementIndex(0);
+            },
+            isInCarouselMode: true,
+            onPaginationComplete: (int totalPages) {
+              _isArrearPaginationActive = false;
+              _goToNextCarouselItem();
+            },
+            onPaginationStart: (int totalPages) {
+              _isArrearPaginationActive = true;
+              _extendCurrentNoticeStayTime(totalPages);
+            },
+          );
+          _widgetCache.removeWhere((key, value) =>
+              key.startsWith('arrear_table_') && key != mgmtTableKey);
+
+          _arrearProvider!.markUpdateApplied();
+        }
+      }
+
+      if (includeMgmt && _widgetCache.containsKey(mgmtTableKey)) {
+        widgetMap[mgmtTableKey] = _widgetCache[mgmtTableKey]!;
+        orderedKeys.add(mgmtTableKey);
+        usedKeys.add(mgmtTableKey);
+      }
+    } catch (e) {
+      _widgetCache[mgmtTableKey] = Container(
+        child: const Center(
+          child: Text('繳費數據暫不可用', style: TextStyle(fontSize: 18)),
+        ),
+      );
+      widgetMap[mgmtTableKey] = _widgetCache[mgmtTableKey]!;
+      usedKeys.add(mgmtTableKey);
+      orderedKeys.add(mgmtTableKey);
+    }
+
+    // 5. 通告widgets（放在表單之後）
+    for (final announcement in _carouselAnnouncements) {
+      final key = 'announcement_${announcement.id}';
+
+      if (!_widgetCache.containsKey(key) ||
+          _hasAnnouncementChanged(key, announcement)) {
+        try {
+          if (!_fileManagerCache.containsKey(key)) {
+            _fileManagerCache[key] = FileManager();
+          }
+          final fileManager = _fileManagerCache[key]!;
+          fileManager.getFile(announcement.file);
+
+          final widgetIndex = orderedKeys.indexOf(key);
+          final initialPosition =
+              getVideoProgress(widgetIndex) ?? Duration.zero;
+
+          _widgetCache[key] = Center(
+            child: AnnouncementReaderWidget(
+              key: ValueKey(key),
+              announcement: announcement,
+              fileManager: fileManager,
+              onHomeButtonPressed: _homeButtonCallback,
+              onVideoProgressChanged: (Duration position) {
+                final widgetIndex = orderedKeys.indexOf(key);
+                if (widgetIndex >= 0) {
+                  recordVideoProgress(widgetIndex, position);
+                }
+              },
+              initialPlaybackPosition: initialPosition,
+            ),
+          );
+        } catch (e) {
+          continue;
+        }
+      }
+
+      widgetMap[key] = _widgetCache[key]!;
+      orderedKeys.add(key);
+      usedKeys.add(key);
     }
 
     // 清理不再使用的緩存
@@ -533,6 +576,12 @@ class AnnouncementCarouselProvider extends ChangeNotifier {
         return;
       }
 
+      // 僅管理費用模式：不切換輪播，由表內自行首末頁循環
+      if (_onlyManagementTableMode) {
+        _scheduleNextCarousel(apiNoticeStayDuration);
+        return;
+      }
+
       // 验证轮播组件状态
       if (!isCarouselHealthy) {
         _ensureBasicContent();
@@ -562,10 +611,20 @@ class AnnouncementCarouselProvider extends ChangeNotifier {
         // 在切换前记录当前内容的播放进度
         _recordCurrentVideoProgress();
 
-        // 计算下一个索引，跳过主屏幕（索引0）
-        _currentNoticeIndex++;
-        if (_currentNoticeIndex >= _midCarouselController.widgetCount) {
-          _currentNoticeIndex = 1; // 回到第一个内容，跳过主屏幕
+        // 修復：正確處理索引計算，避免無限循環
+        if (_midCarouselController.widgetCount <= 2) {
+          // 只有主屏和一個表單的情況：在主屏和表單之間切換
+          if (_currentNoticeIndex == 1) {
+            _currentNoticeIndex = 0; // 回到主屏
+          } else {
+            _currentNoticeIndex = 1; // 回到表單
+          }
+        } else {
+          // 有多個內容的情況：正常遞增
+          _currentNoticeIndex++;
+          if (_currentNoticeIndex >= _midCarouselController.widgetCount) {
+            _currentNoticeIndex = 1; // 回到第一个内容，跳过主屏幕
+          }
         }
 
         // 检查是否切换到欠费总览（最后一个索引）
@@ -1106,33 +1165,57 @@ class AnnouncementCarouselProvider extends ChangeNotifier {
   ///18，切换到下一个轮播项（欠费总览翻页完成后调用）
   void _goToNextCarouselItem() {
     if (_isMidCarouselPaused) {
+      debugPrint('[AnnouncementCarousel] ⏸️ 轮播已暂停，跳过切换');
+      return;
+    }
+
+    // 僅管理費用模式：不切換輪播，由表內自行首末頁循環
+    if (_onlyManagementTableMode) {
+      debugPrint('[AnnouncementCarousel] 🧭 僅管理費用模式，跳過輪播切換');
       return;
     }
 
     // 如果欠费总览仍在活跃，则不进行轮播切换，等待其完成
     if (_isArrearPaginationActive) {
+      debugPrint('[AnnouncementCarousel] 🔄 欠费总览仍在活跃，跳过切换');
       return;
     }
 
     try {
-      // 切换到下一个内容
+      debugPrint('[AnnouncementCarousel] 🔍 开始切换到下一个轮播项');
+      debugPrint(
+          '[AnnouncementCarousel] 当前索引: $_currentNoticeIndex, 总widget数: ${_midCarouselController.widgetCount}');
+      debugPrint(
+          '[AnnouncementCarousel] 轮播控制器状态: isAttached=${_midCarouselController.isAttached}, currentIndex=${_midCarouselController.currentIndex}');
+
+      // 正常遞增
       _currentNoticeIndex++;
       if (_currentNoticeIndex >= _midCarouselController.widgetCount) {
         _currentNoticeIndex = 1; // 回到第一个内容，跳过主屏幕
       }
 
-      // 跳转到下一个内容
+      debugPrint('[AnnouncementCarousel] 🎯 目标索引: $_currentNoticeIndex');
+
       _midCarouselController.jumpToIndex(_currentNoticeIndex);
 
-      // 记录新内容开始时间
+      Future.delayed(const Duration(milliseconds: 100), () {
+        final actualIndex = _midCarouselController.currentIndex;
+        debugPrint(
+            '[AnnouncementCarousel] ✅ 跳转完成，目标索引: $_currentNoticeIndex, 实际索引: $actualIndex');
+
+        if (actualIndex != _currentNoticeIndex) {
+          debugPrint('[AnnouncementCarousel] ⚠️ 跳转失败，强制重新跳转');
+          _midCarouselController.jumpToIndex(_currentNoticeIndex);
+        }
+      });
+
       _currentNoticeStartTime = DateTime.now();
 
       debugPrint('[AnnouncementCarousel] 缴费表单翻页完成，切换到索引: $_currentNoticeIndex');
 
-      // 重新启动轮播定时器，使用当前API配置的停留时间
       _scheduleNextCarousel(_noticeDuration.inSeconds);
     } catch (e) {
-      // 切换失败时，延迟重试
+      debugPrint('[AnnouncementCarousel] ❌ 切换失败: $e');
       Future.delayed(const Duration(seconds: 2), () {
         if (!_isMidCarouselPaused) {
           _goToNextCarouselItem();

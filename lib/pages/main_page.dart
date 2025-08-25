@@ -114,12 +114,21 @@ class MainPageState extends State<MainPage> {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted) {
           final carouselProvider = context.read<CarouselStateProvider>();
+          // final wasInFullscreenAd =
+          //     carouselProvider.currentAppState == AppState.fullscreenAd;
+
+          // 先切換到手動操作狀態
           carouselProvider.enterManualOperation();
-          if (carouselProvider.currentAppState == AppState.fullscreenAd) {
-            final announcementCarouselProvider =
-                context.read<AnnouncementCarouselProvider>();
-            announcementCarouselProvider.jumpToAnnouncementIndex(0);
-          }
+
+          // 如果之前在全屏廣告狀態，關閉後自動回到主屏幕
+          // if (wasInFullscreenAd) {
+          //   Logger().i('🔄 通過showAdsDialog關閉全屏廣告，自動切換到手動操作狀態');
+
+          //   // 通知通告轮播提供者回到主屏幕
+          //   final announcementCarouselProvider =
+          //       context.read<AnnouncementCarouselProvider>();
+          //   announcementCarouselProvider.jumpToAnnouncementIndex(0);
+          // }
         }
       });
 

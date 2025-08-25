@@ -38,13 +38,13 @@ class _FullAdWidgetState extends State<FullAdWidget> {
   bool _isLoadingVideo = false;
   String? _errorMessage;
   String? _currentFilePath; // 当前视频文件路径
+  bool _isReleasing = false; // 防重入釋放
 
   // 保存AdvertisementProvider引用，避免dispose时context访问问题
   AdvertisementProvider? _advertisementProvider;
 
   // 防抖机制：避免频繁重新播放
-  DateTime? _lastPlaybackRetry;
-  static const Duration _playbackRetryCooldown = Duration(seconds: 2);
+  // 移除未使用的重試變量
 
   // 播放狀態日誌節流
   DateTime? _lastStatusLogAt;
@@ -151,14 +151,16 @@ class _FullAdWidgetState extends State<FullAdWidget> {
         // 确保控制器已初始化
         if (_videoController!.value.isInitialized) {
           try {
-            // 明确设置循环
+            // 明确设置循环與首播參數
             await _videoController!.setLooping(true);
+            await _videoController!.setVolume(0.0);
+            await _videoController!.setPlaybackSpeed(1.0);
 
             // 重置到开头
             await _videoController!.seekTo(Duration.zero);
 
-            // 等待视频准备就绪
-            await Future.delayed(const Duration(milliseconds: 200));
+            // 等待视频準備更充分（避免首次播放失敗）
+            await Future.delayed(const Duration(milliseconds: 350));
 
             // 开始播放
             await _videoController!.play();
@@ -200,7 +202,12 @@ class _FullAdWidgetState extends State<FullAdWidget> {
 
   @override
   void dispose() {
-    // 释放视频控制器到池中（延遲釋放 1 秒）
+    // 釋放視頻控制器到池中（延遲 1 秒，防重入）
+    if (_isReleasing) {
+      super.dispose();
+      return;
+    }
+    _isReleasing = true;
     if (_videoController != null && _currentFilePath != null) {
       _logger.i('🗑️ 開始釋放全屏廣告控制器（延遲1秒）: $_currentFilePath');
 
@@ -261,14 +268,15 @@ class _FullAdWidgetState extends State<FullAdWidget> {
         // 暫停自動重播邏輯：僅輸出播放狀態
         // if (!isPlaying && duration.inMilliseconds > 0) { ... }
 
-        // 回调進度（固定為0），並節流輸出播放狀態日誌
-        final now = DateTime.now();
-        if (_lastStatusLogAt == null ||
-            now.difference(_lastStatusLogAt!) >= _statusLogInterval) {
-          _lastStatusLogAt = now;
-          _logger.i(
-              '💡 🎬 视频播放状态: isPlaying=$isPlaying, duration=${duration.inMilliseconds}ms');
-        }
+        // 回调進度（固定為0）
+        // 每秒播放狀態日誌已停用：
+        // final now = DateTime.now();
+        // if (_lastStatusLogAt == null ||
+        //     now.difference(_lastStatusLogAt!) >= _statusLogInterval) {
+        //   _lastStatusLogAt = now;
+        //   _logger.i(
+        //       '💡 🎬 视频播放状态: isPlaying=$isPlaying, duration=${duration.inMilliseconds}ms');
+        // }
         widget.onVideoProgressChanged!(widget.ad.id.toString(), Duration.zero);
       }
     } catch (e) {

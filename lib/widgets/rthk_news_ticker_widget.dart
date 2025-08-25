@@ -33,7 +33,10 @@ class RthkNewsTickerWidgetState extends State<RthkNewsTickerWidget>
   @override
   void initState() {
     super.initState();
-    _controller = AnimationController(vsync: this);
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(seconds: 30),
+    );
     _scrollController = ScrollController();
   }
 
@@ -68,12 +71,12 @@ class RthkNewsTickerWidgetState extends State<RthkNewsTickerWidget>
     return totalWidth > minWidth ? totalWidth : minWidth;
   }
 
-  ///2, 启动滚动动画
+  ///2, 啟動滾動動畫
   void _startScrolling() {
     if (!_scrollController.hasClients) return;
 
     final maxScrollExtent = _scrollController.position.maxScrollExtent;
-    const scrollSpeed = 40.0; // 降低滚动速度，让用户更容易阅读长标题
+    const scrollSpeed = 40.0; // 降低滾動速度，讓使用者更易讀
     final durationSeconds = (maxScrollExtent / scrollSpeed).ceil();
 
     if (durationSeconds <= 0) return;
@@ -95,13 +98,12 @@ class RthkNewsTickerWidgetState extends State<RthkNewsTickerWidget>
       }
     }
 
-// 先移除已有监听器
+// 先移除已有監聽器
     _controller.removeListener(animationListener);
     _controller.removeStatusListener(animationStatusListener);
 
-// 添加监听器
+// 添加監聽器
     _controller.addListener(animationListener);
-    _controller.addStatusListener(animationStatusListener);
     _controller.addStatusListener(animationStatusListener);
     _controller.forward();
   }
@@ -111,10 +113,10 @@ class RthkNewsTickerWidgetState extends State<RthkNewsTickerWidget>
     _controller.stop();
   }
 
-  ///4, 更新新闻数据并重新启动滚动
+  ///4, 更新新聞數據並重新啟動滾動
   void _updateNews(List<String> newTexts) {
     if (newTexts.isEmpty) {
-      _newsTexts = ['暂无新闻数据'];
+      _newsTexts = ['暫無新聞數據'];
     } else {
       _newsTexts = newTexts;
     }
@@ -133,8 +135,8 @@ class RthkNewsTickerWidgetState extends State<RthkNewsTickerWidget>
       if (!mounted) return;
 
       _totalContentWidth = _calculateTotalWidth(_newsTexts);
-      // 打印总宽度
-      logger.i('总宽度: $_totalContentWidth');
+      // 調試：總寬度
+      logger.i('總寬度: $_totalContentWidth');
       _scrollController.jumpTo(0);
 
       setState(() {});
@@ -160,10 +162,12 @@ class RthkNewsTickerWidgetState extends State<RthkNewsTickerWidget>
     _stopScrolling();
   }
 
-  ///7, 恢复滚动
+  ///7, 恢復滾動
   void _resumeScrolling() {
     if (_isPaused) {
       _isPaused = false;
+      // 確保存在有效時長
+      _controller.duration ??= const Duration(seconds: 30);
       _controller.forward();
     }
   }
@@ -236,21 +240,18 @@ class RthkNewsTickerWidgetState extends State<RthkNewsTickerWidget>
                 controller: _scrollController,
                 scrollDirection: Axis.horizontal,
                 physics: const NeverScrollableScrollPhysics(),
-                itemCount: _getItemCount(), // 根据新闻数量智能确定显示次数
+                itemCount: _getItemCount(), // 根據新聞數量智能決定顯示次數
                 itemBuilder: (context, index) {
                   final text = _newsTexts[index % _newsTexts.length];
                   return Container(
-                    margin:
-                        const EdgeInsets.only(right: 80), // 增加右边距，确保新闻之间有足够间隔
-                    // 移除maxWidth限制，让文字能够完整显示
+                    margin: const EdgeInsets.only(right: 80),
                     child: Text(
                       text,
-                      // 移除maxLines和overflow限制，确保文字完整显示
                       style: const TextStyle(
                         color: Colors.black87,
                         fontSize: 14,
                         fontWeight: FontWeight.w500,
-                        height: 1.2, // 添加行高，让文字更易读
+                        height: 1.2,
                       ),
                     ),
                   );

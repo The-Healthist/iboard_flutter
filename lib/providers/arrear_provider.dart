@@ -471,6 +471,21 @@ class ArrearProvider extends ChangeNotifier {
     return true; // 所有单位都没有费用，返回true
   }
 
+  ///38, 是否存在任意其他費用記錄（忽略樓座選擇，用於輪播判斷）
+  bool get hasAnyOtherFeeRecords {
+    if (_otherFeeData == null) return false;
+    for (final block in _otherFeeData!.blocks) {
+      for (final floor in block.floors) {
+        for (final unit in floor.units) {
+          if (unit.bills.isNotEmpty) {
+            return true;
+          }
+        }
+      }
+    }
+    return false;
+  }
+
   ///9, 从缓存加载数据
   Future<void> loadFromCache() async {
     try {

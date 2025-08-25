@@ -46,6 +46,8 @@ class EnhancedVideoPoolManager {
   // 视频控制器缓存
   final Map<String, VideoControllerWrapper> _controllerCache = {};
   static const int _maxCacheSize = 10;
+  // 釋放中的鍵，避免重入
+  final Set<String> _releasingKeys = {};
 
   factory EnhancedVideoPoolManager() {
     _instance ??= EnhancedVideoPoolManager._internal();
@@ -268,6 +270,11 @@ class EnhancedVideoPoolManager {
     final key = _generateControllerKey(filePath, videoType);
 
     if (_controllerCache.containsKey(key)) {
+      if (_releasingKeys.contains(key)) {
+        _logger.i('⏳ 控制器釋放進行中，略過: $key');
+        return;
+      }
+      _releasingKeys.add(key);
       final wrapper = _controllerCache[key]!;
       final controller = wrapper.controller;
 
@@ -285,6 +292,8 @@ class EnhancedVideoPoolManager {
         _logger.i('🔓 控制器已释放: $key');
       } catch (e) {
         _logger.w('释放控制器时出错: $e');
+      } finally {
+        _releasingKeys.remove(key);
       }
     }
   }
