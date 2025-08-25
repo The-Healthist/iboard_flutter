@@ -4,7 +4,7 @@ import 'package:flutter/foundation.dart';
 import 'package:iboard_app/managers/file_manager.dart';
 import 'package:iboard_app/models/ad_model.dart';
 import 'package:iboard_app/widgets/carousel_widget.dart' as custom_carousel;
-import 'package:iboard_app/widgets/mainscreen/top_ad_widget.dart';
+import 'package:iboard_app/widgets/mainscreen/ad_top_widget.dart';
 import 'package:logger/logger.dart';
 
 /// 頂部廣告輪播Provider
@@ -218,8 +218,6 @@ class TopAdCarouselProvider extends ChangeNotifier {
       _currentTopAdIndex = currentIndex;
       _topAdElapsedTime = Duration.zero;
       timerDuration = _topAdDuration; // 新廣告使用完整時長
-      _logger
-          .d('🔄 重置頂部廣告計時器: 索引=$currentIndex, 時長=${_topAdDuration.inSeconds}s');
     } else {
       // 如果是恢复状态，保持现有的时间设置
       _topAdDuration = ad.durationObject;
@@ -228,8 +226,6 @@ class TopAdCarouselProvider extends ChangeNotifier {
       timerDuration = remainingTime.isNegative
           ? Duration.zero
           : remainingTime; // 恢復狀態使用剩餘時長
-      _logger.d(
-          '🔄 恢復頂部廣告計時器: 索引=$currentIndex, 已播放=${_topAdElapsedTime.inSeconds}s, 剩餘=${timerDuration.inSeconds}s');
     }
 
     // 關鍵修復：使用計算出的定時器時長而不是廣告總時長
@@ -265,9 +261,6 @@ class TopAdCarouselProvider extends ChangeNotifier {
       if (_topAdElapsedTime >= _topAdDuration) {
         _topAdElapsedTime = _topAdDuration;
       }
-
-      _logger.i(
-          '⏸️ 暫停頂部廣告 - 已播放: ${_topAdElapsedTime.inSeconds}s/${_topAdDuration.inSeconds}s');
 
       // 添加額外的狀態一致性檢查
       if (_topAdElapsedTime > _topAdDuration) {
@@ -337,8 +330,6 @@ class TopAdCarouselProvider extends ChangeNotifier {
   /// 從全屏廣告狀態退出後恢復頂部廣告
   void resumeFromFullscreenAdExit() {
     if (_isTopCarouselPaused) {
-      _logger.i('🔄 從全屏廣告狀態退出，重置頂部廣告播放');
-
       // 重置暂停状态
       _isTopCarouselPaused = false;
 

@@ -2,7 +2,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:iboard_app/managers/file_manager.dart';
 import 'package:iboard_app/models/ad_model.dart';
-import 'package:iboard_app/widgets/full_ad_widget.dart';
+import 'package:iboard_app/widgets/ad_full_widget.dart';
 import 'package:logger/logger.dart';
 import 'package:iboard_app/providers/app_data_provider.dart';
 import 'package:iboard_app/utils/enhanced_video_pool_manager.dart';
@@ -84,7 +84,7 @@ class FullscreenAdProvider extends ChangeNotifier {
       _defaultFullscreenAdDuration;
 
   ///1，更新轮播广告列表（由AdvertisementProvider调用）
-  void updateCarouselList(List<AdModel> newFullscreenAds) {
+  Future<void> updateCarouselList(List<AdModel> newFullscreenAds) async {
     // 检查数据是否真的发生了变化
     if (_areAdsListsEqual(_fullscreenAds, newFullscreenAds)) {
       _logger.d('🔄 全屏广告轮播列表没有变化，跳过更新');
@@ -101,7 +101,7 @@ class FullscreenAdProvider extends ChangeNotifier {
       _pendingWidgetUpdate = true;
     } else {
       // 不在播放状态，可以安全更新
-      _smartCreateAdWidgets();
+      await _smartCreateAdWidgets();
     }
     notifyListeners();
   }
@@ -115,7 +115,7 @@ class FullscreenAdProvider extends ChangeNotifier {
   }
 
   ///6, 更新全屏广告数据
-  void updateFullscreenAds(List<AdModel> newAds) {
+  Future<void> updateFullscreenAds(List<AdModel> newAds) async {
     // 检查数据是否真的发生了变化
     if (_areAdsListsEqual(_fullscreenAds, newAds)) {
       _logger.d('🔄 全屏广告数据没有变化，跳过更新');
@@ -127,7 +127,7 @@ class FullscreenAdProvider extends ChangeNotifier {
     _logger.i('🔄 更新全屏广告数据: ${_fullscreenAds.length}个广告');
 
     // 重新创建广告Widget
-    _createAdWidgets();
+    await _createAdWidgets();
     notifyListeners();
   }
 
@@ -143,21 +143,24 @@ class FullscreenAdProvider extends ChangeNotifier {
   }
 
   ///7, 创建广告Widget组件列表
-  void _createAdWidgets() {
-    _adWidgets = fullscreenAds.asMap().entries.map((entry) {
-      return _createSingleAdWidget(entry.value, entry.key);
-    }).toList();
-    // _logger.i('📺 创建了 ${_adWidgets.length} 个广告Widget');
+  Future<void> _createAdWidgets() async {
+    final List<Widget> widgets = [];
+    for (int i = 0; i < fullscreenAds.length; i++) {
+      final widget = await _createCachedAdWidget(fullscreenAds[i], i);
+      widgets.add(widget);
+    }
+    _adWidgets = widgets;
+    _logger.i('📺 创建了 ${_adWidgets.length} 个广告Widget');
   }
 
   ///7a, 智能创建广告Widget（使用缓存）
-  void _smartCreateAdWidgets() {
+  Future<void> _smartCreateAdWidgets() async {
     final List<Widget> newWidgets = [];
     final Set<String> usedKeys = {};
 
     for (int i = 0; i < fullscreenAds.length; i++) {
       final ad = fullscreenAds[i];
-      final key = 'fullscreen_ad_${ad.id}';
+      final key = 'fullscreen_ad_${ad.id}_$i';
       usedKeys.add(key);
 
       // 检查缓存中是否已有此Widget
@@ -166,7 +169,7 @@ class FullscreenAdProvider extends ChangeNotifier {
         newWidgets.add(_widgetCache[key]!);
       } else {
         // 创建新Widget并缓存
-        final widget = _createCachedAdWidget(ad, i);
+        final widget = await _createCachedAdWidget(ad, i);
         _widgetCache[key] = widget;
         newWidgets.add(widget);
       }
@@ -178,21 +181,56 @@ class FullscreenAdProvider extends ChangeNotifier {
 
     _adWidgets = newWidgets;
     _pendingWidgetUpdate = false;
-
-    // 注意：全屏广告不使用CarouselWidget，所以不需要调用smartUpdateCarousel
-    // 它直接管理_adWidgets列表，通过getCurrentWidget()获取当前显示的Widget
   }
 
-  ///7b, 创建缓存的广告Widget（改进版）
-  Widget _createCachedAdWidget(AdModel ad, int index) {
-    final key = 'fullscreen_ad_${ad.id}';
+  ///6，获取视频控制器Future（私有方法）
+  Future<VideoPlayerController?> _getVideoControllerFuture(
+      AdModel ad, String key) async {
+    try {
+      // 先通过FileManager获取本地文件
+      final fileManager = _fileManagerCache[key] ?? FileManager();
+      final localFile = await fileManager.getFile(ad.file);
+
+      if (localFile == null || !await localFile.exists()) {
+        _logger.e('❌ 无法获取本地视频文件: ${ad.title}');
+        return null;
+      }
+
+      // 根据广告类型确定视频类型
+      VideoType videoType;
+      if (ad.display == AdDisplayType.topfull) {
+        videoType = VideoType.fullAd; // topfull类型在全屏广告中使用fullAd类型
+      } else {
+        videoType = VideoType.fullAd;
+      }
+
+      // 使用本地文件路径创建控制器
+      return await EnhancedVideoPoolManager().getController(
+        filePath: localFile.path,
+        videoType: videoType,
+        autoPlay: true,
+        looping: true,
+        onError: () {
+          _logger.e('全屏广告视频控制器初始化失败: ${ad.title}');
+        },
+      );
+    } catch (e) {
+      _logger.e('❌ 获取视频控制器Future失败: ${ad.title}', error: e);
+      return null;
+    }
+  }
+
+  ///7b, 创建缓存的广告Widget
+  Future<Widget> _createCachedAdWidget(AdModel ad, int index) async {
+    final key = 'fullscreen_ad_${ad.id}_$index';
 
     // 重用或创建FileManager
     if (!_fileManagerCache.containsKey(key)) {
       _fileManagerCache[key] = FileManager();
     }
     final fileManager = _fileManagerCache[key]!;
-    fileManager.getFile(ad.file);
+    // 确保文件已下载到本地
+    await fileManager.getFile(ad.file);
 
     // 检查是否已有缓存的控制器
     Future<VideoPlayerController?> controllerFuture = Future.value(null);
@@ -213,17 +251,8 @@ class FullscreenAdProvider extends ChangeNotifier {
           return cachedController;
         });
       } else {
-        // 创建新的控制器
-        controllerFuture = EnhancedVideoPoolManager().getController(
-          filePath: ad.file.url,
-          videoType: VideoType.fullAd,
-          isNetwork: ad.file.url.startsWith('http'),
-          autoPlay: true,
-          looping: true,
-          onError: () {
-            _logger.e('全屏广告视频控制器初始化失败: ${ad.title}');
-          },
-        );
+        // 创建新的控制器 - 需要先获取本地文件路径
+        controllerFuture = _getVideoControllerFuture(ad, key);
 
         // 缓存新创建的控制器
         controllerFuture.then((controller) {
@@ -248,7 +277,7 @@ class FullscreenAdProvider extends ChangeNotifier {
   }
 
   ///8, 创建单个广告Widget
-  Widget _createSingleAdWidget(AdModel ad, int index) {
+  Future<Widget> _createSingleAdWidget(AdModel ad, int index) async {
     final key = 'fullscreen_ad_${ad.id}_$index';
 
     // 重用或创建FileManager
@@ -256,21 +285,13 @@ class FullscreenAdProvider extends ChangeNotifier {
       _fileManagerCache[key] = FileManager();
     }
     final fileManager = _fileManagerCache[key]!;
-    fileManager.getFile(ad.file);
+    // 确保文件已下载到本地
+    await fileManager.getFile(ad.file);
 
     // 使用 EnhancedVideoPoolManager 获取控制器
     Future<VideoPlayerController?> controllerFuture = Future.value(null);
     if (ad.file.mimeType.startsWith('video/')) {
-      controllerFuture = EnhancedVideoPoolManager().getController(
-        filePath: ad.file.url,
-        videoType: VideoType.fullAd,
-        isNetwork: ad.file.url.startsWith('http'),
-        autoPlay: false,
-        looping: true,
-        onError: () {
-          _logger.e('全屏广告视频控制器初始化失败: ${ad.title}');
-        },
-      );
+      controllerFuture = _getVideoControllerFuture(ad, key);
     }
 
     return FullAdWidget(
@@ -292,7 +313,7 @@ class FullscreenAdProvider extends ChangeNotifier {
   }
 
   ///9, 进入全屏广告模式并开始轮播
-  void enterFullscreenMode() {
+  Future<void> enterFullscreenMode() async {
     if (_isActive) return;
 
     _isActive = true;
@@ -306,15 +327,7 @@ class FullscreenAdProvider extends ChangeNotifier {
         _currentAdIndex = 0;
       }
 
-      _createAdWidgets();
-
-      // 尝试强制播放当前广告
-      final currentWidget = getCurrentWidget();
-      if (currentWidget is FullAdWidget) {
-        _logger.i('🎬 强制尝试播放当前全屏广告');
-        // 可以在这里添加额外的播放逻辑，例如通过 Provider 强制刷新
-        notifyListeners();
-      }
+      await _createAdWidgets();
 
       startFullscreenAdTimer(_currentAdIndex);
       startDebugTimer();
@@ -362,10 +375,11 @@ class FullscreenAdProvider extends ChangeNotifier {
     if (_adDuration.inSeconds < fullscreenAdDuration) {
       // _logger.i(
       //     '⏰ 启动短时广告计时器: ${_adDuration.inSeconds}秒 (索引: $_currentAdIndex/${this.fullscreenAds.length})');
-      _fullscreenTimer = Timer(Duration(seconds: _adDuration.inSeconds), () {
+      _fullscreenTimer =
+          Timer(Duration(seconds: _adDuration.inSeconds), () async {
         if (_isActive && !_isPaused) {
           // _logger.d('⏭️ 短时广告计时器到期，切换到下一个');
-          _nextAd();
+          await _nextAd();
         } else {
           _logger.w('⚠️ 计时器到期但条件不满足: active=$_isActive, paused=$_isPaused');
         }
@@ -373,10 +387,11 @@ class FullscreenAdProvider extends ChangeNotifier {
     } else {
       // _logger.i(
       //     '⏰ 启动标准广告计时器: ${fullscreenAdDuration}秒 (索引: $_currentAdIndex/${this.fullscreenAds.length})');
-      _fullscreenTimer = Timer(Duration(seconds: fullscreenAdDuration), () {
+      _fullscreenTimer =
+          Timer(Duration(seconds: fullscreenAdDuration), () async {
         if (_isActive && !_isPaused) {
           _logger.d('⏭️ 标准广告计时器到期，切换到下一个');
-          _nextAd();
+          await _nextAd();
         } else {
           _logger.w('⚠️ 计时器到期但条件不满足: active=$_isActive, paused=$_isPaused');
         }
@@ -385,7 +400,7 @@ class FullscreenAdProvider extends ChangeNotifier {
   }
 
   ///10, 切换到下一个广告（私有方法）- 添加视频切换延迟
-  void _nextAd() {
+  Future<void> _nextAd() async {
     if (fullscreenAds.isEmpty || _isPaused || !_isActive) {
       _logger.w(
           '⚠️ _nextAd被阻止: isEmpty=${fullscreenAds.isEmpty}, paused=$_isPaused, active=$_isActive');
@@ -401,7 +416,7 @@ class FullscreenAdProvider extends ChangeNotifier {
     // 检查是否有待更新的Widget
     if (_pendingWidgetUpdate) {
       _logger.i('🔄 执行延迟的Widget更新');
-      _smartCreateAdWidgets();
+      await _smartCreateAdWidgets();
     }
 
     // 重置时间记录
@@ -542,16 +557,16 @@ class FullscreenAdProvider extends ChangeNotifier {
       if (remainingTime.inSeconds <= 0) {
         _logger.i('🔄 [恢复] 剩余时间已到0，立即切换到下一个广告');
         // 使用微小延迟确保状态正确设置
-        Future.delayed(const Duration(milliseconds: 100), () {
+        Future.delayed(const Duration(milliseconds: 100), () async {
           if (_isActive && !_isPaused) {
-            _nextAd();
+            await _nextAd();
           }
         });
       } else {
-        _fullscreenTimer = Timer(remainingTime, () {
+        _fullscreenTimer = Timer(remainingTime, () async {
           if (_isActive && !_isPaused) {
             // _logger.i('⏰ [定时] 全屏广告时间到，切换到下一个');
-            _nextAd();
+            await _nextAd();
           }
         });
       }
@@ -569,7 +584,6 @@ class FullscreenAdProvider extends ChangeNotifier {
     // 为下次进入准备下一个广告（但不触发切换逻辑）
     if (fullscreenAds.isNotEmpty) {
       _currentAdIndex = (_currentAdIndex + 1) % fullscreenAds.length;
-      // _logger.i(' 3 3   33 3 🔄 广告索引更新为下一个: $_currentAdIndex');
     }
 
     // 确保取消所有定时器

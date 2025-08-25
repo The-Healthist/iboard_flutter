@@ -131,7 +131,7 @@ class TopAdWidgetState extends State<TopAdWidget> {
     }
   }
 
-  //2，初始化视频播放器 - 使用视频池管理器
+  ///2，初始化视频播放器 - 使用视频池管理器
   Future<void> _initializeVideoPlayer() async {
     if (_localFilePath == null || !mounted) return;
 
@@ -154,11 +154,19 @@ class TopAdWidgetState extends State<TopAdWidget> {
     try {
       if (!mounted) return;
       _advertisementProvider ??= context.read<AdvertisementProvider>();
+
+      // 根据广告类型确定视频类型
+      VideoType videoType;
+      if (widget.ad.display == AdDisplayType.topfull) {
+        videoType = VideoType.topAd; // topfull类型在顶部广告中使用topAd类型
+      } else {
+        videoType = VideoType.topAd;
+      }
+
       _videoController =
           await _advertisementProvider!.videoPoolManager.getController(
         filePath: _localFilePath!,
-        videoType: VideoType.topAd,
-        isNetwork: false,
+        videoType: videoType,
         autoPlay: true,
         looping: true,
         onError: () {

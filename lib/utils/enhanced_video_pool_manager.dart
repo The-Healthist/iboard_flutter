@@ -58,7 +58,7 @@ class EnhancedVideoPoolManager {
   Future<VideoPlayerController?> getController({
     required String filePath,
     required VideoType videoType,
-    bool isNetwork = true,
+    bool isNetwork = false,
     bool autoPlay = false,
     bool looping = false,
     VoidCallback? onError,
@@ -138,7 +138,7 @@ class EnhancedVideoPoolManager {
   /// 创建视频控制器
   Future<VideoPlayerController?> _createController({
     required String filePath,
-    bool isNetwork = true,
+    bool isNetwork = false,
     bool autoPlay = false,
     bool looping = false,
     VoidCallback? onError,
@@ -167,6 +167,7 @@ class EnhancedVideoPoolManager {
   }
 
   /// 重置控制器设置
+  ///2, 重置控制器设置（增加播放失败的错误捕获）
   Future<void> _resetControllerSettings(
       VideoPlayerController controller, bool autoPlay, bool looping) async {
     if (!controller.value.isInitialized) return;
@@ -178,28 +179,50 @@ class EnhancedVideoPoolManager {
       // 设置循环
       controller.setLooping(looping);
 
-      // 根据需要播放或暂停
-      if (autoPlay && !controller.value.isPlaying) {
-        await controller.play();
-      } else if (!autoPlay && controller.value.isPlaying) {
-        await controller.pause();
+      // 根据需要播放或暂停，并捕获播放异常
+      if (autoPlay) {
+        try {
+          await controller.play();
+        } catch (e) {
+          _logger.w('播放时出错: $e');
+        }
+      } else {
+        if (controller.value.isPlaying) {
+          await controller.pause();
+        }
       }
     } catch (e) {
       _logger.w('重置控制器设置失败: $e');
-      rethrow; // 重新抛出异常，触发外层重新创建
+      rethrow;
     }
   }
 
   /// 检查控制器是否有效
+  ///1, 判断控制器是否有效（只判定初始化和是否有错误，不判断播放状态）
   bool _isControllerValid(VideoPlayerController controller) {
-    return controller.value.isInitialized &&
-        !controller.value.hasError &&
-        controller.value.isPlaying == false;
+    return controller.value.isInitialized && !controller.value.hasError;
   }
 
   /// 生成控制器唯一标识（类型+文件路径作为唯一key，不会冲突）
   String _generateControllerKey(String filePath, VideoType type) {
     return '${type.toString()}::$filePath';
+  }
+
+  /// 根据广告类型生成多个控制器Key（处理topfull类型）
+  List<String> generateControllerKeys(String filePath, String adType) {
+    final keys = <String>[];
+
+    if (adType == 'topfull') {
+      // topfull类型需要创建两个独立的控制器
+      keys.add('${VideoType.topAd.toString()}::$filePath');
+      keys.add('${VideoType.fullAd.toString()}::$filePath');
+    } else if (adType == 'top') {
+      keys.add('${VideoType.topAd.toString()}::$filePath');
+    } else if (adType == 'full') {
+      keys.add('${VideoType.fullAd.toString()}::$filePath');
+    }
+
+    return keys;
   }
 
   /// 获取控制器缓存状态
