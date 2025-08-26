@@ -59,18 +59,18 @@ class AdvertisementProvider extends ChangeNotifier {
   ApiClient get apiClient => _apiClient; // 添加apiClient getter用于比较
 
   AdvertisementProvider(this._apiClient, this._appDataProvider) {
-    _loadAdvertisementsFromCache(); // 启动时从缓存加载数据
-    _loadCarouselAdvertisementsFromCache(); // 加载轮播广告数据
+    _loadAdvertisementsFromCache();
+    _loadCarouselAdvertisementsFromCache();
+    // 監聽登入狀態，登入後再啟動定時更新
+    _appDataProvider.addListener(_onAppDataChanged);
+  }
 
-    // 延迟检查AppDataProvider登录状态，确保初始化完成
-    Future.delayed(const Duration(milliseconds: 100), () {
-      if (_appDataProvider.isLoggedIn) {
-        _logger.i('AppDataProvider已登录，自动启动广告定时更新');
-        startPeriodicUpdate();
-      } else {
-        _logger.w('AppDataProvider未登录，跳过自动启动广告定时更新');
-      }
-    });
+  ///1, 監聽AppDataProvider變更以啟動定時更新
+  void _onAppDataChanged() {
+    if (_appDataProvider.isLoggedIn && !_isPeriodicUpdateActive) {
+      _logger.i('AppDataProvider已登入，啟動廣告定時更新');
+      startPeriodicUpdate();
+    }
   }
 
   ///11，设置轮播Provider引用
@@ -144,65 +144,6 @@ class AdvertisementProvider extends ChangeNotifier {
         _fullCarouselAdvertisements.isNotEmpty) {
       _logger.i('🔄 從緩存初始化全屏廣告輪播: ${_fullCarouselAdvertisements.length} 個廣告');
       _fullscreenAdProvider!.updateCarouselList(_fullCarouselAdvertisements);
-    }
-  }
-
-  ///13，初始化時獲取輪播廣告數據
-  Future<void> initializeCarouselAdvertisements() async {
-    if (_appDataProvider.token == null) {
-      _logger.w('Token為空，跳過初始化輪播廣告數據');
-      return;
-    }
-
-    try {
-      _logger.i('🚀 初始化時獲取輪播廣告數據...');
-
-      // 並行獲取輪播數據
-      final List<Future> futures = [
-        _apiClient.getCarouselTopAdvertisements(),
-        _apiClient.getCarouselFullAdvertisements(),
-      ];
-
-      final List results = await Future.wait(futures);
-
-      // 處理頂部廣告輪播數據
-      final List<Map<String, dynamic>> topCarouselData =
-          results[0] as List<Map<String, dynamic>>;
-      final List<AdModel> newTopCarouselAds = topCarouselData
-          .map((jsonItem) => AdModel.fromJson(jsonItem))
-          .toList();
-
-      // 處理全屏廣告輪播數據
-      final List<Map<String, dynamic>> fullCarouselData =
-          results[1] as List<Map<String, dynamic>>;
-      final List<AdModel> newFullCarouselAds = fullCarouselData
-          .map((jsonItem) => AdModel.fromJson(jsonItem))
-          .toList();
-
-      // 更新頂部廣告輪播數據
-      _topCarouselAdvertisements = List<AdModel>.from(newTopCarouselAds);
-      await _saveTopCarouselAdvertisementsToCache(_topCarouselAdvertisements);
-      _logger.i('✅ 初始化頂部廣告輪播數據: ${_topCarouselAdvertisements.length} 個廣告');
-
-      // 更新全屏廣告輪播數據
-      _fullCarouselAdvertisements = List<AdModel>.from(newFullCarouselAds);
-      await _saveFullCarouselAdvertisementsToCache(_fullCarouselAdvertisements);
-      _logger.i('✅ 初始化全屏廣告輪播數據: ${_fullCarouselAdvertisements.length} 個廣告');
-
-      // 如果Provider已經設置，立即更新
-      if (_topAdCarouselProvider != null) {
-        _topAdCarouselProvider!.updateCarouselList(_topCarouselAdvertisements);
-      }
-
-      if (_fullscreenAdProvider != null) {
-        _fullscreenAdProvider!.updateCarouselList(_fullCarouselAdvertisements);
-      }
-
-      notifyListeners();
-    } catch (e) {
-      _logger.e('初始化輪播廣告數據失敗', error: e);
-      // 初始化失敗時，嘗試使用緩存數據
-      _initializeCarouselProvidersWithCache();
     }
   }
 
@@ -293,6 +234,7 @@ class AdvertisementProvider extends ChangeNotifier {
   @override
   void dispose() {
     stopPeriodicUpdate();
+    _appDataProvider.removeListener(_onAppDataChanged);
     super.dispose();
   }
 
@@ -352,7 +294,8 @@ class AdvertisementProvider extends ChangeNotifier {
   /// 检查文件是否已缓存（使用 FileManager 检查）
   ///7，智能对比更新广告列表
   // Interface to fetch/update advertisements
-  Future<void> fetchAdvertisements() async {
+  ///14，抓取/更新輪播廣告數據（支持強制初始化）
+  Future<void> fetchAdvertisements({bool forceInit = false}) async {
     if (_appDataProvider.token == null) {
       _error = "Authentication token is missing. Cannot fetch advertisements.";
       _logger.w(_error);
@@ -396,9 +339,9 @@ class AdvertisementProvider extends ChangeNotifier {
       final List<AdModel> newFullCarouselAds = fullCarouselData
           .map((jsonItem) => AdModel.fromJson(jsonItem))
           .toList();
-      // 检查顶部广告轮播数据是否变化
+      // 检查顶部广告轮播数据是否变化或強制初始化
       final bool hasTopCarouselChanges =
-          _hasTopCarouselDataChanged(newTopCarouselAds);
+          forceInit ? true : _hasTopCarouselDataChanged(newTopCarouselAds);
       if (hasTopCarouselChanges) {
         _logger.i('检测到顶部广告轮播数据变化，开始更新...');
         _topCarouselAdvertisements = List<AdModel>.from(newTopCarouselAds);
@@ -413,9 +356,9 @@ class AdvertisementProvider extends ChangeNotifier {
         _logger.i('顶部广告轮播数据无变化，跳过更新操作');
       }
 
-      // 检查全屏广告轮播数据是否变化
+      // 检查全屏广告轮播数据是否变化或強制初始化
       final bool hasFullCarouselChanges =
-          _hasFullCarouselDataChanged(newFullCarouselAds);
+          forceInit ? true : _hasFullCarouselDataChanged(newFullCarouselAds);
       if (hasFullCarouselChanges) {
         _logger.i('检测到全屏广告轮播数据变化，开始更新...');
         _fullCarouselAdvertisements = List<AdModel>.from(newFullCarouselAds);
@@ -431,8 +374,10 @@ class AdvertisementProvider extends ChangeNotifier {
         _logger.i('全屏广告轮播数据无变化，跳过更新操作');
       }
 
-      _logger.i(
-          'Advertisement update completed. Top carousel: ${_topCarouselAdvertisements.length}, Full carousel: ${_fullCarouselAdvertisements.length}, General: ${_advertisements.length}');
+      _logger.i('Advertisement update completed. Top carousel: '
+          '${_topCarouselAdvertisements.length}, Full carousel: '
+          '${_fullCarouselAdvertisements.length}, General: '
+          '${_advertisements.length}');
       _error = null; // 成功时清除错误
     } on ApiException catch (e) {
       _logger.e('Failed to fetch advertisements (ApiException)',

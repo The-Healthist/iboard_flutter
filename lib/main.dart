@@ -35,7 +35,6 @@ void main() {
           ChangeNotifierProvider(
             create: (context) => AppDataProvider(
                 baseUrl: 'http://test.iboard.skylinedances.com'),
-            // baseUrl: 'http://117.72.193.54:10031'),
           ),
           Provider<FileManager>(
             create: (context) => FileManager(),
@@ -63,12 +62,8 @@ void main() {
               );
             },
           ),
-          ChangeNotifierProvider(
-              create: (_) =>
-                  CarouselStateProvider()), // Add CarouselStateProvider here
-          ChangeNotifierProvider(
-              create: (_) =>
-                  TopAdCarouselProvider()), // Add TopAdCarouselProvider here
+          ChangeNotifierProvider(create: (_) => CarouselStateProvider()),
+          ChangeNotifierProvider(create: (_) => TopAdCarouselProvider()),
           ChangeNotifierProvider<AnnouncementCarouselProvider>(
             create: (context) {
               final announcementProvider = AnnouncementCarouselProvider();
@@ -165,7 +160,6 @@ class HomePage extends StatefulWidget {
 }
 
 class HomePageState extends State<HomePage> {
-  final Logger _logger = Logger();
   bool _isInitializing = false;
   String? _initializationError;
 
@@ -182,6 +176,7 @@ class HomePageState extends State<HomePage> {
     });
 
     try {
+      // 1
       final deviceIdUtil = DeviceIdUtil();
       final deviceId = await deviceIdUtil.generateUniqueDeviceId();
 
@@ -196,79 +191,40 @@ class HomePageState extends State<HomePage> {
               Provider.of<AdvertisementProvider>(context, listen: false);
           final announcementProvider =
               Provider.of<AnnouncementProvider>(context, listen: false);
+          final weatherProvider =
+              Provider.of<WeatherProvider>(context, listen: false);
 
-          // 设置Provider间的关联
           appDataProvider.setCarouselStateProvider(carouselStateProvider);
 
           // 获取Provider引用（现在通过构造函数注入，无需手动设置）
           final arrearProvider =
               Provider.of<ArrearProvider>(context, listen: false);
           appDataProvider.setArrearProvider(arrearProvider);
-          // 设置预加载回调
-          carouselStateProvider.setPreloadFullscreenAdCallback(() async {
-            // 新的Provider没有预加载方法
-          });
+          carouselStateProvider.setPreloadFullscreenAdCallback(() async {});
+          // 2.登录
+          await appDataProvider.initialize(deviceId: deviceId);
+          // 3.初始化天气数据（不需要登录，公开API）
+          await weatherProvider.fetchAllWeatherData();
 
-          // 初始化天气数据（不需要登录，公开API）
-          try {
-            final weatherProvider =
-                Provider.of<WeatherProvider>(context, listen: false);
-
-            // 等待WeatherProvider完成初始化
-            await weatherProvider.waitForInitialization();
-
-            // 如果缓存中没有数据，才获取新数据
-            if (!weatherProvider.hasForecastData &&
-                !weatherProvider.hasCurrentData &&
-                !weatherProvider.hasWarningData) {
-              await weatherProvider.fetchAllWeatherData();
-            } else {
-              _logger.i('使用緩存的天氣數據');
-            }
-
-            weatherProvider.startPeriodicUpdate(
-                interval: const Duration(minutes: 1));
-            _logger.i('天氣數據初始化完成 - 定時更新間隔設置為1分鐘');
-          } catch (e) {
-            _logger.e('天氣數據初始化失敗: $e');
-          }
-
-          // 执行登录前检查缓存状态
-          _logger.i('🚀 開始執行設備初始化和登錄流程');
-          _logger.i('🔍 檢查初始化前的緩存狀態...');
-          await appDataProvider.debugSharedPreferencesKeys();
-          final hasCachedData = await appDataProvider.hasCachedLoginData();
-          _logger.i('🔍 初始化前緩存數據存在: $hasCachedData');
-
-          await appDataProvider.initialize(deviceIdToSet: deviceId);
-          _logger.i('🚀 設備初始化流程完成');
-
-          // 初始化完成后启动定时更新和初始化欠费数据（数据可能来自登录或缓存）
-          _logger.i('初始化完成，登錄狀態: ${appDataProvider.isLoggedIn}');
-          _logger.i('Token狀態: ${appDataProvider.token != null ? '有效' : '無效'}');
-          _logger.i(
-              '設備設置狀態: ${appDataProvider.deviceSettings != null ? '已加載' : '未加載'}');
-          _logger.i('數據源: ${appDataProvider.isLoggedIn ? '最新登錄數據' : '緩存備用數據'}');
-
-          // 在 _initializeDeviceId 方法中，優化初始化順序和錯誤處理
-          // 如果有设备设置数据（无论是从登录还是缓存获取），就启动应用
+          // 3.1 启动天气数据定时更新（120分钟一次）
+          weatherProvider.startPeriodicUpdate(
+              interval: const Duration(minutes: 120));
           if (appDataProvider.deviceSettings != null) {
             // 启动定时登录任务（12小时一次）
             appDataProvider.startPeriodicLogin();
-            _logger.i('定時登錄任務已啟動');
-
             // 启动健康检查定时任务（30分钟一次）
             appDataProvider.startPeriodicHealthCheck();
-            _logger.i('健康檢查定時任務已啟動');
 
-            // ===== 統一輪播數據初始化區塊 =====
+            // 4. 統一輪播數據初始化區塊
             try {
-              // 1. 首先初始化所有基礎數據
-              await advertisementProvider.initializeCarouselAdvertisements();
+              // 4.1. 首先初始化所有基礎數據
+              await advertisementProvider.fetchAdvertisements(forceInit: true);
 
-              // 2. 確保欠費數據先初始化完成
-              await appDataProvider.initGetArrearData();
-              _logger.i('✅ 欠費數據初始化完成');
+              // 4.2 確保欠費數據先初始化完成
+              await arrearProvider.fetchFeeData();
+
+              // 4.3 获取通告数据初始化
+              await announcementProvider.fetchNotices(forceInit: true);
 
               // 3. 設置Provider引用
               final topAdCarouselProvider =
@@ -278,7 +234,7 @@ class HomePageState extends State<HomePage> {
               final announcementCarouselProvider =
                   Provider.of<AnnouncementCarouselProvider>(context,
                       listen: false);
-
+              // 設置廣告輪播提供者的依賴引用
               advertisementProvider.setCarouselProviders(
                 topAdCarouselProvider: topAdCarouselProvider,
                 fullscreenAdProvider: fullscreenAdProvider,
@@ -298,68 +254,52 @@ class HomePageState extends State<HomePage> {
               if (carouselAnnouncements.isNotEmpty) {
                 announcementCarouselProvider
                     .updateCarouselList(carouselAnnouncements);
-                _logger
-                    .i('✅ 通告輪播數據從緩存初始化完成: ${carouselAnnouncements.length} 個通告');
               } else {
-                // 如果緩存中沒有數據，先初始化空輪播組件（確保主屏幕可用）
                 announcementCarouselProvider.updateCarouselList([]);
-                _logger.i('⚠️ 緩存中暫無通告數據，已初始化空輪播組件（包含主屏幕）');
-
-                // 然後異步獲取通告數據
                 announcementProvider.fetchNotices().then((_) {
                   final freshCarouselAnnouncements =
                       announcementProvider.getCarouselAnnouncements();
                   if (freshCarouselAnnouncements.isNotEmpty) {
                     announcementCarouselProvider
                         .updateCarouselList(freshCarouselAnnouncements);
-                    _logger.i(
-                        '✅ 通告輪播數據從網絡異步更新完成: ${freshCarouselAnnouncements.length} 個通告');
                   }
                 }).catchError((e) {
-                  _logger.e('異步獲取通告數據失敗: $e');
+                  debugPrint('異步獲取通告數據失敗: $e');
                 });
               }
-
-              _logger.i('🎯 所有輪播數據初始化完成，確保內容正常顯示');
             } catch (e) {
-              _logger.e('輪播數據初始化過程中發生錯誤: $e');
+              debugPrint('輪播數據初始化過程中發生錯誤: $e');
               // 即使部分初始化失敗，也要確保基本的輪播組件可用
               try {
                 final announcementCarouselProvider =
                     Provider.of<AnnouncementCarouselProvider>(context,
                         listen: false);
                 announcementCarouselProvider.updateCarouselList([]);
-                _logger.i('🔧 錯誤恢復：已初始化基本輪播組件');
+                debugPrint('🔧 錯誤恢復：已初始化基本輪播組件');
               } catch (recoveryError) {
-                _logger.e('錯誤恢復失敗: $recoveryError');
+                debugPrint('錯誤恢復失敗: $recoveryError');
               }
             }
 
             // 启动广告定时更新
-            _logger.i(
-                '準備啟動廣告定時更新，設備設置: ${appDataProvider.deviceSettings?.advertisementUpdateDuration ?? '未設置'}');
             advertisementProvider.startPeriodicUpdate();
-            _logger.i('廣告定時更新已啟動');
 
             // 启动通告定时更新
-            _logger.i(
-                '準備啟動通告定時更新，設備設置: ${appDataProvider.deviceSettings?.noticeUpdateDuration ?? '未設置'}');
             announcementProvider.startPeriodicUpdate();
-            _logger.i('通告定時更新已啟動');
 
             final deviceSettings = appDataProvider.deviceSettings;
             final arrearUpdateInterval =
                 deviceSettings?.arrearageUpdateDuration ?? 1;
             arrearProvider.startPeriodicUpdate(
                 updateIntervalMinutes: arrearUpdateInterval);
-            _logger.i('欠費數據定時更新已啟動，間隔: $arrearUpdateInterval分鐘');
+            debugPrint('欠費數據定時更新已啟動，間隔: $arrearUpdateInterval分鐘');
 
             // 初始化欠费数据
             try {
-              await appDataProvider.initGetArrearData();
-              _logger.i('欠費數據初始化完成');
+              await arrearProvider.fetchFeeData();
+              debugPrint('欠費數據初始化完成');
             } catch (e) {
-              _logger.e('欠費數據初始化失敗: $e');
+              debugPrint('欠費數據初始化失敗: $e');
             }
 
             // 檢查應用更新
@@ -372,11 +312,11 @@ class HomePageState extends State<HomePage> {
               if (!mounted) return;
               // 如果有更新，自動下載到緩存
               if (updateProvider.hasUpdate) {
-                _logger.i('🔄 檢測到應用更新: ${updateProvider.remoteVersion}');
-                _logger.i('📦 更新包將自動下載到應用緩存目錄');
+                debugPrint('🔄 檢測到應用更新: ${updateProvider.remoteVersion}');
+                debugPrint('📦 更新包將自動下載到應用緩存目錄');
               }
             } catch (e) {
-              _logger.e('檢查應用更新失敗: $e');
+              debugPrint('檢查應用更新失敗: $e');
             }
 
             // 自動跳轉到主頁面
@@ -392,7 +332,7 @@ class HomePageState extends State<HomePage> {
             });
           }
         } catch (e) {
-          _logger.e('Auto login failed: $e');
+          debugPrint('Auto login failed: $e');
           final error = e.toString();
 
           setState(() {
@@ -401,7 +341,7 @@ class HomePageState extends State<HomePage> {
         }
       }
     } catch (e) {
-      _logger.e('Failed to generate device ID: $e');
+      debugPrint('Failed to generate device ID: $e');
       setState(() {
         _initializationError = '设备ID生成失败: $e';
       });
@@ -506,7 +446,7 @@ class HomePageState extends State<HomePage> {
                             _isDataParseError(appDataProvider.error!)) &&
                         appDataProvider.deviceSettings != null) {
                       // 有缓存数据，继续正常流程，不显示错误
-                      _logger.i('檢測到網絡錯誤或數據解析錯誤但有緩存數據，繼續使用緩存數據運行');
+                      debugPrint('檢測到網絡錯誤或數據解析錯誤但有緩存數據，繼續使用緩存數據運行');
                     } else {
                       // 没有缓存数据或非网络错误，显示错误页面
                       return ErrorPage(

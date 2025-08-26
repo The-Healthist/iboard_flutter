@@ -17,8 +17,6 @@ import 'package:iboard_app/providers/rthk_news_provider.dart';
 import 'package:iboard_app/widgets/carousel_widget.dart' as custom_carousel;
 import 'package:iboard_app/widgets/mainscreen/bottom_display/bottom_display_widget.dart';
 import 'package:iboard_app/widgets/rthk_news_ticker_widget.dart';
-// ArrearDisplayWidget已删除，功能整合到MainScreenWidget
-import 'package:iboard_app/widgets/mainscreen/main_display/arrear_table_widget.dart';
 import 'package:iboard_app/pages/settings_page.dart';
 import 'package:logger/logger.dart';
 import 'package:provider/provider.dart';
@@ -53,8 +51,6 @@ class AnnouncementPageState extends State<AnnouncementPage> {
 
   // 欠费组件的GlobalKey，用于调用组件方法
   // ArrearDisplayWidget已删除，功能整合到MainScreenWidget
-  final GlobalKey<ArrearTableWidgetState> _arrearTableKey =
-      GlobalKey<ArrearTableWidgetState>();
   late ArrearProvider _arrearProvider;
 
   ///1， 根据当前应用状态更新轮播暂停状态
@@ -373,24 +369,6 @@ class AnnouncementPageState extends State<AnnouncementPage> {
     }
   }
 
-  ///7，自动隐藏欠费页面当进入全屏广告状态
-  void _autoHideArrearPagesOnFullscreenAd() {
-    final announcementCarouselProvider =
-        context.read<AnnouncementCarouselProvider>();
-
-    // 检查是否有欠费查询页面正在显示（已删除，功能整合到MainScreenWidget）
-    // if (announcementCarouselProvider.isShowingArrearQuery) {
-    //   // _logger.i('📺 [全屏广告] 检测到欠费查询页面正在显示，自动隐藏');
-    //   announcementCarouselProvider.hideArrearQueryWidget(() {}, 10, 10);
-    // }
-
-    // 检查是否有欠费总览页面正在显示
-    if (announcementCarouselProvider.isShowingArrearTable) {
-      // _logger.i('📺 [全屏广告] 检测到欠费总览页面正在显示，自动隐藏');
-      announcementCarouselProvider.hideArrearTableWidget(() {}, 10, 10);
-    }
-  }
-
   ///8，初始化中部轮播
   void _initializeMidWidgets() {
     final announcementProvider =
@@ -561,7 +539,6 @@ class AnnouncementPageState extends State<AnnouncementPage> {
         if (currentAppState == AppState.fullscreenAd) {
           // _logger.i('📺 进入全屏广告状态');
           _pauseAllCarousels();
-          _autoHideArrearPagesOnFullscreenAd(); // 自动隐藏欠费页面
         } else if (currentAppState == AppState.manualOperation) {
           // _logger.i('🖱️ 进入手动操作状态');
           _handleManualOperationMode();
@@ -722,40 +699,6 @@ class AnnouncementPageState extends State<AnnouncementPage> {
                     //     return const SizedBox.shrink();
                     //   },
                     // ),
-
-                    // 欠费总览覆盖层 - 按需显示
-                    Consumer<AnnouncementCarouselProvider>(
-                      builder: (context, announcementCarouselProvider, child) {
-                        // _logger.i(
-                        //     '🔄 [MainScreenPage Overlay] 检查欠费总览覆盖层 - isShowingArrearTable: ${announcementCarouselProvider.isShowingArrearTable}');
-
-                        if (announcementCarouselProvider.isShowingArrearTable) {
-                          // _logger.i('📊 [MainScreenPage Overlay] 显示欠费总览覆盖层');
-                          return SizedBox(
-                            width: double.infinity,
-                            height: double.infinity,
-                            child: ArrearTableWidget(
-                              key: _arrearTableKey,
-                              onHomeButtonPressed: () {
-                                _logger.i(
-                                    '🏠 [MainScreenPage Overlay] 欠费总览返回按钮被点击，隐藏覆盖层');
-                                announcementCarouselProvider
-                                    .hideArrearTableWidget(
-                                  () {},
-                                  10, // 简化参数
-                                  10,
-                                );
-                                // _logger.i(
-                                //     '🏠 [MainScreenPage Overlay] 欠费总览覆盖层已隐藏');
-                              },
-                            ),
-                          );
-                        }
-
-                        // 不显示欠费总览时返回空容器
-                        return const SizedBox.shrink();
-                      },
-                    ),
                   ],
                 ),
               ),

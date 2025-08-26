@@ -14,43 +14,32 @@ class DeviceIdUtil {
 
   DeviceIdUtil._internal();
 
-  /// 生成一个唯一的设备ID
-  /// 格式: DEVICE_XXXXXXXX (X为大写字母或数字)
-  /// 同一设备每次生成的ID相同
+  /// 1, 生成一个唯一的设备ID
   Future<String> generateUniqueDeviceId() async {
-    // 首先尝试从本地存储获取已生成的设备ID
-    String? existingId = await _getStoredDeviceId();
+    String? existingId = await _getCachedDeviceId();
     if (existingId != null && isValidDeviceId(existingId)) {
       return existingId;
     }
-
-    // 获取设备信息（包含更多唯一性标识符）
     String deviceInfo = await _getEnhancedDeviceInfo();
-
-    // 使用设备信息生成哈希值
     String uniqueId = _generateDeterministicId(deviceInfo);
-
-    // 格式化为DEVICE_XXXXXXXX
     String newDeviceId = 'DEVICE_$uniqueId';
 
-    // 保存到本地存储
-    await _storeDeviceId(newDeviceId);
-
+    await _cacheDeviceId(newDeviceId);
     return newDeviceId;
   }
 
-  /// 从本地存储获取已保存的设备ID
-  Future<String?> _getStoredDeviceId() async {
+  /// 2,从本地存储获取已保存的设备ID
+  Future<String?> _getCachedDeviceId() async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      return prefs.getString('cached_device_id');
+      return prefs.getString('device_id');
     } catch (e) {
       return null;
     }
   }
 
-  /// 保存设备ID到本地存储
-  Future<void> _storeDeviceId(String deviceId) async {
+  /// 3, 保存设备ID到本地存储
+  Future<void> _cacheDeviceId(String deviceId) async {
     try {
       final prefs = await SharedPreferences.getInstance();
       await prefs.setString('cached_device_id', deviceId);
@@ -59,7 +48,7 @@ class DeviceIdUtil {
     }
   }
 
-  /// 获取增强的设备信息（包含更多唯一性标识符）
+  /// 4, 获取增强的设备信息（包含更多唯一性标识符）
   Future<String> _getEnhancedDeviceInfo() async {
     DeviceInfoPlugin deviceInfo = DeviceInfoPlugin();
     List<String> infoComponents = [];
@@ -165,7 +154,7 @@ class DeviceIdUtil {
     return infoComponents.join('|');
   }
 
-  /// 生成fallback ID（当设备信息不可用时）
+  /// 5, 生成fallback ID（当设备信息不可用时）
   Future<String> _generateFallbackId() async {
     try {
       final prefs = await SharedPreferences.getInstance();
@@ -185,7 +174,7 @@ class DeviceIdUtil {
     }
   }
 
-  /// 生成随机但持久的ID
+  /// 6, 生成随机但持久的ID
   String _generateRandomPersistentId() {
     final random = Random.secure();
     const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
@@ -193,7 +182,7 @@ class DeviceIdUtil {
         .join();
   }
 
-  /// 从设备信息生成确定性ID
+  /// 7, 从设备信息生成确定性ID
   String _generateDeterministicId(String deviceInfo) {
     // 使用SHA-256生成哈希
     var bytes = utf8.encode(deviceInfo);
@@ -206,7 +195,7 @@ class DeviceIdUtil {
     return _formatDeterministicId(hashString);
   }
 
-  /// 格式化ID为8位大写字母和数字
+  /// 8, 格式化ID为8位大写字母和数字
   String _formatDeterministicId(String hashString) {
     String result = '';
     final validChars = RegExp(r'[A-Z0-9]');
@@ -235,13 +224,13 @@ class DeviceIdUtil {
     return result;
   }
 
-  /// 验证设备ID格式是否正确
+  /// 9, 验证设备ID格式是否正确
   bool isValidDeviceId(String deviceId) {
     final RegExp deviceIdPattern = RegExp(r'^DEVICE_[A-Z0-9]{8}$');
     return deviceIdPattern.hasMatch(deviceId);
   }
 
-  /// 清除本地存储的设备ID（强制重新生成）
+  /// 10, 清除本地存储的设备ID（强制重新生成）
   Future<void> clearStoredDeviceId() async {
     try {
       final prefs = await SharedPreferences.getInstance();
@@ -252,11 +241,11 @@ class DeviceIdUtil {
     }
   }
 
-  /// 获取设备ID调试信息
+  /// 11, 获取设备ID调试信息
   Future<Map<String, dynamic>> getDeviceIdDebugInfo() async {
     try {
       String deviceInfo = await _getEnhancedDeviceInfo();
-      String? storedId = await _getStoredDeviceId();
+      String? storedId = await _getCachedDeviceId();
 
       return {
         'deviceInfo': deviceInfo,

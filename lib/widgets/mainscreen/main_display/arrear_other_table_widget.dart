@@ -538,7 +538,7 @@ class ArrearOtherTableWidgetState extends State<ArrearOtherTableWidget> {
     //paymentTableOnePageDuration 乘以 10
     final paginationDuration =
         (deviceSettings?.paymentTableOnePageDuration ?? 3) * 5;
-
+    //TODO: 需要修改為從設定中獲取翻頁時間
     _autoPaginationTimer?.cancel();
     _autoPaginationTimer =
         Timer.periodic(Duration(seconds: paginationDuration), (timer) {

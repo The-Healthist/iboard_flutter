@@ -83,7 +83,7 @@ class EnhancedVideoPoolManager {
           wrapper.lastUsed = DateTime.now();
           wrapper.useCount++;
 
-          _logger.i('🔄 复用视频控制器: $key (使用次数: ${wrapper.useCount})');
+          debugPrint('🔄 复用视频控制器: $key (使用次数: ${wrapper.useCount})');
           return controller;
         } else {
           // 如果控制器无效，移除并重新创建
@@ -91,7 +91,7 @@ class EnhancedVideoPoolManager {
           await controller.dispose();
         }
       } catch (e) {
-        _logger.w('控制器重用失败: $e');
+        debugPrint('控制器重用失败: $e');
         _controllerCache.remove(key);
       }
     }
@@ -159,10 +159,10 @@ class EnhancedVideoPoolManager {
         await controller.play();
       }
 
-      _logger.i('🆕 创建新视频控制器: $filePath');
+      debugPrint('🆕 创建新视频控制器: $filePath');
       return controller;
     } catch (e) {
-      _logger.e('❌ 创建视频控制器失败: $e');
+      debugPrint('❌ 创建视频控制器失败: $e');
       onError?.call();
       return null;
     }
@@ -186,7 +186,7 @@ class EnhancedVideoPoolManager {
         try {
           await controller.play();
         } catch (e) {
-          _logger.w('播放时出错: $e');
+          debugPrint('播放时出错: $e');
         }
       } else {
         if (controller.value.isPlaying) {
@@ -194,7 +194,7 @@ class EnhancedVideoPoolManager {
         }
       }
     } catch (e) {
-      _logger.w('重置控制器设置失败: $e');
+      debugPrint('重置控制器设置失败: $e');
       rethrow;
     }
   }
@@ -242,10 +242,10 @@ class EnhancedVideoPoolManager {
 
   /// 调试：打印控制器池状态
   void debugPrintPoolStatus() {
-    _logger.i('📊 视频控制器池状态：');
+    debugPrint('📊 视频控制器池状态：');
     _controllerCache.forEach((key, wrapper) {
-      _logger
-          .i(' 🎬 $key - 使用次数: ${wrapper.useCount}, 类型: ${wrapper.videoType}');
+      debugPrint(
+          ' 🎬 $key - 使用次数: ${wrapper.useCount}, 类型: ${wrapper.videoType}');
     });
   }
 
@@ -255,7 +255,7 @@ class EnhancedVideoPoolManager {
       try {
         await wrapper.controller.dispose();
       } catch (e) {
-        _logger.e('销毁控制器时出错: $e');
+        debugPrint('销毁控制器时出错: $e');
       }
     }
     _controllerCache.clear();
@@ -271,7 +271,7 @@ class EnhancedVideoPoolManager {
 
     if (_controllerCache.containsKey(key)) {
       if (_releasingKeys.contains(key)) {
-        _logger.i('⏳ 控制器釋放進行中，略過: $key');
+        debugPrint('⏳ 控制器釋放進行中，略過: $key');
         return;
       }
       _releasingKeys.add(key);
@@ -289,9 +289,9 @@ class EnhancedVideoPoolManager {
         wrapper.isInUse = false;
         wrapper.lastUsed = DateTime.now();
 
-        _logger.i('🔓 控制器已释放: $key');
+        debugPrint('🔓 控制器已释放: $key');
       } catch (e) {
-        _logger.w('释放控制器时出错: $e');
+        debugPrint('释放控制器时出错: $e');
       } finally {
         _releasingKeys.remove(key);
       }
@@ -311,9 +311,9 @@ class EnhancedVideoPoolManager {
 
       try {
         await wrapper?.controller.dispose();
-        _logger.i('🗑️ 强制移除控制器: $key');
+        debugPrint('🗑️ 强制移除控制器: $key');
       } catch (e) {
-        _logger.w('强制移除控制器时出错: $e');
+        debugPrint('强制移除控制器时出错: $e');
       }
     }
   }
@@ -345,10 +345,10 @@ class EnhancedVideoPoolManager {
         final wrapper = _controllerCache.remove(key);
         await wrapper?.controller.dispose();
       } catch (e) {
-        _logger.w('移除控制器时出错: $e');
+        debugPrint('移除控制器时出错: $e');
       }
     }
 
-    _logger.i('✅ 列表更新完成，当前池大小: ${_controllerCache.length}');
+    debugPrint('✅ 列表更新完成，当前池大小: ${_controllerCache.length}');
   }
 }

@@ -57,7 +57,6 @@ class _FullAdWidgetState extends State<FullAdWidget> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       try {
         _advertisementProvider = context.read<AdvertisementProvider>();
-        _logger.i('✅ 成功获取 AdvertisementProvider');
       } catch (e) {
         _logger.e('❌ 获取 AdvertisementProvider 失败: $e');
       }
@@ -165,11 +164,11 @@ class _FullAdWidgetState extends State<FullAdWidget> {
             // 开始播放
             await _videoController!.play();
 
-            _logger.i('▶️ 视频开始播放: ${widget.ad.title}');
+            debugPrint('▶️ 视频开始播放: ${widget.ad.title}');
             // 保留一次狀態觀察，不自動重播
             await Future.delayed(const Duration(milliseconds: 100));
-            final playingNow = _videoController!.value.isPlaying;
-            _logger.i('🎬 视频播放状态: isPlaying=$playingNow');
+            // final playingNow = _videoController!.value.isPlaying;
+            // _logger.i('🎬 视频播放状态: isPlaying=$playingNow');
           } catch (playError) {
             _logger.e('❌ 视频播放失败',
                 error: playError, stackTrace: StackTrace.current);
@@ -225,21 +224,21 @@ class _FullAdWidgetState extends State<FullAdWidget> {
                 filePath: filePathToRelease,
                 videoType: VideoType.fullAd,
               );
-              _logger.i('🔓 全屏廣告控制器已釋放: $filePathToRelease');
+              debugPrint('🔓 全屏廣告控制器已釋放: $filePathToRelease');
               if (widget.onVideoDisposed != null) {
                 widget.onVideoDisposed!();
               }
             } else {
-              _logger.w('⚠️ AdvertisementProvider 為空，直接釋放控制器實例');
+              debugPrint('⚠️ AdvertisementProvider 為空，直接釋放控制器實例');
               _videoController?.pause();
               await _videoController?.dispose();
             }
-          } catch (error, stack) {
-            _logger.e('❌ 延遲釋放控制器時出錯', error: error, stackTrace: stack);
+          } catch (error) {
+            debugPrint('❌ 延遲釋放控制器時出錯: $error');
           }
         });
-      } catch (e, stackTrace) {
-        _logger.e('❌ 安排延遲釋放時出錯', error: e, stackTrace: stackTrace);
+      } catch (e) {
+        debugPrint('❌ 安排延遲釋放時出錯: $e');
       }
 
       _videoController = null;
@@ -259,11 +258,11 @@ class _FullAdWidgetState extends State<FullAdWidget> {
         final duration = _videoController!.value.duration;
 
         // 只记录播放状态和时长，不依赖position
-        if (duration.inMilliseconds % 5000 == 0) {
-          _logger.i('🎬 视频播放状态: '
-              'isPlaying=$isPlaying, '
-              'duration=${duration.inMilliseconds}ms');
-        }
+        // if (duration.inMilliseconds % 5000 == 0) {
+        //   _logger.i('🎬 视频播放状态: '
+        //       'isPlaying=$isPlaying, '
+        //       'duration=${duration.inMilliseconds}ms');
+        // }
 
         // 暫停自動重播邏輯：僅輸出播放狀態
         // if (!isPlaying && duration.inMilliseconds > 0) { ... }
@@ -280,7 +279,7 @@ class _FullAdWidgetState extends State<FullAdWidget> {
         widget.onVideoProgressChanged!(widget.ad.id.toString(), Duration.zero);
       }
     } catch (e) {
-      _logger.w('⚠️ 视频进度监听器出错: $e');
+      debugPrint('⚠️ 视频进度监听器出错: $e');
     }
   }
 
@@ -349,7 +348,7 @@ class _FullAdWidgetState extends State<FullAdWidget> {
               width: double.infinity,
               height: double.infinity,
               errorBuilder: (context, error, stackTrace) {
-                _logger.e('本地圖片加載失敗: ${localFile.path}', error: error);
+                debugPrint('本地圖片加載失敗: $error');
                 return _buildNetworkImage();
               },
             ),

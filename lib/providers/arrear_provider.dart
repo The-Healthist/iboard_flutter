@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:iboard_app/models/arrear_model.dart';
 import 'package:iboard_app/http/api_client.dart';
-import 'package:iboard_app/widgets/mainscreen/main_display/arrear_table_widget.dart'; // Added import for ArrearTableWidget
+import 'package:iboard_app/widgets/mainscreen/main_display/arrear_manage_table_widget.dart'; // Added import for ArrearTableWidget
 import 'package:iboard_app/providers/app_data_provider.dart';
 import 'package:logger/logger.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -24,7 +24,7 @@ class ArrearProvider extends ChangeNotifier {
   ManagementFeeModel? _managementFeeData; // 物业管理费用数据
   OtherFeeModel? _otherFeeData; // 其他分摊费用数据
 
-  String? _selectedBuildingId; // 实际存储的是ismartId，用于API调用
+  String? _ismartId; // 实际存储的是ismartId，用于API调用
   String? _selectedBlock; // 新增：选中的楼座
   String? _selectedFloor; // 存储用户选择的楼层，用于UI显示和数据筛选
   String? _selectedUnit;
@@ -79,7 +79,7 @@ class ArrearProvider extends ChangeNotifier {
   // Getters
   bool get isLoading => _isLoading;
   String? get error => _error;
-  String? get selectedBuildingId => _selectedBuildingId;
+  String? get ismartId => _ismartId;
   String? get selectedBlock => _selectedBlock; // 新增
   String? get selectedFloor => _selectedFloor;
   String? get selectedUnit => _selectedUnit;
@@ -628,7 +628,6 @@ class ArrearProvider extends ChangeNotifier {
   ///16, 获取费用数据
   Future<void> fetchFeeData({bool reset = false, String? buildingId}) async {
     if (_isLoading) {
-      _logger.w('费用数据正在加载中，跳过重复请求');
       return;
     }
 
@@ -638,14 +637,12 @@ class ArrearProvider extends ChangeNotifier {
     if (reset) {
       _managementFeeData = null;
       _otherFeeData = null;
-      _logger.i('重置费用数据');
     }
 
     notifyListeners();
 
     try {
       String targetBuildingId = buildingId ?? _getTargetIsmartId();
-      _logger.i('调用API获取费用数据，使用ismartId: $targetBuildingId');
 
       // 并行获取两种数据
       final results = await Future.wait([
@@ -655,11 +652,11 @@ class ArrearProvider extends ChangeNotifier {
 
       // 处理物业管理费用数据
       _managementFeeData = ManagementFeeModel.fromJson(results[0]);
-      _logger.i('✅ 成功获取物业管理费用数据');
+      debugPrint('✅ 成功获取物业管理费用数据');
 
       // 处理其他分摊费用数据
       _otherFeeData = OtherFeeModel.fromJson(results[1]);
-      _logger.i('✅ 成功获取其他分摊费用数据');
+      debugPrint('✅ 成功获取其他分摊费用数据');
 
       // 保存到缓存
       await saveToCache();
@@ -671,9 +668,9 @@ class ArrearProvider extends ChangeNotifier {
       _hasPendingUpdate = true;
 
       _error = null;
-      _logger.i('✅ 所有费用数据获取完成，数据版本: $_currentDataVersion');
-    } catch (e, stackTrace) {
-      _logger.e('获取费用数据时发生异常: $e', error: e, stackTrace: stackTrace);
+      debugPrint('✅ 所有费用数据获取完成，数据版本: $_currentDataVersion');
+    } catch (e) {
+      debugPrint('获取费用数据时发生异常: $e');
 
       if (e.toString().contains('Building ID') ||
           e.toString().contains('只能包含数字和英文字母') ||
@@ -681,9 +678,9 @@ class ArrearProvider extends ChangeNotifier {
         _error = '楼宇ID格式错误：只能包含数字和英文字母';
       } else {
         if (hasData) {
-          _logger.i('网络请求失败，保持现有缓存数据');
+          debugPrint('网络请求失败，保持现有缓存数据');
         } else {
-          _logger.i('网络请求失败，且无缓存数据');
+          debugPrint('网络请求失败，且无缓存数据');
         }
       }
     } finally {
@@ -698,8 +695,8 @@ class ArrearProvider extends ChangeNotifier {
   }
 
   ///18, 设置楼宇ismartId
-  void setSelectedBuildingId(String? buildingId) {
-    _selectedBuildingId = buildingId;
+  void setIsmartId(String? buildingId) {
+    _ismartId = buildingId;
     _selectedBlock = null; // 重置楼座选择
     _selectedFloor = null;
     _selectedUnit = null;

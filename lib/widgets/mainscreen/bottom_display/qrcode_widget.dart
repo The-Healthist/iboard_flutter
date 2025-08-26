@@ -55,7 +55,7 @@ class QrcodeWidgetState extends State<QrcodeWidget> {
     if (appDataProvider.cachedComplaintQrCode == null ||
         appDataProvider.cachedRegistrationQrCode == null) {
       // _logger.w('⚠️ 二维码未生成，尝试完整初始化...');
-      appDataProvider.initializeQrCodes();
+      appDataProvider.initializeQrCodesInternal();
     }
   }
 

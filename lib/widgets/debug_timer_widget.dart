@@ -250,7 +250,7 @@ class _TimerDebugWidgetState extends State<TimerDebugWidget> {
     content.add('数据状态: ${provider.hasData ? '✅ 有数据' : '❌ 无数据'}');
     content.add('记录总数: ${provider.hasData ? '有数据' : '无数据'}');
     content.add('楼宇数量: ${provider.buildings.length}');
-    content.add('选中楼宇: ${provider.selectedBuildingId ?? '未选择'}');
+    content.add('选中楼宇: ${provider.ismartId ?? '未选择'}');
     content.add('选中单元: ${provider.selectedUnit ?? '未选择'}');
 
     if (provider.error != null) {

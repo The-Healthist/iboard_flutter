@@ -6,7 +6,7 @@ import 'package:iboard_app/models/weather_forecast_model.dart';
 import 'package:iboard_app/models/current_weather_model.dart';
 import 'package:iboard_app/models/weather_warning_model.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:iboard_app/providers/app_data_provider.dart'; // Added import for AppDataProvider
+import 'package:iboard_app/providers/app_data_provider.dart';
 
 /// 轮播状态枚举
 enum CarouselState { weather, qrcode }
@@ -14,7 +14,6 @@ enum CarouselState { weather, qrcode }
 /// 当前天气卡片页面枚举
 enum CurrentWeatherPage { page1, page2 }
 
-/// 天气数据提供者 - 负责所有天气数据的获取、存储和管理
 class WeatherProvider extends ChangeNotifier {
   final WeatherService _weatherService = WeatherService();
 
@@ -107,14 +106,6 @@ class WeatherProvider extends ChangeNotifier {
   bool get showCurrentWeatherPage2 =>
       _currentWeatherPage == CurrentWeatherPage.page2;
 
-  // 添加初始化状态跟踪
-  bool _isInitialized = false;
-  bool get isInitialized => _isInitialized;
-
-  WeatherProvider() {
-    _initializeProvider();
-  }
-
   /// 设置AppDataProvider引用
   void setAppDataProvider(AppDataProvider appDataProvider) {
     _appDataProvider = appDataProvider;
@@ -134,21 +125,6 @@ class WeatherProvider extends ChangeNotifier {
       _currentWeatherCardTimer?.cancel();
       _currentWeatherPage = CurrentWeatherPage.page1; // 重置到第一页
       notifyListeners();
-    }
-  }
-
-  ///0，初始化Provider
-  Future<void> _initializeProvider() async {
-    await _loadWeatherDataFromCache();
-    _isInitialized = true;
-  }
-
-  ///1，等待初始化完成
-  Future<void> waitForInitialization() async {
-    if (_isInitialized) return;
-
-    while (!_isInitialized) {
-      await Future.delayed(const Duration(milliseconds: 50));
     }
   }
 
@@ -178,6 +154,7 @@ class WeatherProvider extends ChangeNotifier {
           _weatherForecastData = WeatherData.fromJson(forecastData);
         } catch (e) {
           // 解析缓存的天气预报数据失败
+          debugPrint('解析缓存的天气预报数据失败: $e');
         }
       }
 
@@ -189,6 +166,7 @@ class WeatherProvider extends ChangeNotifier {
           _currentWeatherData = CurrentWeatherDataModel.fromJson(currentData);
         } catch (e) {
           // 解析缓存的当前天气数据失败
+          debugPrint('解析缓存的当前天气数据失败: $e');
         }
       }
 
@@ -200,12 +178,13 @@ class WeatherProvider extends ChangeNotifier {
           _weatherWarningData = WeatherWarningModel.fromJson(warningData);
         } catch (e) {
           // 解析缓存的天气警告数据失败
+          debugPrint('解析缓存的天气警告数据失败: $e');
         }
       }
 
       notifyListeners();
     } catch (e) {
-      // 从缓存加载天气数据失败
+      debugPrint('从缓存加载天气数据失败: $e');
     }
   }
 
@@ -351,13 +330,14 @@ class WeatherProvider extends ChangeNotifier {
   ///7，获取所有天气数据
   Future<void> fetchAllWeatherData() async {
     final stopwatch = Stopwatch()..start();
-
-    await Future.wait([
-      fetchWeatherForecast(),
-      fetchCurrentWeather(),
-      fetchWeatherWarnings(),
-    ]);
-
+    try {
+      await fetchWeatherForecast();
+      await fetchCurrentWeather();
+      await fetchWeatherWarnings();
+    } catch (e) {
+      debugPrint('获取所有天气数据失败: $e');
+      await _loadWeatherDataFromCache();
+    }
     stopwatch.stop();
   }
 
@@ -366,9 +346,7 @@ class WeatherProvider extends ChangeNotifier {
     if (_isPeriodicUpdateActive) {
       return;
     }
-
     _isPeriodicUpdateActive = true;
-
     _updateTimer = Timer.periodic(interval, (timer) {
       fetchAllWeatherData();
     });
@@ -488,11 +466,11 @@ class WeatherProvider extends ChangeNotifier {
     switch (_currentState) {
       case CarouselState.weather:
         _currentState = CarouselState.qrcode;
-//_logger.i('🔄 底部轮播切换: 天气 -> 二维码');
+
         break;
       case CarouselState.qrcode:
         _currentState = CarouselState.weather;
-        // _logger.i('🔄 底部轮播切换: 二维码 -> 天气');
+
         break;
     }
 
@@ -555,8 +533,7 @@ class WeatherProvider extends ChangeNotifier {
   void startDebugTimer() {
     _debugTimer?.cancel();
 
-    _debugTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
-    });
+    _debugTimer = Timer.periodic(const Duration(seconds: 1), (timer) {});
   }
 
   ///19，停止调试定时器

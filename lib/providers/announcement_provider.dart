@@ -25,7 +25,7 @@ class AnnouncementProvider extends ChangeNotifier {
   AnnouncementCarouselProvider? _announcementCarouselProvider;
 
   List<AnnouncementModel> _announcements = [];
-  List<AnnouncementModel> _carouselAnnouncements = []; // 轮播专用通告数组
+  List<AnnouncementModel> _carouselAnnouncements = [];
   bool _isLoading = false;
   String? _error;
   Timer? _updateTimer; // 定时更新定时器
@@ -33,8 +33,7 @@ class AnnouncementProvider extends ChangeNotifier {
 
   // Getters
   List<AnnouncementModel> get announcements => _announcements;
-  List<AnnouncementModel> get carouselAnnouncements =>
-      _carouselAnnouncements; // 轮播通告获取器
+  List<AnnouncementModel> get carouselAnnouncements => _carouselAnnouncements;
   bool get isLoading => _isLoading;
   String? get error => _error;
   ApiClient get apiClient => _apiClient; // 添加apiClient getter用于比较
@@ -359,27 +358,12 @@ class AnnouncementProvider extends ChangeNotifier {
     }
   }
 
-  ///6，fetchNotices,获取轮播通告数据
-  Future<void> fetchNotices() async {
-    if (_appDataProvider.token == null) {
-      _error = "Authentication token is missing. Cannot fetch notices.";
-      _logger.w(_error);
-
-      // 即使没有token，也要确保轮播提供者被通知
-      if (_announcementCarouselProvider != null) {
-        _announcementCarouselProvider!
-            .updateCarouselList(_carouselAnnouncements);
-        _logger.i(
-            '📢 Token缺失，已通知輪播Provider使用現有數據: ${_carouselAnnouncements.length} 個通告');
-      }
-
-      notifyListeners();
+  ///6，fetchNotices,获取轮播通告数据（支持強制初始化）
+  Future<void> fetchNotices({bool forceInit = false}) async {
+    if (_appDataProvider.token == null || _isLoading) {
       return;
     }
 
-    if (_isLoading) {
-      return;
-    }
     _isLoading = true;
     _error = null;
     notifyListeners();
@@ -391,8 +375,9 @@ class AnnouncementProvider extends ChangeNotifier {
           .map((jsonItem) => AnnouncementModel.fromJson(jsonItem))
           .toList();
 
-      // 判断是否有数据变化(只比对id顺序和数量即可)
-      final bool hasChanges = _hasDataChanged(fetchedAnnouncements);
+      // 判断是否有数据变化(只比对id顺序和数量即可)；首啟強制更新
+      final bool hasChanges =
+          forceInit ? true : _hasDataChanged(fetchedAnnouncements);
 
       if (!hasChanges) {
         _logger.i('通告数据无变化，跳过更新与通知');
@@ -406,7 +391,6 @@ class AnnouncementProvider extends ChangeNotifier {
       if (_announcementCarouselProvider != null) {
         _announcementCarouselProvider!
             .updateCarouselList(_carouselAnnouncements);
-        _logger.i('通告数据变更，已通知轮播Provider更新列表');
       }
 
       // 如果之前有网络错误，记录恢复信息
@@ -424,12 +408,9 @@ class AnnouncementProvider extends ChangeNotifier {
           // 尝试重新登录获取新 token
           await _appDataProvider.initializeAndLogin();
           if (_appDataProvider.isLoggedIn) {
-            // _logger.i('Token refresh successful, retrying notices fetch...');
-            // 设置标志位防止递归调用导致的问题
-            _isLoading = false; // 重置状态
-            // 递归调用自己重试 (只重试一次，避免无限循环)
-            await fetchNotices();
-            return; // 成功后直接返回，不执行后续的错误处理
+            _isLoading = false;
+            await fetchNotices(forceInit: forceInit);
+            return;
           } else {
             _error = 'Token refresh failed: Unable to re-authenticate';
           }
@@ -479,11 +460,19 @@ class AnnouncementProvider extends ChangeNotifier {
 
   // 7,更新轮播通告数组 - 只包含緊急和一般通告
   void _updateCarouselAnnouncements() {
-    _carouselAnnouncements = _announcements
+    final filtered = _announcements
         .where((announcement) =>
             announcement.uiType == AnnouncementTypeUi.emergency ||
             announcement.uiType == AnnouncementTypeUi.general)
         .toList();
+
+    // 若過濾後為空但原始非空，臨時使用全部通告參與輪播，避免通告區被清空
+    if (filtered.isEmpty && _announcements.isNotEmpty) {
+      _carouselAnnouncements = List<AnnouncementModel>.from(_announcements);
+      _logger.i('📢 警示：過濾後輪播通告為空，臨時使用全部通告進入輪播');
+    } else {
+      _carouselAnnouncements = filtered;
+    }
   }
 
   // 获取轮播专用通告

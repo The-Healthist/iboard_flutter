@@ -6,7 +6,6 @@ import 'package:logger/logger.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:iboard_app/providers/arrear_provider.dart';
 import 'package:iboard_app/utils/qr_code_util.dart';
-import 'package:iboard_app/utils/device_id_util.dart';
 import 'dart:io';
 import 'dart:typed_data';
 import 'package:path_provider/path_provider.dart';
@@ -26,13 +25,11 @@ class AppDataProvider extends ChangeNotifier {
   bool _isLoading = false;
   String? _error;
 
-  // 二维码缓存相关 - 现在存储本地文件路径
+  //缓存键
   String? _cachedComplaintQrCode;
   String? _cachedRegistrationQrCode;
   static const String _complaintQrCodeKey = 'complaint_qr_code_path';
   static const String _registrationQrCodeKey = 'registration_qr_code_path';
-
-  // 添加登录设备数据持久化相关常量
   static const String _loginDeviceDataKey = 'login_device_data';
 
   // 定时登录相关
@@ -72,8 +69,6 @@ class AppDataProvider extends ChangeNotifier {
   DateTime? get lastHealthCheckTime => _lastHealthCheckTime;
   String? get lastHealthCheckResult => _lastHealthCheckResult;
 
-  static const String _deviceIdKey = 'deviceId';
-
   AppDataProvider({
     required String baseUrl,
   }) : _baseUrl = baseUrl {
@@ -83,7 +78,6 @@ class AppDataProvider extends ChangeNotifier {
     );
   }
 
-  ///1, 切换到备用服务器
   ///1，保存登录设备数据到SharedPreferences缓存
   Future<void> _saveLoginDeviceData(Map<String, dynamic> responseData) async {
     try {
@@ -121,20 +115,14 @@ class AppDataProvider extends ChangeNotifier {
     }
   }
 
-  ///4，应用启动时的完整初始化方法 - 优先登录，失败时使用缓存数据作为备用
-  Future<void> initialize({String? deviceIdToSet}) async {
+  ///4，应用启动时的完整初始化方法(优先登录，失败时使用缓存数据作为备用)
+  Future<void> initialize({String? deviceId}) async {
     _isLoading = true;
     _error = null;
     notifyListeners();
 
     try {
-      // 如果有新设备ID，保存它
-      if (deviceIdToSet != null) {
-        await _saveDeviceId(deviceIdToSet);
-      } else {
-        await _loadDeviceId();
-      }
-
+      _deviceId = deviceId;
       if (_deviceId == null || _deviceId!.isEmpty) {
         _error = 'Device ID is not set. Cannot initialize.';
         _isLoading = false;
@@ -144,7 +132,7 @@ class AppDataProvider extends ChangeNotifier {
 
       // 尝试登录（包含自动设备注册逻辑）
       try {
-        await initializeAndLogin(throwOnFailure: true);
+        await initializeAndLogin();
       } catch (loginError) {
         // 登录失败，尝试从缓存加载数据
         await _loadFromCacheAsFallback();
@@ -171,7 +159,7 @@ class AppDataProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// 从缓存加载验证后的设置并应用
+  /// 5,从缓存加载验证后的设置并应用
   Future<void> _loadValidatedSettingsFromCacheAndApply() async {
     try {
       final cachedSettings = await _loadValidatedSettingsFromCache();
@@ -187,7 +175,7 @@ class AppDataProvider extends ChangeNotifier {
     }
   }
 
-  /// 手动刷新设置 - 用于定时任务或其他需要刷新设置的场景
+  /// 6，手动刷新设置 - 用于定时任务或其他需要刷新设置的场景
   Future<void> refreshSettings() async {
     try {
       if (_settingsModel?.settings != null) {
@@ -202,7 +190,7 @@ class AppDataProvider extends ChangeNotifier {
     }
   }
 
-  ///5，登录失败时的缓存数据备用加载方法
+  /// 7，登录失败时的缓存数据备用加载方法
   Future<void> _loadFromCacheAsFallback() async {
     try {
       final cachedData = await _loadLoginDeviceData();
@@ -224,9 +212,9 @@ class AppDataProvider extends ChangeNotifier {
           if (_settingsModel != null) {
             final buildingIsmartId = _settingsModel!.building.ismartId;
             if (buildingIsmartId.isNotEmpty) {
-              setBuildingIdToArrearProvider(buildingIsmartId);
+              _arrearProvider!.setIsmartId(buildingIsmartId);
               // 初始化二维码
-              await initializeQrCodes();
+              await initializeQrCodesInternal();
             }
           }
 
@@ -250,17 +238,13 @@ class AppDataProvider extends ChangeNotifier {
     }
   }
 
-  ///10，执行登录逻辑的私有方法
-  ///11，从缓存加载登录设备数据的方法（保留原有方法以供其他地方使用）
+  /// 8，从缓存加载登录设备数据的方法（保留原有方法以供其他地方使用）
   Future<void> initializeFromCache() async {
     _isLoading = true;
     _error = null; // 清除之前的错误状态
     notifyListeners();
 
     try {
-      // 先加载设备ID
-      await _loadDeviceId();
-
       // 尝试从缓存加载登录设备数据
       final cachedData = await _loadLoginDeviceData();
       if (cachedData != null) {
@@ -281,9 +265,9 @@ class AppDataProvider extends ChangeNotifier {
           if (_settingsModel != null) {
             final buildingIsmartId = _settingsModel!.building.ismartId;
             if (buildingIsmartId.isNotEmpty) {
-              setBuildingIdToArrearProvider(buildingIsmartId);
+              _arrearProvider!.setIsmartId(buildingIsmartId);
               // 初始化二维码
-              await initializeQrCodes();
+              await initializeQrCodesInternal();
             }
           }
 
@@ -307,7 +291,7 @@ class AppDataProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// 设置CarouselStateProvider的引用，用于更新时间配置
+  /// 9，设置CarouselStateProvider的引用，用于更新时间配置
   void setCarouselStateProvider(CarouselStateProvider? provider) {
     _carouselStateProvider = provider;
     // 如果已有设置数据，立即验证并更新
@@ -316,12 +300,12 @@ class AppDataProvider extends ChangeNotifier {
     }
   }
 
-  /// 设置ArrearProvider的引用，用于设置楼宇ID
+  /// 10，设置ArrearProvider的引用，用于设置楼宇ID
   void setArrearProvider(ArrearProvider? provider) {
     _arrearProvider = provider;
   }
 
-  /// 验证并持久化Settings配置 - 确保所有时间字段都有合理的默认值
+  /// 11，验证并持久化Settings配置 - 确保所有时间字段都有合理的默认值
   Future<void> _validateAndPersistSettings(Settings settings) async {
     try {
       _logger.i('🔧 [设置验证] 开始验证和持久化Settings配置');
@@ -352,7 +336,7 @@ class AppDataProvider extends ChangeNotifier {
             : 10,
         paymentTableOnePageDuration: settings.paymentTableOnePageDuration > 0
             ? settings.paymentTableOnePageDuration
-            : 10,
+            : 5,
         normalToAnnouncementCarouselDuration:
             settings.normalToAnnouncementCarouselDuration > 0
                 ? settings.normalToAnnouncementCarouselDuration
@@ -393,7 +377,7 @@ class AppDataProvider extends ChangeNotifier {
         corrections.add('bottomCarouselDuration: 0 -> 10');
       }
       if (settings.paymentTableOnePageDuration == 0) {
-        corrections.add('paymentTableOnePageDuration: 0 -> 10');
+        corrections.add('paymentTableOnePageDuration: 0 -> 5');
       }
       if (settings.normalToAnnouncementCarouselDuration == 0) {
         corrections.add('normalToAnnouncementCarouselDuration: 0 -> 5');
@@ -414,7 +398,7 @@ class AppDataProvider extends ChangeNotifier {
     }
   }
 
-  /// 保存Settings配置到缓存
+  /// 12，保存Settings配置到缓存
   Future<void> _saveSettingsToCache(Settings settings) async {
     try {
       final prefs = await SharedPreferences.getInstance();
@@ -446,7 +430,7 @@ class AppDataProvider extends ChangeNotifier {
     }
   }
 
-  /// 从缓存加载验证后的Settings配置
+  /// 13，从缓存加载验证后的Settings配置
   Future<Settings?> _loadValidatedSettingsFromCache() async {
     try {
       final prefs = await SharedPreferences.getInstance();
@@ -482,7 +466,7 @@ class AppDataProvider extends ChangeNotifier {
           noticeStayDuration: settingsData['noticeStayDuration'] ?? 5,
           bottomCarouselDuration: settingsData['bottomCarouselDuration'] ?? 10,
           paymentTableOnePageDuration:
-              settingsData['paymentTableOnePageDuration'] ?? 10,
+              settingsData['paymentTableOnePageDuration'] ?? 5,
           normalToAnnouncementCarouselDuration:
               settingsData['normalToAnnouncementCarouselDuration'] ?? 5,
           announcementCarouselToFullAdsCarouselDuration:
@@ -498,49 +482,21 @@ class AppDataProvider extends ChangeNotifier {
     return null;
   }
 
-  /// 设置楼宇ID到ArrearProvider
-  void setBuildingIdToArrearProvider(String? ismartId) {
-    if (_arrearProvider != null && ismartId != null && ismartId.isNotEmpty) {
-      // 检查Provider是否已被销毁
-      if (!_arrearProvider!.isDisposed) {
-        _logger.i('设置ArrearProvider楼宇ID: $ismartId');
-        _arrearProvider!.setSelectedBuildingId(ismartId);
-      } else {
-        _logger.w('ArrearProvider已被销毁，无法设置楼宇ID');
-      }
-    } else {
-      _logger.w('ArrearProvider未设置或楼宇ID无效，跳过设置');
-    }
-  }
-
-  Future<void> _loadDeviceId() async {
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      _deviceId = prefs.getString(_deviceIdKey);
-      _logger.i('Loaded deviceId: $_deviceId');
-    } catch (e) {
-      _logger.e('Failed to load deviceId from SharedPreferences', error: e);
-      _deviceId = null; // Ensure it's null if loading fails
-    }
-  }
-
-  Future<void> _saveDeviceId(String deviceId) async {
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.setString(_deviceIdKey, deviceId);
-      _deviceId = deviceId; // Update in-memory value
-      _logger.i('Saved deviceId: $deviceId');
-    } catch (e) {
-      _logger.e('Failed to save deviceId to SharedPreferences', error: e);
-    }
-  }
-
-  // Call this method when the app starts or when device ID is set
+  /// 15，初始化登录
   Future<void> initializeAndLogin(
-      {String? deviceIdToSet,
+      {String? deviceId,
       bool useFallbackUrl = true,
       bool throwOnFailure = false}) async {
-    _logger.i('🔐 [initializeAndLogin] 开始初始化登录流程，启用缓存保护');
+    // 統一確定將要使用的設備ID
+    final String? loginDeviceId = deviceId ?? _deviceId;
+
+    if (loginDeviceId == null || loginDeviceId.isEmpty) {
+      _error = 'Device ID is not set. Cannot login.';
+      _isLoading = false;
+      _logger.w(_error);
+      notifyListeners();
+      return;
+    }
 
     // 保存当前的设置模型，以便登录失败时可以恢复
     final backupSettingsModel = _settingsModel;
@@ -549,26 +505,11 @@ class AppDataProvider extends ChangeNotifier {
     _error = null;
     notifyListeners();
 
-    if (deviceIdToSet != null) {
-      await _saveDeviceId(deviceIdToSet);
-    } else {
-      await _loadDeviceId();
-    }
-
-    if (_deviceId == null || _deviceId!.isEmpty) {
-      _error = 'Device ID is not set. Cannot login.';
-      _isLoading = false;
-      _logger.w(_error);
-      notifyListeners();
-      return;
-    }
-
     // 保存原始baseUrl用于可能的恢复
     String? originalBaseUrl;
 
     try {
-      final responseData = await _apiClient.login(deviceId: _deviceId!);
-
+      final responseData = await _apiClient.login(deviceId: loginDeviceId);
       try {
         _settingsModel = SettingsModel.fromJson(responseData);
       } catch (parseError) {
@@ -580,30 +521,20 @@ class AppDataProvider extends ChangeNotifier {
         );
       }
 
-      // ApiClient's internal token is already set by its login method.
-      // We also update the AppDataProvider's token via settingsModel.
-
-      ///5，登录成功后保存登录设备数据到缓存
+      // 15.1，保存登录设备数据到缓存
       await _saveLoginDeviceData(responseData);
 
-      // 验证并持久化Settings配置
+      // 15.2，验证并持久化Settings配置
       if (_settingsModel?.settings != null) {
         await _validateAndPersistSettings(_settingsModel!.settings);
       }
 
-      // 更新CarouselStateProvider的时间配置（现在在_validateAndPersistSettings中处理）
-      // if (_carouselStateProvider != null && _settingsModel?.settings != null) {
-      //   _carouselStateProvider!.updateSettings(_settingsModel!.settings);
-      //   _logger.i('CarouselStateProvider settings updated successfully.');
-      // }
-
-      // 设置ArrearProvider的楼宇ID
+      // 15.3，设置ArrearProvider的楼宇ID
       if (_settingsModel != null) {
         final buildingIsmartId = _settingsModel!.building.ismartId;
         if (buildingIsmartId.isNotEmpty) {
-          setBuildingIdToArrearProvider(buildingIsmartId);
-          // 初始化二维码
-          await initializeQrCodes();
+          _arrearProvider!.setIsmartId(buildingIsmartId);
+          await initializeQrCodesInternal();
         }
       }
 
@@ -612,21 +543,15 @@ class AppDataProvider extends ChangeNotifier {
       _logger.e('Initial login failed',
           error: e, stackTrace: e.errorData is StackTrace ? e.errorData : null);
 
-      // 检查是否是设备ID无效错误（状态码400且消息包含Invalid device ID）
-      // 改进错误检测逻辑，支持多种错误消息格式
+      // 15.4，检查是否是设备ID无效错误
       bool isInvalidDeviceIdError = false;
-
       if (e.statusCode == 400) {
         String errorMessage = '';
-
-        // 尝试从不同位置获取错误消息
         if (e.errorData is Map) {
           errorMessage = e.errorData['message']?.toString() ?? '';
         } else if (e.message.isNotEmpty) {
           errorMessage = e.message;
         }
-
-        // 检查多种可能的错误消息格式
         isInvalidDeviceIdError =
             errorMessage.toLowerCase().contains('invalid device id') ||
                 errorMessage.toLowerCase().contains('device not found') ||
@@ -637,13 +562,12 @@ class AppDataProvider extends ChangeNotifier {
 
       if (isInvalidDeviceIdError) {
         try {
-          // 尝试注册设备
-          await _registerNewDevice(_deviceId!);
+          // 15.5，尝试注册设备
+          await _registerNewDevice(loginDeviceId);
 
-          // 重新尝试登录
+          // 15.6，重新尝试登录
           final retryResponseData =
-              await _apiClient.login(deviceId: _deviceId!);
-
+              await _apiClient.login(deviceId: loginDeviceId);
           try {
             _settingsModel = SettingsModel.fromJson(retryResponseData);
             _logger.i('Login successful after device registration.');
@@ -659,28 +583,19 @@ class AppDataProvider extends ChangeNotifier {
             );
           }
 
-          ///6，设备注册后登录成功也要保存登录设备数据到缓存
+          ///15.7，设备注册后登录成功也要保存登录设备数据到缓存
           await _saveLoginDeviceData(retryResponseData);
 
-          // 验证并持久化Settings配置
+          // 15.8，验证并持久化Settings配置
           if (_settingsModel?.settings != null) {
             await _validateAndPersistSettings(_settingsModel!.settings);
           }
 
-          // 更新CarouselStateProvider的时间配置（现在在_validateAndPersistSettings中处理）
-          // if (_carouselStateProvider != null &&
-          //     _settingsModel?.settings != null) {
-          //   _carouselStateProvider!.updateSettings(_settingsModel!.settings);
-          //   _logger.i(
-          //       'CarouselStateProvider settings updated successfully after registration.');
-          // }
-
-          // 设置ArrearProvider的楼宇ID
+          // 15.9，设置ArrearProvider的楼宇ID
           final building = _settingsModel?.building;
           if (building?.ismartId != null) {
-            setBuildingIdToArrearProvider(building!.ismartId);
-            // 初始化二维码
-            await initializeQrCodes();
+            _arrearProvider!.setIsmartId(building!.ismartId);
+            await initializeQrCodesInternal();
           }
 
           _error = null;
@@ -688,24 +603,20 @@ class AppDataProvider extends ChangeNotifier {
           _logger.e('Device registration or retry login failed',
               error: registrationError);
           _error = 'Device registration failed: $registrationError';
-          // 恢复备份的设置模型，而不是清空
           _settingsModel = backupSettingsModel;
           if (backupSettingsModel?.token != null) {
             _apiClient.setAuthToken(backupSettingsModel!.token);
           }
-          // 根据throwOnFailure参数决定是否抛出异常
           if (throwOnFailure) {
             rethrow;
           }
         }
       } else {
         _error = 'Login failed: ${e.message}';
-        // 恢复备份的设置模型，而不是清空
         _settingsModel = backupSettingsModel;
         if (backupSettingsModel?.token != null) {
           _apiClient.setAuthToken(backupSettingsModel!.token);
         }
-        // 根据throwOnFailure参数决定是否抛出异常
         if (throwOnFailure) {
           rethrow;
         }
@@ -714,23 +625,19 @@ class AppDataProvider extends ChangeNotifier {
       _logger.e('An unexpected error occurred during initial login',
           error: e, stackTrace: stackTrace);
 
-      // 如果是网络连接错误且启用了备用URL，则尝试使用IP地址重新登录
+      // 15.10，網絡錯誤用備用URL重試
       if (useFallbackUrl &&
           (e.toString().contains('SocketException') ||
               e.toString().contains('Failed host lookup'))) {
         try {
-          // 保存原始baseUrl
           originalBaseUrl = _baseUrl;
-
-          // 切换到IP地址
           _baseUrl = 'http://39.108.49.167:10031';
           _apiClient = ApiClient(
             baseUrl: _baseUrl,
             onNeedsTokenRefresh: _handleTokenRefresh,
           );
 
-          final responseData = await _apiClient.login(deviceId: _deviceId!);
-
+          final responseData = await _apiClient.login(deviceId: loginDeviceId);
           try {
             _settingsModel = SettingsModel.fromJson(responseData);
           } catch (parseError) {
@@ -744,29 +651,20 @@ class AppDataProvider extends ChangeNotifier {
             );
           }
 
-          ///7，备用URL登录成功也要保存登录设备数据到缓存
+          ///15.11，備用URL成功也保存
           await _saveLoginDeviceData(responseData);
 
-          // 验证并持久化Settings配置
+          // 15.12，驗證並持久化設定
           if (_settingsModel?.settings != null) {
             await _validateAndPersistSettings(_settingsModel!.settings);
           }
 
-          // 更新CarouselStateProvider的时间配置（现在在_validateAndPersistSettings中处理）
-          // if (_carouselStateProvider != null &&
-          //     _settingsModel?.settings != null) {
-          //   _carouselStateProvider!.updateSettings(_settingsModel!.settings);
-          //   _logger.i(
-          //       'CarouselStateProvider settings updated successfully after fallback.');
-          // }
-
-          // 设置ArrearProvider的楼宇ID
+          // 設置樓宇ID
           if (_settingsModel != null) {
             final buildingIsmartId = _settingsModel!.building.ismartId;
             if (buildingIsmartId.isNotEmpty) {
-              setBuildingIdToArrearProvider(buildingIsmartId);
-              // 初始化二维码
-              await initializeQrCodes();
+              _arrearProvider!.setIsmartId(buildingIsmartId);
+              await initializeQrCodesInternal();
             }
           }
 
@@ -774,7 +672,6 @@ class AppDataProvider extends ChangeNotifier {
         } catch (fallbackError, fallbackStack) {
           _logger.e('Fallback login also failed',
               error: fallbackError, stackTrace: fallbackStack);
-          // 恢复原始baseUrl
           if (originalBaseUrl != null) {
             _baseUrl = originalBaseUrl;
             _apiClient = ApiClient(
@@ -783,24 +680,20 @@ class AppDataProvider extends ChangeNotifier {
             );
           }
           _error = 'Login failed: $e';
-          // 恢复备份的设置模型，而不是清空
           _settingsModel = backupSettingsModel;
           if (backupSettingsModel?.token != null) {
             _apiClient.setAuthToken(backupSettingsModel!.token);
           }
-          // 根据throwOnFailure参数决定是否抛出异常
           if (throwOnFailure) {
             rethrow;
           }
         }
       } else {
         _error = 'An unexpected error occurred: $e';
-        // 恢复备份的设置模型，而不是清空
         _settingsModel = backupSettingsModel;
         if (backupSettingsModel?.token != null) {
           _apiClient.setAuthToken(backupSettingsModel!.token);
         }
-        // 根据throwOnFailure参数决定是否抛出异常
         if (throwOnFailure) {
           rethrow;
         }
@@ -811,7 +704,7 @@ class AppDataProvider extends ChangeNotifier {
     }
   }
 
-  // This method is called by ApiClient when a 401 is encountered
+  /// 16，token刷新
   Future<String?> _handleTokenRefresh() async {
     // 保存当前的设置模型，以便刷新失败时可以恢复
     final backupSettingsModel = _settingsModel;
@@ -837,13 +730,6 @@ class AppDataProvider extends ChangeNotifier {
       if (_settingsModel?.settings != null) {
         await _validateAndPersistSettings(_settingsModel!.settings);
       }
-
-      // 更新CarouselStateProvider的时间配置（现在在_validateAndPersistSettings中处理）
-      // if (_carouselStateProvider != null && _settingsModel?.settings != null) {
-      //   _carouselStateProvider!.updateSettings(_settingsModel!.settings);
-      //   _logger
-      //       .i('CarouselStateProvider settings updated after token refresh.');
-      // }
 
       _error = null; // Clear previous errors
       notifyListeners(); // Notify listeners about the updated settings model (and token)
@@ -880,7 +766,7 @@ class AppDataProvider extends ChangeNotifier {
     }
   }
 
-  // 注册新设备的私有方法
+  /// 17，注册新设备
   Future<void> _registerNewDevice(String deviceId) async {
     try {
       // 第一步：使用管理员账号登录获取 token
@@ -908,7 +794,7 @@ class AppDataProvider extends ChangeNotifier {
     }
   }
 
-  ///9，登出时清除所有缓存数据
+  /// 18，登出时清除所有缓存数据
   Future<void> logout() async {
     _settingsModel = null;
     _apiClient.setAuthToken(null); // Clear token in ApiClient
@@ -921,58 +807,7 @@ class AppDataProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  // Example of how other API calls might be exposed or handled via provider if needed,
-  // though direct use of `appDataProvider.apiClient.method()` is also fine.
-  // Future<Map<String, dynamic>?> fetchAdvertisements() async {
-  //   if (token == null) {
-  //     _error = "Not authenticated. Please login.";
-  //     notifyListeners();
-  //     return null;
-  //   }
-  //   _isLoading = true;
-  //   _error = null;
-  //   notifyListeners();
-  //   try {
-  //     final data = await _apiClient.getAdvertisementsBuilding();
-  //     _isLoading = false;
-  //     notifyListeners();
-  //     return data;
-  //   } on ApiException catch (e) {
-  //     _logger.e('Failed to fetch advertisements', error: e);
-  //     _error = e.message;
-  //     _isLoading = false;
-  //     notifyListeners();
-  //     return null;
-  //   } catch (e) {
-  //     _logger.e('Unexpected error fetching advertisements', error: e);
-  //     _error = "An unexpected error occurred.";
-  //     _isLoading = false;
-  //     notifyListeners();
-  //     return null;
-  //   }
-  // }
-
-  /// 初始化获取欠费数据 - 使用新的双接口实现
-  Future<void> initGetArrearData() async {
-    if (_arrearProvider != null && !(_arrearProvider!.isDisposed)) {
-      try {
-        // 确保我们有有效的楼宇ID
-        final buildingIsmartId = _settingsModel?.building.ismartId;
-        if (buildingIsmartId != null && buildingIsmartId.isNotEmpty) {
-          // 设置楼宇ID到ArrearProvider
-          _arrearProvider!.setSelectedBuildingId(buildingIsmartId);
-          // 获取欠费数据（使用新的双接口方法）
-          await _arrearProvider!
-              .fetchFeeData(reset: true, buildingId: buildingIsmartId);
-        }
-      } catch (e, stackTrace) {
-        _logger.e('AppDataProvider: 欠费数据初始化失败: $e',
-            error: e, stackTrace: stackTrace);
-      }
-    }
-  }
-
-  ///1，生成意见投诉二维码（使用本地生成工具）
+  /// 20，生成意见投诉二维码（使用本地生成工具）
   Future<String?> generateComplaintQrCode() async {
     if (_cachedComplaintQrCode != null) {
       // 检查本地文件是否存在
@@ -1024,7 +859,7 @@ class AppDataProvider extends ChangeNotifier {
     }
   }
 
-  ///2，生成住户登记二维码（使用本地生成工具）
+  /// 21，生成住户登记二维码（使用本地生成工具）
   Future<String?> generateRegistrationQrCode() async {
     if (_cachedRegistrationQrCode != null) {
       // 检查本地文件是否存在
@@ -1074,8 +909,7 @@ class AppDataProvider extends ChangeNotifier {
     }
   }
 
-  ///3，下载二维码到本地文件（带重试机制）
-  ///4，保存二维码图片数据到本地文件
+  /// 22，保存二维码图片数据到本地文件
   Future<String?> _saveQrCodeImageToLocal(
       Uint8List imageData, String fileName) async {
     try {
@@ -1100,7 +934,7 @@ class AppDataProvider extends ChangeNotifier {
     }
   }
 
-  ///5，保存二维码路径到SharedPreferences缓存
+  /// 23，保存二维码路径到SharedPreferences缓存
   Future<void> _saveQrCodeToCache(String key, String localPath) async {
     try {
       final prefs = await SharedPreferences.getInstance();
@@ -1110,7 +944,7 @@ class AppDataProvider extends ChangeNotifier {
     }
   }
 
-  ///5，检查二维码是否需要重新生成
+  /// 24，检查二维码是否需要重新生成（根据二维码路径和ismartId）
   Future<bool> _needRegenerateQrCode(
       String? cachedQrCode, String ismartId) async {
     if (cachedQrCode == null || !cachedQrCode.contains(ismartId)) {
@@ -1121,118 +955,65 @@ class AppDataProvider extends ChangeNotifier {
     return !await File(cachedQrCode).exists();
   }
 
-  ///6，从缓存加载二维码路径
+  /// 25，从缓存加载二维码路径
   Future<void> _loadQrCodesFromCache() async {
     try {
       final prefs = await SharedPreferences.getInstance();
       _cachedComplaintQrCode = prefs.getString(_complaintQrCodeKey);
       _cachedRegistrationQrCode = prefs.getString(_registrationQrCodeKey);
     } catch (e) {
-      _logger.e('从缓存加载二维码失败', error: e);
+      debugPrint('从缓存加载二维码失败: $e');
     }
   }
 
-  ///7，初始化二维码（在获得ismartId后调用）- 带超时和错误处理
-  Future<void> initializeQrCodes() async {
-    _logger.i('🚀 开始初始化二维码');
-
-    try {
-      // 设置总超时时间为60秒
-      await _initializeQrCodesInternal().timeout(
-        const Duration(seconds: 60),
-        onTimeout: () {
-          _logger.w('⏰ 二维码初始化超时，将使用网络URL作为备选方案');
-          _ensureQrCodeFallback();
-          return;
-        },
-      );
-    } catch (e) {
-      _logger.e('❌ 二维码初始化过程中发生错误，使用备选方案', error: e);
-      _ensureQrCodeFallback();
-    }
-  }
-
-  ///8，内部二维码初始化方法
-  Future<void> _initializeQrCodesInternal() async {
-    // 先从缓存加载
+  /// 26，二维码初始化
+  Future<void> initializeQrCodesInternal() async {
+    // 7.1，从缓存加载二维码路径
     await _loadQrCodesFromCache();
-
-    // 如果缓存中没有或ismartId发生变化，重新生成
     final ismartId = _settingsModel?.building.ismartId;
     if (ismartId != null && ismartId.isNotEmpty) {
-      // 检查缓存的二维码是否需要重新生成
+      // 7.2，检查缓存的二维码是否需要重新生成
       bool needRegenerateComplaint =
           await _needRegenerateQrCode(_cachedComplaintQrCode, ismartId);
       bool needRegenerateRegistration =
           await _needRegenerateQrCode(_cachedRegistrationQrCode, ismartId);
 
-      // 并行生成二维码以提高效率
       final futures = <Future<void>>[];
-
+      // 7.3，如果需要重新生成，则生成二维码（设置超时时間30秒）
       if (needRegenerateComplaint) {
-        _cachedComplaintQrCode = null; // 清除旧缓存
-        futures.add(_generateComplaintQrCodeWithTimeout());
+        _cachedComplaintQrCode = null;
+        futures.add(
+          generateComplaintQrCode().timeout(
+            const Duration(seconds: 30),
+            onTimeout: () {
+              debugPrint('⚠️ 投訴二維碼生成超時（30秒）');
+              return;
+            },
+          ),
+        );
       }
 
       if (needRegenerateRegistration) {
-        _cachedRegistrationQrCode = null; // 清除旧缓存
-        futures.add(_generateRegistrationQrCodeWithTimeout());
+        _cachedRegistrationQrCode = null;
+        futures.add(
+          generateRegistrationQrCode().timeout(
+            const Duration(seconds: 30),
+            onTimeout: () {
+              debugPrint('⚠️ 登記二維碼生成超時（30秒）');
+              return;
+            },
+          ),
+        );
       }
 
-      // 等待所有二维码生成完成，但不会因为单个失败而阻塞
+      // 7.4，等待所有二维码生成完成，但不会因为单个失败而阻塞
       if (futures.isNotEmpty) {
         await Future.wait(futures, eagerError: false);
       }
     }
   }
 
-  ///9，确保二维码有备选方案
-  void _ensureQrCodeFallback() {
-    final ismartId = _settingsModel?.building.ismartId;
-    if (ismartId != null && ismartId.isNotEmpty) {
-      // 如果投诉二维码为空，记录日志但不设置网络URL
-      if (_cachedComplaintQrCode == null) {
-        // 需要重新生成
-      }
-
-      // 如果登记二维码为空，记录日志但不设置网络URL
-      if (_cachedRegistrationQrCode == null) {
-        // 需要重新生成
-      }
-    }
-    notifyListeners(); // 通知UI更新
-  }
-
-  ///10，带超时的投诉二维码生成
-  Future<void> _generateComplaintQrCodeWithTimeout() async {
-    try {
-      await generateComplaintQrCode().timeout(
-        const Duration(seconds: 30),
-        onTimeout: () {
-          return null;
-        },
-      );
-    } catch (e) {
-      // 投诉二维码生成失败
-    }
-  }
-
-  ///11，带超时的登记二维码生成
-  Future<void> _generateRegistrationQrCodeWithTimeout() async {
-    try {
-      await generateRegistrationQrCode().timeout(
-        const Duration(seconds: 30),
-        onTimeout: () {
-          return null;
-        },
-      );
-    } catch (e) {
-      // 登记二维码生成失败
-    }
-    notifyListeners(); // 通知UI更新
-  }
-
-  ///8，清除二维码缓存
+  /// 27，清除二维码缓存
   Future<void> clearQrCodeCache() async {
     try {
       final prefs = await SharedPreferences.getInstance();
@@ -1249,31 +1030,31 @@ class AppDataProvider extends ChangeNotifier {
     }
   }
 
-  ///9，清除投诉二维码缓存
+  /// 28，清除投诉二维码缓存
   void clearComplaintQrCodeCache() {
     _cachedComplaintQrCode = null;
   }
 
-  ///10，清除登记二维码缓存
+  /// 29，清除登记二维码缓存
   void clearRegistrationQrCodeCache() {
     _cachedRegistrationQrCode = null;
   }
 
-  ///11，直接设置投诉二维码
+  /// 30，直接设置投诉二维码
   Future<void> setComplaintQrCodeDirect(String qrCodeUrl) async {
     _cachedComplaintQrCode = qrCodeUrl;
     await _saveQrCodeToCache(_complaintQrCodeKey, qrCodeUrl);
     notifyListeners();
   }
 
-  ///12，直接设置登记二维码
+  /// 31，直接设置登记二维码
   Future<void> setRegistrationQrCodeDirect(String qrCodeUrl) async {
     _cachedRegistrationQrCode = qrCodeUrl;
     await _saveQrCodeToCache(_registrationQrCodeKey, qrCodeUrl);
     notifyListeners();
   }
 
-  ///13，开始定时登录任务
+  /// 32，开始定时登录任务
   void startPeriodicLogin() {
     if (_isPeriodicLoginActive) {
       return;
@@ -1296,7 +1077,7 @@ class AppDataProvider extends ChangeNotifier {
     });
   }
 
-  ///14，停止定时登录任务
+  /// 33，停止定时登录任务
   void stopPeriodicLogin() {
     if (_loginTimer != null) {
       _loginTimer!.cancel();
@@ -1305,7 +1086,7 @@ class AppDataProvider extends ChangeNotifier {
     _isPeriodicLoginActive = false;
   }
 
-  ///15，开始健康检查定时任务
+  /// 34，开始健康检查定时任务
   void startPeriodicHealthCheck() {
     if (_isPeriodicHealthCheckActive) {
       return;
@@ -1331,7 +1112,7 @@ class AppDataProvider extends ChangeNotifier {
     }
   }
 
-  ///16，停止健康检查定时任务
+  /// 35，停止健康检查定时任务
   void stopPeriodicHealthCheck() {
     if (_healthCheckTimer != null) {
       _healthCheckTimer!.cancel();
@@ -1341,7 +1122,7 @@ class AppDataProvider extends ChangeNotifier {
     _logger.i('Periodic health check stopped.');
   }
 
-  ///17，执行健康检查
+  /// 36，执行健康检查
   Future<void> performHealthCheck() async {
     if (!isLoggedIn) {
       _logger.w('Device not logged in, cannot perform health check');
@@ -1373,24 +1154,6 @@ class AppDataProvider extends ChangeNotifier {
     }
   }
 
-  /// 强制重新生成设备ID并尝试登录
-  Future<void> forceRegenerateDeviceIdAndLogin() async {
-    try {
-      // 清除存储的设备ID
-      await DeviceIdUtil().clearStoredDeviceId();
-
-      // 重新生成设备ID
-      String newDeviceId = await DeviceIdUtil().generateUniqueDeviceId();
-
-      // 使用新设备ID尝试登录
-      await initializeAndLogin(deviceIdToSet: newDeviceId);
-    } catch (e) {
-      _logger.e('强制重新生成设备ID失败', error: e);
-      _error = '强制重新生成设备ID失败: $e';
-      notifyListeners();
-    }
-  }
-
   /// 测试设备注册流程
   Future<void> testDeviceRegistration() async {
     if (_deviceId == null || _deviceId!.isEmpty) {
@@ -1406,7 +1169,7 @@ class AppDataProvider extends ChangeNotifier {
     }
   }
 
-  ///18，检查缓存中是否存在登录数据
+  /// 37，检查缓存中是否存在登录数据
   Future<bool> hasCachedLoginData() async {
     try {
       final prefs = await SharedPreferences.getInstance();
@@ -1419,7 +1182,7 @@ class AppDataProvider extends ChangeNotifier {
     }
   }
 
-  ///19，获取所有SharedPreferences键
+  /// 38，获取所有SharedPreferences键
   Future<void> debugSharedPreferencesKeys() async {
     try {
       final prefs = await SharedPreferences.getInstance();
@@ -1443,7 +1206,7 @@ class AppDataProvider extends ChangeNotifier {
     }
   }
 
-  ///20，安全登录方法 - 成功才更新缓存，失败则保持现状
+  /// 39，安全登录方法 - 成功才更新缓存，失败则保持现状
   Future<bool> _safeLogin({
     String? context = '登录',
     bool throwOnFailure = false,
@@ -1469,23 +1232,16 @@ class AppDataProvider extends ChangeNotifier {
         await _validateAndPersistSettings(_settingsModel!.settings);
       }
 
-      // 更新CarouselStateProvider的时间配置（现在在_validateAndPersistSettings中处理）
-      // if (_carouselStateProvider != null && _settingsModel?.settings != null) {
-      //   _carouselStateProvider!.updateSettings(_settingsModel!.settings);
-      //   _logger.i('🔐 [$context] CarouselStateProvider配置已更新');
-      // }
-
       // 设置ArrearProvider的楼宇ID
       if (_settingsModel != null) {
         final buildingIsmartId = _settingsModel!.building.ismartId;
         if (buildingIsmartId.isNotEmpty) {
-          setBuildingIdToArrearProvider(buildingIsmartId);
+          _arrearProvider!.setIsmartId(buildingIsmartId);
           // 初始化二维码
-          await initializeQrCodes();
+          await initializeQrCodesInternal();
         }
       }
 
-      // 清除错误状态
       _error = null;
       return true;
     } catch (e) {
@@ -1511,7 +1267,7 @@ class AppDataProvider extends ChangeNotifier {
     }
   }
 
-  ///21，手动登录方法 - 使用安全登录机制
+  /// 40，手动登录方法 - 使用安全登录机制
   Future<void> manualLogin() async {
     _isLoading = true;
     notifyListeners();
@@ -1531,7 +1287,7 @@ class AppDataProvider extends ChangeNotifier {
     super.dispose();
   }
 
-  /// 获取验证后的设置 - 确保所有时间字段都有合理的默认值
+  /// 41，获取验证后的设置 - 确保所有时间字段都有合理的默认值
   Settings? get validatedDeviceSettings {
     final settings = _settingsModel?.settings;
     if (settings == null) return null;
@@ -1561,7 +1317,7 @@ class AppDataProvider extends ChangeNotifier {
           : 10,
       paymentTableOnePageDuration: settings.paymentTableOnePageDuration > 0
           ? settings.paymentTableOnePageDuration
-          : 10,
+          : 5,
       normalToAnnouncementCarouselDuration:
           settings.normalToAnnouncementCarouselDuration > 0
               ? settings.normalToAnnouncementCarouselDuration
