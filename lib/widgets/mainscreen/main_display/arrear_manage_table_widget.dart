@@ -4,13 +4,13 @@ import 'package:provider/provider.dart';
 import 'package:iboard_app/providers/arrear_provider.dart';
 import 'package:iboard_app/providers/state_provider.dart';
 
-class ArrearTableWidget extends StatefulWidget {
+class ArrearManagementTableWidget extends StatefulWidget {
   final VoidCallback? onHomeButtonPressed; // 添加主頁按鈕回調
   final bool isInCarouselMode; // 是否在轮播模式中
   final Function(int totalPages)? onPaginationComplete; // 轮播模式下翻页完成回调
   final Function(int totalPages)? onPaginationStart; // 轮播模式下翻页开始回调
 
-  const ArrearTableWidget({
+  const ArrearManagementTableWidget({
     super.key,
     this.onHomeButtonPressed,
     this.isInCarouselMode = false, // 默认不在轮播模式
@@ -19,10 +19,12 @@ class ArrearTableWidget extends StatefulWidget {
   });
 
   @override
-  ArrearTableWidgetState createState() => ArrearTableWidgetState();
+  ArrearManagementTableWidgetState createState() =>
+      ArrearManagementTableWidgetState();
 }
 
-class ArrearTableWidgetState extends State<ArrearTableWidget> {
+class ArrearManagementTableWidgetState
+    extends State<ArrearManagementTableWidget> {
   int _currentPage = 1;
   int _itemsPerPage = 20; // 增加初始每页项数以减少空白
   Timer? _autoPaginationTimer; // 自动翻页定时器

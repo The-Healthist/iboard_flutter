@@ -6,6 +6,7 @@ import 'package:iboard_app/widgets/debug_update_time_widget.dart'; // 导入调�
 
 import 'package:provider/provider.dart';
 import 'package:flutter/foundation.dart'; // 导入kDebugMode
+import 'package:shared_preferences/shared_preferences.dart';
 
 class TimeSettingsPage extends StatefulWidget {
   const TimeSettingsPage({super.key});
@@ -26,7 +27,9 @@ class TimeSettingsPageState extends State<TimeSettingsPage> {
       if (!mounted) return;
       final appDataProvider =
           Provider.of<AppDataProvider>(context, listen: false);
-      await appDataProvider.initialize();
+      final prefs = await SharedPreferences.getInstance();
+      final deviceId = prefs.getString('deviceId');
+      await appDataProvider.initialize(deviceId: deviceId);
     } catch (e) {
       // 處理錯誤，例如顯示SnackBar
       if (!mounted) return;

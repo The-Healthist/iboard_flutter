@@ -136,12 +136,13 @@ class AnnouncementCarouselProvider extends ChangeNotifier {
     final List<String> orderedKeys = [];
     final Set<String> usedKeys = {};
 
-    // 2.4 主屏幕 widget（固定key）- 確保始終創建
+    // 2.4 主屏幕 widget（固定key）- 如已有則復用
     const mainScreenKey = 'main_screen';
     try {
-      // 移除對_homeButtonCallback的null檢查，確保主屏幕widget始終被創建
-      _widgetCache[mainScreenKey] =
-          _createMainScreenWidget(_homeButtonCallback);
+      if (!_widgetCache.containsKey(mainScreenKey)) {
+        _widgetCache[mainScreenKey] =
+            _createMainScreenWidget(_homeButtonCallback);
+      }
       widgetMap[mainScreenKey] = _widgetCache[mainScreenKey]!;
       orderedKeys.add(mainScreenKey);
       usedKeys.add(mainScreenKey);
@@ -238,14 +239,15 @@ class AnnouncementCarouselProvider extends ChangeNotifier {
 
     // 2.8 管理費用表 widget（根據數據版本）
     final mgmtDataVersion = _arrearProvider?.currentDataVersion ?? 'default';
-    final mgmtTableKey = 'arrear_table_$mgmtDataVersion';
+    final mgmtTableKey = 'management_fee_table_$mgmtDataVersion';
     try {
       final includeMgmt = _arrearProvider?.hasManagementFeeData == true;
       if (includeMgmt &&
           (!_widgetCache.containsKey(mgmtTableKey) ||
               _arrearProvider?.hasPendingUpdate == true)) {
         if (_arrearProvider != null) {
-          _widgetCache[mgmtTableKey] = _arrearProvider!.createArrearTableWidget(
+          _widgetCache[mgmtTableKey] =
+              _arrearProvider!.createArrearManagementTableWidget(
             onHomeButtonPressed: () {
               jumpToAnnouncementIndex(0);
             },
@@ -260,7 +262,7 @@ class AnnouncementCarouselProvider extends ChangeNotifier {
             },
           );
           _widgetCache.removeWhere((key, value) =>
-              key.startsWith('arrear_table_') && key != mgmtTableKey);
+              key.startsWith('management_fee_table_') && key != mgmtTableKey);
 
           _arrearProvider!.markUpdateApplied();
         }
@@ -312,13 +314,13 @@ class AnnouncementCarouselProvider extends ChangeNotifier {
       // 强制创建缴费表单widget
       final arrearDataVersion =
           _arrearProvider?.currentDataVersion ?? 'default';
-      final arrearTableKey = 'arrear_table_$arrearDataVersion';
+      final arrearTableKey = 'management_fee_table_$arrearDataVersion';
 
       if (!widgetMap.containsKey(arrearTableKey)) {
         try {
           if (_arrearProvider != null) {
             _widgetCache[arrearTableKey] =
-                _arrearProvider!.createArrearTableWidget(
+                _arrearProvider!.createArrearManagementTableWidget(
               onHomeButtonPressed: () {
                 jumpToAnnouncementIndex(0);
               },
@@ -414,40 +416,13 @@ class AnnouncementCarouselProvider extends ChangeNotifier {
       // 保存主页回调
       _homeButtonCallback = onHomeButtonPressed;
       _noticeDuration = Duration(seconds: apiNoticeStayDuration);
-
-      // 確保通告數據不為空，如果为空則使用空列表
-      _carouselAnnouncements =
-          List<AnnouncementModel>.from(carouselAnnouncements);
-
-      // 強制清理緩存，確保重新創建所有widget
-      _widgetCache.clear();
-      _fileManagerCache.clear();
-
       // 重置暫停相關的狀態，確保初始化時狀態乾淨
       _currentNoticePauseTime = null;
       _noticeElapsedTime = Duration.zero;
 
-      // 清空視頻播放進度記錄
-
-      // 初始化时使用智能更新 - 确保即使没有通告数据也能显示主屏幕
-      _smartUpdateCarousel(_carouselAnnouncements);
-
       _midTimer?.cancel();
       _delayedNoticeTimer?.cancel();
-
-      // 确保轮播组件有内容後，重置當前索引到主屏幕
-      if (_midCarouselController.widgetCount > 0) {
-        _currentNoticeIndex = 0;
-        _midCarouselController.jumpToIndex(0);
-      } else {
-        // 尝试恢复基本内容
-        _ensureBasicContent();
-      }
-
-      // 修复：确保轮播组件至少有2个widget（主屏幕和缴费表单）
-      if (_midCarouselController.widgetCount < 2) {
-        _ensureBasicContent();
-      }
+      _ensureBasicContent();
 
       // 启动轮播定时器 - 无论是否有通告数据都要启动
       if (!_isMidCarouselPaused) {
@@ -988,8 +963,6 @@ class AnnouncementCarouselProvider extends ChangeNotifier {
     return MainScreenWidget(
       onAnnouncementTap: (AnnouncementModel? announcement) {
         if (announcement == null) {
-          // 显示欠费查询界面 - 功能已整合到MainScreenWidget中
-          // showArrearQueryWidget(onHomeButtonPressed);
         } else {
           // 显示独立通告 - 修复：使用_homeButtonCallback确保返回按钮能正确工作
           showIndependentAnnouncement(announcement, _homeButtonCallback);
@@ -1010,7 +983,7 @@ class AnnouncementCarouselProvider extends ChangeNotifier {
       width: double.infinity,
       height: double.infinity,
       color: Colors.grey.shade50,
-      child: ArrearTableWidget(
+      child: ArrearManagementTableWidget(
         isInCarouselMode: true, // 标记为轮播模式
         onHomeButtonPressed: () {
           // 点击主页按钮时，跳转回主屏幕（索引0）
@@ -1050,7 +1023,7 @@ class AnnouncementCarouselProvider extends ChangeNotifier {
     final paginationDuration =
         (durationPerPage != null && durationPerPage > 0) ? durationPerPage : 5;
 
-    final int extensionSeconds = totalPages * 1;
+    final int extensionSeconds = totalPages * paginationDuration;
 
     // 取消现有的定时器，避免冲突
     _midTimer?.cancel();
@@ -1170,100 +1143,114 @@ class AnnouncementCarouselProvider extends ChangeNotifier {
     } catch (e) {}
   }
 
-  ///20，确保基本内容的方法
+  ///20，确保widget和我的数据同步(通告,主屏幕,管理费用表单,其他费用表单)
   void _ensureBasicContent() {
     try {
       debugPrint('[AnnouncementCarousel] 尝试恢复基本轮播内容...');
-
-      // 强制创建主屏幕Widget
-      const mainScreenKey = 'main_screen';
-
-      _widgetCache[mainScreenKey] =
-          _createMainScreenWidget(_homeButtonCallback);
-
-      // 创建基本的轮播内容
-      final Map<String, Widget> basicWidgetMap = {
-        mainScreenKey: _widgetCache[mainScreenKey]!,
-      };
-
-      final List<String> basicOrderedKeys = [mainScreenKey];
-
-      // 修复：強制創建缴費表單widget，確保至少有2個widget
-      final arrearDataVersion =
-          _arrearProvider?.currentDataVersion ?? 'default';
-      final arrearTableKey = 'arrear_table_$arrearDataVersion';
-
-      try {
-        if (_arrearProvider != null) {
-          _widgetCache[arrearTableKey] =
-              _arrearProvider!.createArrearTableWidget(
-            onHomeButtonPressed: () {
-              jumpToAnnouncementIndex(0);
-            },
-            isInCarouselMode: true,
-            onPaginationComplete: (int totalPages) {
-              _isArrearPaginationActive = false;
-              _goToNextCarouselItem();
-            },
-            onPaginationStart: (int totalPages) {
-              _isArrearPaginationActive = true;
-              _extendCurrentNoticeStayTime(totalPages);
-            },
-          );
-        } else {
-          _widgetCache[arrearTableKey] = Container(
-            width: double.infinity,
-            height: double.infinity,
-            color: Colors.grey.shade50,
-            child: const Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(Icons.payment, size: 64, color: Colors.grey),
-                  SizedBox(height: 16),
-                  Text('繳費表單',
-                      style:
-                          TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
-                  SizedBox(height: 8),
-                  Text('暫無通告數據，顯示繳費表單',
-                      style: TextStyle(fontSize: 16, color: Colors.grey)),
-                ],
-              ),
-            ),
-          );
-        }
-
-        basicWidgetMap[arrearTableKey] = _widgetCache[arrearTableKey]!;
-        basicOrderedKeys.add(arrearTableKey);
-        debugPrint('[AnnouncementCarousel] 基本內容創建：缴费表单widget創建成功');
-      } catch (e) {
-        debugPrint('[AnnouncementCarousel] 基本內容創建：缴费表单widget創建失败: $e');
-        // 創建一個簡單的備用widget
-        _widgetCache[arrearTableKey] = Container(
-          width: double.infinity,
-          height: double.infinity,
-          color: Colors.grey.shade50,
-          child: const Center(
-            child: Text('缴費數據暫不可用', style: TextStyle(fontSize: 18)),
-          ),
-        );
-        basicWidgetMap[arrearTableKey] = _widgetCache[arrearTableKey]!;
-        basicOrderedKeys.add(arrearTableKey);
+      // 0. 如果已有通告，直接走智能更新，通告與費用表格會一併處理
+      if (_carouselAnnouncements.isNotEmpty) {
+        _smartUpdateCarousel(_carouselAnnouncements);
+        return;
       }
 
-      // 强制更新轮播组件
-      _midCarouselController.smartUpdateCarousel(
-          basicWidgetMap, basicOrderedKeys);
+      // 1. 主屏幕（固定加入）- 如已有則復用
+      const mainScreenKey = 'main_screen';
+      if (!_widgetCache.containsKey(mainScreenKey)) {
+        _widgetCache[mainScreenKey] =
+            _createMainScreenWidget(_homeButtonCallback);
+      }
 
-      // 确保跳转到主屏幕
+      final Map<String, Widget> widgetMap = {
+        mainScreenKey: _widgetCache[mainScreenKey]!,
+      };
+      final List<String> orderedKeys = [mainScreenKey];
+
+      // 2. 明確按數據加入「其他費用表」
+      try {
+        final otherDataVersion =
+            _arrearProvider?.currentDataVersion ?? 'default';
+        final otherKey = 'other_fee_table_$otherDataVersion';
+        final includeOther = _arrearProvider?.hasAnyOtherFeeRecords == true;
+
+        if (includeOther) {
+          if (_arrearProvider != null &&
+              (!_widgetCache.containsKey(otherKey) ||
+                  _arrearProvider?.hasPendingUpdate == true)) {
+            _widgetCache[otherKey] =
+                _arrearProvider!.createArrearOtherTableWidget(
+              onHomeButtonPressed: () => jumpToAnnouncementIndex(0),
+              isInCarouselMode: true,
+              onPaginationComplete: (int totalPages) {
+                _isArrearPaginationActive = false;
+                _goToNextCarouselItem();
+              },
+              onPaginationStart: (int totalPages) {
+                _isArrearPaginationActive = true;
+                _extendCurrentNoticeStayTime(totalPages);
+              },
+            );
+            _widgetCache.removeWhere((key, value) =>
+                key.startsWith('other_fee_table_') && key != otherKey);
+            _arrearProvider!.markUpdateApplied();
+          }
+
+          if (_widgetCache.containsKey(otherKey)) {
+            widgetMap[otherKey] = _widgetCache[otherKey]!;
+            orderedKeys.add(otherKey);
+          }
+        }
+      } catch (_) {}
+
+      // 3. 明確按數據加入「管理費用表」
+      try {
+        final mgmtDataVersion =
+            _arrearProvider?.currentDataVersion ?? 'default';
+        final mgmtKey = 'management_fee_table_$mgmtDataVersion';
+        final includeMgmt = _arrearProvider?.hasManagementFeeData == true;
+
+        if (includeMgmt) {
+          if (_arrearProvider != null &&
+              (!_widgetCache.containsKey(mgmtKey) ||
+                  _arrearProvider?.hasPendingUpdate == true)) {
+            _widgetCache[mgmtKey] =
+                _arrearProvider!.createArrearManagementTableWidget(
+              onHomeButtonPressed: () => jumpToAnnouncementIndex(0),
+              isInCarouselMode: true,
+              onPaginationComplete: (int totalPages) {
+                _isArrearPaginationActive = false;
+                _goToNextCarouselItem();
+              },
+              onPaginationStart: (int totalPages) {
+                _isArrearPaginationActive = true;
+                _extendCurrentNoticeStayTime(totalPages);
+              },
+            );
+            _widgetCache.removeWhere((key, value) =>
+                key.startsWith('management_fee_table_') && key != mgmtKey);
+            _arrearProvider!.markUpdateApplied();
+          }
+
+          if (_widgetCache.containsKey(mgmtKey)) {
+            widgetMap[mgmtKey] = _widgetCache[mgmtKey]!;
+            orderedKeys.add(mgmtKey);
+          }
+        }
+      } catch (_) {}
+
+      // 4. 更新輪播
+      _midCarouselController.smartUpdateCarousel(widgetMap, orderedKeys);
+
+      // 5. 跳轉到主屏幕
       if (_midCarouselController.widgetCount > 0) {
         _currentNoticeIndex = 0;
         _midCarouselController.jumpToIndex(0);
-        debugPrint(
-            '[AnnouncementCarousel] 基本內容恢復完成：${_midCarouselController.widgetCount} widgets');
+        try {
+          debugPrint(
+              '[AnnouncementCarousel] 基本內容恢復完成：${_midCarouselController.widgetCount} widgets');
+        } catch (_) {}
       }
 
-      // 使用 WidgetsBinding.instance.addPostFrameCallback 延迟通知
+      // 6. 通知
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (hasListeners) {
           notifyListeners();

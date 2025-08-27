@@ -920,24 +920,24 @@ class ArrearProvider extends ChangeNotifier {
     return blocks.length > 1;
   }
 
-  ///29, 创建欠费表单Widget（缓存版本）
-  Widget createArrearTableWidget({
+  ///29, 创建管理费用表单Widget（缓存版本）
+  Widget createArrearManagementTableWidget({
     required VoidCallback? onHomeButtonPressed,
     required bool isInCarouselMode,
     required Function(int totalPages)? onPaginationComplete,
     required Function(int totalPages)? onPaginationStart,
   }) {
     final dataVersion = _currentDataVersion ?? 'initial';
-    final key = 'arrear_table_$dataVersion';
+    final key = 'management_fee_table_$dataVersion';
 
     // 检查缓存中是否已有此Widget
     if (_widgetCache.containsKey(key)) {
-      _logger.i('💾 使用缓存的欠费表单Widget: $key');
+      _logger.i('💾 使用缓存的管理费用表单Widget: $key');
       return _widgetCache[key]!;
     }
 
     // 创建新的Widget并缓存
-    final widget = ArrearTableWidget(
+    final widget = ArrearManagementTableWidget(
       key: ValueKey(key),
       onHomeButtonPressed: onHomeButtonPressed,
       isInCarouselMode: isInCarouselMode,

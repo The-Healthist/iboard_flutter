@@ -26,10 +26,8 @@ class MainPage extends StatefulWidget {
 
 class MainPageState extends State<MainPage> {
   Timer? _mainTimer;
-  List<AnnouncementModel>?
-      _previousAnnouncementsForBuild; // Added state variable
-  bool _isAdsDialogOpen = false; // 是否已打開全屏廣告對話框
-
+  List<AnnouncementModel>? _previousAnnouncementsForBuild;
+  bool _isAdsDialogOpen = false;
   @override
   void initState() {
     super.initState();
@@ -114,21 +112,7 @@ class MainPageState extends State<MainPage> {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted) {
           final carouselProvider = context.read<CarouselStateProvider>();
-          // final wasInFullscreenAd =
-          //     carouselProvider.currentAppState == AppState.fullscreenAd;
-
-          // 先切換到手動操作狀態
           carouselProvider.enterManualOperation();
-
-          // 如果之前在全屏廣告狀態，關閉後自動回到主屏幕
-          // if (wasInFullscreenAd) {
-          //   Logger().i('🔄 通過showAdsDialog關閉全屏廣告，自動切換到手動操作狀態');
-
-          //   // 通知通告轮播提供者回到主屏幕
-          //   final announcementCarouselProvider =
-          //       context.read<AnnouncementCarouselProvider>();
-          //   announcementCarouselProvider.jumpToAnnouncementIndex(0);
-          // }
         }
       });
 

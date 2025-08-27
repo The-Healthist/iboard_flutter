@@ -321,7 +321,6 @@ class AdvertisementProvider extends ChangeNotifier {
       final List<Future> futures = [
         _apiClient.getCarouselTopAdvertisements(),
         _apiClient.getCarouselFullAdvertisements(),
-        // _apiClient.getAdvertisementsBuilding(), // 保留原有的广告接口作为备用
       ];
 
       final List results = await Future.wait(futures);
@@ -343,7 +342,6 @@ class AdvertisementProvider extends ChangeNotifier {
       final bool hasTopCarouselChanges =
           forceInit ? true : _hasTopCarouselDataChanged(newTopCarouselAds);
       if (hasTopCarouselChanges) {
-        _logger.i('检测到顶部广告轮播数据变化，开始更新...');
         _topCarouselAdvertisements = List<AdModel>.from(newTopCarouselAds);
         await _saveTopCarouselAdvertisementsToCache(_topCarouselAdvertisements);
 

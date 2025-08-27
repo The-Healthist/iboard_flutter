@@ -108,31 +108,28 @@ class AnnouncementPageState extends State<AnnouncementPage> {
   ///2， 初始化状态
   void initState() {
     super.initState();
-    _bottomCarouselController = custom_carousel.CarouselController();
 
+    _bottomCarouselController = custom_carousel.CarouselController();
+    _arrearProvider = Provider.of<ArrearProvider>(context, listen: false);
+
+    final announcementCarouselProvider =
+        Provider.of<AnnouncementCarouselProvider>(context, listen: false);
+    announcementCarouselProvider.setArrearProvider(_arrearProvider);
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      // 设置全屏广告预加载回调
       _setupFullscreenAdPreloadCallback();
 
       _initializeMidWidgets();
       _initializeTopWidgets();
       _initializeBottomWidgets();
-      _initializeNewsAnnouncements(); // 初始化新闻公报
-      _startDebugTimer(); // 启动调试定时器
-      _startCarouselWatchdog(); // 启动轮播监控
+      _initializeNewsAnnouncements();
+      _startDebugTimer();
+      _startCarouselWatchdog();
 
       // Trigger data fetching
       final advertisementProvider =
           Provider.of<AdvertisementProvider>(context, listen: false);
       advertisementProvider.fetchAdvertisements();
     });
-
-    // 初始化 _arrearProvider
-    _arrearProvider = Provider.of<ArrearProvider>(context, listen: false);
-    // 将 _arrearProvider 传递给 AnnouncementCarouselProvider
-    final announcementCarouselProvider =
-        Provider.of<AnnouncementCarouselProvider>(context, listen: false);
-    announcementCarouselProvider.setArrearProvider(_arrearProvider);
   }
 
   ///2.1，初始化RTHK新闻
@@ -399,41 +396,16 @@ class AnnouncementPageState extends State<AnnouncementPage> {
       delayBeforeNotice: delayBeforeNotice,
       onAnnouncementTap: (AnnouncementModel? announcement) {
         if (announcement == null) {
-          // 显示欠费查询界面 - 立即进入手动操作状态
-          // _logger.i('🔵 [MainScreenPage] 接收到欠费查询请求，从主页面跳转到欠费查询界面');
-          // _logger.i(
-          //     '🔵 [MainScreenPage] 当前应用状态: ${carouselStateProvider.currentAppState}');
-          // 触发手动操作状态
-          // _logger.i('🔵 [MainScreenPage] 准备进入手动操作状态');
           carouselStateProvider.enterManualOperation();
-          // _logger.i(
-          //     '🔵 [MainScreenPage] 已进入手动操作状态: ${carouselStateProvider.currentAppState}');
-          // 欠费查询功能已整合到MainScreenWidget中，不再需要单独的覆盖层
-          // _logger.i('🔵 [MainScreenPage] 欠费查询功能已整合到MainScreenWidget');
         } else {
-          // _logger.i(
-          //     '📰 [MainScreenPage] 接收到通告点击请求: ${announcement.title} (ID: ${announcement.id})');
-
-          // 新逻辑：直接显示点击的通告，不依赖轮播列表查找
-          // _logger.i(
-          //     '📰 [MainScreenPage] 直接显示点击的通告，根据文件MD5: ${announcement.file.md5}');
-
-          // 直接显示独立通告
           announcementCarouselProvider.showIndependentAnnouncement(announcement,
               () {
-            // 返回主页时跳转到主屏幕
             announcementCarouselProvider.jumpToAnnouncementIndex(0);
           });
-
-          // 触发手动操作状态
-          // _logger.i('📰 [MainScreenPage] 准备进入手动操作状态');
           carouselStateProvider.enterManualOperation();
-          // _logger.i(
-          //     '📰 [MainScreenPage] 已进入手动操作状态: ${carouselStateProvider.currentAppState}');
         }
       },
       onHomeButtonPressed: () {
-        // 主頁按鈕被按下時，跳轉到第一個項目（主屏幕）
         announcementCarouselProvider.jumpToAnnouncementIndex(0);
       },
     );
