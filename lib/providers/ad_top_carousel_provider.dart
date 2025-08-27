@@ -329,32 +329,41 @@ class TopAdCarouselProvider extends ChangeNotifier {
 
   /// 從全屏廣告狀態退出後恢復頂部廣告
   void resumeFromFullscreenAdExit() {
-    if (_isTopCarouselPaused) {
-      // 重置暂停状态
-      _isTopCarouselPaused = false;
+    _logger.i('🔄 开始恢复顶部广告轮播');
 
-      // 恢复媒体播放
-      _topCarouselController.resumeAllMedia();
+    // 重置暂停状态
+    _isTopCarouselPaused = false;
 
-      // 如果有广告，直接从第一个广告重新开始
-      if (topAds.isNotEmpty) {
-        // 重置时间相关状态
-        _currentTopAdStartTime = DateTime.now();
-        _topAdElapsedTime = Duration.zero;
-        final currentIndex = _topCarouselController.currentIndex;
-        _topAdDuration = topAds[currentIndex].durationObject;
+    // 恢复媒体播放
+    _topCarouselController.resumeAllMedia();
 
-        // 启动新的定时器
-        startTopAdTimer(currentIndex);
-      }
+    // 如果有广告，从当前广告重新开始
+    if (topAds.isNotEmpty) {
+      // 重置时间相关状态
+      _currentTopAdStartTime = DateTime.now();
+      _topAdElapsedTime = Duration.zero;
+      final currentIndex = _topCarouselController.currentIndex;
 
-      // 使用 WidgetsBinding.instance.addPostFrameCallback 延迟通知
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (hasListeners) {
-          notifyListeners();
-        }
-      });
+      // 确保索引有效
+      final validIndex =
+          currentIndex >= 0 && currentIndex < topAds.length ? currentIndex : 0;
+
+      _topAdDuration = topAds[validIndex].durationObject;
+
+      // 启动新的定时器
+      startTopAdTimer(validIndex);
+
+      _logger.i('✅ 顶部广告恢复完成，当前索引: $validIndex');
+    } else {
+      _logger.w('⚠️ 顶部广告列表为空，无法恢复');
     }
+
+    // 使用 WidgetsBinding.instance.addPostFrameCallback 延迟通知
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (hasListeners) {
+        notifyListeners();
+      }
+    });
   }
 
   /// 檢查並恢復輪播狀態（監控定時器使用）

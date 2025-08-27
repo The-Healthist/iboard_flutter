@@ -150,12 +150,28 @@ class EnhancedVideoPoolManager {
           ? VideoPlayerController.networkUrl(Uri.parse(filePath))
           : VideoPlayerController.file(File(filePath));
 
-      await controller.initialize();
+      // 添加超时控制，防止初始化无限等待
+      await controller.initialize().timeout(
+        const Duration(seconds: 10),
+        onTimeout: () {
+          controller.dispose();
+          throw TimeoutException('视频初始化超时', const Duration(seconds: 10));
+        },
+      );
+
+      // 检查初始化结果
+      if (!controller.value.isInitialized) {
+        controller.dispose();
+        throw Exception('视频控制器初始化失败');
+      }
 
       // 设置循环和自动播放
       controller.setLooping(looping);
 
-      if (autoPlay) {
+      // 设置音量为最大（确保有声音）
+      await controller.setVolume(1.0);
+
+      if (autoPlay && !controller.value.hasError) {
         await controller.play();
       }
 
@@ -169,24 +185,36 @@ class EnhancedVideoPoolManager {
   }
 
   /// 重置控制器设置
-  ///2, 重置控制器设置（增加播放失败的错误捕获）
+  ///2, 重置控制器设置（增加播放失败的错误捕获和状态检查）
   Future<void> _resetControllerSettings(
       VideoPlayerController controller, bool autoPlay, bool looping) async {
     if (!controller.value.isInitialized) return;
 
     try {
+      // 确保控制器还在有效状态
+      if (controller.value.hasError) {
+        debugPrint('⚠️ 控制器存在错误，跳过重置: ${controller.value.errorDescription}');
+        return;
+      }
+
       // 重置到开头
       await controller.seekTo(Duration.zero);
 
       // 设置循环
       controller.setLooping(looping);
 
+      // 设置音量为最大（修复全屏广告无声音问题）
+      await controller.setVolume(1.0);
+
       // 根据需要播放或暂停，并捕获播放异常
       if (autoPlay) {
         try {
-          await controller.play();
+          // 添加状态检查，确保在有效状态下播放
+          if (controller.value.isInitialized && !controller.value.hasError) {
+            await controller.play();
+          }
         } catch (e) {
-          debugPrint('播放时出错: $e');
+          debugPrint('❌ 播放时出错: $e');
         }
       } else {
         if (controller.value.isPlaying) {

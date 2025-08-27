@@ -152,7 +152,7 @@ class _FullAdWidgetState extends State<FullAdWidget> {
           try {
             // 明确设置循环與首播參數
             await _videoController!.setLooping(true);
-            await _videoController!.setVolume(0.0);
+            await _videoController!.setVolume(1.0); // 修复：设置音量为1.0，恢复声音
             await _videoController!.setPlaybackSpeed(1.0);
 
             // 重置到开头

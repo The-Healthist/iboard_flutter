@@ -123,6 +123,7 @@ class AnnouncementPageState extends State<AnnouncementPage> {
       _logger.i('🚀 应用初始化，强制进入默认轮播状态');
 
       _setupFullscreenAdPreloadCallback();
+      _setupProviderReferences();
 
       _initializeMidWidgets();
       _initializeTopWidgets();
@@ -171,6 +172,17 @@ class AnnouncementPageState extends State<AnnouncementPage> {
     stateProvider.setExitFullscreenAdModeCallback(() {
       fullAdProvider.exitFullscreenMode();
     });
+  }
+
+  ///2.3，设置Provider引用
+  void _setupProviderReferences() {
+    final stateProvider = context.read<CarouselStateProvider>();
+    final topAdProvider = context.read<TopAdCarouselProvider>();
+
+    // 设置顶部广告轮播Provider引用（修复音视频不同步问题）
+    stateProvider.setTopCarouselProvider(topAdProvider);
+
+    _logger.i('🔗 Provider引用设置完成');
   }
 
   @override

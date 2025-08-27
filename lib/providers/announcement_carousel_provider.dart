@@ -101,6 +101,21 @@ class AnnouncementCarouselProvider extends ChangeNotifier {
     }
   }
 
+  /// 检查是否有可轮播的内容（包括只有管理费用表格的情况）
+  bool get hasCarouselContent {
+    final widgetCount = _midCarouselController.widgetCount;
+    final hasAnnouncements = _carouselAnnouncements.isNotEmpty;
+    final hasManagementData = _arrearProvider?.hasManagementFeeData == true;
+    final hasOtherData = _arrearProvider?.hasAnyOtherFeeRecords == true;
+
+    debugPrint(
+        '[AnnouncementCarousel] 🔍 检查轮播内容: widgetCount=$widgetCount, 通告=$hasAnnouncements, 管理费用=$hasManagementData, 其他费用=$hasOtherData');
+
+    // 至少需要主屏幕 + 任意一种内容（通告或费用表格）
+    return widgetCount >= 2 &&
+        (hasAnnouncements || hasManagementData || hasOtherData);
+  }
+
   /// 确认轮播模式
   bool get _onlyManagementTableMode =>
       _carouselAnnouncements.isEmpty &&
@@ -755,6 +770,10 @@ class AnnouncementCarouselProvider extends ChangeNotifier {
   ///4，恢复通告轮播
   void resumeMidCarousel(int apiNoticeStayDuration,
       {bool forceJumpToIndex = false}) {
+    final widgetCount = _midCarouselController.widgetCount;
+    debugPrint(
+        '[AnnouncementCarousel] 🔄 恢复通告轮播 - Widget数量: $widgetCount, 是否暂停: $_isMidCarouselPaused');
+
     // 显式取消旧的定时器，避免重复启动
     _pauseAllTimers();
 
@@ -768,7 +787,11 @@ class AnnouncementCarouselProvider extends ChangeNotifier {
     _midCarouselController.resumeAllMedia();
 
     // 恢復通告輪播 - 使用視頻播放進度而不是時間
-    if (_midCarouselController.widgetCount > 1 && !_isMidCarouselPaused) {
+    // 修复：即使只有管理费用表格（widgetCount = 2：主屏幕+管理费用）也要进入轮播模式
+    if (_midCarouselController.widgetCount >= 2 && !_isMidCarouselPaused) {
+      debugPrint(
+          '[AnnouncementCarousel] ✅ 满足轮播条件，开始轮播 (widgetCount: ${_midCarouselController.widgetCount})');
+
       _noticeDuration = Duration(seconds: apiNoticeStayDuration); // 更新当前时长配置
 
       // 重要修復：不要重置開始時間，保持暫停前的時間狀態
@@ -850,6 +873,17 @@ class AnnouncementCarouselProvider extends ChangeNotifier {
 
           _scheduleNextCarousel(apiNoticeStayDuration);
         }
+      }
+    } else {
+      // 条件不满足的情况
+      debugPrint(
+          '[AnnouncementCarousel] ❌ 不满足轮播条件 - widgetCount: ${_midCarouselController.widgetCount}, 暂停状态: $_isMidCarouselPaused');
+
+      // 即使不能轮播，也要确保当前显示正确的内容
+      if (_midCarouselController.widgetCount >= 2 && _currentNoticeIndex < 1) {
+        debugPrint('[AnnouncementCarousel] 🔧 修正当前索引到管理费用表格');
+        _currentNoticeIndex = 1; // 跳转到第一个内容（管理费用表格）
+        _midCarouselController.jumpToIndex(_currentNoticeIndex);
       }
     }
 
@@ -982,7 +1016,8 @@ class AnnouncementCarouselProvider extends ChangeNotifier {
     _midCarouselController.resumeAllMedia();
 
     // 恢复通告轮播
-    if (_midCarouselController.widgetCount > 1) {
+    // 修复：即使只有管理费用表格也要进入轮播模式
+    if (_midCarouselController.widgetCount >= 2) {
       _currentNoticeStartTime = DateTime.now();
 
       // 确保当前索引在内容范围内

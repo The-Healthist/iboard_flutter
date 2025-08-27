@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:iboard_app/models/settings_model.dart';
 import 'package:iboard_app/providers/announcement_carousel_provider.dart';
+import 'package:iboard_app/providers/ad_top_carousel_provider.dart';
 import 'package:logger/logger.dart';
 
 /// 播放狀態枚舉
@@ -196,6 +197,7 @@ class CarouselStateProvider extends ChangeNotifier {
 
   // Provider引用
   AnnouncementCarouselProvider? _announcementCarouselProvider; // 通告轮播Provider引用
+  TopAdCarouselProvider? _topCarouselProvider; // 顶部广告轮播Provider引用
 
   // 媒體控制狀態 - 按區域分別控制
   bool _isTopMediaPaused = false; // 頂部廣告媒體暫停狀態
@@ -295,6 +297,11 @@ class CarouselStateProvider extends ChangeNotifier {
     _announcementCarouselProvider = provider;
   }
 
+  /// 设置顶部广告轮播Provider引用
+  void setTopCarouselProvider(TopAdCarouselProvider? provider) {
+    _topCarouselProvider = provider;
+  }
+
   /// 獲取當前狀態
   CarouselState get currentState => _currentState;
 
@@ -384,6 +391,9 @@ class CarouselStateProvider extends ChangeNotifier {
         _pauseNoticeCarousel();
       }
 
+      // 暂停顶部广告轮播（修复音视频不同步问题）
+      _topCarouselProvider?.pauseTopCarousel();
+
       // 自动隐藏所有覆盖层（欠费查询和欠费总览）
       _announcementCarouselProvider?.autoHideAllOverlays();
 
@@ -420,6 +430,9 @@ class CarouselStateProvider extends ChangeNotifier {
       if (wasInFullscreenAd) {
         // 通知FullAdvertisementCarouselProvider退出全屏广告模式
         _onExitFullscreenAdMode?.call();
+
+        // 恢复顶部广告轮播（修复音视频不同步问题）
+        _topCarouselProvider?.resumeFromFullscreenAdExit();
       }
 
       // 更新媒體狀態
@@ -442,6 +455,9 @@ class CarouselStateProvider extends ChangeNotifier {
 
       if (wasInFullscreenAd) {
         _lastFullscreenAdEndTime = DateTime.now();
+
+        // 恢复顶部广告轮播（修复音视频不同步问题）
+        _topCarouselProvider?.resumeFromFullscreenAdExit();
       }
 
       // 通知FullAdvertisementCarouselProvider退出全屏广告模式
@@ -468,10 +484,24 @@ class CarouselStateProvider extends ChangeNotifier {
 
     // 通知通告轮播提供者恢复轮播（恢复之前暂停的状态，不跳转索引）
     if (_announcementCarouselProvider != null) {
-      _announcementCarouselProvider!.updateCarouselPauseState(false);
+      final widgetCount =
+          _announcementCarouselProvider!.midCarouselController.widgetCount;
+      final hasContent = _announcementCarouselProvider!.hasCarouselContent;
+      _logger.i(
+          '🔍 [状态Provider] 通告轮播状态检查: Widget数量=$widgetCount, 有轮播内容=$hasContent');
 
-      _announcementCarouselProvider!
-          .resumeMidCarousel(noticeStayDuration, forceJumpToIndex: false);
+      // 添加调试信息，帮助定位问题
+      if (!hasContent) {
+        _logger.w('⚠️ [状态Provider] 没有可轮播的内容，跳过通告轮播模式');
+        // 即使没有内容可轮播，也要切换到默认状态并启动定时器
+      } else {
+        _logger.i('✅ [状态Provider] 准备进入通告轮播模式');
+        _announcementCarouselProvider!.updateCarouselPauseState(false);
+        _announcementCarouselProvider!
+            .resumeMidCarousel(noticeStayDuration, forceJumpToIndex: false);
+      }
+    } else {
+      _logger.w('⚠️ [状态Provider] 通告轮播提供者为空，无法进入通告轮播模式');
     }
 
     // 启动通告轮播到全屏广告的计时器
