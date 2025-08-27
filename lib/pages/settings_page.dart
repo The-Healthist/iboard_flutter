@@ -4,7 +4,6 @@ import 'package:iboard_app/providers/announcement_carousel_provider.dart';
 import 'package:iboard_app/providers/ad_full_carousel_provider.dart';
 import 'package:iboard_app/providers/state_provider.dart';
 import 'package:iboard_app/providers/ad_top_carousel_provider.dart';
-import 'package:iboard_app/providers/arrear_provider.dart'; // 新增导入
 import 'package:iboard_app/providers/app_update_provider.dart'; // 导入更新Provider
 import 'package:iboard_app/widgets/carousel_widget.dart'; // 导入通知类
 
@@ -63,7 +62,7 @@ class SettingsPageState extends State<SettingsPage> {
     // 5. 暂停其他定时器
     carouselStateProvider.pauseAllStateTimers();
 
-    // 6. 强制发送媒体暂停通知，确保所有视频都暂停
+    // 6. 强制发送媒體暂停通知，确保所有视频都暂停
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) {
         MediaPauseNotification().dispatch(context);
@@ -79,7 +78,7 @@ class SettingsPageState extends State<SettingsPage> {
         context.read<AnnouncementCarouselProvider>();
     final fullAdCarouselProvider = context.read<FullscreenAdProvider>();
 
-    // 从设置页面强制重置到默认状态（绕过手动操作状态的转换限制）
+    // 从设置頁面强制重置到默认状态（绕过手动操作状态的转换限制）
     carouselStateProvider.resetToDefault();
 
     // 恢复顶部广告轮播
@@ -96,7 +95,7 @@ class SettingsPageState extends State<SettingsPage> {
       fullAdCarouselProvider.startDebugTimer();
     }
 
-    // 强制发送媒体恢复通知，确保所有视频都恢复播放
+    // 强制发送媒體恢复通知，确保所有视频都恢复播放
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) {
         MediaResumeNotification().dispatch(context);
@@ -104,7 +103,7 @@ class SettingsPageState extends State<SettingsPage> {
     });
   }
 
-  ///5, 处理导航到子页面 - 不恢复轮播
+  ///5, 处理导航到子頁面 - 不恢复轮播
   void _navigateToSubPage(Widget page) {
     Navigator.push(
       context,
@@ -112,17 +111,17 @@ class SettingsPageState extends State<SettingsPage> {
     );
   }
 
-  ///6, 处理导航到轮播设置页面 - 不恢复轮播
+  ///6, 处理导航到轮播设置頁面 - 不恢复轮播
   void _navigateToCarouselSettings() {
     Navigator.pushNamed(context, '/carousel-settings');
   }
 
-  ///7, 处理真正退出设置页面 - 恢复轮播
+  ///7, 处理真正退出设置頁面 - 恢复轮播
   void _exitSettingsPage() {
     // 立即恢复所有轮播和计时器
     _resumeAllCarouselsFromSettings();
 
-    // 延迟发送媒体恢复通知，确保所有视频都恢复播放
+    // 延迟发送媒體恢复通知，确保所有视频都恢复播放
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) {
         MediaResumeNotification().dispatch(context);
@@ -132,57 +131,7 @@ class SettingsPageState extends State<SettingsPage> {
     Navigator.pop(context);
   }
 
-  ///9, 显示其他欠费表单的调试方法
-  void _showOtherFeeTableDebug() {
-    final arrearProvider = context.read<ArrearProvider>();
-
-    // 检查是否有其他费用数据
-    if (arrearProvider.hasOtherFeeData) {
-      showDialog(
-        context: context,
-        builder: (BuildContext context) {
-          return Dialog(
-            child: Container(
-              width: MediaQuery.of(context).size.width * 0.95,
-              height: MediaQuery.of(context).size.height * 0.9,
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                children: [
-                  Text(
-                    '其他費用表單調試',
-                    style: TextStyle(
-                      fontSize: 20,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.blue.shade600,
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  Expanded(
-                    child: arrearProvider.createArrearOtherTableWidget(
-                      onHomeButtonPressed: () {
-                        Navigator.of(context).pop();
-                      },
-                      isInCarouselMode: false,
-                      onPaginationComplete: null,
-                      onPaginationStart: null,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          );
-        },
-      );
-    } else {
-      // 如果没有其他费用数据，显示提示
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('暫無其他費用數據'),
-          backgroundColor: Colors.orange,
-        ),
-      );
-    }
-  }
+  ///8, 构建版本更新项目
 
   @override
   Widget build(BuildContext context) {
@@ -192,7 +141,7 @@ class SettingsPageState extends State<SettingsPage> {
           // 在返回前恢复所有轮播
           _resumeAllCarouselsFromSettings();
 
-          // 延迟发送媒体恢复通知，确保所有视频都恢复播放
+          // 延迟发送媒體恢复通知，确保所有视频都恢复播放
           WidgetsBinding.instance.addPostFrameCallback((_) {
             if (mounted) {
               MediaResumeNotification().dispatch(context);
@@ -323,13 +272,6 @@ class SettingsPageState extends State<SettingsPage> {
                           onTap: () {},
                         ),
                         const SizedBox(height: 16),
-                        _buildSettingsItem(
-                          icon: Icons.table_chart,
-                          title: '其他費用表單調試',
-                          subtitle: '顯示其他費用表單的調試視圖',
-                          onTap: _showOtherFeeTableDebug,
-                        ),
-                        const SizedBox(height: 16),
                         _buildVersionUpdateItem(),
                       ],
                     ),
@@ -445,15 +387,15 @@ class SettingsPageState extends State<SettingsPage> {
             ),
             trailing: updateProvider.hasLocalApk
                 ? ElevatedButton(
-                    onPressed: updateProvider.isInstalling
-                        ? null // 安装中时禁用按钮
-                        : () async {
+                    onPressed: updateProvider.canInstall
+                        ? () async {
                             await updateProvider.installApk();
-                          },
+                          }
+                        : null, // 不满足条件时禁用按钮
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: updateProvider.isInstalling
-                          ? Colors.grey.shade400 // 安装中时使用灰色背景
-                          : Colors.blue.shade600,
+                      backgroundColor: updateProvider.canInstall
+                          ? Colors.blue.shade600
+                          : Colors.grey.shade400, // 禁用时使用灰色背景
                       foregroundColor: Colors.white,
                       padding: const EdgeInsets.symmetric(
                           horizontal: 16, vertical: 8),
@@ -485,9 +427,9 @@ class SettingsPageState extends State<SettingsPage> {
                               ),
                             ],
                           )
-                        : const Text(
-                            '更新',
-                            style: TextStyle(
+                        : Text(
+                            updateProvider.canInstall ? '更新' : '請稍候',
+                            style: const TextStyle(
                                 fontSize: 12, fontWeight: FontWeight.w500),
                           ),
                   )

@@ -23,7 +23,7 @@ class RthkNewsProvider extends ChangeNotifier {
   // 定时更新管理
   Timer? _updateTimer;
   DateTime? _lastUpdateTime;
-  static const Duration _updateInterval = Duration(minutes: 30); // 30分钟更新一次
+  static const Duration _updateInterval = Duration(minutes: 30); // 30分鈡更新一次
 
   // 本地存储键
   static const String _storageKey = 'rthk_news';
@@ -111,12 +111,12 @@ class RthkNewsProvider extends ChangeNotifier {
   void _startUpdateTimer() {
     _updateTimer?.cancel();
 
-    // 启动定时器，每30分钟检查一次
+    // 启动定时器，每30分鈡检查一次
     _updateTimer = Timer.periodic(const Duration(minutes: 30), (timer) {
       _checkAndUpdate();
     });
 
-    _logger.i('⏰ RTHK新闻更新定时器已启动，更新间隔: 30分钟');
+    _logger.i('⏰ RTHK新闻更新定时器已启动，更新间隔: 30分鈡');
   }
 
   ///4, 检查并执行更新
@@ -124,7 +124,7 @@ class RthkNewsProvider extends ChangeNotifier {
     if (_lastUpdateTime != null) {
       final timeSinceLastUpdate = DateTime.now().difference(_lastUpdateTime!);
       if (timeSinceLastUpdate < _updateInterval) {
-        return; // 距离上次更新不足30分钟，跳过
+        return; // 距离上次更新不足30分鈡，跳过
       }
     }
 
@@ -155,7 +155,7 @@ class RthkNewsProvider extends ChangeNotifier {
     if (!forceUpdate && _lastUpdateTime != null) {
       final timeSinceLastUpdate = DateTime.now().difference(_lastUpdateTime!);
       if (timeSinceLastUpdate < _updateInterval) {
-        _logger.i('⏭️ 距离上次更新不足30分钟，跳过更新');
+        _logger.i('⏭️ 距离上次更新不足30分鈡，跳过更新');
         return;
       }
     }
@@ -237,7 +237,7 @@ class RthkNewsProvider extends ChangeNotifier {
     }
   }
 
-  ///5.1, 使用网络连接失败提示
+  ///5.1, 使用网络連接失败提示
   void _useNetworkErrorPrompt() {
     final now = DateTime.now();
     _newsList = [
@@ -252,8 +252,8 @@ class RthkNewsProvider extends ChangeNotifier {
     ];
 
     _lastUpdateTime = now;
-    _logger.i('⚠️ 网络连接失败，显示错误提示信息');
-    _logger.w('⚠️ 注意：显示网络连接失败提示，而不是模拟数据');
+    _logger.i('⚠️ 网络連接失败，显示错误提示信息');
+    _logger.w('⚠️ 注意：显示网络連接失败提示，而不是模拟数据');
   }
 
   ///6, 手动刷新新闻

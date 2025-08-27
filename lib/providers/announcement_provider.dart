@@ -150,7 +150,7 @@ class AnnouncementProvider extends ChangeNotifier {
       return;
     }
 
-    // 获取更新间隔时间（从设置中获取，单位：分钟）
+    // 获取更新间隔时间（从设置中获取，單位：分鈡）
     final updateIntervalMinutes =
         _appDataProvider.deviceSettings?.noticeUpdateDuration ?? 5;
     final updateIntervalSeconds = updateIntervalMinutes * 60;

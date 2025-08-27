@@ -16,8 +16,8 @@ import 'package:provider/provider.dart';
 import 'pages/mainscreen_page.dart';
 import 'pages/fullscreen_ads_page.dart';
 import 'pages/settings_page.dart';
-import 'pages/carousel_settings_page.dart'; // 添加轮播设置页面导入
-import 'pages/error_page.dart'; // 添加错误页面导入
+import 'pages/carousel_settings_page.dart'; // 添加轮播设置頁面导入
+import 'pages/error_page.dart'; // 添加错误頁面导入
 import 'providers/arrear_provider.dart'; // 添加欠费provider导入
 import 'providers/weather_provider.dart'; // 添加天气provider导入
 import 'package:logger/logger.dart';
@@ -206,13 +206,13 @@ class HomePageState extends State<HomePage> {
           // 3.初始化天气数据（不需要登录，公开API）
           await weatherProvider.fetchAllWeatherData();
 
-          // 3.1 启动天气数据定时更新（120分钟一次）
+          // 3.1 启动天气数据定时更新（120分鈡一次）
           weatherProvider.startPeriodicUpdate(
               interval: const Duration(minutes: 120));
           if (appDataProvider.deviceSettings != null) {
             // 启动定时登录任务（12小时一次）
             appDataProvider.startPeriodicLogin();
-            // 启动健康检查定时任务（30分钟一次）
+            // 启动健康检查定时任务（30分鈡一次）
             appDataProvider.startPeriodicHealthCheck();
 
             // 4. 統一輪播數據初始化區塊
@@ -244,6 +244,13 @@ class HomePageState extends State<HomePage> {
               announcementCarouselProvider.setAppDataProvider(appDataProvider);
               announcementCarouselProvider.setArrearProvider(arrearProvider);
 
+              // 🔧 修复：在创建Widget之前设置正确的返回按钮回调
+              announcementCarouselProvider.setHomeButtonCallback(() {
+                // 返回主屏幕的回调逻辑
+                announcementCarouselProvider.jumpToAnnouncementIndex(0);
+                debugPrint('🏠 [Main] 通过返回按钮跳转到主屏幕');
+              });
+
               // 設置通告提供者的輪播提供者引用
               announcementProvider
                   .setCarouselProvider(announcementCarouselProvider);
@@ -252,14 +259,19 @@ class HomePageState extends State<HomePage> {
               final carouselAnnouncements =
                   announcementProvider.getCarouselAnnouncements();
               if (carouselAnnouncements.isNotEmpty) {
+                debugPrint(
+                    '🏠 [Main] 初始化轮播（有通告）: ${carouselAnnouncements.length} 个');
                 announcementCarouselProvider
                     .updateCarouselList(carouselAnnouncements);
               } else {
+                debugPrint('🏠 [Main] 初始化轮播（无通告），创建主屏幕+费用表格模式');
                 announcementCarouselProvider.updateCarouselList([]);
                 announcementProvider.fetchNotices().then((_) {
                   final freshCarouselAnnouncements =
                       announcementProvider.getCarouselAnnouncements();
                   if (freshCarouselAnnouncements.isNotEmpty) {
+                    debugPrint(
+                        '🔄 [Main] 异步获取到通告: ${freshCarouselAnnouncements.length} 个');
                     announcementCarouselProvider
                         .updateCarouselList(freshCarouselAnnouncements);
                   }
@@ -360,8 +372,8 @@ class HomePageState extends State<HomePage> {
   ///1, 检查是否为网络错误
   bool _isNetworkError(String error) {
     final networkErrorKeywords = [
-      '无法连接到服务器',
-      '网络连接失败',
+      '无法連接到服务器',
+      '网络連接失败',
       '请求超时',
       'SocketException',
       'ClientException',
@@ -392,7 +404,7 @@ class HomePageState extends State<HomePage> {
   ///3, 获取用户友好的错误信息
   String _getUserFriendlyError(String error) {
     if (_isNetworkError(error)) {
-      return '🌐 网络连接失败\n\n请检查网络连接后重试，或联系管理员';
+      return '🌐 网络連接失败\n\n请检查网络連接后重试，或联系管理员';
     } else if (_isDataParseError(error)) {
       return '📊 服务器数据格式错误\n\n请联系管理员检查服务器配置';
     } else {
@@ -423,7 +435,7 @@ class HomePageState extends State<HomePage> {
 
   @override
   Widget build(BuildContext context) {
-    // 如果有初始化错误，显示错误页面
+    // 如果有初始化错误，显示错误頁面
     if (_initializationError != null) {
       return ErrorPage(
         errorMessage: _initializationError!,
@@ -441,14 +453,14 @@ class HomePageState extends State<HomePage> {
                   // 如果AppDataProvider有错误且不在加载状态，检查是否有缓存数据可用
                   if (appDataProvider.error != null &&
                       !appDataProvider.isLoading) {
-                    // 如果是网络错误但有设备设置数据（缓存），不显示错误页面
+                    // 如果是网络错误但有设备设置数据（缓存），不显示错误頁面
                     if ((_isNetworkError(appDataProvider.error!) ||
                             _isDataParseError(appDataProvider.error!)) &&
                         appDataProvider.deviceSettings != null) {
                       // 有缓存数据，继续正常流程，不显示错误
                       debugPrint('檢測到網絡錯誤或數據解析錯誤但有緩存數據，繼續使用緩存數據運行');
                     } else {
-                      // 没有缓存数据或非网络错误，显示错误页面
+                      // 没有缓存数据或非网络错误，显示错误頁面
                       return ErrorPage(
                         errorMessage:
                             _getUserFriendlyError(appDataProvider.error!),

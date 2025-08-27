@@ -57,7 +57,7 @@ class WeatherWidgetState extends State<WeatherWidget> {
     super.dispose();
   }
 
-  ///1，启动时间更新定时器 - 每分钟同步一次系统时间
+  ///1，启动时间更新定时器 - 每分鈡同步一次系统时间
   void _startTimeUpdateTimer() {
     setState(() {
       _currentTime = DateTime.now();
@@ -169,7 +169,7 @@ class WeatherWidgetState extends State<WeatherWidget> {
     );
   }
 
-  ///8，构建单个警告行
+  ///8，构建單个警告行
   Widget _buildWarningRow(String warningCode, WeatherWarningInfo warningInfo) {
     final iconPath =
         WeatherIconUtil.getWeatherWarningIconPathByCode(warningCode);
@@ -213,7 +213,7 @@ class WeatherWidgetState extends State<WeatherWidget> {
     );
   }
 
-  ///9，构建当前天气卡片第一页
+  ///9，构建当前天气卡片第一頁
   Widget _buildCurrentWeatherPage1(CurrentWeatherDataModel currentWeatherData) {
     CurrentTemperatureDataModel? tempLocationData;
 
@@ -351,7 +351,7 @@ class WeatherWidgetState extends State<WeatherWidget> {
     );
   }
 
-  ///10，构建当前天气卡片第二页
+  ///10，构建当前天气卡片第二頁
   Widget _buildCurrentWeatherPage2(CurrentWeatherDataModel currentWeatherData) {
     CurrentTemperatureDataModel? tempLocationData;
 
@@ -510,12 +510,12 @@ class WeatherWidgetState extends State<WeatherWidget> {
     final hasWarnings = weatherProvider.weatherWarningData != null &&
         weatherProvider.weatherWarningData!.warnings.isNotEmpty;
 
-    // 如果没有天气警告信息，只显示第一页
+    // 如果没有天气警告信息，只显示第一頁
     if (!hasWarnings) {
       return _buildCurrentWeatherPage1(weatherProvider.currentWeatherData!);
     }
 
-    // 根据Provider的状态自动切换页面（只有在有天气警告时才轮播）
+    // 根据Provider的状态自动切换頁面（只有在有天气警告时才轮播）
     return AnimatedSwitcher(
       duration: const Duration(milliseconds: 500),
       transitionBuilder: (Widget child, Animation<double> animation) {

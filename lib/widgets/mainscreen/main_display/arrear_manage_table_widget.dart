@@ -3,12 +3,13 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:iboard_app/providers/arrear_provider.dart';
 import 'package:iboard_app/providers/state_provider.dart';
+import 'package:iboard_app/providers/app_data_provider.dart';
 
 class ArrearManagementTableWidget extends StatefulWidget {
   final VoidCallback? onHomeButtonPressed; // 添加主頁按鈕回調
   final bool isInCarouselMode; // 是否在轮播模式中
-  final Function(int totalPages)? onPaginationComplete; // 轮播模式下翻页完成回调
-  final Function(int totalPages)? onPaginationStart; // 轮播模式下翻页开始回调
+  final Function(int totalPages)? onPaginationComplete; // 轮播模式下翻頁完成回调
+  final Function(int totalPages)? onPaginationStart; // 轮播模式下翻頁开始回调
 
   const ArrearManagementTableWidget({
     super.key,
@@ -26,16 +27,16 @@ class ArrearManagementTableWidget extends StatefulWidget {
 class ArrearManagementTableWidgetState
     extends State<ArrearManagementTableWidget> {
   int _currentPage = 1;
-  int _itemsPerPage = 20; // 增加初始每页项数以减少空白
-  Timer? _autoPaginationTimer; // 自动翻页定时器
-  bool _isPaginationPaused = false; // 翻页是否暂停
-  int _totalPages = 0; // 总页数
+  int _itemsPerPage = 20; // 增加初始每頁项数以减少空白
+  Timer? _autoPaginationTimer; // 自动翻頁定时器
+  bool _isPaginationPaused = false; // 翻頁是否暂停
+  int _totalPages = 0; // 总頁数
 
   // 数据版本跟踪 - 用于检测数据更新
   String? _lastDataVersion;
   bool _isWaitingForDataUpdate = false;
 
-  ///1, 自动返回主页方法 - 用于全屏广告状态时调用
+  ///1, 自动返回主頁方法 - 用于全屏广告状态时调用
   void autoReturnToHome() {
     if (widget.onHomeButtonPressed != null) {
       widget.onHomeButtonPressed!();
@@ -53,9 +54,9 @@ class ArrearManagementTableWidgetState
         provider.loadFromCache();
       }
 
-      // 如果在轮播模式下，启动自动翻页
+      // 如果在轮播模式下，启动自动翻頁
       if (widget.isInCarouselMode) {
-        // 无论是否有数据都要启动自动翻页，确保轮播逻辑正常
+        // 无论是否有数据都要启动自动翻頁，确保轮播逻辑正常
         _startAutoPagination();
       }
     });
@@ -68,13 +69,13 @@ class ArrearManagementTableWidgetState
         // 检测数据版本是否变化
         if (_lastDataVersion != provider.currentDataVersion) {
           if (_lastDataVersion != null && widget.isInCarouselMode) {
-            // 数据已更新，但在轮播模式下不立即切换，等待下次翻页
+            // 数据已更新，但在轮播模式下不立即切换，等待下次翻頁
             _isWaitingForDataUpdate = true;
           }
           _lastDataVersion = provider.currentDataVersion;
         }
 
-        // 监听媒体暂停状态 - 仅在轮播模式下生效
+        // 监听媒體暂停状态 - 仅在轮播模式下生效
         if (widget.isInCarouselMode) {
           final carouselStateProvider = context.watch<CarouselStateProvider>();
           final currentAppState = carouselStateProvider.currentAppState;
@@ -186,7 +187,7 @@ class ArrearManagementTableWidgetState
         // 動態計算每頁顯示的行數，增加顯示行數以減少空白
         const double outerPadding = 16 * 2; // 上下margin
         const double titleHeight = 56; // 标题区域高度
-        const double paginationHeight = 56; // 分页栏高度
+        const double paginationHeight = 56; // 分頁栏高度
         const double rowHeight = 40; // 減少每行高度從48到40
         const double headerHeight = 44; // 表头高度
 
@@ -200,13 +201,13 @@ class ArrearManagementTableWidgetState
         final int dynamicRows = ((availableHeight / rowHeight).floor() - 1)
             .clamp(8, 50); // 行數減1防止溢出
 
-        // 如果每页项数发生变化，更新状态以确保分页控件显示正确
+        // 如果每頁项数发生变化，更新状态以确保分頁控件显示正确
         if (_itemsPerPage != dynamicRows) {
           _itemsPerPage = dynamicRows;
           WidgetsBinding.instance.addPostFrameCallback((_) {
             if (mounted) {
               setState(() {
-                // 触发重新构建以更新分页控件
+                // 触发重新构建以更新分頁控件
               });
             }
           });
@@ -314,11 +315,11 @@ class ArrearManagementTableWidgetState
     );
   }
 
-  ///3, 构建表格数据（合并所有楼座数据）
+  ///3, 构建表格数据（合并所有樓座数据）
   List<Map<String, dynamic>> _buildTableData(ArrearProvider provider) {
     final List<Map<String, dynamic>> tableData = [];
 
-    // 从物业管理费用数据构建表格数据，合并所有楼座
+    // 从物业管理费用数据构建表格数据，合并所有樓座
     if (provider.managementFeeData != null) {
       for (final block in provider.managementFeeData!.blocks) {
         for (final floor in block.floors) {
@@ -341,15 +342,15 @@ class ArrearManagementTableWidgetState
     return tableData;
   }
 
-  ///3.1, 格式化单位显示（楼座+楼层+单元）
+  ///3.1, 格式化單位显示（樓座+樓层+單元）
   String _formatUnitDisplay(
       String blockName, String floorName, String unitName) {
     if (blockName.isEmpty) {
-      // 如果楼座名称为空，只显示楼层+单元
-      return '${floorName}${unitName}';
+      // 如果樓座名称为空，显示：XX 樓XX室
+      return '${floorName}樓${unitName}室';
     } else {
-      // 显示楼座+楼层+单元，例如：01座01A
-      return '${blockName}座${floorName}${unitName}';
+      // 显示樓座+樓层+單元，例如：01座01樓A室
+      return '${blockName}座${floorName}樓${unitName}室';
     }
   }
 
@@ -405,7 +406,7 @@ class ArrearManagementTableWidgetState
     return firstRecord.keys.where((key) => key != '單位').toList();
   }
 
-  ///9, 获取分页数据
+  ///9, 获取分頁数据
   List<Map<String, dynamic>> _getPaginatedData(
       List<Map<String, dynamic>> tableData) {
     final startIndex = (_currentPage - 1) * _itemsPerPage;
@@ -413,15 +414,15 @@ class ArrearManagementTableWidgetState
     return tableData.sublist(startIndex, endIndex);
   }
 
-  ///10, 构建分页控件
+  ///10, 构建分頁控件
   Widget _buildPagination(ArrearProvider provider) {
     final tableData = _buildTableData(provider);
     final totalItems = tableData.length;
 
-    // 确保使用正确计算的每页项数
+    // 确保使用正确计算的每頁项数
     int actualItemsPerPage = _itemsPerPage;
 
-    // 如果还是初始值（20），重新计算正确的每页项数
+    // 如果还是初始值（20），重新计算正确的每頁项数
     if (_itemsPerPage == 20) {
       final double screenHeight = MediaQuery.of(context).size.height;
       final double mainAreaHeight = screenHeight * 14 / 24;
@@ -449,7 +450,7 @@ class ArrearManagementTableWidgetState
       child: Row(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          // 上一页按钮
+          // 上一頁按钮
           ElevatedButton(
             onPressed: _currentPage > 1
                 ? () {
@@ -476,7 +477,7 @@ class ArrearManagementTableWidgetState
 
           const SizedBox(width: 16),
 
-          // 页码显示
+          // 頁码显示
           Text(
             '第 $_currentPage 頁，共 $totalPages 頁',
             style: const TextStyle(
@@ -487,7 +488,7 @@ class ArrearManagementTableWidgetState
 
           const SizedBox(width: 16),
 
-          // 下一页按钮
+          // 下一頁按钮
           ElevatedButton(
             onPressed: _currentPage < totalPages
                 ? () {
@@ -517,16 +518,16 @@ class ArrearManagementTableWidgetState
     );
   }
 
-  ///11, 启动自动翻页 - 仅在轮播模式下使用
+  ///11, 启动自动翻頁 - 仅在轮播模式下使用
   void _startAutoPagination() {
     if (!widget.isInCarouselMode) return;
 
-    // 确保在启动自动翻页前先计算正确的每页项数
+    // 确保在启动自动翻頁前先计算正确的每頁项数
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final provider = Provider.of<ArrearProvider>(context, listen: false);
       final tableData = _buildTableData(provider);
 
-      // 重新计算每页项数，确保总页数准确
+      // 重新计算每頁项数，确保总頁数准确
       final screenHeight = MediaQuery.of(context).size.height;
       final double mainAreaHeight = screenHeight * 14 / 24;
       const double outerPadding = 16 * 2;
@@ -547,7 +548,7 @@ class ArrearManagementTableWidgetState
       _totalPages = (tableData.length / _itemsPerPage).ceil();
 
       if (_totalPages <= 1) {
-        // 只有一页或无数据，延迟后通知完成，让轮播继续
+        // 只有一頁或无数据，延迟后通知完成，让轮播继续
         Future.delayed(const Duration(seconds: 5), () {
           if (widget.onPaginationComplete != null) {
             widget.onPaginationComplete!(_totalPages);
@@ -556,25 +557,24 @@ class ArrearManagementTableWidgetState
         return;
       }
 
-      // 通知轮播提供者开始翻页（用于动态延长停留时间）
+      // 通知轮播提供者开始翻頁（用于动态延长停留时间）
       if (widget.onPaginationStart != null) {
         widget.onPaginationStart!(_totalPages);
       }
 
-      // 启动实际的自动翻页逻辑
+      // 启动实际的自动翻頁逻辑
       _startActualAutoPagination();
     });
   }
 
-  ///12, 启动实际的自动翻页逻辑
+  ///12, 启动实际的自动翻頁逻辑
   void _startActualAutoPagination() {
-    //TODO: 需要修改為從設定中獲取翻頁時間
-    // 获取设置中的翻页时间，默认为5秒
-    // final appDataProvider =
-    //     Provider.of<AppDataProvider>(context, listen: false);
-    // paymentTableOnePageDuration 乘以 1
-    final paginationDuration = 1;
-    // (deviceSettings?.paymentTableOnePageDuration ?? 3) * 1;
+    // 获取设置中的翻頁时间，默认为5秒
+    final appDataProvider =
+        Provider.of<AppDataProvider>(context, listen: false);
+    final deviceSettings = appDataProvider.deviceSettings;
+    final paginationDuration =
+        (deviceSettings?.paymentTableOnePageDuration ?? 3) * 1;
 
     _autoPaginationTimer?.cancel();
     _autoPaginationTimer =
@@ -586,7 +586,7 @@ class ArrearManagementTableWidgetState
           _currentPage++;
         });
       } else {
-        // 已经是最后一页，检查是否有待更新的数据
+        // 已经是最后一頁，检查是否有待更新的数据
         if (_isWaitingForDataUpdate) {
           // 有新数据待更新，在这里切换到新的Widget
           _isWaitingForDataUpdate = false;
@@ -594,7 +594,7 @@ class ArrearManagementTableWidgetState
           setState(() {
             _currentPage = 1;
           });
-          // 通知AnnouncementCarouselProvider更新欠费表单Widget
+          // 通知AnnouncementCarouselProvider更新欠费表單Widget
           if (widget.onPaginationComplete != null) {
             widget.onPaginationComplete!(_totalPages);
           }
@@ -612,19 +612,19 @@ class ArrearManagementTableWidgetState
     });
   }
 
-  ///13, 暂停自动翻页
+  ///13, 暂停自动翻頁
   void _pauseAutoPagination() {
     if (!_isPaginationPaused) {
       _isPaginationPaused = true;
     }
   }
 
-  ///14, 恢复自动翻页
+  ///14, 恢复自动翻頁
   void _resumeAutoPagination() {
     if (_isPaginationPaused) {
       _isPaginationPaused = false;
 
-      // 如果定时器不活跃且还有页面需要翻页，重新启动翻页
+      // 如果定时器不活跃且还有頁面需要翻頁，重新启动翻頁
       if ((_autoPaginationTimer == null || !_autoPaginationTimer!.isActive) &&
           _currentPage < _totalPages) {
         _startActualAutoPagination();
@@ -632,7 +632,7 @@ class ArrearManagementTableWidgetState
     }
   }
 
-  ///15, 停止自动翻页
+  ///15, 停止自动翻頁
   void _stopAutoPagination() {
     _autoPaginationTimer?.cancel();
     _autoPaginationTimer = null;
@@ -685,7 +685,7 @@ class ArrearManagementTableWidgetState
 
   @override
   void dispose() {
-    _stopAutoPagination(); // 清理自动翻页定时器
+    _stopAutoPagination(); // 清理自动翻頁定时器
     super.dispose();
   }
 }

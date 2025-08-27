@@ -278,7 +278,7 @@ class DebugUpdateTimeWidgetState extends State<DebugUpdateTimeWidget> {
     if (difference.inMinutes < 1) {
       return "刚刚";
     } else if (difference.inHours < 1) {
-      return "${difference.inMinutes}分钟前";
+      return "${difference.inMinutes}分鈡前";
     } else if (difference.inDays < 1) {
       return "${difference.inHours}小时前";
     } else {
@@ -357,7 +357,7 @@ class DebugUpdateTimeWidgetState extends State<DebugUpdateTimeWidget> {
     return widgets;
   }
 
-  ///11，构建单个任务项
+  ///11，构建單个任务项
   Widget _buildTaskItem(
       String name, String countdown, String lastUpdate, Color statusColor) {
     return Padding(

@@ -49,7 +49,7 @@ class TimeSettingsPageState extends State<TimeSettingsPage> {
   Widget build(BuildContext context) {
     return PopScope(
       onPopInvoked: (didPop) {
-        // 直接返回，不恢复轮播，因为这只是返回到设置页面
+        // 直接返回，不恢复轮播，因为这只是返回到设置頁面
         // PopScope handles the pop automatically
       },
       child: Consumer<AppDataProvider>(
@@ -546,12 +546,12 @@ class TimeSettingsPageState extends State<TimeSettingsPage> {
                   ),
                   // 检查更新按钮
                   IconButton(
-                    onPressed: updateProvider.isCheckingUpdate
-                        ? null
-                        : () async {
+                    onPressed: updateProvider.canCheckUpdate
+                        ? () async {
                             await updateProvider.checkForUpdate(
                                 autoDownload: true);
-                          },
+                          }
+                        : null, // 不满足条件时禁用按钮
                     icon: updateProvider.isCheckingUpdate
                         ? SizedBox(
                             width: 20,
@@ -564,9 +564,13 @@ class TimeSettingsPageState extends State<TimeSettingsPage> {
                           )
                         : Icon(
                             Icons.refresh,
-                            color: Colors.blue.shade600,
+                            color: updateProvider.canCheckUpdate 
+                                ? Colors.blue.shade600
+                                : Colors.grey.shade400, // 禁用时显示灰色
                           ),
-                    tooltip: '檢查更新',
+                    tooltip: updateProvider.canCheckUpdate 
+                        ? '檢查更新'
+                        : '請稍後再試', // 禁用时显示不同提示
                   ),
                 ],
               ),

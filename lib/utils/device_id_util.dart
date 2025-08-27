@@ -150,7 +150,7 @@ class DeviceIdUtil {
       ]);
     }
 
-    // 将所有组件连接成一个字符串
+    // 将所有组件連接成一个字符串
     return infoComponents.join('|');
   }
 

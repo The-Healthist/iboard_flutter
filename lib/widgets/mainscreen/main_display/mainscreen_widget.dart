@@ -24,7 +24,7 @@ class MainScreenWidgetState extends State<MainScreenWidget> {
   final Logger _logger = Logger();
   // Set default to all
   AnnouncementTypeUi _selectedAnnouncementType = AnnouncementTypeUi.all;
-  // 当前选中的楼座、楼层与单位
+  // 当前选中的樓座、樓层与單位
   String? _selectedBlock;
   String? _selectedBuilding;
   String? _selectedFloor;
@@ -44,7 +44,7 @@ class MainScreenWidgetState extends State<MainScreenWidget> {
         provider.loadFromCache();
       }
 
-      // 同步Provider的楼座选择状态
+      // 同步Provider的樓座选择状态
       if (provider.selectedBlock != null) {
         _selectedBlock = provider.selectedBlock;
       }
@@ -83,13 +83,13 @@ class MainScreenWidgetState extends State<MainScreenWidget> {
               // 添加繳費表單功能
               // else if (chineseTitle == '繳費表單') {
               //   print('🔵 [MainScreenWidget] 用户点击繳費表單按钮 - 在右侧显示');
-              //   // 缴费表单现在显示全部数据，不需要选择器，所以不需要重置状态
-              //   print('🔵 [MainScreenWidget] 右侧显示缴费表单内容');
+              //   // 缴费表單现在显示全部数据，不需要选择器，所以不需要重置状态
+              //   print('🔵 [MainScreenWidget] 右侧显示缴费表單内容');
               // }
               // 註釋掉繳費表單功能
               // else if (chineseTitle == '繳費表單') {
               //   print('🔵 [MainScreenWidget] 用户点击繳費表單按钮');
-              //   // 导航到繳費表單页面
+              //   // 导航到繳費表單頁面
               //   widget.onArrearTableTap?.call();
               //   print('🔵 [MainScreenWidget] 已调用 onArrearTableTap()');
               // }
@@ -300,7 +300,7 @@ class MainScreenWidgetState extends State<MainScreenWidget> {
       ),
       child: Column(
         children: [
-          // 楼座选择器（只有当有多个非空名称的楼座时才显示）
+          // 樓座选择器（只有当有多个非空名称的樓座时才显示）
           if (provider.shouldShowBlockSelector) ...[
             _buildArrearBlockSelector(provider),
             const SizedBox(height: 10),
@@ -349,7 +349,7 @@ class MainScreenWidgetState extends State<MainScreenWidget> {
                     _selectedBuilding = null; // 重置樓層選擇
                     _selectedFloor = null; // 重置單位選擇
                     _showArrearResults = false; // 重置查詢結果
-                    // 设置楼座
+                    // 设置樓座
                     provider.setSelectedBlock(block);
                   });
                 },
@@ -403,7 +403,7 @@ class MainScreenWidgetState extends State<MainScreenWidget> {
             ),
           ),
           const SizedBox(height: 12),
-          // 如果没有楼层数据，显示相应提示
+          // 如果没有樓层数据，显示相应提示
           if (buildings.isEmpty) ...[
             Container(
               width: double.infinity,
@@ -437,7 +437,7 @@ class MainScreenWidgetState extends State<MainScreenWidget> {
                       _selectedBuilding = building;
                       _selectedFloor = null; // 重置單位選擇
                       _showArrearResults = false; // 重置查詢結果
-                      // 设置楼层（不是buildingId）
+                      // 设置樓层（不是buildingId）
                       provider.setSelectedFloor(building);
                     });
                   },
@@ -477,7 +477,7 @@ class MainScreenWidgetState extends State<MainScreenWidget> {
   ///8, 構建單位選擇器
   Widget _buildArrearFloorSelector(ArrearProvider provider) {
     final floors = _selectedBuilding != null
-        ? provider.getFloors(_selectedBuilding!) // 使用getFloors获取所有单位
+        ? provider.getFloors(_selectedBuilding!) // 使用getFloors获取所有單位
         : [];
 
     return SizedBox(
@@ -494,7 +494,7 @@ class MainScreenWidgetState extends State<MainScreenWidget> {
             ),
           ),
           const SizedBox(height: 12),
-          // 如果没有单位数据，显示相应提示
+          // 如果没有單位数据，显示相应提示
           if (floors.isEmpty) ...[
             Container(
               width: double.infinity,
@@ -522,7 +522,7 @@ class MainScreenWidgetState extends State<MainScreenWidget> {
               runSpacing: 8,
               children: floors.map((floor) {
                 final isSelected = _selectedFloor == floor;
-                // 检查该单位是否有其他分摊费用（根据费用类型决定是否显示淡紫色）
+                // 检查该單位是否有其他分摊费用（根据费用类型决定是否显示淡紫色）
                 // final hasOtherFees =
                 //     provider.hasOtherFees(_selectedBuilding!, floor);
 
@@ -531,7 +531,7 @@ class MainScreenWidgetState extends State<MainScreenWidget> {
                     setState(() {
                       _selectedFloor = floor;
                       _showArrearResults = false; // 重置查詢結果
-                      // 设置单位
+                      // 设置單位
                       provider.setSelectedUnit(floor);
                       _logger.i('🔍 [MainScreenWidget] 選擇單位: "$floor"');
                     });
@@ -630,12 +630,12 @@ class MainScreenWidgetState extends State<MainScreenWidget> {
 
   ///9.0, 检查欠费查询选择是否有效
   bool _hasValidArrearSelection(ArrearProvider provider) {
-    // 如果有多个楼座，必须选择楼座
+    // 如果有多个樓座，必须选择樓座
     if (provider.blocks.length > 1 && _selectedBlock == null) {
       return false;
     }
 
-    // 必须选择楼层和单位
+    // 必须选择樓层和單位
     return _selectedBuilding != null && _selectedFloor != null;
   }
 
@@ -872,7 +872,7 @@ class MainScreenWidgetState extends State<MainScreenWidget> {
       return _buildDetailedArrearList(provider);
     }
 
-    // 管理费用使用原有简单显示
+    // 管理费用使用原有简單显示
     final currentArrearage = provider.currentArrearage;
 
     if (currentArrearage == null) {
@@ -1294,7 +1294,7 @@ class MainScreenWidgetState extends State<MainScreenWidget> {
                 final error = announcementProvider.error!;
                 final hasCachedData =
                     announcementProvider.announcements.isNotEmpty;
-                final isNetworkError = error.contains('网络连接失败') ||
+                final isNetworkError = error.contains('网络連接失败') ||
                     error.contains('请求超时') ||
                     error.contains('使用缓存的');
 

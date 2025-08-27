@@ -176,7 +176,7 @@ class RthkNewsTickerWidgetState extends State<RthkNewsTickerWidget>
   int _getItemCount() {
     // 如果只有一条新闻（通常是网络错误提示），检查是否需要滚动
     if (_newsTexts.length == 1) {
-      // 计算单条新闻的宽度
+      // 计算單条新闻的宽度
       final textPainter = TextPainter(textDirection: TextDirection.ltr);
       textPainter.text = TextSpan(
         text: _newsTexts.first,
@@ -188,12 +188,12 @@ class RthkNewsTickerWidgetState extends State<RthkNewsTickerWidget>
       );
       textPainter.layout();
 
-      // 如果单条新闻宽度小于容器宽度，不需要滚动，只显示一次
+      // 如果單条新闻宽度小于容器宽度，不需要滚动，只显示一次
       if (textPainter.width < widget.width - 160) {
         // 减去左右边距
         return 1;
       }
-      // 如果单条新闻很长，需要重复显示来实现滚动
+      // 如果單条新闻很长，需要重复显示来实现滚动
       return 2;
     }
     // 如果有多条新闻，重复显示两次确保无缝循环

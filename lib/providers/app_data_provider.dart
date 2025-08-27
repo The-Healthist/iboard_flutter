@@ -40,7 +40,7 @@ class AppDataProvider extends ChangeNotifier {
   // 健康检查定时任务相关
   Timer? _healthCheckTimer; // 健康检查定时器
   bool _isPeriodicHealthCheckActive = false; // 是否正在进行定期健康检查
-  static const int _healthCheckIntervalMinutes = 30; // 30分钟健康检查一次
+  static const int _healthCheckIntervalMinutes = 30; // 30分鈡健康检查一次
   DateTime? _lastHealthCheckTime; // 最后一次健康检查时间
   String? _lastHealthCheckResult; // 最后一次健康检查结果
 
@@ -208,7 +208,7 @@ class AppDataProvider extends ChangeNotifier {
             await _validateAndPersistSettings(_settingsModel!.settings);
           }
 
-          // 设置ArrearProvider的楼宇ID
+          // 设置ArrearProvider的樓宇ID
           if (_settingsModel != null) {
             final buildingIsmartId = _settingsModel!.building.ismartId;
             if (buildingIsmartId.isNotEmpty) {
@@ -261,7 +261,7 @@ class AppDataProvider extends ChangeNotifier {
             await _validateAndPersistSettings(_settingsModel!.settings);
           }
 
-          // 设置ArrearProvider的楼宇ID
+          // 设置ArrearProvider的樓宇ID
           if (_settingsModel != null) {
             final buildingIsmartId = _settingsModel!.building.ismartId;
             if (buildingIsmartId.isNotEmpty) {
@@ -300,7 +300,7 @@ class AppDataProvider extends ChangeNotifier {
     }
   }
 
-  /// 10，设置ArrearProvider的引用，用于设置楼宇ID
+  /// 10，设置ArrearProvider的引用，用于设置樓宇ID
   void setArrearProvider(ArrearProvider? provider) {
     _arrearProvider = provider;
   }
@@ -529,7 +529,7 @@ class AppDataProvider extends ChangeNotifier {
         await _validateAndPersistSettings(_settingsModel!.settings);
       }
 
-      // 15.3，设置ArrearProvider的楼宇ID
+      // 15.3，设置ArrearProvider的樓宇ID
       if (_settingsModel != null) {
         final buildingIsmartId = _settingsModel!.building.ismartId;
         if (buildingIsmartId.isNotEmpty) {
@@ -591,7 +591,7 @@ class AppDataProvider extends ChangeNotifier {
             await _validateAndPersistSettings(_settingsModel!.settings);
           }
 
-          // 15.9，设置ArrearProvider的楼宇ID
+          // 15.9，设置ArrearProvider的樓宇ID
           final building = _settingsModel?.building;
           if (building?.ismartId != null) {
             _arrearProvider!.setIsmartId(building!.ismartId);
@@ -1006,7 +1006,7 @@ class AppDataProvider extends ChangeNotifier {
         );
       }
 
-      // 7.4，等待所有二维码生成完成，但不会因为单个失败而阻塞
+      // 7.4，等待所有二维码生成完成，但不会因为單个失败而阻塞
       if (futures.isNotEmpty) {
         await Future.wait(futures, eagerError: false);
       }
@@ -1232,7 +1232,7 @@ class AppDataProvider extends ChangeNotifier {
         await _validateAndPersistSettings(_settingsModel!.settings);
       }
 
-      // 设置ArrearProvider的楼宇ID
+      // 设置ArrearProvider的樓宇ID
       if (_settingsModel != null) {
         final buildingIsmartId = _settingsModel!.building.ismartId;
         if (buildingIsmartId.isNotEmpty) {

@@ -79,7 +79,7 @@ class _TimerDebugWidgetState extends State<TimerDebugWidget> {
         '定时登录状态: ${appDataProvider.isPeriodicLoginActive ? '✅ 运行中' : '❌ 已停止'}',
         '定时登录间隔: 12小时',
         '健康检查状态: ${appDataProvider.isPeriodicHealthCheckActive ? '✅ 运行中' : '❌ 已停止'}',
-        '健康检查间隔: 30分钟',
+        '健康检查间隔: 30分鈡',
       ];
 
       // 添加最后一次健康检查信息
@@ -161,7 +161,7 @@ class _TimerDebugWidgetState extends State<TimerDebugWidget> {
     List<String> content = [];
     content
         .add('定时更新状态: ${provider.isPeriodicUpdateActive ? '✅ 运行中' : '❌ 已停止'}');
-    content.add('更新间隔: $updateInterval分钟 (${updateInterval * 60}秒)');
+    content.add('更新间隔: $updateInterval分鈡 (${updateInterval * 60}秒)');
     content.add('设备设置状态: ${deviceSettings != null ? '✅ 已加载' : '❌ 未加载'}');
     content.add('登录状态: ${appDataProvider.isLoggedIn ? '✅ 已登录' : '❌ 未登录'}');
     content.add('广告总数: ${provider.advertisements.length}');
@@ -189,7 +189,7 @@ class _TimerDebugWidgetState extends State<TimerDebugWidget> {
     List<String> content = [];
     content
         .add('定时更新状态: ${provider.isPeriodicUpdateActive ? '✅ 运行中' : '❌ 已停止'}');
-    content.add('更新间隔: $updateInterval分钟 (${updateInterval * 60}秒)');
+    content.add('更新间隔: $updateInterval分鈡 (${updateInterval * 60}秒)');
     content.add('设备设置状态: ${deviceSettings != null ? '✅ 已加载' : '❌ 未加载'}');
     content.add('登录状态: ${appDataProvider.isLoggedIn ? '✅ 已登录' : '❌ 未登录'}');
     content.add('通告总数: ${provider.announcements.length}');
@@ -246,12 +246,12 @@ class _TimerDebugWidgetState extends State<TimerDebugWidget> {
     List<String> content = [];
     content
         .add('定时更新状态: ${provider.isPeriodicUpdateActive ? '✅ 运行中' : '❌ 已停止'}');
-    content.add('更新间隔: $updateInterval分钟 (${updateInterval * 60}秒)');
+    content.add('更新间隔: $updateInterval分鈡 (${updateInterval * 60}秒)');
     content.add('数据状态: ${provider.hasData ? '✅ 有数据' : '❌ 无数据'}');
     content.add('记录总数: ${provider.hasData ? '有数据' : '无数据'}');
-    content.add('楼宇数量: ${provider.buildings.length}');
-    content.add('选中楼宇: ${provider.ismartId ?? '未选择'}');
-    content.add('选中单元: ${provider.selectedUnit ?? '未选择'}');
+    content.add('樓宇数量: ${provider.buildings.length}');
+    content.add('选中樓宇: ${provider.ismartId ?? '未选择'}');
+    content.add('选中單元: ${provider.selectedUnit ?? '未选择'}');
 
     if (provider.error != null) {
       content.add('错误信息: ${provider.error}');
@@ -317,9 +317,9 @@ class _TimerDebugWidgetState extends State<TimerDebugWidget> {
     }
 
     List<String> content = [];
-    content.add('欠费更新间隔: ${deviceSettings.arrearageUpdateDuration}分钟');
-    content.add('通告更新间隔: ${deviceSettings.noticeUpdateDuration}分钟');
-    content.add('广告更新间隔: ${deviceSettings.advertisementUpdateDuration}分钟');
+    content.add('欠费更新间隔: ${deviceSettings.arrearageUpdateDuration}分鈡');
+    content.add('通告更新间隔: ${deviceSettings.noticeUpdateDuration}分鈡');
+    content.add('广告更新间隔: ${deviceSettings.advertisementUpdateDuration}分鈡');
     content.add('广告播放时长: ${deviceSettings.advertisementPlayDuration}秒');
     content.add('通告播放时长: ${deviceSettings.noticePlayDuration}秒');
     content.add('空闲时长: ${deviceSettings.spareDuration}秒');
@@ -517,7 +517,7 @@ class _TimerDebugWidgetState extends State<TimerDebugWidget> {
         'timestamp': endTime,
         'data': {
           '数据状态': arrearProvider.hasData ? '✅ 有数据' : '❌ 无数据',
-          '楼宇数量': arrearProvider.buildings.length,
+          '樓宇数量': arrearProvider.buildings.length,
         }
       };
 

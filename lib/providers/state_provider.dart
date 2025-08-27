@@ -666,7 +666,7 @@ Timer Info: $timerInfo
     super.dispose();
   }
 
-  ///26， 暂停所有状态定时器（用于设置页面等场景）
+  ///26， 暂停所有状态定时器（用于设置頁面等场景）
   void pauseAllStateTimers() {
     _clearAllTimers();
     _clearNoticeCarouselTimers();

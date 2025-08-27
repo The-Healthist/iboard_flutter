@@ -79,14 +79,14 @@ class ErrorPage extends StatelessWidget {
 
               const SizedBox(height: 20),
 
-              // 返回主页按钮
+              // 返回主頁按钮
               TextButton(
                 onPressed: () {
-                  // _logger.i('🏠 用户点击返回主页按钮');
+                  // _logger.i('🏠 用户点击返回主頁按钮');
                   onRetry();
                 },
                 child: Text(
-                  '返回主页',
+                  '返回主頁',
                   style: TextStyle(
                     fontSize: 16,
                     color: Theme.of(context).primaryColor,

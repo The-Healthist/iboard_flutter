@@ -24,7 +24,7 @@ class CarouselSettingsPageState extends State<CarouselSettingsPage> {
   Widget build(BuildContext context) {
     return PopScope(
       onPopInvoked: (didPop) {
-        // 直接返回，不恢复轮播，因为这只是返回到设置页面
+        // 直接返回，不恢复轮播，因为这只是返回到设置頁面
         // PopScope handles the pop automatically
       },
       child: Scaffold(

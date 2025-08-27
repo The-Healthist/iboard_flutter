@@ -11,7 +11,7 @@ import 'package:iboard_app/providers/app_data_provider.dart';
 /// 轮播状态枚举
 enum CarouselState { weather, qrcode }
 
-/// 当前天气卡片页面枚举
+/// 当前天气卡片頁面枚举
 enum CurrentWeatherPage { page1, page2 }
 
 class WeatherProvider extends ChangeNotifier {
@@ -123,7 +123,7 @@ class WeatherProvider extends ChangeNotifier {
     } else if (!hasWarnings && !_isCurrentWeatherCardPaused) {
       _isCurrentWeatherCardPaused = true;
       _currentWeatherCardTimer?.cancel();
-      _currentWeatherPage = CurrentWeatherPage.page1; // 重置到第一页
+      _currentWeatherPage = CurrentWeatherPage.page1; // 重置到第一頁
       notifyListeners();
     }
   }
@@ -569,7 +569,7 @@ class WeatherProvider extends ChangeNotifier {
     });
   }
 
-  ///25，切换到下一个当前天气卡片页面
+  ///25，切换到下一个当前天气卡片頁面
   void _switchToNextCurrentWeatherPage() {
     switch (_currentWeatherPage) {
       case CurrentWeatherPage.page1:
@@ -627,7 +627,7 @@ class WeatherProvider extends ChangeNotifier {
     }
   }
 
-  ///28，暂停所有定时器（用于设置页面）
+  ///28，暂停所有定时器（用于设置頁面）
   void pauseAllTimersForSettings() {
     _bottomTimer?.cancel();
     _debugTimer?.cancel();
@@ -636,7 +636,7 @@ class WeatherProvider extends ChangeNotifier {
     _isCurrentWeatherCardPaused = true;
   }
 
-  ///29，恢复所有定时器（从设置页面返回）
+  ///29，恢复所有定时器（从设置頁面返回）
   void resumeAllTimersFromSettings() {
     _isBottomCarouselPaused = false;
     _isCurrentWeatherCardPaused = false;

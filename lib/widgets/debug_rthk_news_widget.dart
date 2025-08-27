@@ -72,7 +72,7 @@ class DebugRthkNewsWidgetState extends State<DebugRthkNewsWidget> {
     if (difference.inMinutes < 1) {
       return '刚刚';
     } else if (difference.inMinutes < 60) {
-      return '${difference.inMinutes}分钟前';
+      return '${difference.inMinutes}分鈡前';
     } else if (difference.inHours < 24) {
       return '${difference.inHours}小时前';
     } else {
@@ -100,8 +100,8 @@ class DebugRthkNewsWidgetState extends State<DebugRthkNewsWidget> {
       // 发布时间
       newsInfo['新闻${i + 1} - 发布时间'] = _formatDateTime(news.pubDate);
 
-      // 新闻链接
-      newsInfo['新闻${i + 1} - 链接'] = news.link;
+      // 新闻鏈接
+      newsInfo['新闻${i + 1} - 鏈接'] = news.link;
 
       // 新闻GUID
       newsInfo['新闻${i + 1} - GUID'] = news.guid;
@@ -287,7 +287,7 @@ class DebugRthkNewsWidgetState extends State<DebugRthkNewsWidget> {
       return Colors.blue.shade800;
     }
 
-    if (key.contains('链接')) {
+    if (key.contains('鏈接')) {
       return Colors.blue.shade600;
     }
 

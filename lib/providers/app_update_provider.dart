@@ -6,6 +6,7 @@ import 'package:path_provider/path_provider.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:open_file/open_file.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../http/api_client.dart';
 import '../utils/version_util.dart';
 import 'package:logger/logger.dart';
@@ -20,6 +21,9 @@ class AppUpdateProvider with ChangeNotifier {
   // 当前版本信息
   String? _currentVersion;
   String? get currentVersion => _currentVersion;
+
+  String? _currentVersionDescription; // 添加当前版本的描述字段
+  String? get currentVersionDescription => _currentVersionDescription;
 
   // 远程版本信息
   String? _remoteVersion;
@@ -79,6 +83,26 @@ class AppUpdateProvider with ChangeNotifier {
   // 下载方式
   bool _useSystemDownloader = false;
   bool get useSystemDownloader => _useSystemDownloader;
+
+  // 节流控制
+  DateTime? _lastCheckTime;
+  DateTime? _lastInstallTime;
+  static const Duration _checkThrottleDuration = Duration(seconds: 3); // 检查更新节流3秒
+  static const Duration _installThrottleDuration = Duration(seconds: 5); // 安装节流5秒
+
+  ///2.1. 检查是否可以进行更新检查 (节流控制)
+  bool get canCheckUpdate {
+    if (_isCheckingUpdate) return false;
+    if (_lastCheckTime == null) return true;
+    return DateTime.now().difference(_lastCheckTime!) > _checkThrottleDuration;
+  }
+
+  ///2.2. 检查是否可以进行安装 (节流控制)  
+  bool get canInstall {
+    if (_isInstalling) return false;
+    if (_lastInstallTime == null) return true;
+    return DateTime.now().difference(_lastInstallTime!) > _installThrottleDuration;
+  }
 
   ///2. 初始化权限状态检查
   Future<void> initializePermissions() async {
@@ -225,10 +249,81 @@ class AppUpdateProvider with ChangeNotifier {
     }
   }
 
+  ///7. 加载本地保存的版本描述
+  Future<void> _loadCurrentVersionDescription() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      _currentVersionDescription = prefs.getString('app_version_description');
+      _logger.d('📖 加载本地版本描述: ${_currentVersionDescription ?? '(无)'}');
+    } catch (e) {
+      _logger.e('❌ 加载本地版本描述失败: $e');
+      _currentVersionDescription = null;
+    }
+  }
+
+  ///7a. 保存版本描述到本地
+  Future<void> _saveCurrentVersionDescription(String description) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString('app_version_description', description);
+      _currentVersionDescription = description;
+      _logger.d('💾 保存版本描述: $description');
+    } catch (e) {
+      _logger.e('❌ 保存版本描述失败: $e');
+    }
+  }
+
+  ///7b. 检查是否需要更新（增强版 - 考虑description）
+  bool _needsUpdateWithDescription(
+    String currentVersion,
+    String currentBuild,
+    String? currentDescription,
+    String remoteVersion,
+    String remoteBuild,
+    String remoteDescription,
+  ) {
+    // 首先使用原有的版本号和构建号比较逻辑
+    final versionNeedsUpdate = VersionUtil.needsUpdate(
+      currentVersion,
+      currentBuild,
+      remoteVersion,
+      remoteBuild,
+    );
+
+    // 如果版本需要更新，直接返回true
+    if (versionNeedsUpdate) {
+      _logger.i('📱 版本号检查: 需要更新 ($currentVersion → $remoteVersion)');
+      return true;
+    }
+
+    // 如果版本号相同，检查description是否不同
+    if (currentVersion == remoteVersion && currentBuild == remoteBuild) {
+      final descriptionChanged = (currentDescription ?? '') != remoteDescription;
+      if (descriptionChanged) {
+        _logger.i('📝 描述检查: 发现描述变化，需要更新');
+        _logger.d('   当前描述: ${currentDescription ?? '(空)'}');
+        _logger.d('   远程描述: $remoteDescription');
+        return true;
+      }
+    }
+
+    _logger.i('✅ 版本和描述检查: 无需更新');
+    return false;
+  }
+
   ///8. 检查应用更新
   Future<void> checkForUpdate({bool autoDownload = false}) async {
+    // 节流检查
+    if (!canCheckUpdate) {
+      _logger.i('⏳ 检查更新操作频繁，请稍后再试');
+      _error = '操作频繁，请稍后再试';
+      notifyListeners();
+      return;
+    }
+
     try {
       _isCheckingUpdate = true;
+      _lastCheckTime = DateTime.now(); // 记录操作时间
       _error = null;
       notifyListeners();
 
@@ -280,15 +375,24 @@ class AppUpdateProvider with ChangeNotifier {
       _downloadUrl = downloadUrl;
 
       _logger.i('🌐 遠程版本: $_remoteVersion');
-
+      _logger.i('📝 遠程描述: $description');
       _logger.i('🔗 下載鏈接: $downloadUrl');
 
-      // 检查是否需要更新
-      final needsUpdate = VersionUtil.needsUpdate(
-          currentVersion, currentBuild, remoteVersion, remoteBuild);
+      // 加载当前版本的描述（如果存在）
+      await _loadCurrentVersionDescription();
+
+      // 使用增强的更新检查逻辑（同时考虑版本和描述）
+      final needsUpdate = _needsUpdateWithDescription(
+        currentVersion,
+        currentBuild, 
+        _currentVersionDescription,
+        remoteVersion,
+        remoteBuild,
+        description,
+      );
 
       if (needsUpdate) {
-        _logger.i('✅ 發現新版本，需要更新');
+        _logger.i('✅ 發現新版本或内容更新，需要更新');
         _hasUpdate = true;
         // 检查是否已下载
         await _checkLocalApk();
@@ -345,8 +449,11 @@ class AppUpdateProvider with ChangeNotifier {
 
       // 获取下载目录
       final downloadDir = await _getDownloadDirectory();
+      
+      // 生成包含description哈希的文件名
+      final descriptionHash = _updateDescription?.hashCode.toString() ?? '0';
       final fileName =
-          'iboard_v${_remoteVersionNumber}_$_remoteBuildNumber.apk';
+          'iboard_v${_remoteVersionNumber}_${_remoteBuildNumber}_$descriptionHash.apk';
       final filePath = '${downloadDir.path}/$fileName';
 
       _logger.i('📁 下載路徑: $filePath');
@@ -432,8 +539,17 @@ class AppUpdateProvider with ChangeNotifier {
       return;
     }
 
+    // 节流检查
+    if (!canInstall) {
+      _logger.i('⏳ 安装操作频繁，请稍后再试');
+      _error = '操作频繁，请稍后再试';
+      notifyListeners();
+      return;
+    }
+
     try {
       _isInstalling = true;
+      _lastInstallTime = DateTime.now(); // 记录操作时间
       _error = null;
       notifyListeners();
 
@@ -459,6 +575,12 @@ class AppUpdateProvider with ChangeNotifier {
 
       if (result.type == ResultType.done) {
         _logger.i('✅ APK安裝程序已啟動');
+        
+        // 安装程序启动成功后，保存当前的description以备下次比较
+        if (_updateDescription != null) {
+          await _saveCurrentVersionDescription(_updateDescription!);
+          _logger.i('💾 已保存当前版本描述信息');
+        }
       } else {
         _logger.e('❌ 啟動APK安裝失敗: ${result.message}');
         _error = '启动APK安装失败: ${result.message}';
@@ -481,18 +603,23 @@ class AppUpdateProvider with ChangeNotifier {
 
     try {
       final downloadDir = await _getDownloadDirectory();
+      
+      // 生成包含description哈希的文件名，确保description变化时重新下载
+      final descriptionHash = _updateDescription?.hashCode.toString() ?? '0';
       final fileName =
-          'iboard_v${_remoteVersionNumber}_$_remoteBuildNumber.apk';
+          'iboard_v${_remoteVersionNumber}_${_remoteBuildNumber}_$descriptionHash.apk';
       final filePath = '${downloadDir.path}/$fileName';
 
       final file = File(filePath);
       if (await file.exists()) {
         _localApkPath = filePath;
         _hasLocalApk = true;
-        _logger.i('✅ AppUpdateProvider: 找到本地APK文件 - $filePath');
+        _logger.i('✅ AppUpdateProvider: 找到匹配的本地APK文件 - $filePath');
       } else {
         _hasLocalApk = false;
-        _logger.i('❌ AppUpdateProvider: 本地APK文件不存在');
+        _logger.i('❌ AppUpdateProvider: 本地APK文件不存在或description已变更，需要重新下载');
+        // 清理可能存在的旧版本APK文件
+        await _cleanOldVersionApkFiles();
       }
     } catch (e) {
       _hasLocalApk = false;
@@ -500,7 +627,33 @@ class AppUpdateProvider with ChangeNotifier {
     }
   }
 
-  ///7. 手动检查本地APK（用于页面刷新）
+  ///6a. 清理特定版本的旧APK文件
+  Future<void> _cleanOldVersionApkFiles() async {
+    try {
+      final downloadDir = await _getDownloadDirectory();
+      final files = downloadDir.listSync();
+      
+      // 查找当前版本的旧APK文件（不同description哈希）
+      final currentVersionPrefix = 'iboard_v${_remoteVersionNumber}_$_remoteBuildNumber';
+      
+      for (final file in files) {
+        if (file is File && 
+            file.path.contains(currentVersionPrefix) && 
+            file.path.endsWith('.apk')) {
+          try {
+            await file.delete();
+            _logger.i('🗑️ 已清理旧版本APK文件: ${file.path}');
+          } catch (e) {
+            _logger.w('⚠️ 清理APK文件失败: ${file.path} - $e');
+          }
+        }
+      }
+    } catch (e) {
+      _logger.e('❌ 清理旧版本APK文件失败: $e');
+    }
+  }
+
+  ///7. 手动检查本地APK（用于頁面刷新）
   Future<void> refreshLocalApkStatus() async {
     await _checkLocalApk();
     notifyListeners();
@@ -572,7 +725,7 @@ class AppUpdateProvider with ChangeNotifier {
     try {
       _logger.i('📱 使用系統下載管理器下載APK');
 
-      // 使用系统浏览器打开下载链接
+      // 使用系统浏览器打开下载鏈接
       await _openUrlInBrowser(_downloadUrl!);
 
       _downloadProgress = 0;
@@ -612,8 +765,8 @@ class AppUpdateProvider with ChangeNotifier {
       }
     } catch (e) {
       _logger.e('❌ 打開瀏覽器失敗: $e');
-      // 降级方案：显示下载链接让用户手动复制
-      _error = '无法自动打开浏览器，请手动复制以下链接下载：\n$url';
+      // 降级方案：显示下载鏈接让用户手动复制
+      _error = '无法自动打开浏览器，请手动复制以下鏈接下载：\n$url';
       rethrow;
     }
   }
@@ -699,6 +852,7 @@ class AppUpdateProvider with ChangeNotifier {
   ///12. 重置状态
   void resetState() {
     _currentVersion = null;
+    _currentVersionDescription = null; // 添加描述重置
     _remoteVersion = null;
     _remoteVersionNumber = null;
     _remoteBuildNumber = null;

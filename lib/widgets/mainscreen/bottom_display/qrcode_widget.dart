@@ -204,7 +204,7 @@ class QrcodeWidgetState extends State<QrcodeWidget> {
     );
   }
 
-  ///3，构建单个二维码卡片
+  ///3，构建單个二维码卡片
   Widget _buildQrCodeCard({
     required String title,
     required String subtitle,

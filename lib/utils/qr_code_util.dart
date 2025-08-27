@@ -165,7 +165,7 @@ class QrCodeUtil {
   }
 
   ///4，生成意见投诉二维码数据
-  /// 根据楼宇ID生成意见投诉二维码
+  /// 根据樓宇ID生成意见投诉二维码
   Future<Uint8List?> generateComplaintQrCode({
     required String ismartId,
     int size = 88,
@@ -178,7 +178,7 @@ class QrCodeUtil {
   }
 
   ///5，生成住户登记二维码数据
-  /// 根据楼宇ID生成住户登记二维码
+  /// 根据樓宇ID生成住户登记二维码
   Future<Uint8List?> generateRegistrationQrCode({
     required String ismartId,
     int size = 88,
@@ -289,12 +289,12 @@ class QrCodeUtil {
     }
   }
 
-  ///14，从二维码数据中提取楼宇ID
+  ///14，从二维码数据中提取樓宇ID
   String? extractIsmartIdFromQrCodeData(String data) {
     try {
       final uri = Uri.parse(data);
       if (uri.pathSegments.length >= 2) {
-        return uri.pathSegments[1]; // 获取路径中的第二个部分作为楼宇ID
+        return uri.pathSegments[1]; // 获取路径中的第二个部分作为樓宇ID
       }
       return null;
     } catch (e) {

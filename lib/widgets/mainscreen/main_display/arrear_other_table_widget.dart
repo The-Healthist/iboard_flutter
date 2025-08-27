@@ -33,7 +33,7 @@ class ArrearOtherTableWidgetState extends State<ArrearOtherTableWidget> {
   String? _lastDataVersion;
   bool _isWaitingForDataUpdate = false;
 
-  ///1, 自动返回主页方法
+  ///1, 自动返回主頁方法
   void autoReturnToHome() {
     if (widget.onHomeButtonPressed != null) {
       widget.onHomeButtonPressed!();
@@ -68,7 +68,7 @@ class ArrearOtherTableWidgetState extends State<ArrearOtherTableWidget> {
           _lastDataVersion = provider.currentDataVersion;
         }
 
-        // 监听媒体暂停状态 - 仅在轮播模式下生效
+        // 监听媒體暂停状态 - 仅在轮播模式下生效
         if (widget.isInCarouselMode) {
           final carouselStateProvider = context.watch<CarouselStateProvider>();
           final currentAppState = carouselStateProvider.currentAppState;
@@ -287,7 +287,7 @@ class ArrearOtherTableWidgetState extends State<ArrearOtherTableWidget> {
     );
   }
 
-  ///3, 构建表格数据（合并所有楼座数据）
+  ///3, 构建表格数据（合并所有樓座数据）
   List<Map<String, dynamic>> _buildTableData(ArrearProvider provider) {
     final List<Map<String, dynamic>> tableData = [];
 
@@ -315,15 +315,15 @@ class ArrearOtherTableWidgetState extends State<ArrearOtherTableWidget> {
     return tableData;
   }
 
-  ///3.1, 格式化单位显示（楼座+楼层+单元）
+  ///3.1, 格式化單位显示（樓座+樓层+單元）
   String _formatUnitDisplay(
       String blockName, String floorName, String unitName) {
     if (blockName.isEmpty) {
-      // 如果楼座名称为空，只显示楼层+单元
-      return '${floorName}${unitName}';
+      // 如果樓座名称为空，显示：XX樓XX室
+      return '${floorName}樓${unitName}室';
     } else {
-      // 显示楼座+楼层+单元，例如：01座01A
-      return '${blockName}座${floorName}${unitName}';
+      // 显示樓座+樓层+單元，例如：01座01樓A室
+      return '${blockName}座${floorName}樓${unitName}室';
     }
   }
 
@@ -374,11 +374,11 @@ class ArrearOtherTableWidgetState extends State<ArrearOtherTableWidget> {
   List<String> _getTableHeaders(List<Map<String, dynamic>> tableData) {
     if (tableData.isEmpty) return [];
 
-    // 固定顺序的表头，包括单位列
+    // 固定顺序的表头，包括單位列
     return ['單位', '費用', '類型', '費用明細', '日期'];
   }
 
-  ///9, 获取分页数据
+  ///9, 获取分頁数据
   List<Map<String, dynamic>> _getPaginatedData(
       List<Map<String, dynamic>> tableData) {
     final startIndex = (_currentPage - 1) * _itemsPerPage;
@@ -386,7 +386,7 @@ class ArrearOtherTableWidgetState extends State<ArrearOtherTableWidget> {
     return tableData.sublist(startIndex, endIndex);
   }
 
-  ///10, 构建分页控件
+  ///10, 构建分頁控件
   Widget _buildPagination(ArrearProvider provider) {
     final tableData = _buildTableData(provider);
     final totalItems = tableData.length;
@@ -420,7 +420,7 @@ class ArrearOtherTableWidgetState extends State<ArrearOtherTableWidget> {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          // 上一页按钮
+          // 上一頁按钮
           ElevatedButton(
             onPressed: _currentPage > 1
                 ? () {
@@ -446,7 +446,7 @@ class ArrearOtherTableWidgetState extends State<ArrearOtherTableWidget> {
 
           const SizedBox(width: 16),
 
-          // 页码显示
+          // 頁码显示
           Text(
             '第 $_currentPage 頁，共 $totalPages 頁',
             style: const TextStyle(
@@ -457,7 +457,7 @@ class ArrearOtherTableWidgetState extends State<ArrearOtherTableWidget> {
 
           const SizedBox(width: 16),
 
-          // 下一页按钮
+          // 下一頁按钮
           ElevatedButton(
             onPressed: _currentPage < totalPages
                 ? () {
@@ -486,7 +486,7 @@ class ArrearOtherTableWidgetState extends State<ArrearOtherTableWidget> {
     );
   }
 
-  ///11, 启动自动翻页
+  ///11, 启动自动翻頁
   void _startAutoPagination() {
     if (!widget.isInCarouselMode) return;
 
@@ -530,15 +530,13 @@ class ArrearOtherTableWidgetState extends State<ArrearOtherTableWidget> {
     });
   }
 
-  ///12, 启动实际的自动翻页逻辑
+  ///12, 启动实际的自动翻頁逻辑
   void _startActualAutoPagination() {
     final appDataProvider =
         Provider.of<AppDataProvider>(context, listen: false);
     final deviceSettings = appDataProvider.deviceSettings;
-    //paymentTableOnePageDuration 乘以 10
     final paginationDuration =
-        (deviceSettings?.paymentTableOnePageDuration ?? 3) * 5;
-    //TODO: 需要修改為從設定中獲取翻頁時間
+        (deviceSettings?.paymentTableOnePageDuration ?? 3) * 2;
     _autoPaginationTimer?.cancel();
     _autoPaginationTimer =
         Timer.periodic(Duration(seconds: paginationDuration), (timer) {
@@ -572,14 +570,14 @@ class ArrearOtherTableWidgetState extends State<ArrearOtherTableWidget> {
     });
   }
 
-  ///13, 暂停自动翻页
+  ///13, 暂停自动翻頁
   void _pauseAutoPagination() {
     if (!_isPaginationPaused) {
       _isPaginationPaused = true;
     }
   }
 
-  ///14, 恢复自动翻页
+  ///14, 恢复自动翻頁
   void _resumeAutoPagination() {
     if (_isPaginationPaused) {
       _isPaginationPaused = false;
@@ -591,7 +589,7 @@ class ArrearOtherTableWidgetState extends State<ArrearOtherTableWidget> {
     }
   }
 
-  ///15, 停止自动翻页
+  ///15, 停止自动翻頁
   void _stopAutoPagination() {
     _autoPaginationTimer?.cancel();
     _autoPaginationTimer = null;
