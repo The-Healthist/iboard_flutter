@@ -115,7 +115,13 @@ class AnnouncementPageState extends State<AnnouncementPage> {
     final announcementCarouselProvider =
         Provider.of<AnnouncementCarouselProvider>(context, listen: false);
     announcementCarouselProvider.setArrearProvider(_arrearProvider);
+
     WidgetsBinding.instance.addPostFrameCallback((_) {
+      // 🔧 修复：初始化时强制确保应用进入默认状态
+      final carouselStateProvider = context.read<CarouselStateProvider>();
+      carouselStateProvider.enterDefaultState();
+      _logger.i('🚀 应用初始化，强制进入默认轮播状态');
+
       _setupFullscreenAdPreloadCallback();
 
       _initializeMidWidgets();
@@ -124,6 +130,15 @@ class AnnouncementPageState extends State<AnnouncementPage> {
       _initializeNewsAnnouncements();
       _startDebugTimer();
       _startCarouselWatchdog();
+
+      // 🔧 修复：初始化时主动获取费用数据，确保轮播内容完整
+      _arrearProvider.initGetFeeData().then((_) {
+        _logger.i('✅ 费用数据初始化完成');
+        // 费用数据加载完成后，重新初始化中部轮播以包含费用表格
+        _initializeMidWidgets();
+      }).catchError((error) {
+        _logger.e('❌ 费用数据初始化失败: $error');
+      });
 
       // Trigger data fetching
       final advertisementProvider =
@@ -384,10 +399,14 @@ class AnnouncementPageState extends State<AnnouncementPage> {
 
     // 即使没有通告数据也要初始化轮播组件，确保主屏幕能正常显示
     if (carouselAnnouncements.isEmpty) {
-      _logger.w('⚠️ 通告数据为空，使用空列表初始化轮播组件');
+      _logger.w('⚠️ 通告数据为空，初始化费用表格轮播模式');
     } else {
       _logger.i('✅ 通告轮播数据初始化: ${carouselAnnouncements.length} 个通告');
     }
+
+    // 🔧 修复：无论是否有通告，都确保应用保持在默认轮播状态
+    // 不要让应用进入手动操作模式，而是保持轮播状态
+    carouselStateProvider.enterDefaultState();
 
     // 初始化通告轮播
     announcementCarouselProvider.initializeMidWidgets(
@@ -395,14 +414,17 @@ class AnnouncementPageState extends State<AnnouncementPage> {
       apiNoticeStayDuration: apiNoticeStayDuration,
       delayBeforeNotice: delayBeforeNotice,
       onAnnouncementTap: (AnnouncementModel? announcement) {
+        // 🔧 修复：点击通告时保持默认状态，不进入手动操作模式
         if (announcement == null) {
-          carouselStateProvider.enterManualOperation();
+          // 点击主屏幕时，不改变应用状态，保持轮播继续
+          _logger.d('🏠 点击主屏幕，保持轮播状态');
         } else {
           announcementCarouselProvider.showIndependentAnnouncement(announcement,
               () {
             announcementCarouselProvider.jumpToAnnouncementIndex(0);
           });
-          carouselStateProvider.enterManualOperation();
+          // 显示独立通告时也不进入手动模式，让轮播继续
+          _logger.d('📢 显示独立通告，保持轮播状态');
         }
       },
       onHomeButtonPressed: () {
@@ -410,7 +432,7 @@ class AnnouncementPageState extends State<AnnouncementPage> {
       },
     );
 
-    _logger.i('✅ 中部轮播初始化完成');
+    _logger.i('✅ 中部轮播初始化完成，应用状态: ${carouselStateProvider.currentAppState}');
   }
 
   ///9，初始化顶部轮播

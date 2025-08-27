@@ -42,6 +42,16 @@ android {
         targetSdk = 34
         versionCode = flutterVersionCode.toInteger()
         versionName = flutterVersionName
+        
+        // 增加JVM堆内存大小选项
+        javaCompileOptions {
+            annotationProcessorOptions {
+                arguments += [
+                    'room.schemaLocation': "$projectDir/schemas".toString(),
+                    'room.incremental': 'true'
+                ]
+            }
+        }
     }
 
     buildTypes {
