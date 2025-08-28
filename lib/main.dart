@@ -412,27 +412,6 @@ class HomePageState extends State<HomePage> {
     }
   }
 
-  ///2，设置全屏广告预加载回调
-  void _setupFullscreenAdPreloadCallback() {
-    final stateProvider = context.read<CarouselStateProvider>();
-    final fullAdProvider = context.read<FullscreenAdProvider>();
-
-    // 设置预加载回调
-    stateProvider.setPreloadFullscreenAdCallback(() async {
-      // 新的Provider没有预加载方法
-    });
-
-    // 设置进入全屏广告模式回调
-    stateProvider.setEnterFullscreenAdModeCallback(() {
-      fullAdProvider.enterFullscreenMode();
-    });
-
-    // 设置退出全屏广告模式回调
-    stateProvider.setExitFullscreenAdModeCallback(() {
-      fullAdProvider.exitFullscreenMode();
-    });
-  }
-
   @override
   Widget build(BuildContext context) {
     // 如果有初始化错误，显示错误頁面

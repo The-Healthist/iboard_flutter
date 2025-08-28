@@ -124,8 +124,8 @@ class FullscreenAdProvider extends ChangeNotifier {
     _fullscreenAds = List<AdModel>.from(newAds);
     debugPrint('🔄 更新全屏广告数据: ${_fullscreenAds.length}个广告');
 
-    // 重新创建广告Widget
-    await _createAdWidgets();
+    // 🎯 使用智能缓存检查重新创建广告Widget
+    await _ensureAdWidgets();
     notifyListeners();
   }
 
@@ -325,7 +325,8 @@ class FullscreenAdProvider extends ChangeNotifier {
         _currentAdIndex = 0;
       }
 
-      await _createAdWidgets();
+      // 确保是否有广告Widget
+      await _ensureAdWidgets();
 
       startFullscreenAdTimer(_currentAdIndex);
       startDebugTimer();
@@ -335,7 +336,32 @@ class FullscreenAdProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  ///10, 启动全屏广告计时器 - 添加视频切换延迟
+  ///9a, 确保广告Widget存在（智能缓存检查）
+  Future<void> _ensureAdWidgets() async {
+    final List<Widget> widgets = [];
+
+    for (int i = 0; i < fullscreenAds.length; i++) {
+      final ad = fullscreenAds[i];
+      final key = 'fullscreen_ad_${ad.id}_$i';
+      if (_widgetCache.containsKey(key)) {
+        // 使用缓存的Widget
+        widgets.add(_widgetCache[key]!);
+        debugPrint('📺 使用缓存Widget: ${ad.title}');
+      } else {
+        // 创建新Widget并加入缓存
+        debugPrint('📺 创建新Widget: ${ad.title}');
+        final widget = await _createCachedAdWidget(ad, i);
+        _widgetCache[key] = widget;
+        widgets.add(widget);
+      }
+    }
+
+    _adWidgets = widgets;
+    debugPrint(
+        '📺 广告Widget准备完成: ${_adWidgets.length}个 (缓存命中: ${_widgetCache.length}个)');
+  }
+
+  ///10, 启动全屏广告计时
   void startFullscreenAdTimer(int currentIndex) {
     _fullscreenTimer?.cancel(); // 取消之前的计时器
 
@@ -344,13 +370,6 @@ class FullscreenAdProvider extends ChangeNotifier {
       debugPrint('⚠️ 全屏广告列表为空，无法启动计时器');
       return;
     }
-
-    if (currentIndex < 0 || currentIndex >= fullscreenAds.length) {
-      debugPrint(
-          '⚠️ 广告索引越界: $currentIndex (有效范围: 0-${fullscreenAds.length - 1})');
-      return;
-    }
-
     if (_isPaused) {
       debugPrint('⚠️ 广告已暂停，跳过计时器启动');
       return;
@@ -390,7 +409,7 @@ class FullscreenAdProvider extends ChangeNotifier {
     }
   }
 
-  ///10, 切换到下一个广告（私有方法）- 添加视频切换延迟
+  ///10, 切换到下一个广告（私有方法）- 优化版本，参考顶部广告的优雅实现
   Future<void> _nextAd() async {
     if (fullscreenAds.isEmpty || _isPaused || !_isActive) {
       debugPrint(
@@ -398,11 +417,19 @@ class FullscreenAdProvider extends ChangeNotifier {
       return;
     }
 
-    // 切换到下一个广告 - 使用模运算确保循环
+    if (fullscreenAds.isEmpty) {
+      debugPrint('⚠️ 全屏广告列表为空，无法切换广告');
+      return;
+    }
+
+    // 🎯 关键改进1: 在切换之前先暂停和重置当前广告
+    await _pauseAndResetCurrentAd();
+
+    // 切换到下一个广告索引
     _currentAdIndex = (_currentAdIndex + 1) % fullscreenAds.length;
 
-    // 额外的安全检查
-    _validateAndFixIndex();
+    debugPrint(
+        '🔄 全屏广告切换: 索引 ${_currentAdIndex}/${fullscreenAds.length} - ${fullscreenAds[_currentAdIndex].title}');
 
     // 检查是否有待更新的Widget
     if (_pendingWidgetUpdate) {
@@ -418,21 +445,6 @@ class FullscreenAdProvider extends ChangeNotifier {
     // 清除当前广告的视频进度
     clearVideoProgress(fullscreenAds[_currentAdIndex].id.toString());
 
-    // 尝试释放之前的控制器
-    final previousAdId = fullscreenAds[
-            (_currentAdIndex - 1 + fullscreenAds.length) % fullscreenAds.length]
-        .id
-        .toString();
-    final previousKey = 'fullscreen_ad_$previousAdId';
-    if (_videoControllerCache.containsKey(previousKey)) {
-      try {
-        _videoControllerCache[previousKey]?.pause();
-        _videoControllerCache[previousKey]?.seekTo(Duration.zero);
-      } catch (e) {
-        debugPrint('⚠️ 释放前一个控制器时出错: $e');
-      }
-    }
-
     notifyListeners();
 
     // 添加小延迟，让前一个视频有时间完全释放资源
@@ -443,21 +455,19 @@ class FullscreenAdProvider extends ChangeNotifier {
     });
   }
 
-  ///24, 验证并修正广告索引
-  void _validateAndFixIndex() {
-    if (fullscreenAds.isEmpty) {
-      _currentAdIndex = 0;
-      return;
-    }
+  ///10a, 暂停和重置当前广告（参考顶部广告的实现）- 优化版本：让Widget自己释放
+  Future<void> _pauseAndResetCurrentAd() async {
+    debugPrint('⏸️ 开始暂停当前全屏广告 - 让Widget自己处理释放');
 
-    if (_currentAdIndex < 0) {
-      debugPrint('⚠️ 索引小于0，修正为0: $_currentAdIndex → 0');
-      _currentAdIndex = 0;
-    } else if (_currentAdIndex >= fullscreenAds.length) {
-      debugPrint(
-          '⚠️ 索引越界，修正为0: $_currentAdIndex → 0 (总数: ${fullscreenAds.length})');
-      _currentAdIndex = 0;
-    }
+    // 获取当前广告的控制器信息
+    final currentAd = getCurrentAd();
+    if (currentAd == null) return;
+
+    debugPrint('� 准备切换广告，让Widget自己处理暂停和释放: ${currentAd.title}');
+
+    // 延迟确保Widget有时间处理 - 这很重要！
+    await Future.delayed(const Duration(milliseconds: 150));
+    debugPrint('✅ 全屏广告Widget处理时间预留完成');
   }
 
   ///24, 公开的切换到下一个广告方法（供外部调用）
@@ -565,11 +575,6 @@ class FullscreenAdProvider extends ChangeNotifier {
   void exitFullscreenMode() {
     if (!_isActive) return;
 
-    // 为下次进入准备下一个广告（但不触发切换逻辑）
-    if (fullscreenAds.isNotEmpty) {
-      _currentAdIndex = (_currentAdIndex + 1) % fullscreenAds.length;
-    }
-
     // 确保取消所有定时器
     _isActive = false;
     _fullscreenTimer?.cancel();
@@ -582,7 +587,18 @@ class FullscreenAdProvider extends ChangeNotifier {
     // 清除所有视频进度记录
     _videoProgressMap.clear();
 
-    notifyListeners();
+    // 🎯 关键修改：将索引更新放在notifyListeners前面
+    // 为下次进入准备下一个广告（但不触发切换逻辑）
+    if (fullscreenAds.isNotEmpty) {
+      _currentAdIndex = (_currentAdIndex + 1) % fullscreenAds.length;
+    }
+
+    // 🎯 延迟通知，避免Dialog关闭前显示下一个广告的闪现
+    Future.delayed(const Duration(milliseconds: 500), () {
+      if (hasListeners) {
+        notifyListeners();
+      }
+    });
   }
 
   ///15, 启动调试定时器 - 每秒输出全屏广告的实时状态（已禁用）
@@ -688,23 +704,28 @@ class FullscreenAdProvider extends ChangeNotifier {
 
   @override
   void dispose() {
+    debugPrint('🗑️ FullscreenAdProvider dispose 开始');
+
+    // 取消所有定时器
     _fullscreenTimer?.cancel();
     _fullscreenTimer = null;
 
     _debugTimer?.cancel();
     _debugTimer = null;
 
-    // 清理缓存
+    // 清理缓存 - 保留这些，因为需要清理内存引用
     _widgetCache.clear();
     _fileManagerCache.clear();
 
-    // 释放所有缓存的视频控制器
-    _videoControllerCache.forEach((key, controller) {
-      controller.dispose();
-    });
+    if (_videoControllerCache.isNotEmpty) {
+      debugPrint(
+          'ℹ️ dispose时发现 ${_videoControllerCache.length} 个控制器缓存将由Widget自己释放');
+    }
+
     _videoControllerCache.clear();
     _videoProgressCache.clear();
 
+    debugPrint('✅ FullscreenAdProvider dispose 完成');
     super.dispose();
   }
 }

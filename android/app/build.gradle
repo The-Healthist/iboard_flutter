@@ -56,8 +56,15 @@ android {
 
     buildTypes {
         release {
-        
+            // 为了先稳定功能，可先禁用代码压缩与资源收缩，再逐步打开定位问题
+            minifyEnabled false
+            shrinkResources false
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
             signingConfig = signingConfigs.debug
+            // 如果仍有问题可尝试：minifyEnabled false
+        }
+        debug {
+            // 保持默认
         }
     }
 }

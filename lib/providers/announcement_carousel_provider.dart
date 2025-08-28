@@ -767,7 +767,7 @@ class AnnouncementCarouselProvider extends ChangeNotifier {
     _debugTimer = null;
   }
 
-  ///4，恢复通告轮播
+  ///4，恢复通告轮播 - 修复时间计算逻辑
   void resumeMidCarousel(int apiNoticeStayDuration,
       {bool forceJumpToIndex = false}) {
     final widgetCount = _midCarouselController.widgetCount;
@@ -786,19 +786,17 @@ class AnnouncementCarouselProvider extends ChangeNotifier {
     // 恢复轮播中的媒體内容
     _midCarouselController.resumeAllMedia();
 
-    // 恢復通告輪播 - 使用視頻播放進度而不是時間
-    // 修复：即使只有管理费用表格（widgetCount = 2：主屏幕+管理费用）也要进入轮播模式
+    // 修复核心问题：从全屏广告恢复时的时间计算
     if (_midCarouselController.widgetCount >= 2 && !_isMidCarouselPaused) {
       debugPrint(
           '[AnnouncementCarousel] ✅ 满足轮播条件，开始轮播 (widgetCount: ${_midCarouselController.widgetCount})');
 
-      _noticeDuration = Duration(seconds: apiNoticeStayDuration); // 更新当前时长配置
+      _noticeDuration = Duration(seconds: apiNoticeStayDuration);
 
-      // 重要修復：不要重置開始時間，保持暫停前的時間狀態
-      // 這樣可以從暫停位置繼續，而不是重新開始
-      if (_currentNoticeStartTime == null) {
-        _currentNoticeStartTime = DateTime.now();
-      }
+      // 修复关键问题：从全屏广告恢复时，重新开始时间计算
+      // 这样可以避免"剩余时间不足"的错误判断，给当前内容完整的展示时间
+      _currentNoticeStartTime = DateTime.now();
+      _noticeElapsedTime = Duration.zero;
 
       // 只有在强制跳转时才确保当前索引在通告范围内
       if (forceJumpToIndex && _currentNoticeIndex < 1) {
@@ -806,74 +804,11 @@ class AnnouncementCarouselProvider extends ChangeNotifier {
         _midCarouselController.jumpToIndex(_currentNoticeIndex);
       }
 
-      // 使用視頻播放進度來計算剩餘時間
-      final remainingNoticeTime =
-          _calculateSmartRemainingTime(apiNoticeStayDuration);
+      // 开始正常的轮播调度，给当前内容完整的展示时间
+      debugPrint(
+          '[AnnouncementCarousel] ⏰ [恢复] 重新开始当前内容，停留时长: $apiNoticeStayDuration 秒');
 
-      if (remainingNoticeTime.inSeconds > 1) {
-        // 剩余时间足够，先等待剩余时间再继续轮播
-        debugPrint(
-            '[AnnouncementCarousel] ⏰ [恢复] 等待剩余时间后继续无限轮播，剩余: ${remainingNoticeTime.inSeconds}秒');
-
-        // 更新当前通告开始时间，使其能正确计算剩余时间
-        _currentNoticeStartTime = DateTime.now();
-        // 保持 _noticeElapsedTime 不变，这样能正确显示从暂停位置继续的时间
-
-        _midTimer = Timer(remainingNoticeTime, () {
-          if (!_isMidCarouselPaused) {
-            // 检查当前是否在欠费总览頁面
-            final isCurrentlyOnArrearTable =
-                _currentNoticeIndex == (_midCarouselController.widgetCount - 1);
-
-            if (isCurrentlyOnArrearTable) {
-              // 如果当前在欠费总览頁面，不直接切换，让自动翻頁完成
-              // 重要修復：不要重置開始時間，保持暫停恢復的邏輯
-              // _currentNoticeStartTime = DateTime.now();
-            } else {
-              // 不是欠费总览，正常切换到下一个内容
-              _currentNoticeIndex++;
-              if (_currentNoticeIndex >= _midCarouselController.widgetCount) {
-                _currentNoticeIndex = 1; // 回到第一个内容，跳过主屏幕
-              }
-              _midCarouselController.jumpToIndex(_currentNoticeIndex);
-              _scheduleNextCarousel(apiNoticeStayDuration);
-            }
-          }
-        });
-      } else {
-        // 剩余时间不足的特殊处理
-        debugPrint('[AnnouncementCarousel] ⚡ [恢复] 剩余时间不足，立即切换到下一个内容');
-
-        // 检查当前是否在欠费总览頁面（最后一个索引）
-        final isCurrentlyOnArrearTable =
-            _currentNoticeIndex == (_midCarouselController.widgetCount - 1);
-
-        if (isCurrentlyOnArrearTable) {
-          // 如果当前在欠费总览頁面，不直接切换，继续展示欠费总览
-
-          // 重置开始时间，给欠费总览足够时间完成翻頁
-          _currentNoticeStartTime = DateTime.now();
-
-          // 不调用 _scheduleNextCarousel，让欠费总览的翻頁完成回调来处理切换
-        } else {
-          // 不是欠费总览，正常处理：直接启动下一个内容并开始无限轮播
-
-          // 如果当前不在内容上，跳转到第一个内容
-          if (_currentNoticeIndex < 1) {
-            _currentNoticeIndex = 1;
-            _midCarouselController.jumpToIndex(_currentNoticeIndex);
-          } else {
-            // 切换到下一个内容
-            _currentNoticeIndex++;
-            if (_currentNoticeIndex >= _midCarouselController.widgetCount) {
-              _currentNoticeIndex = 1; // 回到第一个内容，跳过主屏幕
-            }
-            _midCarouselController.jumpToIndex(_currentNoticeIndex);
-          }
-
-          _scheduleNextCarousel(apiNoticeStayDuration);
-        }
-      }
+      _scheduleNextCarousel(apiNoticeStayDuration);
     } else {
       // 条件不满足的情况
       debugPrint(
@@ -960,7 +895,13 @@ class AnnouncementCarouselProvider extends ChangeNotifier {
   void updateCarouselPauseState(bool isPaused) {
     _isMidCarouselPaused = isPaused;
     // _logger.i('🎛️ 通告轮播状态更新: ${!_isMidCarouselPaused ? "运行" : "暂停"}'); // _logger is not defined
-    notifyListeners();
+
+    // 使用 addPostFrameCallback 延迟通知，避免 setState during build 错误
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (hasListeners) {
+        notifyListeners();
+      }
+    });
   }
 
   ///6，检查并恢复轮播状态（监控定时器使用）

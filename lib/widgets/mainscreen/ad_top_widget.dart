@@ -4,7 +4,6 @@ import 'package:iboard_app/models/ad_model.dart'; // Assuming AdModel exists
 import 'package:iboard_app/managers/file_manager.dart'; // Assuming FileManager exists
 import 'package:iboard_app/providers/state_provider.dart';
 import 'package:iboard_app/widgets/carousel_widget.dart'; // 导入通知类
-import 'package:iboard_app/utils/video_resource_manager.dart';
 import 'package:iboard_app/utils/enhanced_video_pool_manager.dart';
 import 'package:iboard_app/providers/advertisement_provider.dart';
 import 'package:video_player/video_player.dart';
@@ -201,55 +200,85 @@ class TopAdWidgetState extends State<TopAdWidget> {
     }
   }
 
-  //3，暂停视频播放 - 使用视频资源管理器
+  //3，暂停视频播放 - 使用标准VideoPlayerController
   Future<void> _pauseVideo() async {
     if (_videoController != null) {
-      final success = await _videoController!.safePause();
-      if (success) {
-        isManuallyPaused = true;
-        // _logger.i('📱 手动暂停顶部广告视频播放 - ${widget.ad.title}');
-      } else {
-        _logger.w('⚠️ 暂停视频播放失败');
+      try {
+        if (_videoController!.value.isInitialized &&
+            !_videoController!.value.hasError &&
+            _videoController!.value.isPlaying) {
+          await _videoController!.pause();
+          isManuallyPaused = true;
+          // _logger.i('📱 手动暂停顶部广告视频播放 - ${widget.ad.title}');
+        }
+      } catch (e) {
+        _logger.w('⚠️ 暂停视频播放失败: $e');
       }
     }
   }
 
-  //4，恢复视频播放 - 使用视频资源管理器
+  //4，恢复视频播放 - 使用标准VideoPlayerController
   Future<void> _resumeVideo() async {
     if (_videoController != null) {
-      // 检查视频是否处于暂停状态，无论是什么原因暂停的
-      if (_videoController!.safeState == VideoControllerState.paused) {
-        final success = await _videoController!.safePlay();
-        if (success) {
+      try {
+        // 检查视频是否处于暂停状态
+        if (_videoController!.value.isInitialized &&
+            !_videoController!.value.hasError &&
+            !_videoController!.value.isPlaying) {
+          await _videoController!.play();
           isManuallyPaused = false;
           // _logger.i('📱 恢复顶部广告视频播放 - ${widget.ad.title}');
-        } else {
-          _logger.w('⚠️ 恢复视频播放失败');
         }
+      } catch (e) {
+        _logger.w('⚠️ 恢复视频播放失败: $e');
       }
+    }
+  }
+
+  //5，处理轮播切换时的清理
+  Future<void> _handleCarouselSwitch() async {
+    if (_videoController != null) {
+      // 直接释放控制器（释放方法内部已包含暂停逻辑）
+      _releaseVideoController();
+      _logger.d('🔄 处理轮播切换，释放控制器: ${widget.ad.title}');
     }
   }
 
   @override
   void dispose() {
+    _releaseVideoController();
+    super.dispose();
+  }
+
+  ///释放视频控制器到增强池中（优化版本）
+  Future<void> _releaseVideoController() async {
     if (_videoController != null && _localFilePath != null) {
-      // 释放控制器到增强池中，避免阻塞dispose
       try {
-        // 使用保存的Provider引用，避免context访问问题
+        // 确保Provider引用可用
+        _advertisementProvider ??= context.read<AdvertisementProvider>();
+
         if (_advertisementProvider != null) {
-          _advertisementProvider!.videoPoolManager.releaseController(
+          // 先暂停视频播放
+          if (_videoController!.value.isPlaying) {
+            await _videoController!.pause();
+          }
+
+          // 释放控制器到池中
+          await _advertisementProvider!.videoPoolManager.releaseController(
             filePath: _localFilePath!,
             videoType: VideoType.topAd,
           );
+
+          _logger.d('✅ 顶部广告视频控制器已释放到池中: ${widget.ad.title}');
         } else {
           _logger.w('⚠️ AdvertisementProvider引用为空，无法释放视频控制器');
         }
       } catch (e) {
         _logger.w('⚠️ 释放视频控制器时出错: $e');
       }
+
       _videoController = null;
     }
-    super.dispose();
   }
 
   @override
@@ -260,25 +289,27 @@ class TopAdWidgetState extends State<TopAdWidget> {
         carouselStateProvider.isMediaPausedForArea(AreaType.topAd);
 
     // 根据媒体状态控制视频播放 - 使用防抖动控制避免频繁调用
-    if (_videoController != null) {
-      final state = _videoController!.safeState;
-      if (isMediaPaused && state == VideoControllerState.playing) {
+    if (_videoController != null && _videoController!.value.isInitialized) {
+      final isPlaying = _videoController!.value.isPlaying;
+      if (isMediaPaused && isPlaying) {
         // 延迟100ms执行，避免频繁调用
         Future.delayed(const Duration(milliseconds: 100), () {
           if (mounted &&
               _videoController != null &&
-              _videoController!.safeState == VideoControllerState.playing) {
-            _videoController!.safePause();
+              _videoController!.value.isInitialized &&
+              _videoController!.value.isPlaying) {
+            _videoController!.pause();
             // _logger.d('防抖动暂停顶部广告视频播放');
           }
         });
-      } else if (!isMediaPaused && state == VideoControllerState.paused) {
+      } else if (!isMediaPaused && !isPlaying) {
         // 延迟100ms执行，避免频繁调用
         Future.delayed(const Duration(milliseconds: 100), () {
           if (mounted &&
               _videoController != null &&
-              _videoController!.safeState == VideoControllerState.paused) {
-            _videoController!.safePlay();
+              _videoController!.value.isInitialized &&
+              !_videoController!.value.isPlaying) {
+            _videoController!.play();
             // _logger.d('防抖动恢复顶部广告视频播放');
           }
         });
@@ -289,22 +320,38 @@ class TopAdWidgetState extends State<TopAdWidget> {
     return NotificationListener<Notification>(
       onNotification: (notification) {
         if (notification is MediaPauseNotification) {
-          // 防抖动执行，避免重复调用
-          Future.delayed(const Duration(milliseconds: 50), () {
-            if (mounted &&
-                _videoController != null &&
-                _videoController!.safeState == VideoControllerState.playing) {
-              _pauseVideo();
-              // _logger.i('📱 防抖动暂停视频 - ${widget.ad.title}');
-            }
-          });
+          // 检查是否是轮播切换触发的暂停（通过Provider状态判断）
+          final carouselStateProvider = context.read<CarouselStateProvider>();
+          final isFullscreenAd =
+              carouselStateProvider.currentAppState == AppState.fullscreenAd;
+
+          if (isFullscreenAd) {
+            // 全屏广告状态：处理轮播切换，需要释放控制器
+            Future.delayed(const Duration(milliseconds: 50), () {
+              if (mounted) {
+                _handleCarouselSwitch();
+              }
+            });
+          } else {
+            // 普通暂停：只暂停视频，不释放控制器
+            Future.delayed(const Duration(milliseconds: 50), () {
+              if (mounted &&
+                  _videoController != null &&
+                  _videoController!.value.isInitialized &&
+                  _videoController!.value.isPlaying) {
+                _pauseVideo();
+                // _logger.i('📱 防抖动暂停视频 - ${widget.ad.title}');
+              }
+            });
+          }
           return true; // 阻止通知继续传递
         } else if (notification is MediaResumeNotification) {
           // 防抖动执行，避免重复调用
           Future.delayed(const Duration(milliseconds: 50), () {
             if (mounted &&
                 _videoController != null &&
-                _videoController!.safeState == VideoControllerState.paused) {
+                _videoController!.value.isInitialized &&
+                !_videoController!.value.isPlaying) {
               _resumeVideo();
               // _logger.i('📱 防抖动恢复视频 - ${widget.ad.title}');
             }

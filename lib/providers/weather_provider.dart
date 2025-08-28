@@ -501,7 +501,13 @@ class WeatherProvider extends ChangeNotifier {
 
     _isBottomCarouselPaused = true;
     _bottomTimer?.cancel();
-    notifyListeners();
+
+    // 使用 addPostFrameCallback 延迟通知，避免 setState during build 错误
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (hasListeners) {
+        notifyListeners();
+      }
+    });
   }
 
   ///17，恢复底部轮播
@@ -602,7 +608,13 @@ class WeatherProvider extends ChangeNotifier {
 
     _isCurrentWeatherCardPaused = true;
     _currentWeatherCardTimer?.cancel();
-    notifyListeners();
+
+    // 使用 addPostFrameCallback 延迟通知，避免 setState during build 错误
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (hasListeners) {
+        notifyListeners();
+      }
+    });
   }
 
   ///27，恢复当前天气卡片轮播

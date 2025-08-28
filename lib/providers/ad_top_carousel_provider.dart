@@ -32,9 +32,8 @@ class TopAdCarouselProvider extends ChangeNotifier {
   // 狀態管理
   bool _isTopCarouselPaused = false;
 
-  // 時間記錄相關 - 用於全屏廣告暫停恢復
+  // 時間記錄相關 - 简化版本（暂停即切换，不需要复杂的时间管理）
   DateTime? _currentTopAdStartTime; // 當前頂部廣告開始時間
-  DateTime? _currentTopAdPauseTime; // 當前頂部廣告暫停時間
   Duration _topAdElapsedTime = Duration.zero; // 頂部廣告已播放時間
   Duration _topAdDuration = const Duration(seconds: 15); // 頂部廣告總時長
   int _currentTopAdIndex = 0; // 當前頂部廣告索引
@@ -198,7 +197,7 @@ class TopAdCarouselProvider extends ChangeNotifier {
     );
   }
 
-  ///7，啟動頂部廣告計時器
+  ///4，啟動頂部廣告計時器（简化版本 - 每次都是新广告）
   void startTopAdTimer(int currentIndex) {
     _topTimer?.cancel();
     if (topAds.length <= 1 ||
@@ -209,27 +208,14 @@ class TopAdCarouselProvider extends ChangeNotifier {
     }
 
     final ad = topAds[currentIndex];
-    Duration timerDuration; // 計算實際需要的定時器時長
 
-    // 重要修复：只有在没有开始时间或索引变化时才重置时间
-    if (_currentTopAdStartTime == null || _currentTopAdIndex != currentIndex) {
-      _currentTopAdStartTime = DateTime.now();
-      _topAdDuration = ad.durationObject;
-      _currentTopAdIndex = currentIndex;
-      _topAdElapsedTime = Duration.zero;
-      timerDuration = _topAdDuration; // 新廣告使用完整時長
-    } else {
-      // 如果是恢复状态，保持现有的时间设置
-      _topAdDuration = ad.durationObject;
-      _currentTopAdIndex = currentIndex;
-      final remainingTime = _topAdDuration - _topAdElapsedTime;
-      timerDuration = remainingTime.isNegative
-          ? Duration.zero
-          : remainingTime; // 恢復狀態使用剩餘時長
-    }
+    // 简化逻辑：每次启动都是新广告，使用完整时长
+    _currentTopAdStartTime = DateTime.now();
+    _topAdDuration = ad.durationObject;
+    _currentTopAdIndex = currentIndex;
+    _topAdElapsedTime = Duration.zero;
 
-    // 關鍵修復：使用計算出的定時器時長而不是廣告總時長
-    _topTimer = Timer(timerDuration, () {
+    _topTimer = Timer(_topAdDuration, () {
       if (_topCarouselController.widgetCount > 1 && !_isTopCarouselPaused) {
         // 在播放下一個廣告之前檢查是否有待處理的更新
         if (_pendingWidgetUpdate) {
@@ -244,44 +230,27 @@ class TopAdCarouselProvider extends ChangeNotifier {
     });
   }
 
-  /// 暫停頂部輪播
+  ///5，暂停頂部輪播（优化版本 - 包含视频控制器管理）
   void pauseTopCarousel() {
-    // 记录当前播放时间
-    _currentTopAdPauseTime = DateTime.now();
-
-    // 计算已播放时间 - 修复时间累积问题
-    if (_currentTopAdStartTime != null) {
-      final rawElapsed =
-          _currentTopAdPauseTime!.difference(_currentTopAdStartTime!);
-
-      // 關鍵修復：確保時間累積正確，避免多次暫停恢復時時間計算錯誤
-      _topAdElapsedTime = rawElapsed;
-
-      // 确保已播放时间不超过广告总时长
-      if (_topAdElapsedTime >= _topAdDuration) {
-        _topAdElapsedTime = _topAdDuration;
-      }
-
-      // 添加額外的狀態一致性檢查
-      if (_topAdElapsedTime > _topAdDuration) {
-        _logger.w('⚠️ 異常：已播放時間超過廣告總時長');
-        _topAdElapsedTime = _topAdDuration;
-      }
-    }
-
-    // 設置頂部輪播為暫停狀態
+    // 设置頂部輪播为暂停状态
     _isTopCarouselPaused = true;
 
-    // 暫停定時器
+    // 取消当前定时器
     _topTimer?.cancel();
 
-    // 暫停輪播中的媒體內容
-    _topCarouselController.pauseAllMedia();
+    // 暂停当前视频并通知Widget释放控制器
+    _pauseCurrentVideo();
 
-    // 直接切換到下一個廣告
+    // 直接切换到下一个广告（这是核心逻辑）
     if (_topCarouselController.widgetCount > 1) {
       _topCarouselController.playNext();
     }
+
+    // 重置时间状态（因为已经切换广告）
+    _currentTopAdStartTime = null;
+    _topAdElapsedTime = Duration.zero;
+
+    _logger.i('⏸️ 顶部轮播已暂停并切换到下一个广告（包含视频控制器管理）');
 
     // 使用 WidgetsBinding.instance.addPostFrameCallback 延迟通知
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -291,7 +260,18 @@ class TopAdCarouselProvider extends ChangeNotifier {
     });
   }
 
-  /// 恢復頂部輪播
+  ///5a，暂停当前视频并触发控制器释放
+  void _pauseCurrentVideo() {
+    // 发送暂停通知给当前的TopAdWidget
+    _topCarouselController.pauseAllMedia();
+
+    // 延迟一小段时间确保Widget有时间处理暂停和释放
+    Future.delayed(const Duration(milliseconds: 100), () {
+      _logger.d('📱 已通知当前视频Widget暂停并准备释放控制器');
+    });
+  }
+
+  ///6，恢復頂部輪播
   void resumeTopCarousel() {
     _topTimer?.cancel(); // 顯式取消舊的定時器，避免重複計時或意外行為
 
@@ -315,7 +295,7 @@ class TopAdCarouselProvider extends ChangeNotifier {
     });
   }
 
-  /// 更新輪播暫停狀態
+  ///7，更新輪播暫停狀態
   void updateCarouselPauseState(bool isPaused) {
     _isTopCarouselPaused = isPaused;
 
@@ -327,7 +307,7 @@ class TopAdCarouselProvider extends ChangeNotifier {
     });
   }
 
-  /// 從全屏廣告狀態退出後恢復頂部廣告
+  ///8，從全屏廣告狀態退出後恢復頂部廣告
   void resumeFromFullscreenAdExit() {
     _logger.i('🔄 开始恢复顶部广告轮播');
 
@@ -366,7 +346,7 @@ class TopAdCarouselProvider extends ChangeNotifier {
     });
   }
 
-  /// 檢查並恢復輪播狀態（監控定時器使用）
+  /// 9，檢查並恢復輪播狀態（監控定時器使用）
   void checkAndRestoreTopCarousel() {
     if (topAds.isNotEmpty && !_isTopCarouselPaused) {
       // 檢查當前定時器是否活躍
@@ -382,14 +362,14 @@ class TopAdCarouselProvider extends ChangeNotifier {
     }
   }
 
-  ///9，處理頁面變化事件
+  ///10，處理頁面變化事件
   void onPageChanged(int index) {
     if (!_isTopCarouselPaused && topAds.isNotEmpty) {
       startTopAdTimer(index);
     }
   }
 
-  /// 暫停所有計時器（用於設置頁面）
+  ///11，暫停所有計時器（用於設置頁面）
   void pauseAllTimersForSettings() {
     _topTimer?.cancel();
     _debugTimer?.cancel();
@@ -404,7 +384,7 @@ class TopAdCarouselProvider extends ChangeNotifier {
     });
   }
 
-  /// 從設置頁面恢復所有計時器
+  ///12，從設置頁面恢復所有計時器
   void resumeAllTimersFromSettings() {
     _isTopCarouselPaused = false;
     _topCarouselController.resumeAllMedia();

@@ -122,7 +122,6 @@ class AnnouncementPageState extends State<AnnouncementPage> {
       carouselStateProvider.enterDefaultState();
       _logger.i('🚀 应用初始化，强制进入默认轮播状态');
 
-      _setupFullscreenAdPreloadCallback();
       _setupProviderReferences();
 
       _initializeMidWidgets();
@@ -156,22 +155,6 @@ class AnnouncementPageState extends State<AnnouncementPage> {
     rthkNewsProvider.fetchRthkNews();
 
     _logger.i('📰 RTHK新闻初始化完成');
-  }
-
-  ///2，设置全屏广告预加载回调
-  void _setupFullscreenAdPreloadCallback() {
-    final stateProvider = context.read<CarouselStateProvider>();
-    final fullAdProvider = context.read<FullscreenAdProvider>();
-
-    // 设置进入全屏广告模式回调
-    stateProvider.setEnterFullscreenAdModeCallback(() {
-      fullAdProvider.enterFullscreenMode();
-    });
-
-    // 设置退出全屏广告模式回调
-    stateProvider.setExitFullscreenAdModeCallback(() {
-      fullAdProvider.exitFullscreenMode();
-    });
   }
 
   ///2.3，设置Provider引用
@@ -535,12 +518,12 @@ class AnnouncementPageState extends State<AnnouncementPage> {
       // _logger.i(
       //     '🔄 应用状态变化: ${_previousAppState?.name ?? "初始"} -> ${currentAppState.name}');
 
-      // 更新轮播状态基于当前应用状态
-      _updateCarouselStateBasedOnAppState(currentAppState);
-
-      // 使用 addPostFrameCallback 延迟执行轮播控制操作
+      // 使用 addPostFrameCallback 延迟执行所有状态更新操作，避免 setState during build
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (!mounted) return;
+
+        // 更新轮播状态基于当前应用状态
+        _updateCarouselStateBasedOnAppState(currentAppState);
 
         if (currentAppState == AppState.fullscreenAd) {
           // _logger.i('📺 进入全屏广告状态');
@@ -563,8 +546,9 @@ class AnnouncementPageState extends State<AnnouncementPage> {
     if (_previousAnnouncementsForBuild == null ||
         !listEquals(
             _previousAnnouncementsForBuild, currentCarouselAnnouncements)) {
-      if (mounted) {
-        // Ensure widget is still in the tree
+      // 使用 addPostFrameCallback 延迟执行状态更新，避免 setState during build
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
 
         // 检查新的通告数据是否有效，或者是否从有数据变为无数据
         final bool shouldUpdate = currentCarouselAnnouncements.isNotEmpty ||
@@ -593,13 +577,16 @@ class AnnouncementPageState extends State<AnnouncementPage> {
             _logger.w('通告获取错误: ${announcementProvider.error}');
           }
         }
-      }
+      });
     }
 
     // If advertisements have changed, re-initialize the top widgets
     if (_previousAdvertisementsForBuild == null ||
         !listEquals(_previousAdvertisementsForBuild, currentAdvertisements)) {
-      if (mounted) {
+      // 使用 addPostFrameCallback 延迟执行状态更新，避免 setState during build
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+
         // 检查新的广告数据是否有效
         if (currentAdvertisements.isNotEmpty ||
             _previousAdvertisementsForBuild == null) {
@@ -607,16 +594,11 @@ class AnnouncementPageState extends State<AnnouncementPage> {
           try {
             _initializeTopWidgets();
 
-            // 同时更新全屏广告数据 - 延迟到构建完成后执行避免setState错误
-            WidgetsBinding.instance.addPostFrameCallback((_) {
-              if (mounted) {
-                final fullAdCarouselProvider =
-                    context.read<FullscreenAdProvider>();
-                final fullAds = advertisementProvider.fullAdvertisements;
-                fullAdCarouselProvider.updateFullscreenAds(fullAds);
-                // _logger.i('全屏广告数据已更新: ${fullAds.length} 个全屏广告');
-              }
-            });
+            // 同时更新全屏广告数据
+            final fullAdCarouselProvider = context.read<FullscreenAdProvider>();
+            final fullAds = advertisementProvider.fullAdvertisements;
+            fullAdCarouselProvider.updateFullscreenAds(fullAds);
+            // _logger.i('全屏广告数据已更新: ${fullAds.length} 个全屏广告');
 
             _previousAdvertisementsForBuild =
                 List.from(currentAdvertisements); // Update the stored list
@@ -635,7 +617,7 @@ class AnnouncementPageState extends State<AnnouncementPage> {
             _logger.w('广告获取错误: ${advertisementProvider.error}');
           }
         }
-      }
+      });
     }
 
     return Scaffold(

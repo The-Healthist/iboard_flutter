@@ -185,52 +185,86 @@ class EnhancedVideoPoolManager {
   }
 
   /// 重置控制器设置
-  ///2, 重置控制器设置（增加播放失败的错误捕获和状态检查）
+  ///2, 重置控制器设置（增强状态检查和错误处理）
   Future<void> _resetControllerSettings(
       VideoPlayerController controller, bool autoPlay, bool looping) async {
-    if (!controller.value.isInitialized) return;
-
     try {
-      // 确保控制器还在有效状态
-      if (controller.value.hasError) {
-        debugPrint('⚠️ 控制器存在错误，跳过重置: ${controller.value.errorDescription}');
+      // 严格的状态检查
+      if (!controller.value.isInitialized || controller.value.hasError) {
+        debugPrint(
+            '⚠️ 控制器状态异常，跳过重置: initialized=${controller.value.isInitialized}, hasError=${controller.value.hasError}');
         return;
       }
 
-      // 重置到开头
-      await controller.seekTo(Duration.zero);
+      // 添加额外的安全检查，确保控制器没有被释放
+      if (controller.value.duration == Duration.zero) {
+        debugPrint('⚠️ 控制器duration为0，可能已被释放，跳过重置');
+        return;
+      }
 
-      // 设置循环
+      // 安全地重置到开头
+      try {
+        await controller.seekTo(Duration.zero);
+      } catch (e) {
+        debugPrint('⚠️ 重置到开头失败: $e');
+        // 继续执行其他设置
+      }
+
+      // 设置循环和音量
       controller.setLooping(looping);
-
-      // 设置音量为最大（修复全屏广告无声音问题）
       await controller.setVolume(1.0);
 
-      // 根据需要播放或暂停，并捕获播放异常
+      // 根据需要播放或暂停，加强异常处理
       if (autoPlay) {
         try {
-          // 添加状态检查，确保在有效状态下播放
-          if (controller.value.isInitialized && !controller.value.hasError) {
+          if (controller.value.isInitialized &&
+              !controller.value.hasError &&
+              !controller.value.isPlaying) {
             await controller.play();
+            debugPrint('✅ 视频控制器播放成功');
           }
         } catch (e) {
-          debugPrint('❌ 播放时出错: $e');
+          debugPrint('⚠️ 重置并播放控制器时出错: $e');
+          // 不要重新抛出异常，避免影响后续逻辑
         }
       } else {
-        if (controller.value.isPlaying) {
-          await controller.pause();
+        try {
+          if (controller.value.isPlaying) {
+            await controller.pause();
+          }
+        } catch (e) {
+          debugPrint('⚠️ 暂停控制器时出错: $e');
         }
       }
     } catch (e) {
-      debugPrint('重置控制器设置失败: $e');
-      rethrow;
+      debugPrint('❌ 重置控制器设置整体失败: $e');
+      // 不要重新抛出，避免影响缓存逻辑
     }
   }
 
   /// 检查控制器是否有效
-  ///1, 判断控制器是否有效（只判定初始化和是否有错误，不判断播放状态）
+  ///1, 增强判断控制器是否有效的逻辑
   bool _isControllerValid(VideoPlayerController controller) {
-    return controller.value.isInitialized && !controller.value.hasError;
+    try {
+      // 检查基本状态
+      if (!controller.value.isInitialized || controller.value.hasError) {
+        return false;
+      }
+
+      // 检查duration，如果为0可能表示控制器异常
+      if (controller.value.duration == Duration.zero) {
+        debugPrint('⚠️ 控制器duration为0，可能异常');
+        return false;
+      }
+
+      // 尝试访问控制器的其他属性来验证完整性
+      controller.value.position;
+
+      return true;
+    } catch (e) {
+      debugPrint('⚠️ 检查控制器有效性时出错: $e');
+      return false;
+    }
   }
 
   /// 生成控制器唯一标识（类型+文件路径作为唯一key，不会冲突）
@@ -302,15 +336,29 @@ class EnhancedVideoPoolManager {
         debugPrint('⏳ 控制器釋放進行中，略過: $key');
         return;
       }
+
       _releasingKeys.add(key);
       final wrapper = _controllerCache[key]!;
       final controller = wrapper.controller;
 
       try {
-        // 暂停播放并重置到开头
-        if (controller.value.isInitialized) {
-          await controller.pause();
-          await controller.seekTo(Duration.zero);
+        // 检查控制器是否仍然有效
+        if (!_isControllerValid(controller)) {
+          debugPrint('⚠️ 控制器已无效，直接移除缓存: $key');
+          _controllerCache.remove(key);
+          return;
+        }
+
+        // 安全地暂停播放并重置到开头
+        try {
+          if (controller.value.isInitialized && !controller.value.hasError) {
+            if (controller.value.isPlaying) {
+              await controller.pause();
+            }
+            await controller.seekTo(Duration.zero);
+          }
+        } catch (e) {
+          debugPrint('⚠️ 释放控制器操作时出错: $e');
         }
 
         // 标记为未使用
@@ -319,10 +367,14 @@ class EnhancedVideoPoolManager {
 
         debugPrint('🔓 控制器已释放: $key');
       } catch (e) {
-        debugPrint('释放控制器时出错: $e');
+        debugPrint('❌ 释放控制器时出错: $e');
+        // 出错时移除缓存，避免保留无效控制器
+        _controllerCache.remove(key);
       } finally {
         _releasingKeys.remove(key);
       }
+    } else {
+      debugPrint('⚠️ 尝试释放不存在的控制器: $key');
     }
   }
 

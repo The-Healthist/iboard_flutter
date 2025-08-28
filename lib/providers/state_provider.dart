@@ -3,6 +3,7 @@ import 'package:flutter/foundation.dart';
 import 'package:iboard_app/models/settings_model.dart';
 import 'package:iboard_app/providers/announcement_carousel_provider.dart';
 import 'package:iboard_app/providers/ad_top_carousel_provider.dart';
+import 'package:iboard_app/providers/ad_full_carousel_provider.dart';
 import 'package:logger/logger.dart';
 
 /// 播放狀態枚舉
@@ -191,13 +192,12 @@ class CarouselStateProvider extends ChangeNotifier {
   // 回調函數
   VoidCallback? _onShowFullscreenAd; // 顯示全屏廣告的回調
   VoidCallback? _onCloseFullscreenAd; // 關閉全屏廣告的回調
-  VoidCallback? _onEnterFullscreenAdMode; // 进入全屏广告模式的回调（通知FullAdProvider）
-  VoidCallback? _onExitFullscreenAdMode; // 退出全屏广告模式的回调（通知FullAdProvider）
   VoidCallback? _onPreloadFullscreenAd; // 全屏广告预加载回调
 
   // Provider引用
   AnnouncementCarouselProvider? _announcementCarouselProvider; // 通告轮播Provider引用
   TopAdCarouselProvider? _topCarouselProvider; // 顶部广告轮播Provider引用
+  FullscreenAdProvider? _fullscreenAdProvider; // 全屏广告轮播Provider引用
 
   // 媒體控制狀態 - 按區域分別控制
   bool _isTopMediaPaused = false; // 頂部廣告媒體暫停狀態
@@ -272,16 +272,6 @@ class CarouselStateProvider extends ChangeNotifier {
     _onCloseFullscreenAd = callback;
   }
 
-  /// 设置进入全屏广告模式回调
-  void setEnterFullscreenAdModeCallback(VoidCallback? callback) {
-    _onEnterFullscreenAdMode = callback;
-  }
-
-  /// 设置退出全屏广告模式回调
-  void setExitFullscreenAdModeCallback(VoidCallback? callback) {
-    _onExitFullscreenAdMode = callback;
-  }
-
   /// 设置全屏广告预加载回调
   void setPreloadFullscreenAdCallback(VoidCallback? callback) {
     _onPreloadFullscreenAd = callback;
@@ -300,6 +290,11 @@ class CarouselStateProvider extends ChangeNotifier {
   /// 设置顶部广告轮播Provider引用
   void setTopCarouselProvider(TopAdCarouselProvider? provider) {
     _topCarouselProvider = provider;
+  }
+
+  /// 设置全屏广告轮播Provider引用
+  void setFullscreenAdProvider(FullscreenAdProvider? provider) {
+    _fullscreenAdProvider = provider;
   }
 
   /// 獲取當前狀態
@@ -384,14 +379,14 @@ class CarouselStateProvider extends ChangeNotifier {
       // 预加载全屏广告
       _onPreloadFullscreenAd?.call();
 
-      _clearAllTimers();
+      _clearFullManualDefaultTimers();
 
       // 暂停通告轮播定时器
       if (_isNoticeCarouselActive) {
         _pauseNoticeCarousel();
       }
 
-      // 暂停顶部广告轮播（修复音视频不同步问题）
+      // 暂停顶部广告轮播
       _topCarouselProvider?.pauseTopCarousel();
 
       // 自动隐藏所有覆盖层（欠费查询和欠费总览）
@@ -405,8 +400,8 @@ class CarouselStateProvider extends ChangeNotifier {
       // 启动全屏广告状态总时长定时器
       _startFullscreenAdTimer();
 
-      // 通知FullAdvertisementCarouselProvider进入全屏广告模式
-      _onEnterFullscreenAdMode?.call();
+      // 直接调用FullscreenAdProvider进入全屏广告模式
+      _fullscreenAdProvider?.enterFullscreenMode();
 
       notifyListeners();
 
@@ -422,14 +417,14 @@ class CarouselStateProvider extends ChangeNotifier {
       bool wasInFullscreenAd =
           _currentState.currentAppState == AppState.fullscreenAd;
 
-      _clearAllTimers();
+      _clearFullManualDefaultTimers();
       _currentState = _currentState.toManualOperation();
       _lastUserInteractionTime = DateTime.now();
 
       // 如果是从全屏广告状态切换过来，需要暂停全屏广告轮播
       if (wasInFullscreenAd) {
-        // 通知FullAdvertisementCarouselProvider退出全屏广告模式
-        _onExitFullscreenAdMode?.call();
+        // 直接调用FullscreenAdProvider退出全屏广告模式
+        _fullscreenAdProvider?.exitFullscreenMode();
 
         // 恢复顶部广告轮播（修复音视频不同步问题）
         _topCarouselProvider?.resumeFromFullscreenAdExit();
@@ -446,7 +441,7 @@ class CarouselStateProvider extends ChangeNotifier {
   ///6， 切換到默認狀態
   void enterDefaultState() {
     if (_currentState.canTransitionTo(AppState.defaultState)) {
-      _clearAllTimers();
+      _clearFullManualDefaultTimers();
 
       // 只有从全屏广告状态切换到默认状态时，才更新全屏广告结束时间
       bool wasInFullscreenAd =
@@ -460,8 +455,8 @@ class CarouselStateProvider extends ChangeNotifier {
         _topCarouselProvider?.resumeFromFullscreenAdExit();
       }
 
-      // 通知FullAdvertisementCarouselProvider退出全屏广告模式
-      _onExitFullscreenAdMode?.call();
+      // 直接调用FullscreenAdProvider退出全屏广告模式
+      _fullscreenAdProvider?.exitFullscreenMode();
 
       // 更新媒體狀態 - 在退出全屏广告后更新
       _updateMediaStateBasedOnCurrentState();
@@ -476,7 +471,7 @@ class CarouselStateProvider extends ChangeNotifier {
 
   ///6a， 進入通告輪播模式（從手動操作狀態恢復）
   void _enterAnnouncementCarouselMode() {
-    _clearAllTimers();
+    _clearFullManualDefaultTimers();
 
     _isTopMediaPaused = false;
     _isMiddleMediaPaused = false;
@@ -574,8 +569,6 @@ class CarouselStateProvider extends ChangeNotifier {
 
     _defaultStateTimer = Timer(duration, () {
       if (_currentState.currentAppState == AppState.defaultState) {
-        // Default state timer expired log (always available)
-        // print('⏰ 默認狀態動態計時器到期 (${noActivityTimeout}秒)，切換到全屏廣告');
         enterFullscreenAd();
       }
     });
@@ -588,9 +581,7 @@ class CarouselStateProvider extends ChangeNotifier {
         Duration(seconds: announcementCarouselToFullAdsCarouselDuration);
 
     _defaultStateTimer = Timer(duration, () {
-      // 通告轮播模式对应默认状态，所以检查默认状态
       if (_currentState.currentAppState == AppState.defaultState) {
-        // Announcement carousel timer expired log
         _logger.i(
             '⏰ 通告輪播計時器到期 ($announcementCarouselToFullAdsCarouselDuration秒)，切換到全屏廣告');
         enterFullscreenAd();
@@ -598,8 +589,8 @@ class CarouselStateProvider extends ChangeNotifier {
     });
   }
 
-  ///12， 清除所有計時器
-  void _clearAllTimers() {
+  ///12， 清除全屏、手动和默认状态计时器
+  void _clearFullManualDefaultTimers() {
     _fullscreenAdTimer?.cancel();
     _fullscreenAdTimer = null;
 
@@ -608,8 +599,6 @@ class CarouselStateProvider extends ChangeNotifier {
 
     _defaultStateTimer?.cancel();
     _defaultStateTimer = null;
-
-    // 注意：这里不清除通告轮播定时器，因为它们有独立的生命周期
   }
 
   ///13， 檢查是否可以轉換到指定狀態
@@ -640,14 +629,12 @@ class CarouselStateProvider extends ChangeNotifier {
 
   ///15， 重置到默認狀態（強制重置，忽略轉換規則）
   void resetToDefault() {
-    _clearAllTimers();
+    _clearFullManualDefaultTimers();
     _currentState = DefaultCarouselState();
     _lastFullscreenAdEndTime = DateTime.now();
     _lastTimerResetTime = null; // 重置節流計時器
     _startDefaultStateTimer();
     notifyListeners();
-    // Force reset to default log (always available)
-    // print('🔄 強制重置到默認狀態，啟動動態計時器: ${noActivityTimeout}秒');
   }
 
   ///16， 獲取狀態描述（用於調試）
@@ -691,14 +678,14 @@ Timer Info: $timerInfo
   ///17， 釋放資源
   @override
   void dispose() {
-    _clearAllTimers();
+    _clearFullManualDefaultTimers();
     _clearNoticeCarouselTimers();
     super.dispose();
   }
 
   ///26， 暂停所有状态定时器（用于设置頁面等场景）
   void pauseAllStateTimers() {
-    _clearAllTimers();
+    _clearFullManualDefaultTimers();
     _clearNoticeCarouselTimers();
 
     // 只重置用户交互时间和节流时间，保留全屏广告结束时间以维持正确的状态逻辑

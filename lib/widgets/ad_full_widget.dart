@@ -4,6 +4,7 @@ import 'package:iboard_app/managers/file_manager.dart';
 import 'package:iboard_app/models/ad_model.dart';
 import 'package:iboard_app/utils/enhanced_video_pool_manager.dart';
 import 'package:iboard_app/providers/advertisement_provider.dart';
+import 'package:iboard_app/widgets/carousel_widget.dart'; // 导入通知类
 import 'package:provider/provider.dart';
 import 'package:logger/logger.dart';
 import 'dart:io';
@@ -42,14 +43,6 @@ class _FullAdWidgetState extends State<FullAdWidget> {
 
   // 保存AdvertisementProvider引用，避免dispose时context访问问题
   AdvertisementProvider? _advertisementProvider;
-
-  // 防抖机制：避免频繁重新播放
-  // 移除未使用的重試變量
-
-  // 播放狀態日誌節流
-  DateTime? _lastStatusLogAt;
-  static const Duration _statusLogInterval = Duration(seconds: 1);
-
   @override
   void initState() {
     super.initState();
@@ -201,47 +194,34 @@ class _FullAdWidgetState extends State<FullAdWidget> {
 
   @override
   void dispose() {
-    // 釋放視頻控制器到池中（延遲 1 秒，防重入）
+    // 参考顶部广告实现：Widget自己负责释放控制器
     if (_isReleasing) {
       super.dispose();
       return;
     }
+
     _isReleasing = true;
+    _logger.i('🗑️ FullAdWidget dispose 开始: ${widget.ad.title}');
+
     if (_videoController != null && _currentFilePath != null) {
-      _logger.i('🗑️ 開始釋放全屏廣告控制器（延遲1秒）: $_currentFilePath');
-
-      // 移除监听器
-      _videoController!.removeListener(_onVideoProgressChanged);
-
-      // 延遲釋放到增強池中，避免切換瞬間黑屏
       try {
-        final String filePathToRelease = _currentFilePath!;
-        final AdvertisementProvider? providerRef = _advertisementProvider;
-        Future.delayed(const Duration(seconds: 1), () async {
-          try {
-            if (providerRef != null) {
-              await providerRef.videoPoolManager.releaseController(
-                filePath: filePathToRelease,
-                videoType: VideoType.fullAd,
-              );
-              debugPrint('🔓 全屏廣告控制器已釋放: $filePathToRelease');
-              if (widget.onVideoDisposed != null) {
-                widget.onVideoDisposed!();
-              }
-            } else {
-              debugPrint('⚠️ AdvertisementProvider 為空，直接釋放控制器實例');
-              _videoController?.pause();
-              await _videoController?.dispose();
-            }
-          } catch (error) {
-            debugPrint('❌ 延遲釋放控制器時出錯: $error');
-          }
-        });
+        // 安全地移除监听器 - 这个总是需要的
+        _videoController!.removeListener(_onVideoProgressChanged);
       } catch (e) {
-        debugPrint('❌ 安排延遲釋放時出錯: $e');
+        _logger.w('移除監聽器時出錯: $e');
       }
 
+      // 🎯 关键改进：参考顶部广告，Widget自己释放控制器到池中
+      _releaseVideoControllerToPool().then((_) {
+        _logger.d('✅ FullAdWidget dispose完成: ${widget.ad.title}');
+      }).catchError((error) {
+        _logger.e('❌ FullAdWidget dispose释放控制器出错: $error');
+      });
+
       _videoController = null;
+      _currentFilePath = null;
+    } else {
+      _logger.d('✅ 无需释放控制器 - 控制器为空或路径为空');
     }
 
     super.dispose();
@@ -254,28 +234,6 @@ class _FullAdWidgetState extends State<FullAdWidget> {
           _videoController!.value.isInitialized &&
           widget.onVideoProgressChanged != null &&
           mounted) {
-        final isPlaying = _videoController!.value.isPlaying;
-        final duration = _videoController!.value.duration;
-
-        // 只记录播放状态和时长，不依赖position
-        // if (duration.inMilliseconds % 5000 == 0) {
-        //   _logger.i('🎬 视频播放状态: '
-        //       'isPlaying=$isPlaying, '
-        //       'duration=${duration.inMilliseconds}ms');
-        // }
-
-        // 暫停自動重播邏輯：僅輸出播放狀態
-        // if (!isPlaying && duration.inMilliseconds > 0) { ... }
-
-        // 回调進度（固定為0）
-        // 每秒播放狀態日誌已停用：
-        // final now = DateTime.now();
-        // if (_lastStatusLogAt == null ||
-        //     now.difference(_lastStatusLogAt!) >= _statusLogInterval) {
-        //   _lastStatusLogAt = now;
-        //   _logger.i(
-        //       '💡 🎬 视频播放状态: isPlaying=$isPlaying, duration=${duration.inMilliseconds}ms');
-        // }
         widget.onVideoProgressChanged!(widget.ad.id.toString(), Duration.zero);
       }
     } catch (e) {
@@ -283,28 +241,138 @@ class _FullAdWidgetState extends State<FullAdWidget> {
     }
   }
 
+  ///2，处理轮播切换时的清理 - 参考顶部广告实现
+  Future<void> _handleCarouselSwitch() async {
+    if (_videoController != null) {
+      _logger.i('🔄 全屏广告处理轮播切换，释放控制器: ${widget.ad.title}');
+      // 直接释放控制器（释放方法内部已包含暂停逻辑）
+      await _releaseVideoControllerToPool();
+    }
+  }
+
+  ///3，暂停视频播放 - 参考顶部广告实现
+  Future<void> _pauseVideo() async {
+    if (_videoController != null) {
+      try {
+        if (_videoController!.value.isInitialized &&
+            !_videoController!.value.hasError &&
+            _videoController!.value.isPlaying) {
+          await _videoController!.pause();
+          _logger.i('📱 暂停全屏广告视频播放: ${widget.ad.title}');
+        }
+      } catch (e) {
+        _logger.w('⚠️ 暂停视频播放失败: $e');
+      }
+    }
+  }
+
+  ///4，恢复视频播放 - 参考顶部广告实现
+  Future<void> _resumeVideo() async {
+    if (_videoController != null) {
+      try {
+        // 检查视频是否处于暂停状态
+        if (_videoController!.value.isInitialized &&
+            !_videoController!.value.hasError &&
+            !_videoController!.value.isPlaying) {
+          await _videoController!.play();
+          _logger.i('📱 恢复全屏广告视频播放: ${widget.ad.title}');
+        }
+      } catch (e) {
+        _logger.w('⚠️ 恢复视频播放失败: $e');
+      }
+    }
+  }
+
+  ///5，释放视频控制器到池中 - 参考顶部广告实现
+  Future<void> _releaseVideoControllerToPool() async {
+    if (_videoController != null && _currentFilePath != null) {
+      try {
+        _logger.i('🔓 开始释放全屏广告控制器到池中: $_currentFilePath');
+
+        // 先暂停视频播放
+        if (_videoController!.value.isPlaying) {
+          await _videoController!.pause();
+        }
+
+        // 确保AdvertisementProvider引用可用
+        _advertisementProvider ??= context.read<AdvertisementProvider>();
+
+        if (_advertisementProvider != null) {
+          // 释放控制器到池中
+          await _advertisementProvider!.videoPoolManager.releaseController(
+            filePath: _currentFilePath!,
+            videoType: VideoType.fullAd,
+          );
+
+          _logger.d('✅ 全屏广告视频控制器已释放到池中: ${widget.ad.title}');
+
+          // 调用回调
+          if (widget.onVideoDisposed != null) {
+            widget.onVideoDisposed!();
+          }
+        } else {
+          _logger.w('⚠️ AdvertisementProvider引用为空，无法释放全屏广告视频控制器');
+        }
+      } catch (e) {
+        _logger.w('⚠️ 释放全屏广告视频控制器时出错: $e');
+      }
+
+      _videoController = null;
+      _currentFilePath = null;
+    }
+  }
+
   // 移除 _releaseExistingController 方法，不再需要频繁释放和重新创建控制器
 
   @override
   Widget build(BuildContext context) {
-    return SizedBox(
-      width: double.infinity,
-      height: double.infinity,
-      child: Stack(
-        children: [
-          // 广告内容显示
-          _buildAdContent(),
+    // 参考顶部广告实现：使用NotificationListener监听媒体暂停和恢复通知
+    return NotificationListener<Notification>(
+      onNotification: (notification) {
+        if (notification is MediaPauseNotification) {
+          // 全屏广告状态：处理轮播切换，需要释放控制器
+          debugPrint(
+              '📢 FullAdWidget收到MediaPauseNotification: ${widget.ad.title}');
+          Future.delayed(const Duration(milliseconds: 50), () {
+            if (mounted) {
+              _handleCarouselSwitch();
+            }
+          });
+          return true; // 阻止通知继续传递
+        } else if (notification is MediaResumeNotification) {
+          // 防抖动执行，避免重复调用
+          debugPrint(
+              '📢 FullAdWidget收到MediaResumeNotification: ${widget.ad.title}');
+          Future.delayed(const Duration(milliseconds: 50), () {
+            if (mounted &&
+                _videoController != null &&
+                _videoController!.value.isInitialized) {
+              _resumeVideo();
+            }
+          });
+          return true; // 阻止通知继续传递
+        }
+        return false; // 其他通知继续传递
+      },
+      child: SizedBox(
+        width: double.infinity,
+        height: double.infinity,
+        child: Stack(
+          children: [
+            // 广告内容显示
+            _buildAdContent(),
 
-          // 可选：添加一个关闭按钮 (如果需要的話)
-          // Positioned(
-          //   top: 40,
-          //   right: 20,
-          //   child: IconButton(
-          //     onPressed: () => Navigator.pop(context),
-          //     icon: Icon(Icons.close, color: Colors.white, size: 30),
-          //   ),
-          // ),
-        ],
+            // 可选：添加一个关闭按钮 (如果需要的話)
+            // Positioned(
+            //   top: 40,
+            //   right: 20,
+            //   child: IconButton(
+            //     onPressed: () => Navigator.pop(context),
+            //     icon: Icon(Icons.close, color: Colors.white, size: 30),
+            //   ),
+            // ),
+          ],
+        ),
       ),
     );
   }
