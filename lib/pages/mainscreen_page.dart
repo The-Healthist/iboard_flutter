@@ -68,8 +68,10 @@ class AnnouncementPageState extends State<AnnouncementPage> {
       if (_previousAppState != appState) {
         _previousAppState = appState;
 
-        // 如果从全屏广告状态切换到手动操作状态，确保回到主屏幕
-        if (appState == AppState.manualOperation) {
+        // 🔧 修复：只有从全屏广告切换到手动操作状态时才跳转到主屏幕
+        // 从全屏广告直接切换到默认状态时，应该保持当前轮播位置
+        if (_previousAppState == AppState.fullscreenAd &&
+            appState == AppState.manualOperation) {
           announcementCarouselProvider.jumpToAnnouncementIndex(0);
         }
       }
@@ -299,10 +301,9 @@ class AnnouncementPageState extends State<AnnouncementPage> {
     // 恢复顶部广告轮播
     topAdCarouselProvider.resumeTopCarousel();
 
-    // 恢复通告轮播
-    announcementCarouselProvider.resumeMidCarousel(
-        stateProvider.noticeStayDuration,
-        forceJumpToIndex: true);
+    // 恢复通告轮播 - 🔧 修复：不强制跳转索引，保持之前的轮播位置
+    announcementCarouselProvider
+        .resumeMidCarousel(stateProvider.noticeStayDuration);
 
     // 设置日志输出标志 - 默认状态下只显示顶部广告和通告轮播的日志
     fullAdCarouselProvider.startDebugTimer();

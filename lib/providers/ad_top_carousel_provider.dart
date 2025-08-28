@@ -50,7 +50,7 @@ class TopAdCarouselProvider extends ChangeNotifier {
 
   TopAdCarouselProvider() {
     _topCarouselController = custom_carousel.CarouselController();
-    _logger.i('🔍 TopAdCarouselProvider 初始化完成，輪播順序由後台管理');
+    // TopAdCarouselProvider 初始化完成，輪播順序由後台管理
   }
 
   ///1，更新輪播廣告列表（由AdvertisementProvider調用）
@@ -70,7 +70,7 @@ class TopAdCarouselProvider extends ChangeNotifier {
       _logger.i('🎬 檢測到正在播放頂部廣告，延遲更新Widget直到下次切換');
     } else if (_widgetCache.isNotEmpty) {
       // 如果已有Widget緩存且處於暫停狀態，不重建Widget以保持播放狀態
-      _logger.i('🔄 保持現有Widget緩存，避免重建');
+      // 保持現有Widget緩存，避免重建
     } else {
       _smartUpdateWidgets();
     }
@@ -120,7 +120,7 @@ class TopAdCarouselProvider extends ChangeNotifier {
   ///3，初始化頂部輪播
   void initializeTopWidgets(List<AdModel> topAds) {
     if (topAds.isEmpty) {
-      _logger.w('No top advertisements available');
+      // No top advertisements available
       return;
     }
 
@@ -157,7 +157,7 @@ class TopAdCarouselProvider extends ChangeNotifier {
       // 如果是當前播放的廣告且Widget已存在，保持不變
       if (i == currentIndex && _widgetCache.containsKey(key)) {
         widgetMap[key] = _widgetCache[key]!;
-        _logger.d('🔄 保持當前播放廣告Widget: ${ad.title}');
+        // 保持當前播放廣告Widget: ${ad.title}
       } else if (_widgetCache.containsKey(key)) {
         // 其他已緩存的Widget也保持不變
         widgetMap[key] = _widgetCache[key]!;
@@ -250,7 +250,7 @@ class TopAdCarouselProvider extends ChangeNotifier {
     _currentTopAdStartTime = null;
     _topAdElapsedTime = Duration.zero;
 
-    _logger.i('⏸️ 顶部轮播已暂停并切换到下一个广告（包含视频控制器管理）');
+    // 顶部轮播已暂停并切换到下一个广告（包含视频控制器管理）
 
     // 使用 WidgetsBinding.instance.addPostFrameCallback 延迟通知
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -267,7 +267,7 @@ class TopAdCarouselProvider extends ChangeNotifier {
 
     // 延迟一小段时间确保Widget有时间处理暂停和释放
     Future.delayed(const Duration(milliseconds: 100), () {
-      _logger.d('📱 已通知当前视频Widget暂停并准备释放控制器');
+      // 已通知当前视频Widget暂停并准备释放控制器
     });
   }
 
@@ -309,7 +309,7 @@ class TopAdCarouselProvider extends ChangeNotifier {
 
   ///8，從全屏廣告狀態退出後恢復頂部廣告
   void resumeFromFullscreenAdExit() {
-    _logger.i('🔄 开始恢复顶部广告轮播');
+    // 开始恢复顶部广告轮播
 
     // 重置暂停状态
     _isTopCarouselPaused = false;
@@ -333,7 +333,7 @@ class TopAdCarouselProvider extends ChangeNotifier {
       // 启动新的定时器
       startTopAdTimer(validIndex);
 
-      _logger.i('✅ 顶部广告恢复完成，当前索引: $validIndex');
+      // 顶部广告恢复完成，当前索引: $validIndex
     } else {
       _logger.w('⚠️ 顶部广告列表为空，无法恢复');
     }

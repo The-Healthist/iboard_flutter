@@ -77,7 +77,7 @@ class _FullAdWidgetState extends State<FullAdWidget> {
 
     try {
       // 详细日志：文件获取过程
-      _logger.i('🔍 开始初始化视频: ${widget.ad.file.url}');
+      // 开始初始化视频: ${widget.ad.file.url}
 
       // 尝试从FileManager获取本地缓存的视频文件
       final File? localFile = await widget.fileManager.getFile(widget.ad.file);
@@ -91,20 +91,21 @@ class _FullAdWidgetState extends State<FullAdWidget> {
       // 记录当前文件信息
       _currentFilePath = localFile.path;
 
-      _logger.i('📁 视频文件路径: $_currentFilePath');
+      // 视频文件路径: $_currentFilePath
 
       // 與頂部一致：通過 AdvertisementProvider 的 videoPoolManager 取得控制器
       _advertisementProvider ??= context.read<AdvertisementProvider>();
       _videoController =
-          await _advertisementProvider!.videoPoolManager.getController(
+          await _advertisementProvider!.videoPoolManager.getControllerSafely(
         filePath: _currentFilePath!,
         videoType: VideoType.fullAd,
         autoPlay: true,
         looping: true,
         onError: () {
+          debugPrint('❌ 全屏广告控制器获取失败: $_currentFilePath');
           if (mounted) {
             setState(() {
-              _errorMessage = '視頻播放錯誤';
+              _errorMessage = '视频控制器创建失败，显示默认广告';
               _isLoadingVideo = false;
             });
           }
@@ -113,12 +114,7 @@ class _FullAdWidgetState extends State<FullAdWidget> {
 
       // 详细的控制器初始化诊断
       if (_videoController != null) {
-        _logger.i('🎬 控制器初始化详情：'
-            'isInitialized=${_videoController!.value.isInitialized}, '
-            'hasError=${_videoController!.value.hasError}, '
-            'isPlaying=${_videoController!.value.isPlaying}, '
-            'position=${_videoController!.value.position}, '
-            'duration=${_videoController!.value.duration}');
+        debugPrint('✅ 全屏广告控制器获取成功: ${widget.ad.title}');
 
         // 添加进度监听器
         _videoController!.addListener(_onVideoProgressChanged);
@@ -138,7 +134,8 @@ class _FullAdWidgetState extends State<FullAdWidget> {
           throw Exception('视频加载超时，无法初始化');
         }
 
-        _logger.i('✅ 视频加载完成，开始播放流程');
+        // 视频加载完成，开始播放流程
+        debugPrint('🎬 全屏广告视频加载完成，开始播放: ${widget.ad.title}');
 
         // 确保控制器已初始化
         if (_videoController!.value.isInitialized) {
@@ -160,8 +157,6 @@ class _FullAdWidgetState extends State<FullAdWidget> {
             debugPrint('▶️ 视频开始播放: ${widget.ad.title}');
             // 保留一次狀態觀察，不自動重播
             await Future.delayed(const Duration(milliseconds: 100));
-            // final playingNow = _videoController!.value.isPlaying;
-            // _logger.i('🎬 视频播放状态: isPlaying=$playingNow');
           } catch (playError) {
             _logger.e('❌ 视频播放失败',
                 error: playError, stackTrace: StackTrace.current);
@@ -177,7 +172,13 @@ class _FullAdWidgetState extends State<FullAdWidget> {
           _isLoadingVideo = false;
         });
       } else {
-        throw Exception('无法获取视频控制器');
+        // 控制器为null，显示默认广告而不是错误
+        debugPrint('⚠️ 全屏广告控制器为null，显示默认广告: ${widget.ad.title}');
+        setState(() {
+          _isVideoInitialized = false;
+          _isLoadingVideo = false;
+          _errorMessage = null; // 清除错误，让它显示默认广告
+        });
       }
     } catch (e, stackTrace) {
       _logger.e('❌ 視頻初始化失败', error: e, stackTrace: stackTrace);
@@ -201,7 +202,7 @@ class _FullAdWidgetState extends State<FullAdWidget> {
     }
 
     _isReleasing = true;
-    _logger.i('🗑️ FullAdWidget dispose 开始: ${widget.ad.title}');
+    // FullAdWidget dispose 开始: ${widget.ad.title}
 
     if (_videoController != null && _currentFilePath != null) {
       try {
@@ -244,7 +245,7 @@ class _FullAdWidgetState extends State<FullAdWidget> {
   ///2，处理轮播切换时的清理 - 参考顶部广告实现
   Future<void> _handleCarouselSwitch() async {
     if (_videoController != null) {
-      _logger.i('🔄 全屏广告处理轮播切换，释放控制器: ${widget.ad.title}');
+      // 全屏广告处理轮播切换，释放控制器: ${widget.ad.title}
       // 直接释放控制器（释放方法内部已包含暂停逻辑）
       await _releaseVideoControllerToPool();
     }
@@ -258,7 +259,7 @@ class _FullAdWidgetState extends State<FullAdWidget> {
             !_videoController!.value.hasError &&
             _videoController!.value.isPlaying) {
           await _videoController!.pause();
-          _logger.i('📱 暂停全屏广告视频播放: ${widget.ad.title}');
+          // 暂停全屏广告视频播放: ${widget.ad.title}
         }
       } catch (e) {
         _logger.w('⚠️ 暂停视频播放失败: $e');
@@ -275,7 +276,7 @@ class _FullAdWidgetState extends State<FullAdWidget> {
             !_videoController!.value.hasError &&
             !_videoController!.value.isPlaying) {
           await _videoController!.play();
-          _logger.i('📱 恢复全屏广告视频播放: ${widget.ad.title}');
+          // 恢复全屏广告视频播放: ${widget.ad.title}
         }
       } catch (e) {
         _logger.w('⚠️ 恢复视频播放失败: $e');
@@ -287,7 +288,7 @@ class _FullAdWidgetState extends State<FullAdWidget> {
   Future<void> _releaseVideoControllerToPool() async {
     if (_videoController != null && _currentFilePath != null) {
       try {
-        _logger.i('🔓 开始释放全屏广告控制器到池中: $_currentFilePath');
+        // 开始释放全屏广告控制器到池中: $_currentFilePath
 
         // 先暂停视频播放
         if (_videoController!.value.isPlaying) {
@@ -412,7 +413,7 @@ class _FullAdWidgetState extends State<FullAdWidget> {
             height: double.infinity,
             child: Image.file(
               localFile,
-              fit: BoxFit.cover,
+              fit: BoxFit.contain,
               width: double.infinity,
               height: double.infinity,
               errorBuilder: (context, error, stackTrace) {
@@ -484,101 +485,24 @@ class _FullAdWidgetState extends State<FullAdWidget> {
       );
     }
 
-    if (_errorMessage != null) {
-      return Container(
+    // 如果有错误信息或控制器为null，显示默认广告
+    if (_errorMessage != null ||
+        !_isVideoInitialized ||
+        _videoController == null) {
+      return _buildDefaultAd();
+    }
+
+    // 確保視頻控制器已初始化並可播放
+    if (_videoController != null && _videoController!.value.isInitialized) {
+      return SizedBox(
         width: double.infinity,
         height: double.infinity,
-        color: Colors.black,
-        child: Center(
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              const Icon(
-                Icons.error_outline,
-                size: 80,
-                color: Colors.red,
-              ),
-              const SizedBox(height: 20),
-              const SelectableText(
-                '視頻加載失敗',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 24,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-              const SizedBox(height: 10),
-              SelectableText(
-                _errorMessage!,
-                style: const TextStyle(
-                  color: Colors.white70,
-                  fontSize: 16,
-                ),
-                textAlign: TextAlign.center,
-              ),
-              const SizedBox(height: 20),
-              ElevatedButton(
-                onPressed: _initializeVideoPlayer,
-                child: const SelectableText('重試'),
-              ),
-            ],
-          ),
-        ),
+        child: VideoPlayer(_videoController!),
       );
     }
 
-    if (_isVideoInitialized && _videoController != null) {
-      return Container(
-        width: double.infinity,
-        height: double.infinity,
-        color: Colors.black,
-        child: FittedBox(
-          fit: BoxFit.contain, // 修改为 contain 以完整显示视频内容
-          child: SizedBox(
-            width: _videoController!.value.size.width,
-            height: _videoController!.value.size.height,
-            child: VideoPlayer(_videoController!),
-          ),
-        ),
-      );
-    }
-
-    // 显示视频预览或占位符
-    return Container(
-      width: double.infinity,
-      height: double.infinity,
-      color: Colors.black,
-      child: Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            const Icon(
-              Icons.play_circle_outline,
-              size: 100,
-              color: Colors.white,
-            ),
-            const SizedBox(height: 20),
-            const SelectableText(
-              '視頻廣告',
-              style: TextStyle(
-                color: Colors.white,
-                fontSize: 24,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            const SizedBox(height: 10),
-            SelectableText(
-              widget.ad.title,
-              style: const TextStyle(
-                color: Colors.white70,
-                fontSize: 16,
-              ),
-              textAlign: TextAlign.center,
-            ),
-          ],
-        ),
-      ),
-    );
+    // 其他情况也显示默认广告
+    return _buildDefaultAd();
   }
 
   ///7，構建默認廣告
@@ -591,56 +515,107 @@ class _FullAdWidgetState extends State<FullAdWidget> {
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
           colors: [
-            Colors.purple.shade400,
-            Colors.blue.shade600,
-            Colors.teal.shade500,
+            const Color(0xFF2196F3).withOpacity(0.8),
+            const Color(0xFF1976D2).withOpacity(0.9),
           ],
         ),
       ),
-      child: Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            const Icon(
-              Icons.ads_click,
-              size: 120,
-              color: Colors.white,
-            ),
-            const SizedBox(height: 30),
-            Text(
-              widget.ad.title,
-              style: TextStyle(
-                fontSize: 36,
-                fontWeight: FontWeight.bold,
-                color: Colors.white,
-                shadows: [
-                  Shadow(
-                    offset: const Offset(2, 2),
-                    blurRadius: 4,
-                    color: Colors.black.withOpacity(0.3),
-                  ),
-                ],
+      child: Stack(
+        children: [
+          // 背景图案
+          Positioned.fill(
+            child: Container(
+              decoration: const BoxDecoration(
+                image: null, // AdModel没有imageUrls属性，使用纯色背景
               ),
-              textAlign: TextAlign.center,
             ),
-            const SizedBox(height: 20),
-            Text(
-              widget.ad.description,
-              style: TextStyle(
-                fontSize: 18,
-                color: Colors.white.withOpacity(0.9),
-                shadows: [
-                  Shadow(
-                    offset: const Offset(1, 1),
-                    blurRadius: 2,
-                    color: Colors.black.withOpacity(0.3),
+          ),
+          // 内容区域
+          Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                // 广告图标
+                Container(
+                  width: 80,
+                  height: 80,
+                  decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(0.2),
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(
+                      color: Colors.white.withOpacity(0.3),
+                      width: 2,
+                    ),
                   ),
-                ],
-              ),
-              textAlign: TextAlign.center,
+                  child: const Icon(
+                    Icons.play_circle_outline,
+                    size: 50,
+                    color: Colors.white,
+                  ),
+                ),
+                const SizedBox(height: 20),
+                // 广告标题
+                Text(
+                  widget.ad.title,
+                  style: const TextStyle(
+                    fontSize: 24,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.white,
+                    shadows: [
+                      Shadow(
+                        offset: Offset(0, 2),
+                        blurRadius: 4,
+                        color: Colors.black54,
+                      ),
+                    ],
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 12),
+                // 广告描述
+                if (widget.ad.description.isNotEmpty)
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 40),
+                    child: Text(
+                      widget.ad.description,
+                      style: const TextStyle(
+                        fontSize: 16,
+                        color: Colors.white,
+                        shadows: [
+                          Shadow(
+                            offset: Offset(0, 1),
+                            blurRadius: 2,
+                            color: Colors.black54,
+                          ),
+                        ],
+                      ),
+                      textAlign: TextAlign.center,
+                      maxLines: 3,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                const SizedBox(height: 30),
+                // 提示文本
+                Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(0.2),
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: const Text(
+                    '📺 静态广告展示',
+                    style: TextStyle(
+                      fontSize: 14,
+                      color: Colors.white,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ),
+              ],
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }

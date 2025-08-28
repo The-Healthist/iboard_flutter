@@ -29,6 +29,7 @@ class TopAdWidgetState extends State<TopAdWidget> {
   VideoPlayerController? _videoController;
   bool _isLoading = true;
   String? _localFilePath;
+  String? _currentVideoPath; // 添加：當前視頻路徑跟蹤
   String? _error;
   bool isManuallyPaused = false; // 添加手动暂停标记
   bool _isDownloading = false; // 添加下载状态标记
@@ -139,15 +140,38 @@ class TopAdWidgetState extends State<TopAdWidget> {
       _error = null;
     });
 
-    // 先释放之前的控制器到增强池中
-    if (_videoController != null) {
+    // 🔧 修復：只有在切換到不同視頻時才釋放舊控制器
+    if (_videoController != null && _currentVideoPath != _localFilePath) {
       // 确保Provider引用可用
       _advertisementProvider ??= context.read<AdvertisementProvider>();
       await _advertisementProvider!.videoPoolManager.releaseController(
-        filePath: _localFilePath!,
+        filePath: _currentVideoPath!, // 釋放舊路徑的控制器
         videoType: VideoType.topAd,
       );
       _videoController = null;
+      _currentVideoPath = null;
+    }
+
+    // 如果已經有相同路徑的控制器，直接復用不需要重新初始化
+    if (_videoController != null && _currentVideoPath == _localFilePath) {
+      debugPrint('🔄 頂部廣告控制器已存在，直接復用: $_localFilePath');
+      setState(() {
+        _isLoading = false;
+      });
+      return;
+    }
+
+    // 檢查池中是否已有可用的控制器（即使當前widget沒有）
+    if (_videoController == null) {
+      _advertisementProvider ??= context.read<AdvertisementProvider>();
+      final isAvailable =
+          _advertisementProvider!.videoPoolManager.isControllerAvailable(
+        _localFilePath!,
+        VideoType.topAd,
+      );
+      if (isAvailable) {
+        debugPrint('🔍 發現池中有可用控制器，直接獲取: $_localFilePath');
+      }
     }
 
     try {
@@ -162,16 +186,18 @@ class TopAdWidgetState extends State<TopAdWidget> {
         videoType = VideoType.topAd;
       }
 
+      // 使用新的安全获取方法，优雅处理创建失败
       _videoController =
-          await _advertisementProvider!.videoPoolManager.getController(
+          await _advertisementProvider!.videoPoolManager.getControllerSafely(
         filePath: _localFilePath!,
         videoType: videoType,
         autoPlay: true,
         looping: true,
         onError: () {
+          debugPrint('❌ 顶部广告控制器获取失败: $_localFilePath');
           if (mounted) {
             setState(() {
-              _error = 'Video playback error occurred.';
+              _error = '视频控制器创建失败，将显示占位符';
               _isLoading = false;
             });
           }
@@ -179,15 +205,19 @@ class TopAdWidgetState extends State<TopAdWidget> {
       );
 
       if (_videoController != null && mounted) {
+        // 更新當前視頻路徑
+        _currentVideoPath = _localFilePath;
         setState(() {
           _isLoading = false;
         });
-        // _logger.i('✅ 顶部广告视频初始化成功（使用增强视频池）');
+        debugPrint('✅ 顶部广告视频初始化成功: ${widget.ad.title}');
       } else if (mounted) {
+        // 控制器为null，显示优雅的占位符而不是错误
         setState(() {
-          _error = 'Could not initialize video player.';
+          _error = null; // 清除错误，显示占位符
           _isLoading = false;
         });
+        debugPrint('⚠️ 顶部广告控制器为null，显示占位符: ${widget.ad.title}');
       }
     } catch (e) {
       _logger.e('Failed to initialize video controller', error: e);
@@ -240,7 +270,7 @@ class TopAdWidgetState extends State<TopAdWidget> {
     if (_videoController != null) {
       // 直接释放控制器（释放方法内部已包含暂停逻辑）
       _releaseVideoController();
-      _logger.d('🔄 处理轮播切换，释放控制器: ${widget.ad.title}');
+      // 处理轮播切换，释放控制器: ${widget.ad.title}
     }
   }
 
@@ -252,7 +282,7 @@ class TopAdWidgetState extends State<TopAdWidget> {
 
   ///释放视频控制器到增强池中（优化版本）
   Future<void> _releaseVideoController() async {
-    if (_videoController != null && _localFilePath != null) {
+    if (_videoController != null && _currentVideoPath != null) {
       try {
         // 确保Provider引用可用
         _advertisementProvider ??= context.read<AdvertisementProvider>();
@@ -265,11 +295,11 @@ class TopAdWidgetState extends State<TopAdWidget> {
 
           // 释放控制器到池中
           await _advertisementProvider!.videoPoolManager.releaseController(
-            filePath: _localFilePath!,
+            filePath: _currentVideoPath!,
             videoType: VideoType.topAd,
           );
 
-          _logger.d('✅ 顶部广告视频控制器已释放到池中: ${widget.ad.title}');
+          // 顶部广告视频控制器已释放到池中: ${widget.ad.title}
         } else {
           _logger.w('⚠️ AdvertisementProvider引用为空，无法释放视频控制器');
         }
@@ -278,6 +308,7 @@ class TopAdWidgetState extends State<TopAdWidget> {
       }
 
       _videoController = null;
+      _currentVideoPath = null; // 清空當前路徑
     }
   }
 
@@ -440,8 +471,8 @@ class TopAdWidgetState extends State<TopAdWidget> {
             ),
           );
         } else {
-          // Video is still initializing or failed (though _error should catch failure)
-          contentWidget = const Center(child: CircularProgressIndicator());
+          // 视频控制器创建失败，显示优雅的占位符
+          contentWidget = _buildVideoPlaceholder();
         }
       } else if (mimeType == 'image/jpeg' ||
           mimeType == 'image/jpg' ||
@@ -479,5 +510,47 @@ class TopAdWidgetState extends State<TopAdWidget> {
     }
 
     return contentWidget;
+  }
+
+  /// 构建视频占位符（当视频控制器创建失败时显示）
+  Widget _buildVideoPlaceholder() {
+    return Container(
+      width: double.infinity,
+      height: double.infinity,
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            Colors.blue.shade200,
+            Colors.blue.shade400,
+          ],
+        ),
+      ),
+      child: Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              Icons.video_library_outlined,
+              size: 40,
+              color: Colors.white.withOpacity(0.8),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              widget.ad.title,
+              style: TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.w500,
+                color: Colors.white.withOpacity(0.9),
+              ),
+              textAlign: TextAlign.center,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ],
+        ),
+      ),
+    );
   }
 }
