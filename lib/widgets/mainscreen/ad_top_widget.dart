@@ -4,8 +4,8 @@ import 'package:iboard_app/models/ad_model.dart'; // Assuming AdModel exists
 import 'package:iboard_app/managers/file_manager.dart'; // Assuming FileManager exists
 import 'package:iboard_app/providers/state_provider.dart';
 import 'package:iboard_app/widgets/carousel_widget.dart'; // 导入通知类
-import 'package:iboard_app/utils/enhanced_video_pool_manager.dart';
-import 'package:iboard_app/providers/advertisement_provider.dart';
+import 'package:iboard_app/utils/precise_video_pool_manager.dart' as precise;
+import 'package:iboard_app/providers/ad_top_carousel_provider.dart';
 import 'package:video_player/video_player.dart';
 import 'package:logger/logger.dart';
 import 'package:provider/provider.dart';
@@ -36,8 +36,8 @@ class TopAdWidgetState extends State<TopAdWidget> {
   int _retryCount = 0; // 添加重试计数
   static const int _maxRetries = 3; // 最大重试次数
 
-  // 保存AdvertisementProvider引用，避免dispose时context访问问题
-  AdvertisementProvider? _advertisementProvider;
+  // 保存TopAdCarouselProvider引用，避免dispose时context访问问题
+  TopAdCarouselProvider? _topAdCarouselProvider;
 
   @override
   void initState() {
@@ -49,7 +49,7 @@ class TopAdWidgetState extends State<TopAdWidget> {
   void didChangeDependencies() {
     super.didChangeDependencies();
     // 在组件依赖变化时保存Provider引用，确保dispose时可以安全使用
-    _advertisementProvider ??= context.read<AdvertisementProvider>();
+    _topAdCarouselProvider ??= context.read<TopAdCarouselProvider>();
   }
 
   //1，加载广告文件
@@ -143,10 +143,11 @@ class TopAdWidgetState extends State<TopAdWidget> {
     // 🔧 修復：只有在切換到不同視頻時才釋放舊控制器
     if (_videoController != null && _currentVideoPath != _localFilePath) {
       // 确保Provider引用可用
-      _advertisementProvider ??= context.read<AdvertisementProvider>();
-      await _advertisementProvider!.videoPoolManager.releaseController(
+      _topAdCarouselProvider ??= context.read<TopAdCarouselProvider>();
+      await _topAdCarouselProvider!.preciseVideoPoolManager.releaseController(
         filePath: _currentVideoPath!, // 釋放舊路徑的控制器
-        videoType: VideoType.topAd,
+        videoType: precise.VideoType.topAd,
+        forceDispose: true, // 顶部广告切换时释放解码器
       );
       _videoController = null;
       _currentVideoPath = null;
@@ -161,36 +162,19 @@ class TopAdWidgetState extends State<TopAdWidget> {
       return;
     }
 
-    // 檢查池中是否已有可用的控制器（即使當前widget沒有）
-    if (_videoController == null) {
-      _advertisementProvider ??= context.read<AdvertisementProvider>();
-      final isAvailable =
-          _advertisementProvider!.videoPoolManager.isControllerAvailable(
-        _localFilePath!,
-        VideoType.topAd,
-      );
-      if (isAvailable) {
-        debugPrint('🔍 發現池中有可用控制器，直接獲取: $_localFilePath');
-      }
-    }
+    // 檢查池中是否已有可用的控制器 - 精确管理器不需要此检查
+    // 精确管理器会自动处理控制器复用和初始化
 
     try {
       if (!mounted) return;
-      _advertisementProvider ??= context.read<AdvertisementProvider>();
+      _topAdCarouselProvider ??= context.read<TopAdCarouselProvider>();
 
-      // 根据广告类型确定视频类型
-      VideoType videoType;
-      if (widget.ad.display == AdDisplayType.topfull) {
-        videoType = VideoType.topAd; // topfull类型在顶部广告中使用topAd类型
-      } else {
-        videoType = VideoType.topAd;
-      }
-
-      // 使用新的安全获取方法，优雅处理创建失败
-      _videoController =
-          await _advertisementProvider!.videoPoolManager.getControllerSafely(
+      // 🎯 核心改进：使用精确解码器管理器，直接获取已初始化的控制器
+      // 自動dispose邏輯已內建在getInitializedController中
+      _videoController = await _topAdCarouselProvider!.preciseVideoPoolManager
+          .getInitializedController(
         filePath: _localFilePath!,
-        videoType: videoType,
+        videoType: precise.VideoType.topAd, // 顶部广告统一使用 topAd 类型
         autoPlay: true,
         looping: true,
         onError: () {
@@ -203,6 +187,19 @@ class TopAdWidgetState extends State<TopAdWidget> {
           }
         },
       );
+
+      // 🎯 关键修复：检查是否有全屏广告在播放相同文件，如果是则将顶部广告静音
+      if (_videoController != null) {
+        final carouselStateProvider = context.read<CarouselStateProvider>();
+        final isFullscreenAd =
+            carouselStateProvider.currentAppState == AppState.fullscreenAd;
+
+        if (isFullscreenAd) {
+          // 全屏广告状态下，顶部广告静音播放，避免音频冲突
+          await _videoController!.setVolume(0.0);
+          debugPrint('🔇 顶部广告已静音播放，避免与全屏广告冲突: ${widget.ad.title}');
+        }
+      }
 
       if (_videoController != null && mounted) {
         // 更新當前視頻路徑
@@ -268,9 +265,9 @@ class TopAdWidgetState extends State<TopAdWidget> {
   //5，处理轮播切换时的清理
   Future<void> _handleCarouselSwitch() async {
     if (_videoController != null) {
-      // 直接释放控制器（释放方法内部已包含暂停逻辑）
-      _releaseVideoController();
-      // 处理轮播切换，释放控制器: ${widget.ad.title}
+      // 轮播切换时强制释放控制器，避免资源积累
+      await _releaseVideoController(forceDispose: true);
+      // 处理轮播切换，强制释放控制器: ${widget.ad.title}
     }
   }
 
@@ -281,27 +278,29 @@ class TopAdWidgetState extends State<TopAdWidget> {
   }
 
   ///释放视频控制器到增强池中（优化版本）
-  Future<void> _releaseVideoController() async {
+  Future<void> _releaseVideoController({bool forceDispose = false}) async {
     if (_videoController != null && _currentVideoPath != null) {
       try {
         // 确保Provider引用可用
-        _advertisementProvider ??= context.read<AdvertisementProvider>();
+        _topAdCarouselProvider ??= context.read<TopAdCarouselProvider>();
 
-        if (_advertisementProvider != null) {
+        if (_topAdCarouselProvider != null) {
           // 先暂停视频播放
           if (_videoController!.value.isPlaying) {
             await _videoController!.pause();
           }
 
-          // 释放控制器到池中
-          await _advertisementProvider!.videoPoolManager.releaseController(
+          // 释放控制器 - 使用精确解码器管理器
+          await _topAdCarouselProvider!.preciseVideoPoolManager
+              .releaseController(
             filePath: _currentVideoPath!,
-            videoType: VideoType.topAd,
+            videoType: precise.VideoType.topAd,
+            forceDispose: forceDispose, // 根据参数决定是否强制释放
           );
 
           // 顶部广告视频控制器已释放到池中: ${widget.ad.title}
         } else {
-          _logger.w('⚠️ AdvertisementProvider引用为空，无法释放视频控制器');
+          _logger.w('⚠️ TopAdCarouselProvider引用为空，无法释放视频控制器');
         }
       } catch (e) {
         _logger.w('⚠️ 释放视频控制器时出错: $e');
@@ -322,6 +321,24 @@ class TopAdWidgetState extends State<TopAdWidget> {
     // 根据媒体状态控制视频播放 - 使用防抖动控制避免频繁调用
     if (_videoController != null && _videoController!.value.isInitialized) {
       final isPlaying = _videoController!.value.isPlaying;
+      final isFullscreenAd =
+          carouselStateProvider.currentAppState == AppState.fullscreenAd;
+
+      // 🎯 关键修复：根据应用状态动态调整音量，避免音频冲突
+      Future.delayed(const Duration(milliseconds: 50), () {
+        if (mounted &&
+            _videoController != null &&
+            _videoController!.value.isInitialized) {
+          if (isFullscreenAd) {
+            // 全屏广告状态：顶部广告静音播放
+            _videoController!.setVolume(0.0);
+          } else {
+            // 非全屏广告状态：恢复顶部广告音量
+            _videoController!.setVolume(1.0);
+          }
+        }
+      });
+
       if (isMediaPaused && isPlaying) {
         // 延迟100ms执行，避免频繁调用
         Future.delayed(const Duration(milliseconds: 100), () {

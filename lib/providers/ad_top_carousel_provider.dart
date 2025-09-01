@@ -5,6 +5,7 @@ import 'package:iboard_app/managers/file_manager.dart';
 import 'package:iboard_app/models/ad_model.dart';
 import 'package:iboard_app/widgets/carousel_widget.dart' as custom_carousel;
 import 'package:iboard_app/widgets/mainscreen/ad_top_widget.dart';
+import 'package:iboard_app/utils/precise_video_pool_manager.dart' as precise;
 import 'package:logger/logger.dart';
 
 /// 頂部廣告輪播Provider
@@ -32,6 +33,10 @@ class TopAdCarouselProvider extends ChangeNotifier {
   // 狀態管理
   bool _isTopCarouselPaused = false;
 
+  // 🎯 新增：精确视频池管理器实例
+  final precise.PreciseVideoPoolManager _preciseVideoPoolManager =
+      precise.PreciseVideoPoolManager();
+
   // 時間記錄相關 - 简化版本（暂停即切换，不需要复杂的时间管理）
   DateTime? _currentTopAdStartTime; // 當前頂部廣告開始時間
   Duration _topAdElapsedTime = Duration.zero; // 頂部廣告已播放時間
@@ -48,6 +53,10 @@ class TopAdCarouselProvider extends ChangeNotifier {
   DateTime? get currentTopAdStartTime => _currentTopAdStartTime;
   Duration get topAdElapsedTime => _topAdElapsedTime;
 
+  /// 🎯 获取精确视频池管理器实例
+  precise.PreciseVideoPoolManager get preciseVideoPoolManager =>
+      _preciseVideoPoolManager;
+
   TopAdCarouselProvider() {
     _topCarouselController = custom_carousel.CarouselController();
     // TopAdCarouselProvider 初始化完成，輪播順序由後台管理
@@ -57,17 +66,18 @@ class TopAdCarouselProvider extends ChangeNotifier {
   void updateCarouselList(List<AdModel> newTopAds) {
     // 檢查數據是否真的發生了變化
     if (_areAdsListsEqual(_topAds, newTopAds)) {
-      _logger.d('頂部廣告數據無變化，跳過更新');
+      _logger.d('[ad_top_carousel_provider] 頂部廣告數據無變化，跳過更新');
       return;
     }
 
     _topAds = List<AdModel>.from(newTopAds);
-    _logger.i('🔄 更新頂部廣告輪播列表: ${newTopAds.length} 個廣告');
+    _logger
+        .i('[ad_top_carousel_provider] 🔄 更新頂部廣告輪播列表: ${newTopAds.length} 個廣告');
 
     // 智能更新：如果正在播放，延遲更新Widget；如果是恢復操作，不更新Widget
     if (!_isTopCarouselPaused && _topTimer != null && _topTimer!.isActive) {
       _pendingWidgetUpdate = true;
-      _logger.i('🎬 檢測到正在播放頂部廣告，延遲更新Widget直到下次切換');
+      _logger.i('[ad_top_carousel_provider] 🎬 檢測到正在播放頂部廣告，延遲更新Widget直到下次切換');
     } else if (_widgetCache.isNotEmpty) {
       // 如果已有Widget緩存且處於暫停狀態，不重建Widget以保持播放狀態
       // 保持現有Widget緩存，避免重建
@@ -95,19 +105,19 @@ class TopAdCarouselProvider extends ChangeNotifier {
   ///1b，檢查緩存狀態並驗證數據完整性
   bool validateCacheData() {
     if (_topAds.isEmpty) {
-      _logger.w('⚠️ 頂部廣告數據為空');
+      _logger.w('[ad_top_carousel_provider] ⚠️ 頂部廣告數據為空');
       return false;
     }
 
     // 檢查每個廣告的文件是否有效
     for (final ad in _topAds) {
       if (ad.file.url.isEmpty) {
-        _logger.w('⚠️ 發現無效的廣告文件: ${ad.title}');
+        _logger.w('[ad_top_carousel_provider] ⚠️ 發現無效的廣告文件: ${ad.title}');
         return false;
       }
     }
 
-    _logger.i('✅ 緩存數據驗證通過: ${_topAds.length} 個廣告');
+    _logger.i('[ad_top_carousel_provider] ✅ 緩存數據驗證通過: ${_topAds.length} 個廣告');
     return true;
   }
 
@@ -166,7 +176,7 @@ class TopAdCarouselProvider extends ChangeNotifier {
         final widget = _createCachedAdWidget(ad);
         _widgetCache[key] = widget;
         widgetMap[key] = widget;
-        _logger.d('🆕 創建新廣告Widget: ${ad.title}');
+        _logger.d('[ad_top_carousel_provider] 🆕 創建新廣告Widget: ${ad.title}');
       }
     }
 
@@ -219,7 +229,7 @@ class TopAdCarouselProvider extends ChangeNotifier {
       if (_topCarouselController.widgetCount > 1 && !_isTopCarouselPaused) {
         // 在播放下一個廣告之前檢查是否有待處理的更新
         if (_pendingWidgetUpdate) {
-          _logger.i('🔄 執行延遲的Widget更新');
+          _logger.i('[ad_top_carousel_provider] 🔄 執行延遲的Widget更新');
           _smartUpdateWidgets();
           _pendingWidgetUpdate = false;
         }
@@ -230,7 +240,7 @@ class TopAdCarouselProvider extends ChangeNotifier {
     });
   }
 
-  ///5，暂停頂部輪播（优化版本 - 包含视频控制器管理）
+  ///5，暂停頂部輪播（进入全屏广告时 - 只暂停不切换）
   void pauseTopCarousel() {
     // 设置頂部輪播为暂停状态
     _isTopCarouselPaused = true;
@@ -241,23 +251,13 @@ class TopAdCarouselProvider extends ChangeNotifier {
     // 暂停当前视频并通知Widget释放控制器
     _pauseCurrentVideo();
 
-    // 直接切换到下一个广告（这是核心逻辑）
-    if (_topCarouselController.widgetCount > 1) {
-      _topCarouselController.playNext();
+    // 🎯 关键修复：进入全屏广告时只暂停，不切换广告，避免时序冲突
+    debugPrint('[ad_top_carousel_provider] ⏸️ 顶部广告已暂停，等待全屏广告完成后再切换');
+
+    // 通知UI更新暂停状态，但不切换广告索引
+    if (hasListeners) {
+      notifyListeners();
     }
-
-    // 重置时间状态（因为已经切换广告）
-    _currentTopAdStartTime = null;
-    _topAdElapsedTime = Duration.zero;
-
-    // 顶部轮播已暂停并切换到下一个广告（包含视频控制器管理）
-
-    // 使用 WidgetsBinding.instance.addPostFrameCallback 延迟通知
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (hasListeners) {
-        notifyListeners();
-      }
-    });
   }
 
   ///5a，暂停当前视频并触发控制器释放
@@ -307,17 +307,44 @@ class TopAdCarouselProvider extends ChangeNotifier {
     });
   }
 
-  ///8，從全屏廣告狀態退出後恢復頂部廣告
+  ///8，從全屏廣告狀態退出後恢復頂部廣告（改为切换并初始化）
   void resumeFromFullscreenAdExit() {
     // 开始恢复顶部广告轮播
 
     // 重置暂停状态
     _isTopCarouselPaused = false;
 
+    // 🎯 关键修复：退出全屏广告时才切换到下一个广告并初始化
+    if (topAds.isNotEmpty && _topCarouselController.widgetCount > 1) {
+      debugPrint('[ad_top_carousel_provider] 🔄 退出全屏广告，切换到下一个顶部广告');
+      _topCarouselController.playNext();
+
+      // 重置时间状态（因为切换了广告）
+      _currentTopAdStartTime = null;
+      _topAdElapsedTime = Duration.zero;
+
+      // 立即通知UI更新，触发新广告的初始化
+      if (hasListeners) {
+        notifyListeners();
+      }
+
+      // 延迟一小段时间让新广告初始化完成，然后恢复播放
+      Future.delayed(const Duration(milliseconds: 200), () {
+        if (!_isTopCarouselPaused && topAds.isNotEmpty) {
+          _resumePlaybackAfterSwitch();
+        }
+      });
+    } else {
+      // 没有多个广告或列表为空，直接恢复当前广告
+      _resumePlaybackAfterSwitch();
+    }
+  }
+
+  ///8a，切换广告后恢复播放的辅助方法
+  void _resumePlaybackAfterSwitch() {
     // 恢复媒体播放
     _topCarouselController.resumeAllMedia();
 
-    // 如果有广告，从当前广告重新开始
     if (topAds.isNotEmpty) {
       // 重置时间相关状态
       _currentTopAdStartTime = DateTime.now();
@@ -333,9 +360,10 @@ class TopAdCarouselProvider extends ChangeNotifier {
       // 启动新的定时器
       startTopAdTimer(validIndex);
 
-      // 顶部广告恢复完成，当前索引: $validIndex
+      debugPrint(
+          '[ad_top_carousel_provider] ✅ 顶部广告恢复完成，当前索引: $validIndex - ${topAds[validIndex].title}');
     } else {
-      _logger.w('⚠️ 顶部广告列表为空，无法恢复');
+      _logger.w('[ad_top_carousel_provider] ⚠️ 顶部广告列表为空，无法恢复');
     }
 
     // 使用 WidgetsBinding.instance.addPostFrameCallback 延迟通知

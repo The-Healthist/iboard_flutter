@@ -6,7 +6,6 @@ import 'package:iboard_app/providers/app_data_provider.dart';
 import 'package:logger/logger.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:convert';
-import 'package:iboard_app/utils/enhanced_video_pool_manager.dart';
 import 'package:iboard_app/providers/ad_top_carousel_provider.dart';
 import 'package:iboard_app/providers/ad_full_carousel_provider.dart';
 
@@ -23,7 +22,6 @@ class AdvertisementProvider extends ChangeNotifier {
 
   final ApiClient _apiClient;
   final AppDataProvider _appDataProvider;
-  final EnhancedVideoPoolManager _videoPoolManager = EnhancedVideoPoolManager();
 
   // 轮播Provider引用
   TopAdCarouselProvider? _topAdCarouselProvider;
@@ -473,8 +471,6 @@ class AdvertisementProvider extends ChangeNotifier {
 
         if (_advertisements.isNotEmpty) {
           _logger.i('从缓存成功恢复广告数据: ${_advertisements.length}个广告');
-          // 恢复数据后也要更新视频池
-          await _updateVideoPool();
         } else {
           _logger.w('缓存中也没有可用的广告数据');
         }
@@ -485,71 +481,6 @@ class AdvertisementProvider extends ChangeNotifier {
       _logger.e('确保缓存广告数据可用时发生错误', error: e);
     }
   }
-
-  ///10，强制清理特定视频的控制器
-  Future<void> forceRemoveVideoController({
-    required String filePath,
-    required VideoType videoType,
-  }) async {
-    try {
-      await _videoPoolManager.forceRemoveController(
-        filePath: filePath,
-        videoType: videoType,
-        isNetwork: false,
-      );
-      _logger.i(
-          '🗑️ [广告Provider] 强制移除视频控制器: ${videoType == VideoType.topAd ? '顶部' : '全屏'}:$filePath');
-    } catch (e) {
-      _logger.e('❌ [广告Provider] 强制移除视频控制器失败: $e');
-    }
-  }
-
-  ///8，更新视频池管理器（私有方法）
-  Future<void> _updateVideoPool() async {
-    try {
-      // 提取顶部广告中的视频文件路径
-      final topAdVideos = topAdvertisements
-          .where((ad) =>
-              ad.type == 'video' &&
-              ad.file.localFilePath != null &&
-              ad.file.localFilePath!.isNotEmpty)
-          .map((ad) => ad.file.localFilePath!)
-          .toList();
-
-      // 提取全屏广告中的视频文件路径
-      final fullAdVideos = fullAdvertisements
-          .where((ad) =>
-              ad.type == 'video' &&
-              ad.file.localFilePath != null &&
-              ad.file.localFilePath!.isNotEmpty)
-          .map((ad) => ad.file.localFilePath!)
-          .toList();
-
-      _logger.i(
-          '🎬 [广告Provider] 更新视频池: 顶部${topAdVideos.length}个, 全屏${fullAdVideos.length}个');
-
-      // 更新视频池
-      await _videoPoolManager.updateVideoList(
-        topAdVideos: topAdVideos,
-        fullAdVideos: fullAdVideos,
-        isNetwork: false, // 假设都是本地文件
-      );
-
-      final status = _videoPoolManager.getPoolStatus();
-      _logger.i(
-          '✅ [广告Provider] 视频池更新完成 - 总数:${status['totalControllers']}, 控制器:${status['controllers']}');
-    } catch (e) {
-      _logger.e('❌ [广告Provider] 更新视频池失败: $e');
-    }
-  }
-
-  ///9，获取视频池状态信息（调试用）
-  Map<String, dynamic> getVideoPoolStatus() {
-    return _videoPoolManager.getPoolStatus();
-  }
-
-  ///11，获取视频池管理器实例（供组件使用）
-  EnhancedVideoPoolManager get videoPoolManager => _videoPoolManager;
 
   // Potentially add methods to add/update/delete advertisements if the API supports it
   // and if such functionality is required by the app.

@@ -200,7 +200,6 @@ class HomePageState extends State<HomePage> {
           final arrearProvider =
               Provider.of<ArrearProvider>(context, listen: false);
           appDataProvider.setArrearProvider(arrearProvider);
-          carouselStateProvider.setPreloadFullscreenAdCallback(() async {});
           // 2.登录
           await appDataProvider.initialize(deviceId: deviceId);
           // 3.初始化天气数据（不需要登录，公开API）

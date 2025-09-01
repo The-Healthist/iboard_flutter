@@ -476,15 +476,6 @@ class AnnouncementCarouselProvider extends ChangeNotifier {
     return false;
   }
 
-  /// 自动隐藏所有覆盖层（欠费查询和欠费总览）
-  bool autoHideAllOverlays() {
-    // 這裡可以添加更詳細的比較邏輯
-    // 目前簡單比較ID和文件MD5
-    // 由於此方法返回bool，需要確保所有路徑都有返回值
-    // 這裡假設如果沒有找到相關的widget，則不需要隱藏，返回false
-    return false;
-  }
-
   ///2e，清理不再使用的緩存
   void _cleanupUnusedCache(Set<String> usedKeys) {
     // 清理Widget緩存
@@ -808,6 +799,9 @@ class AnnouncementCarouselProvider extends ChangeNotifier {
 
     // 恢复暂停状态
     _restorePauseState();
+
+    // 🎯 关键修复：通告轮播恢复时，发送恢复通知而不是暂停通知
+    _midCarouselController.resumeAllMedia();
 
     // 修复核心问题：从全屏广告恢复时的时间计算
     if (_midCarouselController.widgetCount >= 2 && !_isMidCarouselPaused) {

@@ -2,9 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:video_player/video_player.dart';
 import 'package:iboard_app/managers/file_manager.dart';
 import 'package:iboard_app/models/ad_model.dart';
-import 'package:iboard_app/utils/enhanced_video_pool_manager.dart';
-import 'package:iboard_app/providers/advertisement_provider.dart';
-import 'package:iboard_app/widgets/carousel_widget.dart'; // 导入通知类
+import 'package:iboard_app/utils/precise_video_pool_manager.dart' as precise;
+import 'package:iboard_app/providers/ad_full_carousel_provider.dart';
+
 import 'package:provider/provider.dart';
 import 'package:logger/logger.dart';
 import 'dart:io';
@@ -15,14 +15,12 @@ class FullAdWidget extends StatefulWidget {
   final Function(String adId, Duration position)?
       onVideoProgressChanged; // 视频进度变化回掉
   final VoidCallback? onVideoDisposed; // 视频资源释放完成回掉
-  final Future<VideoPlayerController?> controllerFuture; // 异步控制器
   final Duration? initialPlaybackPosition; // 初始播放位置
 
   const FullAdWidget({
     super.key,
     required this.ad,
     required this.fileManager,
-    required this.controllerFuture,
     this.onVideoProgressChanged,
     this.onVideoDisposed,
     this.initialPlaybackPosition,
@@ -41,17 +39,17 @@ class _FullAdWidgetState extends State<FullAdWidget> {
   String? _currentFilePath; // 当前视频文件路径
   bool _isReleasing = false; // 防重入釋放
 
-  // 保存AdvertisementProvider引用，避免dispose时context访问问题
-  AdvertisementProvider? _advertisementProvider;
+  // 保存FullscreenAdProvider引用，避免dispose时context访问问题
+  FullscreenAdProvider? _fullscreenAdProvider;
   @override
   void initState() {
     super.initState();
-    // 在 initState 中尝试获取 AdvertisementProvider
+    // 在 initState 中尝试获取 FullscreenAdProvider
     WidgetsBinding.instance.addPostFrameCallback((_) {
       try {
-        _advertisementProvider = context.read<AdvertisementProvider>();
+        _fullscreenAdProvider = context.read<FullscreenAdProvider>();
       } catch (e) {
-        _logger.e('❌ 获取 AdvertisementProvider 失败: $e');
+        _logger.e('[ad_full_widget] ❌ 获取 FullscreenAdProvider 失败: $e');
       }
     });
 
@@ -84,25 +82,25 @@ class _FullAdWidgetState extends State<FullAdWidget> {
       if (!mounted) return;
 
       if (localFile == null || !await localFile.exists()) {
-        _logger.e('❌ 视频文件未缓存: ${widget.ad.file.url}');
+        _logger.e('[ad_full_widget] ❌ 视频文件未缓存: ${widget.ad.file.url}');
         throw Exception('视频文件未缓存');
       }
 
       // 记录当前文件信息
       _currentFilePath = localFile.path;
 
-      // 视频文件路径: $_currentFilePath
+      // 🎯 核心改进：通過 FullscreenAdProvider 的精確視頻池管理器取得已初始化控制器
+      _fullscreenAdProvider ??= context.read<FullscreenAdProvider>();
 
-      // 與頂部一致：通過 AdvertisementProvider 的 videoPoolManager 取得控制器
-      _advertisementProvider ??= context.read<AdvertisementProvider>();
-      _videoController =
-          await _advertisementProvider!.videoPoolManager.getControllerSafely(
+      // 🎯 核心改进：使用精确解码器管理器，自動dispose邏輯已內建
+      _videoController = await _fullscreenAdProvider!.preciseVideoPoolManager
+          .getInitializedController(
         filePath: _currentFilePath!,
-        videoType: VideoType.fullAd,
+        videoType: precise.VideoType.fullAd, // 使用fullAd類型
         autoPlay: true,
         looping: true,
         onError: () {
-          debugPrint('❌ 全屏广告控制器获取失败: $_currentFilePath');
+          debugPrint('[ad_full_widget] ❌ 全屏广告控制器获取失败: $_currentFilePath');
           if (mounted) {
             setState(() {
               _errorMessage = '视频控制器创建失败，显示默认广告';
@@ -114,66 +112,72 @@ class _FullAdWidgetState extends State<FullAdWidget> {
 
       // 详细的控制器初始化诊断
       if (_videoController != null) {
-        debugPrint('✅ 全屏广告控制器获取成功: ${widget.ad.title}');
+        debugPrint('[ad_full_widget] ✅ 全屏广告控制器获取成功: ${widget.ad.title}');
 
         // 添加进度监听器
         _videoController!.addListener(_onVideoProgressChanged);
 
-        // 等待视频完全加载
-        int loadAttempts = 0;
-        const maxLoadAttempts = 10;
-
-        while (!_videoController!.value.isInitialized &&
-            loadAttempts < maxLoadAttempts &&
-            mounted) {
-          await Future.delayed(const Duration(milliseconds: 100));
-          loadAttempts++;
-        }
-
-        if (!_videoController!.value.isInitialized) {
-          throw Exception('视频加载超时，无法初始化');
-        }
-
-        // 视频加载完成，开始播放流程
-        debugPrint('🎬 全屏广告视频加载完成，开始播放: ${widget.ad.title}');
-
-        // 确保控制器已初始化
         if (_videoController!.value.isInitialized) {
+          debugPrint(
+              '[ad_full_widget] 🎬 全屏广告视频控制器已初始化，開始播放: ${widget.ad.title}');
+
           try {
-            // 明确设置循环與首播參數
-            await _videoController!.setLooping(true);
-            await _videoController!.setVolume(1.0); // 修复：设置音量为1.0，恢复声音
-            await _videoController!.setPlaybackSpeed(1.0);
-
-            // 重置到开头
-            await _videoController!.seekTo(Duration.zero);
-
-            // 等待视频準備更充分（避免首次播放失敗）
-            await Future.delayed(const Duration(milliseconds: 350));
-
-            // 开始播放
-            await _videoController!.play();
-
-            debugPrint('▶️ 视频开始播放: ${widget.ad.title}');
-            // 保留一次狀態觀察，不自動重播
-            await Future.delayed(const Duration(milliseconds: 100));
+            // 🎯 优化：由于autoPlay=true，视频应该已经在播放
+            // 只需要确认播放状态，不需要重复设置参数
+            if (!_videoController!.value.isPlaying) {
+              await _videoController!.play();
+              debugPrint('[ad_full_widget] ▶️ 视频开始播放: ${widget.ad.title}');
+            } else {
+              debugPrint('[ad_full_widget] ▶️ 视频已在播放: ${widget.ad.title}');
+            }
           } catch (playError) {
-            _logger.e('❌ 视频播放失败',
+            _logger.e('[ad_full_widget] ❌ 视频播放失败',
                 error: playError, stackTrace: StackTrace.current);
-            throw Exception('视频播放初始化失败: $playError');
+            // 不抛出异常，显示默认广告
+            setState(() {
+              _isVideoInitialized = false;
+              _isLoadingVideo = false;
+              _errorMessage = null; // 显示默认广告而不是错误
+            });
+            return;
           }
-        } else {
-          _logger.w('⚠️ 控制器未初始化，无法播放');
-          throw Exception('视频控制器未初始化');
-        }
 
-        setState(() {
-          _isVideoInitialized = true;
-          _isLoadingVideo = false;
-        });
+          setState(() {
+            _isVideoInitialized = true;
+            _isLoadingVideo = false;
+          });
+        } else {
+          // 如果控制器未初始化，等待初始化完成
+          debugPrint('[ad_full_widget] ⏳ 視頻控制器正在初始化，等待完成: ${widget.ad.title}');
+
+          int loadAttempts = 0;
+          const maxLoadAttempts = 10;
+
+          while (!_videoController!.value.isInitialized &&
+              loadAttempts < maxLoadAttempts &&
+              mounted) {
+            await Future.delayed(const Duration(milliseconds: 100));
+            loadAttempts++;
+          }
+
+          if (!_videoController!.value.isInitialized) {
+            throw Exception('视频加载超时，无法初始化');
+          }
+
+          // 初始化完成后立即播放
+          if (!_videoController!.value.isPlaying) {
+            await _videoController!.play();
+          }
+
+          setState(() {
+            _isVideoInitialized = true;
+            _isLoadingVideo = false;
+          });
+        }
       } else {
         // 控制器为null，显示默认广告而不是错误
-        debugPrint('⚠️ 全屏广告控制器为null，显示默认广告: ${widget.ad.title}');
+        debugPrint(
+            '[ad_full_widget] ⚠️ 全屏广告控制器为null，显示默认广告: ${widget.ad.title}');
         setState(() {
           _isVideoInitialized = false;
           _isLoadingVideo = false;
@@ -181,12 +185,12 @@ class _FullAdWidgetState extends State<FullAdWidget> {
         });
       }
     } catch (e, stackTrace) {
-      _logger.e('❌ 視頻初始化失败', error: e, stackTrace: stackTrace);
+      _logger.e('[ad_full_widget] ❌ 視頻初始化失败', error: e, stackTrace: stackTrace);
 
       if (mounted) {
         setState(() {
           _isLoadingVideo = false;
-          _errorMessage = '視頻加載失败: $e';
+          _errorMessage = '[ad_full_widget] 視頻加載失败: $e';
           _isVideoInitialized = false;
         });
       }
@@ -209,12 +213,13 @@ class _FullAdWidgetState extends State<FullAdWidget> {
         // 安全地移除监听器 - 这个总是需要的
         _videoController!.removeListener(_onVideoProgressChanged);
       } catch (e) {
-        _logger.w('移除監聽器時出錯: $e');
+        _logger.w('[ad_full_widget] 移除監聽器時出錯: $e');
       }
 
       // 🎯 关键改进：参考顶部广告，Widget自己释放控制器到池中
       _releaseVideoControllerToPool().then((_) {
-        _logger.d('✅ FullAdWidget dispose完成: ${widget.ad.title}');
+        _logger
+            .d('[ad_full_widget] ✅ FullAdWidget dispose完成: ${widget.ad.title}');
       }).catchError((error) {
         _logger.e('❌ FullAdWidget dispose释放控制器出错: $error');
       });
@@ -222,13 +227,13 @@ class _FullAdWidgetState extends State<FullAdWidget> {
       _videoController = null;
       _currentFilePath = null;
     } else {
-      _logger.d('✅ 无需释放控制器 - 控制器为空或路径为空');
+      _logger.d('[ad_full_widget] ✅ 无需释放控制器 - 控制器为空或路径为空');
     }
 
     super.dispose();
   }
 
-  ///1，视频播放进度变化监听器
+  ///0，视频播放进度变化监听器
   void _onVideoProgressChanged() {
     try {
       if (_videoController != null &&
@@ -238,11 +243,11 @@ class _FullAdWidgetState extends State<FullAdWidget> {
         widget.onVideoProgressChanged!(widget.ad.id.toString(), Duration.zero);
       }
     } catch (e) {
-      debugPrint('⚠️ 视频进度监听器出错: $e');
+      debugPrint('[ad_full_widget] ⚠️ 视频进度监听器出错: $e');
     }
   }
 
-  ///2，处理轮播切换时的清理 - 参考顶部广告实现
+  ///1，处理轮播切换时的清理 - 参考顶部广告实现
   Future<void> _handleCarouselSwitch() async {
     if (_videoController != null) {
       // 全屏广告处理轮播切换，释放控制器: ${widget.ad.title}
@@ -251,7 +256,7 @@ class _FullAdWidgetState extends State<FullAdWidget> {
     }
   }
 
-  ///3，暂停视频播放 - 参考顶部广告实现
+  ///2，暂停视频播放 - 参考顶部广告实现
   Future<void> _pauseVideo() async {
     if (_videoController != null) {
       try {
@@ -262,12 +267,12 @@ class _FullAdWidgetState extends State<FullAdWidget> {
           // 暂停全屏广告视频播放: ${widget.ad.title}
         }
       } catch (e) {
-        _logger.w('⚠️ 暂停视频播放失败: $e');
+        _logger.w('[ad_full_widget] ⚠️ 暂停视频播放失败: $e');
       }
     }
   }
 
-  ///4，恢复视频播放 - 参考顶部广告实现
+  ///3，恢复视频播放 - 参考顶部广告实现
   Future<void> _resumeVideo() async {
     if (_videoController != null) {
       try {
@@ -279,12 +284,12 @@ class _FullAdWidgetState extends State<FullAdWidget> {
           // 恢复全屏广告视频播放: ${widget.ad.title}
         }
       } catch (e) {
-        _logger.w('⚠️ 恢复视频播放失败: $e');
+        _logger.w('[ad_full_widget] ⚠️ 恢复视频播放失败: $e');
       }
     }
   }
 
-  ///5，释放视频控制器到池中 - 参考顶部广告实现
+  ///4，释放视频控制器到池中 - 参考顶部广告实现
   Future<void> _releaseVideoControllerToPool() async {
     if (_videoController != null && _currentFilePath != null) {
       try {
@@ -295,27 +300,30 @@ class _FullAdWidgetState extends State<FullAdWidget> {
           await _videoController!.pause();
         }
 
-        // 确保AdvertisementProvider引用可用
-        _advertisementProvider ??= context.read<AdvertisementProvider>();
+        // 确保FullscreenAdProvider引用可用
+        _fullscreenAdProvider ??= context.read<FullscreenAdProvider>();
 
-        if (_advertisementProvider != null) {
-          // 释放控制器到池中
-          await _advertisementProvider!.videoPoolManager.releaseController(
+        if (_fullscreenAdProvider != null) {
+          // 🎯 使用精確視頻池管理器释放控制器
+          await _fullscreenAdProvider!.preciseVideoPoolManager
+              .releaseController(
             filePath: _currentFilePath!,
-            videoType: VideoType.fullAd,
+            videoType: precise.VideoType.fullAd,
+            forceDispose: true, // 全屏广告切换时强制释放解码器资源
           );
 
-          _logger.d('✅ 全屏广告视频控制器已释放到池中: ${widget.ad.title}');
+          _logger.d('[ad_full_widget] ✅ 全屏广告视频控制器已释放到池中: ${widget.ad.title}');
 
           // 调用回调
           if (widget.onVideoDisposed != null) {
             widget.onVideoDisposed!();
           }
         } else {
-          _logger.w('⚠️ AdvertisementProvider引用为空，无法释放全屏广告视频控制器');
+          _logger
+              .w('[ad_full_widget] ⚠️ FullscreenAdProvider引用为空，无法释放全屏广告视频控制器');
         }
       } catch (e) {
-        _logger.w('⚠️ 释放全屏广告视频控制器时出错: $e');
+        _logger.w('[ad_full_widget] ⚠️ 释放全屏广告视频控制器时出错: $e');
       }
 
       _videoController = null;
@@ -323,62 +331,21 @@ class _FullAdWidgetState extends State<FullAdWidget> {
     }
   }
 
-  // 移除 _releaseExistingController 方法，不再需要频繁释放和重新创建控制器
-
   @override
   Widget build(BuildContext context) {
-    // 参考顶部广告实现：使用NotificationListener监听媒体暂停和恢复通知
-    return NotificationListener<Notification>(
-      onNotification: (notification) {
-        if (notification is MediaPauseNotification) {
-          // 全屏广告状态：处理轮播切换，需要释放控制器
-          debugPrint(
-              '📢 FullAdWidget收到MediaPauseNotification: ${widget.ad.title}');
-          Future.delayed(const Duration(milliseconds: 50), () {
-            if (mounted) {
-              _handleCarouselSwitch();
-            }
-          });
-          return true; // 阻止通知继续传递
-        } else if (notification is MediaResumeNotification) {
-          // 防抖动执行，避免重复调用
-          debugPrint(
-              '📢 FullAdWidget收到MediaResumeNotification: ${widget.ad.title}');
-          Future.delayed(const Duration(milliseconds: 50), () {
-            if (mounted &&
-                _videoController != null &&
-                _videoController!.value.isInitialized) {
-              _resumeVideo();
-            }
-          });
-          return true; // 阻止通知继续传递
-        }
-        return false; // 其他通知继续传递
-      },
-      child: SizedBox(
-        width: double.infinity,
-        height: double.infinity,
-        child: Stack(
-          children: [
-            // 广告内容显示
-            _buildAdContent(),
-
-            // 可选：添加一个关闭按钮 (如果需要的話)
-            // Positioned(
-            //   top: 40,
-            //   right: 20,
-            //   child: IconButton(
-            //     onPressed: () => Navigator.pop(context),
-            //     icon: Icon(Icons.close, color: Colors.white, size: 30),
-            //   ),
-            // ),
-          ],
-        ),
+    return SizedBox(
+      width: double.infinity,
+      height: double.infinity,
+      child: Stack(
+        children: [
+          // 广告内容显示
+          _buildAdContent(),
+        ],
       ),
     );
   }
 
-  ///3，構建廣告內容
+  ///5，構建廣告內容
   Widget _buildAdContent() {
     // 根據文件類型顯示不同的內容
     if (widget.ad.file.mimeType.startsWith('image/')) {
@@ -390,7 +357,7 @@ class _FullAdWidgetState extends State<FullAdWidget> {
     }
   }
 
-  ///4，構建圖片廣告
+  ///6，構建圖片廣告
   Widget _buildImageAd() {
     return FutureBuilder<File?>(
       future: widget.fileManager.getFile(widget.ad.file),
@@ -417,7 +384,7 @@ class _FullAdWidgetState extends State<FullAdWidget> {
               width: double.infinity,
               height: double.infinity,
               errorBuilder: (context, error, stackTrace) {
-                debugPrint('本地圖片加載失敗: $error');
+                debugPrint('[ad_full_widget] 本地圖片加載失敗: $error');
                 return _buildNetworkImage();
               },
             ),
@@ -431,11 +398,11 @@ class _FullAdWidgetState extends State<FullAdWidget> {
     );
   }
 
-  ///5，構建網絡圖片
+  ///7，構建網絡圖片
   Widget _buildNetworkImage() {
     return Image.network(
       widget.ad.file.url,
-      fit: BoxFit.cover,
+      fit: BoxFit.contain,
       width: double.infinity,
       height: double.infinity,
       loadingBuilder: (context, child, loadingProgress) {
@@ -459,7 +426,7 @@ class _FullAdWidgetState extends State<FullAdWidget> {
     );
   }
 
-  ///6，構建視頻廣告
+  ///8，構建視頻廣告
   Widget _buildVideoAd() {
     if (_isLoadingVideo) {
       return Container(
@@ -494,10 +461,16 @@ class _FullAdWidgetState extends State<FullAdWidget> {
 
     // 確保視頻控制器已初始化並可播放
     if (_videoController != null && _videoController!.value.isInitialized) {
-      return SizedBox(
+      return Container(
         width: double.infinity,
         height: double.infinity,
-        child: VideoPlayer(_videoController!),
+        color: Colors.black, // 添加黑色背景，避免视频周围空白
+        child: Center(
+          child: AspectRatio(
+            aspectRatio: _videoController!.value.aspectRatio,
+            child: VideoPlayer(_videoController!),
+          ),
+        ),
       );
     }
 
@@ -505,7 +478,7 @@ class _FullAdWidgetState extends State<FullAdWidget> {
     return _buildDefaultAd();
   }
 
-  ///7，構建默認廣告
+  ///9，構建默認廣告
   Widget _buildDefaultAd() {
     return Container(
       width: double.infinity,

@@ -3,14 +3,10 @@ import 'package:flutter/material.dart';
 import 'package:iboard_app/managers/file_manager.dart';
 import 'package:iboard_app/models/ad_model.dart';
 import 'package:iboard_app/widgets/ad_full_widget.dart';
-import 'package:iboard_app/widgets/carousel_widget.dart';
 
 import 'package:iboard_app/providers/app_data_provider.dart';
-import 'package:iboard_app/utils/enhanced_video_pool_manager.dart';
-import 'package:video_player/video_player.dart';
+import 'package:iboard_app/utils/precise_video_pool_manager.dart' as precise;
 
-/// 简化版全屏广告Provider
-/// 参考顶部广告轮播逻辑实现
 /// 轮播顺序由后台管理，此Provider不再处理自定义顺序
 class FullscreenAdProvider extends ChangeNotifier {
   // 定时器管理
@@ -31,9 +27,6 @@ class FullscreenAdProvider extends ChangeNotifier {
 
   int _currentAdIndex = 0;
 
-  // 添加：BuildContext 引用用於發送通知
-  BuildContext? _currentContext;
-
   // 时间记录
   DateTime? _currentAdStartTime;
   DateTime? _currentStateStartTime;
@@ -47,6 +40,10 @@ class FullscreenAdProvider extends ChangeNotifier {
   // App数据提供者相关
   final AppDataProvider _appDataProvider;
   static const int _defaultFullscreenAdDuration = 10; // 默认全屏广告播放时间（秒）
+
+  // 🎯 新增：精确视频池管理器实例
+  final precise.PreciseVideoPoolManager _preciseVideoPoolManager =
+      precise.PreciseVideoPoolManager();
 
   FullscreenAdProvider(this._appDataProvider) {
     // FullscreenAdProvider initialized with AppDataProvider, 轮播顺序由后台管理
@@ -81,20 +78,26 @@ class FullscreenAdProvider extends ChangeNotifier {
       _appDataProvider.deviceSettings?.advertisementPlayDuration ??
       _defaultFullscreenAdDuration;
 
-  ///1，更新轮播广告列表（由AdvertisementProvider调用）
+  /// 🎯 获取精确视频池管理器实例
+  precise.PreciseVideoPoolManager get preciseVideoPoolManager =>
+      _preciseVideoPoolManager;
+
+  ///0，更新轮播广告列表（由AdvertisementProvider调用）
   Future<void> updateCarouselList(List<AdModel> newFullscreenAds) async {
     // 检查数据是否真的发生了变化
     if (_areAdsListsEqual(_fullscreenAds, newFullscreenAds)) {
-      debugPrint('🔄 全屏广告轮播列表没有变化，跳过更新');
+      debugPrint('[fullscreen_ad_carousel_provider] 🔄 全屏广告轮播列表没有变化，跳过更新');
       return;
     }
 
     _fullscreenAds = List<AdModel>.from(newFullscreenAds);
-    debugPrint('🔄 更新全屏广告轮播列表: ${_fullscreenAds.length} 个广告');
+    debugPrint(
+        '[fullscreen_ad_carousel_provider] 🔄 更新全屏广告轮播列表: ${_fullscreenAds.length} 个广告');
 
     // 智能更新：如果正在播放，延迟更新Widget
     if (_isActive && !_isPaused) {
-      debugPrint('🎬 检测到正在播放全屏广告，延迟更新Widget直到下次切换');
+      debugPrint(
+          '[fullscreen_ad_carousel_provider] 🎬 检测到正在播放全屏广告，延迟更新Widget直到下次切换');
       // 标记需要更新，在下次切换时执行
       _pendingWidgetUpdate = true;
     } else {
@@ -104,12 +107,12 @@ class FullscreenAdProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// 設置BuildContext用於發送通知
+  /// 設置BuildContext用於發送通知（已移除，不再需要）
   void setContext(BuildContext context) {
-    _currentContext = context;
+    // 🎯 移除：不再需要context发送MediaPauseNotification
   }
 
-  ///2，清空轮播广告列表
+  ///1，清空轮播广告列表
   void clearCarouselList() {
     _fullscreenAds.clear();
     _adWidgets.clear();
@@ -117,46 +120,34 @@ class FullscreenAdProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  ///6, 更新全屏广告数据
+  ///2, 更新全屏广告数据
   Future<void> updateFullscreenAds(List<AdModel> newAds) async {
     // 检查数据是否真的发生了变化
     if (_areAdsListsEqual(_fullscreenAds, newAds)) {
-      debugPrint('🔄 全屏广告数据没有变化，跳过更新');
+      debugPrint('[fullscreen_ad_carousel_provider] 🔄 全屏广告数据没有变化，跳过更新');
       return;
     }
 
     // 直接更新广告列表（不再使用自定义顺序）
     _fullscreenAds = List<AdModel>.from(newAds);
-    debugPrint('🔄 更新全屏广告数据: ${_fullscreenAds.length}个广告');
+    debugPrint(
+        '[fullscreen_ad_carousel_provider] 🔄 更新全屏广告数据: ${_fullscreenAds.length}个广告');
 
     // 🎯 使用智能缓存检查重新创建广告Widget
     await _ensureAdWidgets();
     notifyListeners();
   }
 
-  ///7, 检查两个广告列表是否相等
+  ///3, 检查两个广告列表是否相等
   bool _areAdsListsEqual(List<AdModel> list1, List<AdModel> list2) {
     if (list1.length != list2.length) return false;
-
     for (int i = 0; i < list1.length; i++) {
       if (list1[i].id != list2[i].id) return false;
     }
-
     return true;
   }
 
-  ///7, 创建广告Widget组件列表
-  Future<void> _createAdWidgets() async {
-    final List<Widget> widgets = [];
-    for (int i = 0; i < fullscreenAds.length; i++) {
-      final widget = await _createCachedAdWidget(fullscreenAds[i], i);
-      widgets.add(widget);
-    }
-    _adWidgets = widgets;
-    // 创建了 ${_adWidgets.length} 个广告Widget
-  }
-
-  ///7a, 智能创建广告Widget（使用缓存）
+  ///4, 智能创建广告Widget（使用缓存）
   Future<void> _smartCreateAdWidgets() async {
     final List<Widget> newWidgets = [];
     final Set<String> usedKeys = {};
@@ -186,44 +177,7 @@ class FullscreenAdProvider extends ChangeNotifier {
     _pendingWidgetUpdate = false;
   }
 
-  ///6，获取视频控制器Future（私有方法）
-  Future<VideoPlayerController?> _getVideoControllerFuture(
-      AdModel ad, String key) async {
-    try {
-      // 先通过FileManager获取本地文件
-      final fileManager = _fileManagerCache[key] ?? FileManager();
-      final localFile = await fileManager.getFile(ad.file);
-
-      if (localFile == null || !await localFile.exists()) {
-        debugPrint('❌ 无法获取本地视频文件: ${ad.title}');
-        return null;
-      }
-
-      // 根据广告类型确定视频类型
-      VideoType videoType;
-      if (ad.display == AdDisplayType.topfull) {
-        videoType = VideoType.fullAd; // topfull类型在全屏广告中使用fullAd类型
-      } else {
-        videoType = VideoType.fullAd;
-      }
-
-      // 使用本地文件路径创建控制器
-      return await EnhancedVideoPoolManager().getController(
-        filePath: localFile.path,
-        videoType: videoType,
-        autoPlay: true,
-        looping: true,
-        onError: () {
-          debugPrint('全屏广告视频控制器初始化失败: ${ad.title}');
-        },
-      );
-    } catch (e) {
-      debugPrint('❌ 获取视频控制器Future失败: ${ad.title}');
-      return null;
-    }
-  }
-
-  ///7b, 创建缓存的广告Widget
+  ///6, 创建缓存的广告Widget
   Future<Widget> _createCachedAdWidget(AdModel ad, int index) async {
     final key = 'fullscreen_ad_${ad.id}_$index';
 
@@ -235,17 +189,10 @@ class FullscreenAdProvider extends ChangeNotifier {
     // 确保文件已下载到本地
     await fileManager.getFile(ad.file);
 
-    // 簡化控制器獲取：直接使用 EnhancedVideoPoolManager，移除本地緩存
-    Future<VideoPlayerController?> controllerFuture = Future.value(null);
-    if (ad.file.mimeType.startsWith('video/')) {
-      controllerFuture = _getVideoControllerFuture(ad, key);
-    }
-
     return FullAdWidget(
       key: ValueKey(key),
       ad: ad,
       fileManager: fileManager,
-      controllerFuture: controllerFuture,
       // 始终从头开始播放
       initialPlaybackPosition: Duration.zero,
       onVideoProgressChanged: (adId, position) {
@@ -254,45 +201,11 @@ class FullscreenAdProvider extends ChangeNotifier {
     );
   }
 
-  ///8, 创建单个广告Widget
-  Future<Widget> _createSingleAdWidget(AdModel ad, int index) async {
-    final key = 'fullscreen_ad_${ad.id}_$index';
-
-    // 重用或创建FileManager
-    if (!_fileManagerCache.containsKey(key)) {
-      _fileManagerCache[key] = FileManager();
-    }
-    final fileManager = _fileManagerCache[key]!;
-    // 确保文件已下载到本地
-    await fileManager.getFile(ad.file);
-
-    // 使用 EnhancedVideoPoolManager 获取控制器
-    Future<VideoPlayerController?> controllerFuture = Future.value(null);
-    if (ad.file.mimeType.startsWith('video/')) {
-      controllerFuture = _getVideoControllerFuture(ad, key);
-    }
-
-    return FullAdWidget(
-      key: ValueKey(key),
-      ad: ad,
-      fileManager: fileManager,
-      controllerFuture: controllerFuture, // 传入异步控制器
-      onVideoProgressChanged: (adId, position) {
-        if (_currentAdIndex < fullscreenAds.length &&
-            fullscreenAds[_currentAdIndex].id.toString() == adId) {
-          final currentAd = getCurrentAd();
-          if (currentAd != null &&
-              currentAd.file.mimeType.startsWith('image/')) {
-            saveVideoProgress(adId, position);
-          }
-        }
-      },
-    );
-  }
-
-  ///9, 进入全屏广告模式并开始轮播
+  ///7, 进入全屏广告模式并开始轮播
   Future<void> enterFullscreenMode() async {
     if (_isActive) return;
+
+    debugPrint('[fullscreen_ad_carousel_provider] 1, 进入全屏广告模式，开始轮播');
 
     _isActive = true;
     _isPaused = false;
@@ -316,7 +229,7 @@ class FullscreenAdProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  ///9a, 确保广告Widget存在（智能缓存检查）
+  ///8, 确保广告Widget存在（智能缓存检查）
   Future<void> _ensureAdWidgets() async {
     final List<Widget> widgets = [];
 
@@ -324,12 +237,8 @@ class FullscreenAdProvider extends ChangeNotifier {
       final ad = fullscreenAds[i];
       final key = 'fullscreen_ad_${ad.id}_$i';
       if (_widgetCache.containsKey(key)) {
-        // 使用缓存的Widget
         widgets.add(_widgetCache[key]!);
-        // 使用缓存Widget: ${ad.title}
       } else {
-        // 创建新Widget并加入缓存
-        // 创建新Widget: ${ad.title}
         final widget = await _createCachedAdWidget(ad, i);
         _widgetCache[key] = widget;
         widgets.add(widget);
@@ -337,25 +246,24 @@ class FullscreenAdProvider extends ChangeNotifier {
     }
 
     _adWidgets = widgets;
-    // 广告Widget准备完成: ${_adWidgets.length}个 (缓存命中: ${_widgetCache.length}个)
   }
 
-  ///10, 启动全屏广告计时
+  ///9, 启动全屏广告计时（简化版本 - 只管理定时器）
   void startFullscreenAdTimer(int currentIndex) {
     _fullscreenTimer?.cancel(); // 取消之前的计时器
 
     // 改进的边界检查逻辑
     if (fullscreenAds.isEmpty) {
-      debugPrint('⚠️ 全屏广告列表为空，无法启动计时器');
+      debugPrint('[fullscreen_ad_carousel_provider] ⚠️ 全屏广告列表为空，无法启动计时器');
       return;
     }
     if (_isPaused) {
-      debugPrint('⚠️ 广告已暂停，跳过计时器启动');
+      debugPrint('[fullscreen_ad_carousel_provider] ⚠️ 广告已暂停，跳过计时器启动');
       return;
     }
 
     if (!_isActive) {
-      debugPrint('⚠️ 广告未激活，跳过计时器启动');
+      debugPrint('[fullscreen_ad_carousel_provider] ⚠️ 广告未激活，跳过计时器启动');
       return;
     }
 
@@ -364,15 +272,16 @@ class FullscreenAdProvider extends ChangeNotifier {
     _adDuration = ad.durationObject;
     _currentAdIndex = currentIndex;
 
-    // 检查当前广告的duration是否小于fullscreenAdDuration
-    // 如果小于，设置定时器 = duration 然后切换
+    // 🎯 简化：不在Provider中初始化视频控制器，让Widget自己处理
+
     if (_adDuration.inSeconds < fullscreenAdDuration) {
       _fullscreenTimer =
           Timer(Duration(seconds: _adDuration.inSeconds), () async {
         if (_isActive && !_isPaused) {
           await _nextAd();
         } else {
-          debugPrint('⚠️ 计时器到期但条件不满足: active=$_isActive, paused=$_isPaused');
+          debugPrint(
+              '[fullscreen_ad_carousel_provider] ⚠️ 计时器到期但条件不满足: active=$_isActive, paused=$_isPaused');
         }
       });
     } else {
@@ -381,14 +290,12 @@ class FullscreenAdProvider extends ChangeNotifier {
         if (_isActive && !_isPaused) {
           // 标准广告计时器到期，切换到下一个
           await _nextAd();
-        } else {
-          // 计时器到期但条件不满足: active=$_isActive, paused=$_isPaused
-        }
+        } else {}
       });
     }
   }
 
-  ///10, 切换到下一个广告（私有方法）- 优化版本，参考顶部广告的优雅实现
+  ///10, 切换到下一个广告（私有方法）- 简化版本，移除通知机制避免冲突
   Future<void> _nextAd() async {
     if (fullscreenAds.isEmpty || _isPaused || !_isActive) {
       // _nextAd被阻止: isEmpty=${fullscreenAds.isEmpty}, paused=$_isPaused, active=$_isActive
@@ -400,17 +307,18 @@ class FullscreenAdProvider extends ChangeNotifier {
       return;
     }
 
-    // 🎯 关键改进1: 在切换之前先暂停和重置当前广告
-    await _pauseAndResetCurrentAd();
+    // 🎯 关键修复：直接切换索引，让视频池管理器处理控制器切换
+    // 移除MediaPauseNotification机制，避免新视频被意外暂停
 
     // 切换到下一个广告索引
     _currentAdIndex = (_currentAdIndex + 1) % fullscreenAds.length;
 
-    // 全屏广告切换: 索引 ${_currentAdIndex}/${fullscreenAds.length} - ${fullscreenAds[_currentAdIndex].title}
+    debugPrint(
+        '[fullscreen_ad_carousel_provider] 🔄 全屏广告切换: 索引 ${_currentAdIndex}/${fullscreenAds.length} - ${fullscreenAds[_currentAdIndex].title}');
 
     // 检查是否有待更新的Widget
     if (_pendingWidgetUpdate) {
-      debugPrint('🔄 执行延迟的Widget更新');
+      debugPrint('[fullscreen_ad_carousel_provider] 🔄 执行延迟的Widget更新');
       await _smartCreateAdWidgets();
     }
 
@@ -424,40 +332,23 @@ class FullscreenAdProvider extends ChangeNotifier {
 
     notifyListeners();
 
-    // 添加小延迟，让前一个视频有时间完全释放资源
-    Future.delayed(const Duration(milliseconds: 300), () {
-      if (_isActive && !_isPaused) {
-        startFullscreenAdTimer(_currentAdIndex);
-      }
-    });
+    // 🎯 立即启动新广告的定时器，不延迟
+    if (_isActive && !_isPaused) {
+      startFullscreenAdTimer(_currentAdIndex);
+    }
   }
 
-  ///10a, 暂停和重置当前广告（参考顶部广告的实现）- 优化版本：让Widget自己释放
-  Future<void> _pauseAndResetCurrentAd() async {
-    debugPrint('⏸️ 开始暂停当前全屏广告 - 让Widget自己处理释放');
-
-    // 获取当前广告的控制器信息
-    final currentAd = getCurrentAd();
-    if (currentAd == null) return;
-
-    debugPrint('� 准备切换广告，让Widget自己处理暂停和释放: ${currentAd.title}');
-
-    // 延迟确保Widget有时间处理 - 这很重要！
-    await Future.delayed(const Duration(milliseconds: 150));
-    debugPrint('✅ 全屏广告Widget处理时间预留完成');
-  }
-
-  ///24, 公开的切换到下一个广告方法（供外部调用）
+  ///12, 公开的切换到下一个广告方法（供外部调用）
   void nextAd() {
     if (!_isActive || _isPaused) {
-      debugPrint('⚠️ 全屏广告未激活或已暂停，无法切换');
+      debugPrint('[fullscreen_ad_carousel_provider] ⚠️ 全屏广告未激活或已暂停，无法切换');
       return;
     }
 
     _nextAd();
   }
 
-  ///12, 暂停轮播
+  ///13, 暂停轮播
   void pauseCarousel() {
     // 记录当前播放时间
     _currentAdPauseTime = DateTime.now();
@@ -483,7 +374,7 @@ class FullscreenAdProvider extends ChangeNotifier {
 
       final remaining = _adDuration - _adElapsedTime;
       debugPrint(
-          '📊 [暂停] 全屏广告 - 已播放: ${_adElapsedTime.inSeconds}s/${_adDuration.inSeconds}s, 剩余: ${remaining.inSeconds}s');
+          '[fullscreen_ad_carousel_provider] 📊 [暂停] 全屏广告 - 已播放: ${_adElapsedTime.inSeconds}s/${_adDuration.inSeconds}s, 剩余: ${remaining.inSeconds}s');
     }
 
     _isPaused = true;
@@ -491,7 +382,7 @@ class FullscreenAdProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  ///13, 恢复轮播
+  ///14, 恢复轮播
   void resumeCarousel() {
     _fullscreenTimer?.cancel(); // 显式取消旧的定时器，避免重复计时或意外行为
     _isPaused = false;
@@ -524,11 +415,12 @@ class FullscreenAdProvider extends ChangeNotifier {
           Duration(seconds: fullscreenAdDuration) - alreadyPlayed;
 
       debugPrint(
-          '🔄 [恢复] 全屏广告 - 继续播放剩余时间：${remainingTime.inSeconds}s (已播放: ${alreadyPlayed.inSeconds}s, 广告总时长: ${_adDuration.inSeconds}s)');
+          '[fullscreen_ad_carousel_provider] 🔄 [恢复] 全屏广告 - 继续播放剩余时间：${remainingTime.inSeconds}s (已播放: ${alreadyPlayed.inSeconds}s, 广告总时长: ${_adDuration.inSeconds}s)');
 
       // 如果剩余时间 <= 0，应该立即切换到下一个广告
       if (remainingTime.inSeconds <= 0) {
-        debugPrint('🔄 [恢复] 剩余时间已到0，立即切换到下一个广告');
+        debugPrint(
+            '[fullscreen_ad_carousel_provider] 🔄 [恢复] 剩余时间已到0，立即切换到下一个广告');
         // 使用微小延迟确保状态正确设置
         Future.delayed(const Duration(milliseconds: 100), () async {
           if (_isActive && !_isPaused) {
@@ -538,7 +430,7 @@ class FullscreenAdProvider extends ChangeNotifier {
       } else {
         _fullscreenTimer = Timer(remainingTime, () async {
           if (_isActive && !_isPaused) {
-            // debugPrint('⏰ [定时] 全屏广告时间到，切换到下一个');
+            // debugPrint('[fullscreen_ad_carousel_provider] ⏰ [定时] 全屏广告时间到，切换到下一个');
             await _nextAd();
           }
         });
@@ -548,7 +440,7 @@ class FullscreenAdProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  ///14, 退出全屏广告模式
+  ///15, 退出全屏广告模式
   void exitFullscreenMode() {
     if (!_isActive) return;
 
@@ -578,19 +470,19 @@ class FullscreenAdProvider extends ChangeNotifier {
     });
   }
 
-  ///15, 启动调试定时器 - 每秒输出全屏广告的实时状态（已禁用）
+  ///16, 启动调试定时器 - 每秒输出全屏广告的实时状态（已禁用）
   void startDebugTimer() {
     _debugTimer?.cancel();
     // 禁用全屏广告调试定时器以减少日志输出
     return;
   }
 
-  ///16, 停止调试定时器
+  ///17, 停止调试定时器
   void stopDebugTimer() {
     _debugTimer?.cancel();
   }
 
-  ///17, 暂停所有计时器（用于设置页面）
+  ///18, 暂停所有计时器（用于设置页面）
   void pauseAllTimersForSettings() {
     _fullscreenTimer?.cancel();
     _debugTimer?.cancel();
@@ -598,7 +490,7 @@ class FullscreenAdProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  ///18, 从设置页面恢复所有计时器
+  ///19, 从设置页面恢复所有计时器
   void resumeAllTimersFromSettings() {
     _isPaused = false;
 
@@ -614,28 +506,28 @@ class FullscreenAdProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  ///24，记录视频播放进度
+  ///20，记录视频播放进度
   void saveVideoProgress(String adId, Duration position) {
     _videoProgressCache[adId] = position;
   }
 
-  ///25，获取视频播放进度
+  ///21，获取视频播放进度
   Duration? getVideoProgress(String adId) {
     return _videoProgressCache[adId];
   }
 
-  ///26，清除特定视频的播放进度
+  ///22，清除特定视频的播放进度
   void clearVideoProgress(String adId) {
     _videoProgressCache.remove(adId);
   }
 
-  ///22, 获取当前播放的广告模型
+  ///23, 获取当前播放的广告模型
   AdModel? getCurrentAd() {
     if (_currentAdIndex >= fullscreenAds.length) return null;
     return fullscreenAds[_currentAdIndex];
   }
 
-  ///23, 获取当前播放的Widget
+  ///24, 获取当前播放的Widget
   Widget? getCurrentWidget() {
     if (_currentAdIndex >= _adWidgets.length) return null;
     return _adWidgets[_currentAdIndex];
@@ -643,7 +535,8 @@ class FullscreenAdProvider extends ChangeNotifier {
 
   @override
   void dispose() {
-    debugPrint('🗑️ FullscreenAdProvider dispose 开始');
+    debugPrint(
+        '[fullscreen_ad_carousel_provider] 🗑️ FullscreenAdProvider dispose 开始');
 
     // 取消所有定时器
     _fullscreenTimer?.cancel();
@@ -659,7 +552,8 @@ class FullscreenAdProvider extends ChangeNotifier {
     // 控制器由 EnhancedVideoPoolManager 统一管理，无需在此处理
     _videoProgressCache.clear();
 
-    debugPrint('✅ FullscreenAdProvider dispose 完成');
+    debugPrint(
+        '[fullscreen_ad_carousel_provider] ✅ FullscreenAdProvider dispose 完成');
     super.dispose();
   }
 }
