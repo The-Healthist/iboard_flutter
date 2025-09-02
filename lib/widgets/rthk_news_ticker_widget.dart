@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:logger/logger.dart';
 import 'package:provider/provider.dart';
 import 'package:iboard_app/providers/rthk_news_provider.dart';
-import 'package:iboard_app/providers/ad_full_carousel_provider.dart';
 
 class RthkNewsTickerWidget extends StatefulWidget {
   final double height;
@@ -147,11 +146,11 @@ class RthkNewsTickerWidgetState extends State<RthkNewsTickerWidget>
     });
   }
 
-  ///5, 处理全屏广告状态变化
-  void _handleFullscreenAdChange(bool isActive) {
-    if (isActive && !_isPaused) {
+  ///5, 根据Provider状态处理滚动控制
+  void _handleProviderPauseState(bool isProviderPaused) {
+    if (isProviderPaused && !_isPaused) {
       _pauseScrolling();
-    } else if (!isActive && _isPaused) {
+    } else if (!isProviderPaused && _isPaused) {
       _resumeScrolling();
     }
   }
@@ -219,10 +218,10 @@ class RthkNewsTickerWidgetState extends State<RthkNewsTickerWidget>
 
   @override
   Widget build(BuildContext context) {
-    return Consumer2<RthkNewsProvider, FullscreenAdProvider>(
-      builder: (context, newsProvider, fullscreenProvider, child) {
+    return Consumer<RthkNewsProvider>(
+      builder: (context, newsProvider, child) {
         WidgetsBinding.instance.addPostFrameCallback((_) {
-          _handleFullscreenAdChange(fullscreenProvider.isActive);
+          _handleProviderPauseState(newsProvider.isScrollingPaused);
         });
 
         _updateNews(newsProvider.getAllNewsDisplayTexts());

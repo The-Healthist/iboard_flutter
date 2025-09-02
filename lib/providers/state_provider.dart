@@ -4,6 +4,7 @@ import 'package:iboard_app/models/settings_model.dart';
 import 'package:iboard_app/providers/announcement_carousel_provider.dart';
 import 'package:iboard_app/providers/ad_top_carousel_provider.dart';
 import 'package:iboard_app/providers/ad_full_carousel_provider.dart';
+import 'package:iboard_app/providers/rthk_news_provider.dart';
 import 'package:logger/logger.dart';
 
 /// 播放狀態枚舉
@@ -197,6 +198,7 @@ class CarouselStateProvider extends ChangeNotifier {
   AnnouncementCarouselProvider? _announcementCarouselProvider; // 通告轮播Provider引用
   TopAdCarouselProvider? _topCarouselProvider; // 顶部广告轮播Provider引用
   FullscreenAdProvider? _fullscreenAdProvider; // 全屏广告轮播Provider引用
+  RthkNewsProvider? _rthkNewsProvider; // RTHK新闻Provider引用
 
   // 媒體控制狀態 - 按區域分別控制
   bool _isTopMediaPaused = false; // 頂部廣告媒體暫停狀態
@@ -291,6 +293,11 @@ class CarouselStateProvider extends ChangeNotifier {
     _fullscreenAdProvider = provider;
   }
 
+  /// 设置RTHK新闻Provider引用
+  void setRthkNewsProvider(RthkNewsProvider? provider) {
+    _rthkNewsProvider = provider;
+  }
+
   /// 獲取當前狀態
   CarouselState get currentState => _currentState;
 
@@ -380,6 +387,9 @@ class CarouselStateProvider extends ChangeNotifier {
       _currentState = _currentState.toFullscreenAd();
       _topCarouselProvider?.pauseTopCarousel();
 
+      // 暂停RTHK新闻跑马灯
+      _rthkNewsProvider?.pauseScrolling();
+
       // 更新媒體狀態
       _updateMediaStateBasedOnCurrentState();
 
@@ -414,6 +424,9 @@ class CarouselStateProvider extends ChangeNotifier {
 
         // 恢复顶部广告轮播（修复音视频不同步问题）
         _topCarouselProvider?.resumeFromFullscreenAdExit();
+
+        // 恢复RTHK新闻跑马灯
+        _rthkNewsProvider?.resumeScrolling();
       }
 
       // 更新媒體狀態
@@ -439,6 +452,9 @@ class CarouselStateProvider extends ChangeNotifier {
 
         // 恢复顶部广告轮播（修复音视频不同步问题）
         _topCarouselProvider?.resumeFromFullscreenAdExit();
+
+        // 恢复RTHK新闻跑马灯
+        _rthkNewsProvider?.resumeScrolling();
       }
 
       // 直接调用FullscreenAdProvider退出全屏广告模式
@@ -478,8 +494,10 @@ class CarouselStateProvider extends ChangeNotifier {
       } else {
         _logger.i('✅ [状态Provider] 准备进入通告轮播模式');
         _announcementCarouselProvider!.updateCarouselPauseState(false);
-        _announcementCarouselProvider!
-            .resumeMidCarousel(noticeStayDuration, forceJumpToIndex: false);
+        _announcementCarouselProvider!.resumeMidCarousel(
+            normalToAnnouncementCarouselDuration,
+            forceJumpToIndex: false,
+            isFromManualOperation: true);
       }
     } else {
       _logger.w('⚠️ [状态Provider] 通告轮播提供者为空，无法进入通告轮播模式');

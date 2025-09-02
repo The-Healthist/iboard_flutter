@@ -98,34 +98,18 @@ class FullscreenAdsPageState extends State<FullscreenAdsPage> {
 
           // 数据初始化已在didChangeDependencies中处理，这里不需要重复调用
 
-          // 如果Provider处于活跃状态并且有当前广告Widget，显示它
-          if (fullscreenAdProvider.isActive) {
-            final currentAdWidget = fullscreenAdProvider.getCurrentWidget();
-            if (currentAdWidget != null) {
-              return Stack(
-                children: [
-                  // 全屏广告内容
-                  SizedBox(
-                    width: double.infinity,
-                    height: double.infinity,
-                    child: currentAdWidget,
-                  ),
-                  // 调试时间组件 - 只在debug模式下显示
-                  if (kDebugMode) const DebugFullAdTimeWidget(),
-                ],
-              );
-            }
-          }
+          // 🎯 修復：使用懶加載策略，只獲取當前需要顯示的Widget，避免多個Widget同時渲染
+          final adWidgetToShow = fullscreenAdProvider.getCurrentWidget();
 
-          // 默认显示第一个广告（用于初始化时）
-          if (fullscreenAdProvider.adWidgets.isNotEmpty) {
+          // 如果有要顯示的Widget，渲染它
+          if (adWidgetToShow != null) {
             return Stack(
               children: [
                 // 全屏广告内容
                 SizedBox(
                   width: double.infinity,
                   height: double.infinity,
-                  child: fullscreenAdProvider.adWidgets.first,
+                  child: adWidgetToShow,
                 ),
                 // 调试时间组件 - 只在debug模式下显示
                 if (kDebugMode) const DebugFullAdTimeWidget(),

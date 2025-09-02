@@ -9,10 +9,6 @@ import 'package:iboard_app/pages/mainscreen_page.dart';
 import 'package:iboard_app/providers/announcement_provider.dart';
 import 'package:iboard_app/providers/state_provider.dart'; // Added import for CarouselStateProvider
 import 'package:iboard_app/providers/announcement_carousel_provider.dart'; // Added import for AnnouncementCarouselProvider
-import 'package:iboard_app/providers/advertisement_provider.dart'; // Added import for AdvertisementProvider
-import 'package:iboard_app/providers/ad_top_carousel_provider.dart'; // Added import for TopAdCarouselProvider
-import 'package:iboard_app/providers/ad_full_carousel_provider.dart'; // Added import for FullscreenAdProvider
-import 'package:iboard_app/providers/arrear_provider.dart'; // Added import for ArrearProvider
 import 'package:logger/logger.dart';
 
 import 'package:provider/provider.dart';

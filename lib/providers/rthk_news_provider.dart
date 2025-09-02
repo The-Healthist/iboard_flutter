@@ -29,6 +29,9 @@ class RthkNewsProvider extends ChangeNotifier {
   static const String _storageKey = 'rthk_news';
   static const String _lastUpdateKey = 'rthk_news_last_update';
 
+  // 滚动控制状态
+  bool _isScrollingPaused = false;
+
   // Getters
   List<RthkNewsModel> get newsList => _newsList;
   bool get isLoading => _isLoading;
@@ -36,6 +39,7 @@ class RthkNewsProvider extends ChangeNotifier {
   String get errorMessage => _errorMessage;
   DateTime? get lastUpdateTime => _lastUpdateTime;
   int get newsCount => _newsList.length;
+  bool get isScrollingPaused => _isScrollingPaused;
 
   RthkNewsProvider(this._apiClient) {
     _logger.i('🔍 RthkNewsProvider 初始化完成');
@@ -296,6 +300,24 @@ class RthkNewsProvider extends ChangeNotifier {
 
       return '【$timeStr】${news.title}';
     }).toList();
+  }
+
+  ///9, 暂停跑马灯滚动
+  void pauseScrolling() {
+    if (!_isScrollingPaused) {
+      _isScrollingPaused = true;
+      _logger.i('⏸️ RTHK新闻跑马灯已暂停');
+      notifyListeners();
+    }
+  }
+
+  ///10, 恢复跑马灯滚动
+  void resumeScrolling() {
+    if (_isScrollingPaused) {
+      _isScrollingPaused = false;
+      _logger.i('▶️ RTHK新闻跑马灯已恢复');
+      notifyListeners();
+    }
   }
 
   @override

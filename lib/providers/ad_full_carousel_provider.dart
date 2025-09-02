@@ -207,6 +207,9 @@ class FullscreenAdProvider extends ChangeNotifier {
 
     debugPrint('[fullscreen_ad_carousel_provider] 1, 进入全屏广告模式，开始轮播');
 
+    // 🎯 新增：進入全屏廣告模式前清理可能殘留的控制器
+    await _cleanupPreviousControllers();
+
     _isActive = true;
     _isPaused = false;
     _currentAdPauseTime = null;
@@ -217,7 +220,8 @@ class FullscreenAdProvider extends ChangeNotifier {
         // 修正无效的广告索引: $_currentAdIndex → 0
         _currentAdIndex = 0;
       }
-
+      debugPrint(
+          '[fullscreen_ad_carousel_provider] 1.1 currentAdIndex: $_currentAdIndex, 进入全屏广告模式，开始轮播');
       // 确保是否有广告Widget
       await _ensureAdWidgets();
 
@@ -307,8 +311,21 @@ class FullscreenAdProvider extends ChangeNotifier {
       return;
     }
 
-    // 🎯 关键修复：直接切换索引，让视频池管理器处理控制器切换
-    // 移除MediaPauseNotification机制，避免新视频被意外暂停
+    // 🎯 重要修復：在切換前明確釋放當前廣告的控制器，避免重複初始化
+    final currentAd = getCurrentAd();
+    if (currentAd != null && currentAd.file.localFilePath != null) {
+      try {
+        await _preciseVideoPoolManager.releaseController(
+          filePath: currentAd.file.localFilePath!, // 使用本地文件路徑
+          videoType: precise.VideoType.fullAd,
+          forceDispose: true, // 強制釋放解碼器資源
+        );
+        debugPrint(
+            '[fullscreen_ad_carousel_provider] ✅ 成功釋放上一個廣告控制器: ${currentAd.title}');
+      } catch (e) {
+        debugPrint('[fullscreen_ad_carousel_provider] ⚠️ 釋放上一個廣告控制器失敗: $e');
+      }
+    }
 
     // 切换到下一个广告索引
     _currentAdIndex = (_currentAdIndex + 1) % fullscreenAds.length;
@@ -527,10 +544,49 @@ class FullscreenAdProvider extends ChangeNotifier {
     return fullscreenAds[_currentAdIndex];
   }
 
-  ///24, 获取当前播放的Widget
+  ///24, 获取当前播放的Widget（懶加載策略）
   Widget? getCurrentWidget() {
-    if (_currentAdIndex >= _adWidgets.length) return null;
-    return _adWidgets[_currentAdIndex];
+    if (_currentAdIndex >= fullscreenAds.length) return null;
+
+    // 🎯 優化：使用懶加載策略，只為當前廣告創建Widget
+    final currentAd = fullscreenAds[_currentAdIndex];
+    final key = 'fullscreen_ad_${currentAd.id}_$_currentAdIndex';
+
+    // 檢查緩存中是否已有Widget
+    if (_widgetCache.containsKey(key)) {
+      return _widgetCache[key]!;
+    }
+
+    // 為當前廣告創建新Widget並緩存
+    final fileManager = FileManager();
+    final widget = FullAdWidget(
+      key: ValueKey(key),
+      ad: currentAd,
+      fileManager: fileManager,
+      initialPlaybackPosition: Duration.zero,
+      onVideoProgressChanged: (adId, position) {
+        saveVideoProgress(adId, position);
+      },
+    );
+
+    _widgetCache[key] = widget;
+    _fileManagerCache[key] = fileManager;
+
+    debugPrint(
+        '[fullscreen_ad_carousel_provider] 🎯 懶加載創建Widget: ${currentAd.title}');
+    return widget;
+  }
+
+  ///25, 清理之前的控制器以避免重復初始化
+  Future<void> _cleanupPreviousControllers() async {
+    try {
+      // 清理所有全屏廣告類型的控制器
+      await _preciseVideoPoolManager
+          .cleanupControllersByType(precise.VideoType.fullAd);
+      debugPrint('[fullscreen_ad_carousel_provider] ✅ 已清理所有之前的全屏廣告控制器');
+    } catch (e) {
+      debugPrint('[fullscreen_ad_carousel_provider] ⚠️ 清理之前的控制器時出錯: $e');
+    }
   }
 
   @override

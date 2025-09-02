@@ -49,7 +49,7 @@ class PreciseVideoPoolManager {
         final wrapper = _controllerPool[key]!;
         wrapper.useCount++;
         _lastUsed[key] = DateTime.now();
-        debugPrint('✅ 复用未初始化控制器: $key');
+        // debugPrint('✅ 复用未初始化控制器: $key');
         return wrapper.controller;
       }
 
@@ -61,7 +61,7 @@ class PreciseVideoPoolManager {
       // 3. 检查文件是否存在
       final file = File(filePath);
       if (!await file.exists()) {
-        debugPrint('❌ 视频文件不存在: $filePath');
+        // debugPrint('❌ 视频文件不存在: $filePath');
         _failedFiles.add(filePath);
         onError?.call();
         return null;
@@ -80,10 +80,10 @@ class PreciseVideoPoolManager {
       _controllerPool[key] = wrapper;
       _lastUsed[key] = DateTime.now();
 
-      debugPrint('[controllerpool_manager] 🆕 创建未初始化控制器: $key');
+      // debugPrint('[controllerpool_manager] 🆕 创建未初始化控制器: $key');
       return controller;
     } catch (e) {
-      debugPrint('[controllerpool_manager] ❌ 获取未初始化控制器失败: $key, 错误: $e');
+      // debugPrint('[controllerpool_manager] ❌ 获取未初始化控制器失败: $key, 错误: $e');
       _failedFiles.add(filePath);
       onError?.call();
       return null;
@@ -128,7 +128,7 @@ class PreciseVideoPoolManager {
           _lastUsed[key] = DateTime.now();
           wrapper.useCount++;
 
-          debugPrint('✅ 复用已初始化控制器: $key');
+          // debugPrint('✅ 复用已初始化控制器: $key');
 
           if (autoPlay) {
             await _startPlay(wrapper.controller, key);
@@ -140,7 +140,6 @@ class PreciseVideoPoolManager {
 
       // 2. 检查是否正在初始化（防止并发）
       if (_initializingKeys.contains(key)) {
-        debugPrint('[controllerpool_manager] ⏳ 控制器正在初始化中，等待完成: $key');
         // 简单等待策略，生产环境应该用 Completer
         await Future.delayed(const Duration(milliseconds: 100));
         return getInitializedController(
@@ -156,16 +155,10 @@ class PreciseVideoPoolManager {
       final totalPendingInit =
           _initializedControllers.length + _initializingKeys.length;
       if (totalPendingInit >= _maxInitializedDecoders) {
-        debugPrint(
-            '🚨 解码器资源不足，当前已有: ${_initializedControllers.length}, 正在初始化: ${_initializingKeys.length}, 最大限制: $_maxInitializedDecoders');
-
         // 🎯 关键检查：当前广告key是否在初始化池中
         bool currentKeyInPool = _initializedControllers.contains(key);
 
         if (!currentKeyInPool) {
-          debugPrint(
-              '[controllerpool_manager] 🚨 当前广告key不在初始化池中，需要清理${videoType.name}类型的所有控制器: $key');
-
           // 清理该类型的所有控制器
           await cleanupControllersByType(videoType);
 
@@ -173,8 +166,6 @@ class PreciseVideoPoolManager {
           final afterCleanupTotal =
               _initializedControllers.length + _initializingKeys.length;
           if (afterCleanupTotal >= _maxInitializedDecoders) {
-            debugPrint(
-                '[controllerpool_manager] ❌ 清理${videoType.name}类型控制器后仍资源不足，拒绝初始化: $key');
             onError?.call();
             return null;
           }
@@ -186,8 +177,6 @@ class PreciseVideoPoolManager {
           final newTotalPendingInit =
               _initializedControllers.length + _initializingKeys.length;
           if (newTotalPendingInit >= _maxInitializedDecoders) {
-            debugPrint(
-                '[controllerpool_manager] ❌ 释放后仍然没有足够的解码器资源，拒绝初始化: $key');
             onError?.call();
             return null;
           }
@@ -231,7 +220,6 @@ class PreciseVideoPoolManager {
         final currentTotalInit =
             _initializedControllers.length + _initializingKeys.length;
         if (currentTotalInit >= _maxInitializedDecoders) {
-          debugPrint('[controllerpool_manager] ❌ 初始化前再次检查：解码器资源不足，拒绝初始化: $key');
           onError?.call();
           return null;
         }
@@ -239,18 +227,13 @@ class PreciseVideoPoolManager {
         _initializingKeys.add(key);
 
         try {
-          debugPrint('[controllerpool_manager] 🎮 开始初始化控制器（占用解码器）: $key');
           await wrapper.controller.initialize();
 
           // ✅ 初始化成功，添加到已初始化列表
           _initializedControllers.add(key);
           _lastUsed[key] = DateTime.now();
-
-          debugPrint('[controllerpool_manager] ✅ 控制器初始化成功，解码器已占用: $key');
-          debugPrint(
-              '📊 当前已初始化控制器数量: ${_initializedControllers.length}/$_maxInitializedDecoders');
         } catch (e) {
-          debugPrint('[controllerpool_manager] ❌ 控制器初始化失败: $key, 错误: $e');
+          // debugPrint('[controllerpool_manager] ❌ 控制器初始化失败: $key, 错误: $e');
           onError?.call();
           return null;
         } finally {
@@ -264,10 +247,7 @@ class PreciseVideoPoolManager {
       // 6. 如果需要自动播放
       if (autoPlay) {
         await _startPlay(wrapper.controller, key);
-      } else {
-        // 🎯 优化：预热时不标记为播放中，避免占用播放槽位
-        debugPrint('[controllerpool_manager] 🔥 控制器预热完成（未播放）: $key');
-      }
+      } else {}
 
       // 7. 更新当前播放状态（仅在实际播放时更新）
       if (autoPlay) {
@@ -277,7 +257,6 @@ class PreciseVideoPoolManager {
       _printDecoderStatus();
       return wrapper.controller;
     } catch (e) {
-      debugPrint('[controllerpool_manager] ❌ 获取初始化控制器失败: $key, 错误: $e');
       _failedFiles.add(filePath);
       onError?.call();
       return null;
@@ -326,13 +305,9 @@ class PreciseVideoPoolManager {
 
             _controllerPool.remove(key);
             _lastUsed.remove(key);
-
-            debugPrint('[controllerpool_manager] ✅ 已释放控制器和解码器资源: $key');
           } else {
             // 控制器未初始化，只需要重置播放状态
             _playingControllers.remove(key);
-            debugPrint(
-                '[controllerpool_manager] ✅ 控制器已软释放（未初始化，无需释放解码器）: $key');
           }
         }
 
@@ -340,7 +315,6 @@ class PreciseVideoPoolManager {
         _updateCurrentPlayingState(null, videoType);
       }
     } catch (e) {
-      debugPrint('[controllerpool_manager] ❌ 释放控制器时出错: $key, 错误: $e');
     } finally {
       _releasingKeys.remove(key);
       _printDecoderStatus();
@@ -362,17 +336,12 @@ class PreciseVideoPoolManager {
 
       while (_playingControllers.length >= _maxConcurrentPlaying &&
           retryCount < maxRetries) {
-        debugPrint(
-            '[controllerpool_manager] 🚨 播放数量超限 (${_playingControllers.length}/$_maxConcurrentPlaying)，暂停最旧播放');
-
         final beforeCount = _playingControllers.length;
         await _pauseOldestPlaying();
         final afterCount = _playingControllers.length;
 
         // 检查暂停是否有效
         if (beforeCount == afterCount) {
-          debugPrint(
-              '[controllerpool_manager] ⚠️ 暂停操作无效，等待后重试 (${retryCount + 1}/$maxRetries)');
           await Future.delayed(const Duration(milliseconds: 100));
           // 再次尝试清理不一致状态
           await _cleanupInconsistentPlayingState();
@@ -383,27 +352,20 @@ class PreciseVideoPoolManager {
 
       // 📊 最终检查：确保绝对不会超过限制
       if (_playingControllers.length >= _maxConcurrentPlaying) {
-        debugPrint(
-            '[controllerpool_manager] ❌ 无法满足播放并发限制，拒绝播放: $key (重试${maxRetries}次失败)');
         // 强制清理一个播放状态
         if (_playingControllers.isNotEmpty) {
           final oldestKey = _playingControllers.first;
           _playingControllers.remove(oldestKey);
-          debugPrint('[controllerpool_manager] 🔧 强制清理播放状态: $oldestKey');
         }
       }
 
       // 再次检查该控制器是否已在播放列表中
       if (_playingControllers.contains(key)) {
-        debugPrint('[controllerpool_manager] ⚠️ 控制器已在播放列表中，跳过重复添加: $key');
         return;
       }
 
       // 🎯 优化：最终检查并发播放限制，如果达到限制则尝试释放最旧的非关键控制器
       if (_playingControllers.length >= _maxConcurrentPlaying) {
-        debugPrint(
-            '[controllerpool_manager] ⚠️ 达到最大并发播放限制，尝试释放最旧的控制器: $key (${_playingControllers.length}/$_maxConcurrentPlaying)');
-
         // 尝试释放最旧的非关键播放控制器
         bool releasedOldest = false;
         final sortedByUsage = _playingControllers.toList();
@@ -417,19 +379,15 @@ class PreciseVideoPoolManager {
               if (wrapper != null && wrapper.controller.value.isPlaying) {
                 await wrapper.controller.pause();
                 _playingControllers.remove(oldKey);
-                debugPrint('[controllerpool_manager] 🔄 为新播放暂停了旧控制器: $oldKey');
+
                 releasedOldest = true;
                 break;
               }
-            } catch (e) {
-              debugPrint(
-                  '[controllerpool_manager] ⚠️ 暂停旧控制器失败: $oldKey, 错误: $e');
-            }
+            } catch (e) {}
           }
         }
 
         if (!releasedOldest) {
-          debugPrint('[controllerpool_manager] ❌ 无法释放旧控制器，拒绝播放: $key');
           return;
         }
       }
@@ -447,14 +405,8 @@ class PreciseVideoPoolManager {
       _playingControllers.add(key);
 
       // 📊 播放后状态检查
-      if (_playingControllers.length > _maxConcurrentPlaying) {
-        debugPrint(
-            '[controllerpool_manager] ! 警告：正在播放控制器数量超过限制！${_playingControllers.length}/$_maxConcurrentPlaying');
-      }
-
-      debugPrint('[controllerpool_manager] ▶️ 开始播放: $key');
+      if (_playingControllers.length > _maxConcurrentPlaying) {}
     } catch (e) {
-      debugPrint('[controllerpool_manager] ❌ 开始播放失败: $key, 错误: $e');
       // 播放失败时确保从播放列表中移除
       _playingControllers.remove(key);
     }
@@ -472,7 +424,7 @@ class PreciseVideoPoolManager {
   /// 5. 🔄 释放最旧的解码器
   Future<void> _releaseOldestDecoder() async {
     if (_initializedControllers.isEmpty) {
-      debugPrint('[controllerpool_manager] ⚠️ 没有已初始化的控制器可以释放');
+      // debugPrint('[controllerpool_manager] ⚠️ 没有已初始化的控制器可以释放');
       return;
     }
 
@@ -484,13 +436,11 @@ class PreciseVideoPoolManager {
     for (final key in _initializedControllers) {
       // 不释放当前正在播放的
       if (_playingControllers.contains(key)) {
-        debugPrint('[controllerpool_manager] 🔒 跳过正在播放的控制器: $key');
         continue;
       }
 
       // 不释放当前显示的主要视频
       if (key == _currentTopAdKey || key == _currentFullAdKey) {
-        debugPrint('[controllerpool_manager] 🔒 跳过当前显示的主要视频: $key');
         continue;
       }
 
@@ -521,9 +471,6 @@ class PreciseVideoPoolManager {
     if (targetKey != null && _controllerPool.containsKey(targetKey)) {
       final wrapper = _controllerPool[targetKey]!;
 
-      debugPrint(
-          '[controllerpool_manager] 🔄 释放最旧解码器: $targetKey (使用次数: $leastUsageCount)');
-
       // 🔑 关键：dispose控制器以释放解码器资源
       _controllerPool.remove(targetKey);
       _initializedControllers.remove(targetKey);
@@ -532,17 +479,8 @@ class PreciseVideoPoolManager {
 
       try {
         await _safeDisposeController(wrapper.controller, targetKey);
-        debugPrint('[controllerpool_manager] ✅ 最旧解码器已释放: $targetKey');
-      } catch (e) {
-        debugPrint(
-            '[controllerpool_manager] ⚠️ 释放解码器时出现错误: $targetKey, 错误: $e');
-      }
-
-      debugPrint(
-          '📊 释放后已初始化控制器数量: ${_initializedControllers.length}/$_maxInitializedDecoders');
-    } else {
-      debugPrint('[controllerpool_manager] ⚠️ 找不到可以释放的解码器');
-    }
+      } catch (e) {}
+    } else {}
   }
 
   /// 5a. 🧹 清理不一致的播放状态
@@ -556,25 +494,20 @@ class PreciseVideoPoolManager {
       if (wrapper == null || !_initializedControllers.contains(key)) {
         // 只有当控制器已被移除或未初始化时才清理
         toRemove.add(key);
-        debugPrint('[controllerpool_manager] 🧹 发现无效的播放状态: $key (控制器已移除或未初始化)');
       }
       // 🎯 移除：不再检查 isPlaying 状态，因为这会导致正常播放的视频被误判
     }
 
     for (final key in toRemove) {
       _playingControllers.remove(key);
-      debugPrint('[controllerpool_manager] 🧹 清理播放状态: $key');
     }
 
-    if (toRemove.isNotEmpty) {
-      debugPrint('[controllerpool_manager] ✅ 清理了 ${toRemove.length} 个不一致的播放状态');
-    }
+    if (toRemove.isNotEmpty) {}
   }
 
   /// 6. ⏸️ 暂停最旧的播放（增强版 - 确保严格限制）
   Future<void> _pauseOldestPlaying() async {
     if (_playingControllers.isEmpty) {
-      debugPrint('[controllerpool_manager] ⚠️ 没有正在播放的控制器可以暂停');
       return;
     }
 
@@ -585,7 +518,6 @@ class PreciseVideoPoolManager {
       // 🎯 修复：只清理已被移除的控制器，不检查isPlaying状态
       if (wrapper == null) {
         toRemove.add(key);
-        debugPrint('[controllerpool_manager] 🧹 清理已移除的播放控制器: $key');
       }
     }
 
@@ -595,7 +527,6 @@ class PreciseVideoPoolManager {
 
     // 如果清理后没有播放控制器了，直接返回
     if (_playingControllers.isEmpty) {
-      debugPrint('[controllerpool_manager] ✅ 清理完成，没有实际播放的控制器');
       return;
     }
 
@@ -633,25 +564,16 @@ class PreciseVideoPoolManager {
       final wrapper = _controllerPool[targetKey]!;
 
       try {
-        debugPrint(
-            '[controllerpool_manager] ⏸️ 暂停最旧播放: $targetKey (使用次数: $mostUsageCount)');
-
         if (wrapper.controller.value.isPlaying) {
           await wrapper.controller.pause();
         }
 
         _playingControllers.remove(targetKey);
-        debugPrint('[controllerpool_manager] ✅ 成功暂停播放: $targetKey');
-        debugPrint(
-            '📊 暂停后正在播放控制器数量: ${_playingControllers.length}/$_maxConcurrentPlaying');
       } catch (e) {
-        debugPrint('[controllerpool_manager] ❌ 暂停播放失败: $targetKey, 错误: $e');
         // 即使暂停失败也要从播放列表中移除，避免状态不一致
         _playingControllers.remove(targetKey);
       }
-    } else {
-      debugPrint('[controllerpool_manager] ⚠️ 找不到可以暂停的播放控制器');
-    }
+    } else {}
   }
 
   /// 7. 🗑️ 移除最少使用的未初始化控制器
@@ -676,7 +598,6 @@ class PreciseVideoPoolManager {
     if (targetKey != null && targetWrapper != null) {
       _controllerPool.remove(targetKey);
       await _safeDisposeController(targetWrapper.controller, targetKey);
-      debugPrint('[controllerpool_manager] 🗑️ 已移除未使用控制器: $targetKey');
     }
   }
 
@@ -696,33 +617,21 @@ class PreciseVideoPoolManager {
   void _validateStateConsistency() {
     try {
       // 验证初始化控制器数量不超过限制
-      if (_initializedControllers.length > _maxInitializedDecoders) {
-        debugPrint(
-            '⚠️ 警告：已初始化控制器数量超过限制！${_initializedControllers.length}/$_maxInitializedDecoders');
-      }
+      if (_initializedControllers.length > _maxInitializedDecoders) {}
 
       // 验证播放控制器数量不超过限制
-      if (_playingControllers.length > _maxConcurrentPlaying) {
-        debugPrint(
-            '⚠️ 警告：正在播放控制器数量超过限制！${_playingControllers.length}/$_maxConcurrentPlaying');
-      }
+      if (_playingControllers.length > _maxConcurrentPlaying) {}
 
       // 验证所有播放中的控制器都已初始化
       for (final playingKey in _playingControllers) {
-        if (!_initializedControllers.contains(playingKey)) {
-          debugPrint('⚠️ 警告：播放中的控制器未在初始化列表中！$playingKey');
-        }
+        if (!_initializedControllers.contains(playingKey)) {}
       }
 
       // 验证所有已初始化的控制器都在控制器池中
       for (final initializedKey in _initializedControllers) {
-        if (!_controllerPool.containsKey(initializedKey)) {
-          debugPrint('⚠️ 警告：已初始化的控制器不在控制器池中！$initializedKey');
-        }
+        if (!_controllerPool.containsKey(initializedKey)) {}
       }
-    } catch (e) {
-      debugPrint('❌ 状态一致性验证失败: $e');
-    }
+    } catch (e) {}
   }
 
   /// 9. 🔑 检查控制器是否已初始化
@@ -733,8 +642,6 @@ class PreciseVideoPoolManager {
 
   /// 9a. 🎯 优化播放状态管理
   void optimizePlayingStates() {
-    debugPrint('[controllerpool_manager] 🔧 开始优化播放状态管理...');
-
     // 清理不一致的播放状态
     final toRemove = <String>[];
     for (final key in _playingControllers) {
@@ -742,15 +649,12 @@ class PreciseVideoPoolManager {
       if (wrapper == null) {
         // 控制器已被移除但还在播放列表中
         toRemove.add(key);
-        debugPrint('[controllerpool_manager] 🧹 发现已移除的播放控制器: $key');
       } else if (!_initializedControllers.contains(key)) {
         // 控制器未在初始化列表中但在播放列表中
         toRemove.add(key);
-        debugPrint('[controllerpool_manager] 🧹 发现未初始化的播放控制器: $key');
       } else if (!wrapper.controller.value.isInitialized) {
         // 控制器未初始化但在播放列表中
         toRemove.add(key);
-        debugPrint('[controllerpool_manager] 🧹 发现未初始化的控制器: $key');
       }
       // 🎯 修复：移除对 isPlaying 的检查，避免误判正常播放的视频
       // 因为 isPlaying 状态可能因为帧同步、状态更新延迟等原因瞬间为false
@@ -758,24 +662,16 @@ class PreciseVideoPoolManager {
 
     for (final key in toRemove) {
       _playingControllers.remove(key);
-      debugPrint('[controllerpool_manager] 🧹 清理无效播放状态: $key');
     }
-
-    debugPrint(
-        '[controllerpool_manager] ✅ 播放状态优化完成，当前播放: ${_playingControllers.length}/$_maxConcurrentPlaying');
 
     // 🎯 额外检查：确保播放中的控制器都在初始化列表中
     for (final key in _playingControllers) {
-      if (!_initializedControllers.contains(key)) {
-        debugPrint('[controllerpool_manager] ! 警告：播放中的控制器未在初始化列表中！$key');
-      }
+      if (!_initializedControllers.contains(key)) {}
     }
   }
 
   /// 9b. 🎯 清理指定类型的所有控制器（新增方法）
   Future<void> cleanupControllersByType(VideoType videoType) async {
-    debugPrint('[controllerpool_manager] 🧹 开始清理${videoType.name}类型的所有控制器...');
-
     final keysToRemove = <String>[];
 
     // 1. 找到所有该类型的控制器
@@ -788,8 +684,7 @@ class PreciseVideoPoolManager {
       }
     }
 
-    debugPrint(
-        '[controllerpool_manager] 📋 发现${videoType.name}类型控制器${keysToRemove.length}个，准备清理');
+    // debugPrint(
 
     // 2. 逐个清理控制器
     for (final key in keysToRemove) {
@@ -813,13 +708,8 @@ class PreciseVideoPoolManager {
 
           // 从控制器池中移除
           _controllerPool.remove(key);
-
-          debugPrint(
-              '[controllerpool_manager] ✅ 已清理${videoType.name}控制器: $key');
         }
       } catch (e) {
-        debugPrint(
-            '[controllerpool_manager] ⚠️ 清理${videoType.name}控制器失败: $key, 错误: $e');
         // 即使出错也要清理状态
         _playingControllers.remove(key);
         _initializedControllers.remove(key);
@@ -830,7 +720,7 @@ class PreciseVideoPoolManager {
       }
     }
 
-    debugPrint('[controllerpool_manager] 🎯 ${videoType.name}类型控制器清理完成');
+    // debugPrint('[controllerpool_manager] 🎯 ${videoType.name}类型控制器清理完成');
     _printDecoderStatus();
   }
 
@@ -850,22 +740,19 @@ class PreciseVideoPoolManager {
 
       // 特別保護全屏廣告
       if (keyToDispose.startsWith('fullAd_')) {
-        debugPrint(
-            '[controllerpool_manager] 🛡️ 全屏廣告正在播放，絕對不能清理: $keyToDispose');
+        // debugPrint(
+        //'[controllerpool_manager] 🛡️ 全屏廣告正在播放，絕對不能清理: $keyToDispose');
         return;
       }
     }
 
-    // 🛡️ 额外保护：全屏广告无论是否在播放状态，都不允许自动清理
+    // 🎯 修復：允許全屏廣告在切換時清理上一個控制器，但要確保不是當前正在播放的
     if (keyToDispose.startsWith('fullAd_')) {
-      debugPrint(
-          '[controllerpool_manager] 🛡️ 全屏廣告控制器受到絕對保護，不允許自動清理: $keyToDispose');
-      return;
+      // 只有當前正在播放的全屏廣告才需要保護，上一個全屏廣告應該被清理
+      if (_playingControllers.contains(keyToDispose)) {
+        return;
+      }
     }
-
-    debugPrint(
-        '[controllerpool_manager] 🔄 自動清理上一個$videoTypeName控制器: $keyToDispose');
-
     final wrapper = _controllerPool[keyToDispose]!;
 
     try {
@@ -884,13 +771,7 @@ class PreciseVideoPoolManager {
 
       // 3. 安全dispose控制器
       await _safeDisposeController(wrapper.controller, keyToDispose);
-
-      debugPrint(
-          '[controllerpool_manager] ✅ $videoTypeName控制器自動清理完成: $keyToDispose');
     } catch (e) {
-      debugPrint(
-          '[controllerpool_manager] ⚠️ 自動清理$videoTypeName控制器時出錯: $keyToDispose, 錯誤: $e');
-      // 即使出錯也要清理所有狀態，避免狀態不一致
       _playingControllers.remove(keyToDispose);
       _initializedControllers.remove(keyToDispose);
       _initializingKeys.remove(keyToDispose);
@@ -918,38 +799,23 @@ class PreciseVideoPoolManager {
     }
 
     if (conflictingKeys.isNotEmpty) {
-      debugPrint('[controllerpool_manager] 🚨 檢測到相同文件路徑衝突: $filePath');
-      debugPrint(
-          '[controllerpool_manager] 當前請求: $currentKey (${videoType.name})');
-      debugPrint(
-          '[controllerpool_manager] 衝突控制器: ${conflictingKeys.join(", ")}');
-
       // 根據優先級決定處理策略
       for (final conflictingKey in conflictingKeys) {
         final isConflictingPlaying =
             _playingControllers.contains(conflictingKey);
 
         if (isConflictingPlaying) {
-          debugPrint(
-              '[controllerpool_manager] ⚠️ 衝突控制器正在播放，優先保持: $conflictingKey');
-
           // 如果是全屏廣告正在播放，頂部廣告應該等待或跳過
           if (conflictingKey.startsWith('fullAd_') &&
               currentKey.startsWith('topAd_')) {
-            debugPrint('[controllerpool_manager] 🎯 全屏廣告優先，暫停頂部廣告初始化');
-            // 可以考慮返回null或延遲初始化
           }
           // 如果是頂部廣告正在播放，可以讓全屏廣告接管
           else if (conflictingKey.startsWith('topAd_') &&
               currentKey.startsWith('fullAd_')) {
-            debugPrint('[controllerpool_manager] 🎯 全屏廣告接管，停止頂部廣告播放');
-            // 🛡️ 安全清理：只清理顶部广告，不影响全屏广告
             await _autoDisposeController(conflictingKey, '頂部廣告（被全屏廣告接管）');
           }
           // 🚨 重要：不要自动清理全屏广告，即使有冲突
-          else if (conflictingKey.startsWith('fullAd_')) {
-            debugPrint('[controllerpool_manager] 🛡️ 全屏廣告受保護，不進行自動清理');
-          }
+          else if (conflictingKey.startsWith('fullAd_')) {}
         }
       }
     }
@@ -973,13 +839,13 @@ class PreciseVideoPoolManager {
       // 检查控制器是否已经dispose或出现错误
       if (controller.value.errorDescription != null) {
         // 如果已经有错误描述，可能已经dispose或出现其他问题
-        debugPrint(
-            '[controllerpool_manager] ⚠️ 控制器有错误描述，可能已dispose: $key, 错误: ${controller.value.errorDescription}');
+        // debugPrint(
+        //'[controllerpool_manager] ⚠️ 控制器有错误描述，可能已dispose: $key, 错误: ${controller.value.errorDescription}');
       }
 
       // 检查控制器是否已初始化
       if (!controller.value.isInitialized) {
-        debugPrint('[controllerpool_manager] ⚠️ 控制器未初始化，谨慎dispose: $key');
+        // debugPrint('[controllerpool_manager] ⚠️ 控制器未初始化，谨慎dispose: $key');
       }
 
       // 🎯 关键：使用try-catch包围dispose，参考video_player.dart的dispose实现
@@ -990,9 +856,9 @@ class PreciseVideoPoolManager {
       // 捕获所有可能的dispose错误
       final errorMsg = e.toString();
       if (errorMsg.contains('disposed') || errorMsg.contains('Disposed')) {
-        debugPrint('[controllerpool_manager] ℹ️ 控制器已被dispose，跳过: $key');
+        // debugPrint('[controllerpool_manager] ℹ️ 控制器已被dispose，跳过: $key');
       } else {
-        debugPrint('[controllerpool_manager] ⚠️ dispose控制器时出错: $key, 错误: $e');
+        // debugPrint('[controllerpool_manager] ⚠️ dispose控制器时出错: $key, 错误: $e');
       }
       // 即使dispose失败，也认为已经释放，避免资源泄漏
     }
@@ -1000,12 +866,12 @@ class PreciseVideoPoolManager {
 
   /// 9d. 🛠️ 强制检查和修复资源限制（紧急修复方法）
   Future<void> enforceResourceLimits() async {
-    debugPrint('🛠️ 开始强制检查和修复资源限制...');
+    // debugPrint('🛠️ 开始强制检查和修复资源限制...');
 
     // 1. 强制修复初始化控制器数量超限
     while (_initializedControllers.length > _maxInitializedDecoders) {
-      debugPrint(
-          '🚨 强制修复：已初始化控制器超限 (${_initializedControllers.length}/$_maxInitializedDecoders)');
+      // debugPrint(
+      //'🚨 强制修复：已初始化控制器超限 (${_initializedControllers.length}/$_maxInitializedDecoders)');
       await _releaseOldestDecoder();
 
       // 防止无限循环
@@ -1014,8 +880,8 @@ class PreciseVideoPoolManager {
 
     // 2. 强制修复播放控制器数量超限
     while (_playingControllers.length > _maxConcurrentPlaying) {
-      debugPrint(
-          '🚨 强制修复：正在播放控制器超限 (${_playingControllers.length}/$_maxConcurrentPlaying)');
+      // debugPrint(
+      //          '🚨 强制修复：正在播放控制器超限 (${_playingControllers.length}/$_maxConcurrentPlaying)');
       await _pauseOldestPlaying();
 
       // 防止无限循环
@@ -1029,13 +895,13 @@ class PreciseVideoPoolManager {
       // 检查多种不一致状态
       if (!_initializedControllers.contains(playingKey)) {
         toRemoveFromPlaying.add(playingKey);
-        debugPrint('🧹 清理不一致状态：从播放列表移除未初始化的控制器 $playingKey');
+        // debugPrint('🧹 清理不一致状态：从播放列表移除未初始化的控制器 $playingKey');
       } else if (wrapper == null) {
         toRemoveFromPlaying.add(playingKey);
-        debugPrint('🧹 清理不一致状态：从播放列表移除不存在的控制器 $playingKey');
+        // debugPrint('🧹 清理不一致状态：从播放列表移除不存在的控制器 $playingKey');
       } else if (!wrapper.controller.value.isPlaying) {
         toRemoveFromPlaying.add(playingKey);
-        debugPrint('🧹 清理不一致状态：从播放列表移除已停止的控制器 $playingKey');
+        // debugPrint('🧹 清理不一致状态：从播放列表移除已停止的控制器 $playingKey');
       }
     }
 
@@ -1043,7 +909,7 @@ class PreciseVideoPoolManager {
       _playingControllers.remove(key);
     }
 
-    debugPrint('✅ 资源限制修复完成');
+    // debugPrint('✅ 资源限制修复完成');
     _printDecoderStatus();
   }
 
@@ -1059,7 +925,7 @@ class PreciseVideoPoolManager {
 
   /// 11. 释放所有控制器
   Future<void> disposeAll() async {
-    debugPrint('🗑️ 开始释放所有控制器...');
+    // debugPrint('🗑️ 开始释放所有控制器...');
 
     final keys = List<String>.from(_controllerPool.keys);
     for (final key in keys) {
@@ -1077,7 +943,7 @@ class PreciseVideoPoolManager {
     _currentTopAdKey = null;
     _currentFullAdKey = null;
 
-    debugPrint('✅ 所有控制器已释放');
+    // debugPrint('✅ 所有控制器已释放');
   }
 }
 

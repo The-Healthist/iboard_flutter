@@ -72,6 +72,8 @@ class AnnouncementPageState extends State<AnnouncementPage> {
         // 从全屏广告直接切换到默认状态时，应该保持当前轮播位置
         if (_previousAppState == AppState.fullscreenAd &&
             appState == AppState.manualOperation) {
+          // 🆕 在跳转到主屏幕前保存当前轮播索引
+          announcementCarouselProvider.saveManualOperationState();
           announcementCarouselProvider.jumpToAnnouncementIndex(0);
         }
       }
@@ -163,9 +165,13 @@ class AnnouncementPageState extends State<AnnouncementPage> {
   void _setupProviderReferences() {
     final stateProvider = context.read<CarouselStateProvider>();
     final topAdProvider = context.read<TopAdCarouselProvider>();
+    final rthkNewsProvider = context.read<RthkNewsProvider>();
 
     // 设置顶部广告轮播Provider引用（修复音视频不同步问题）
     stateProvider.setTopCarouselProvider(topAdProvider);
+
+    // 设置RTHK新闻Provider引用（用于直接控制跑马灯暂停恢复）
+    stateProvider.setRthkNewsProvider(rthkNewsProvider);
 
     _logger.i('🔗 Provider引用设置完成');
   }
@@ -303,7 +309,7 @@ class AnnouncementPageState extends State<AnnouncementPage> {
 
     // 恢复通告轮播 - 🔧 修复：不强制跳转索引，保持之前的轮播位置
     announcementCarouselProvider
-        .resumeMidCarousel(stateProvider.noticeStayDuration);
+        .resumeMidCarousel(stateProvider.normalToAnnouncementCarouselDuration);
 
     // 设置日志输出标志 - 默认状态下只显示顶部广告和通告轮播的日志
     fullAdCarouselProvider.startDebugTimer();

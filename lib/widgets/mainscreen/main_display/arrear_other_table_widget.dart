@@ -188,7 +188,7 @@ class ArrearOtherTableWidgetState extends State<ArrearOtherTableWidget> {
             paginationHeight -
             headerHeight;
         final int dynamicRows =
-            ((availableHeight / rowHeight).floor() - 1).clamp(8, 50);
+            ((availableHeight / rowHeight).floor() - 2).clamp(7, 49);
 
         if (_itemsPerPage != dynamicRows) {
           _itemsPerPage = dynamicRows;
@@ -226,20 +226,22 @@ class ArrearOtherTableWidgetState extends State<ArrearOtherTableWidget> {
                     topRight: Radius.circular(12),
                   ),
                 ),
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                padding: const EdgeInsets.symmetric(vertical: 10),
                 child: Row(
                   children: [
                     ..._getTableHeaders(tableData).map((header) => Expanded(
-                          flex: header == '單位' ? 1 : 2,
-                          child: Text(
-                            header,
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontWeight: FontWeight.w600,
-                              fontSize: 14,
+                          flex: 1,
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 16),
+                            child: Text(
+                              header,
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontWeight: FontWeight.w600,
+                                fontSize: 14,
+                              ),
+                              textAlign: TextAlign.left,
                             ),
-                            textAlign: TextAlign.center,
                           ),
                         )),
                   ],
@@ -255,25 +257,29 @@ class ArrearOtherTableWidgetState extends State<ArrearOtherTableWidget> {
                     child: Row(
                       children: [
                         ..._getTableHeaders(tableData).map((header) => Expanded(
-                              flex: header == '單位' ? 1 : 2,
-                              child: header == '單位'
-                                  ? Padding(
-                                      padding: const EdgeInsets.symmetric(
-                                        vertical: 10,
-                                        horizontal: 16,
-                                      ),
-                                      child: Text(
-                                        record[header]?.toString() ?? '-',
-                                        style: const TextStyle(
-                                          fontWeight: FontWeight.w500,
-                                          color: Colors.black87,
-                                          fontSize: 13,
+                              flex: 1,
+                              child: Padding(
+                                padding: const EdgeInsets.symmetric(
+                                  vertical: 10,
+                                  horizontal: 16,
+                                ),
+                                child: header == '單位'
+                                    ? Align(
+                                        alignment: Alignment.centerLeft,
+                                        child: Text(
+                                          record[header]?.toString() ?? '-',
+                                          style: const TextStyle(
+                                            fontWeight: FontWeight.w500,
+                                            color: Colors.black87,
+                                            fontSize: 13,
+                                          ),
                                         ),
+                                      )
+                                    : Align(
+                                        alignment: Alignment.centerLeft,
+                                        child: _buildStatusChip(record[header]),
                                       ),
-                                    )
-                                  : Center(
-                                      child: _buildStatusChip(record[header]),
-                                    ),
+                              ),
                             )),
                       ],
                     ),
@@ -407,7 +413,7 @@ class ArrearOtherTableWidgetState extends State<ArrearOtherTableWidget> {
           paginationHeight -
           headerHeight;
       actualItemsPerPage =
-          ((availableHeight / rowHeight).floor() - 1).clamp(8, 50);
+          ((availableHeight / rowHeight).floor() - 2).clamp(7, 49);
     }
 
     final totalPages = (totalItems / actualItemsPerPage).ceil();
@@ -507,7 +513,7 @@ class ArrearOtherTableWidgetState extends State<ArrearOtherTableWidget> {
           paginationHeight -
           headerHeight;
       final int dynamicRows =
-          ((availableHeight / rowHeight).floor() - 1).clamp(8, 50);
+          ((availableHeight / rowHeight).floor() - 2).clamp(7, 49);
 
       _itemsPerPage = dynamicRows;
 

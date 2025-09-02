@@ -198,8 +198,8 @@ class ArrearManagementTableWidgetState
             titleHeight -
             paginationHeight -
             headerHeight;
-        final int dynamicRows = ((availableHeight / rowHeight).floor() - 1)
-            .clamp(8, 50); // 行數減1防止溢出
+        final int dynamicRows = ((availableHeight / rowHeight).floor() - 2)
+            .clamp(7, 49); // 行數減2防止溢出
 
         // 如果每頁项数发生变化，更新状态以确保分頁控件显示正确
         if (_itemsPerPage != dynamicRows) {
@@ -241,31 +241,37 @@ class ArrearManagementTableWidgetState
                     topRight: Radius.circular(12),
                   ),
                 ),
-                padding: const EdgeInsets.symmetric(
-                    horizontal: 16, vertical: 10), // 減少垂直padding
+                padding: const EdgeInsets.symmetric(vertical: 10),
                 child: Row(
                   children: [
                     const Expanded(
-                      flex: 2,
-                      child: Text(
-                        '單位',
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontWeight: FontWeight.w600,
-                          fontSize: 14,
+                      flex: 1,
+                      child: Padding(
+                        padding: EdgeInsets.symmetric(horizontal: 16),
+                        child: Text(
+                          '單位',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.w600,
+                            fontSize: 14,
+                          ),
+                          textAlign: TextAlign.left,
                         ),
                       ),
                     ),
                     ..._getTableHeaders(tableData).map((header) => Expanded(
-                          flex: 2,
-                          child: Text(
-                            header,
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontWeight: FontWeight.w600,
-                              fontSize: 14,
+                          flex: 1,
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 16),
+                            child: Text(
+                              header,
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontWeight: FontWeight.w600,
+                                fontSize: 14,
+                              ),
+                              textAlign: TextAlign.left,
                             ),
-                            textAlign: TextAlign.center,
                           ),
                         )),
                   ],
@@ -281,7 +287,7 @@ class ArrearManagementTableWidgetState
                     child: Row(
                       children: [
                         Expanded(
-                          flex: 2,
+                          flex: 1,
                           child: Padding(
                             padding: const EdgeInsets.symmetric(
                               vertical: 10, // 減少垂直padding從12到10
@@ -298,9 +304,16 @@ class ArrearManagementTableWidgetState
                           ),
                         ),
                         ..._getTableHeaders(tableData).map((header) => Expanded(
-                              flex: 2,
-                              child: Center(
-                                child: _buildStatusChip(record[header]),
+                              flex: 1,
+                              child: Padding(
+                                padding: const EdgeInsets.symmetric(
+                                  vertical: 10,
+                                  horizontal: 16,
+                                ),
+                                child: Align(
+                                  alignment: Alignment.centerLeft,
+                                  child: _buildStatusChip(record[header]),
+                                ),
                               ),
                             )),
                       ],
@@ -437,7 +450,7 @@ class ArrearManagementTableWidgetState
           paginationHeight -
           headerHeight;
       actualItemsPerPage =
-          ((availableHeight / rowHeight).floor() - 1).clamp(8, 50);
+          ((availableHeight / rowHeight).floor() - 2).clamp(7, 49);
     }
 
     final totalPages = (totalItems / actualItemsPerPage).ceil();
@@ -541,7 +554,7 @@ class ArrearManagementTableWidgetState
           paginationHeight -
           headerHeight;
       final int dynamicRows =
-          ((availableHeight / rowHeight).floor() - 1).clamp(8, 50);
+          ((availableHeight / rowHeight).floor() - 2).clamp(7, 49);
 
       _itemsPerPage = dynamicRows;
 
