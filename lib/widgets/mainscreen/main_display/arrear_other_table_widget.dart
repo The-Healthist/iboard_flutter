@@ -119,12 +119,10 @@ class ArrearOtherTableWidgetState extends State<ArrearOtherTableWidget> {
                     ),
                   ),
 
-                  // 表格内容区域
+                  // 表格内容区域和分頁组件的共同容器
                   Expanded(
-                    child: _buildTableContent(provider),
+                    child: _buildTableWithPagination(provider),
                   ),
-                  // 分頁欄放在表格下方
-                  _buildPagination(provider),
                 ],
               ),
             ),
@@ -160,7 +158,35 @@ class ArrearOtherTableWidgetState extends State<ArrearOtherTableWidget> {
     );
   }
 
-  ///2, 构建表格内容
+  ///2, 构建表格和分页的统一容器
+  Widget _buildTableWithPagination(ArrearProvider provider) {
+    return Container(
+      margin: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.06),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Column(
+        children: [
+          // 表格内容区域
+          Expanded(
+            child: _buildTableContent(provider),
+          ),
+          // 分頁组件
+          _buildPagination(provider),
+        ],
+      ),
+    );
+  }
+
+  ///3, 构建表格内容
   Widget _buildTableContent(ArrearProvider provider) {
     if (provider.isLoading) {
       return const Center(
@@ -174,21 +200,16 @@ class ArrearOtherTableWidgetState extends State<ArrearOtherTableWidget> {
 
     return LayoutBuilder(
       builder: (context, constraints) {
-        const double outerPadding = 16 * 2;
-        const double titleHeight = 56;
-        const double paginationHeight = 56;
-        const double rowHeight = 40;
-        const double headerHeight = 44;
+        // 動態計算每頁顯示的行數，基于实际容器高度
+        const double rowHeight = 40; // 每行高度
+        const double headerHeight = 44; // 表头高度
+        const double paginationHeight = 42; // 分頁栏高度（减少了一些）
 
-        final double screenHeight = MediaQuery.of(context).size.height;
-        final double mainAreaHeight = screenHeight * 14 / 24;
-        final double availableHeight = mainAreaHeight -
-            outerPadding -
-            titleHeight -
-            paginationHeight -
-            headerHeight;
+        // 获取当前容器的实际可用高度
+        final double availableHeight =
+            constraints.maxHeight - headerHeight - paginationHeight;
         final int dynamicRows =
-            ((availableHeight / rowHeight).floor() - 2).clamp(7, 49);
+            ((availableHeight / rowHeight).floor() - 1).clamp(7, 49);
 
         if (_itemsPerPage != dynamicRows) {
           _itemsPerPage = dynamicRows;
@@ -202,92 +223,78 @@ class ArrearOtherTableWidgetState extends State<ArrearOtherTableWidget> {
         final tableData = _buildTableData(provider);
         final paginatedData = _getPaginatedData(tableData);
 
-        return Container(
-          margin: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(12),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withOpacity(0.06),
-                blurRadius: 8,
-                offset: const Offset(0, 2),
-              ),
-            ],
-          ),
-          child: Column(
-            children: [
-              // 自定義表頭
-              Container(
-                decoration: const BoxDecoration(
-                  color: Color(0xFF6C4EB6),
-                  borderRadius: BorderRadius.only(
-                    topLeft: Radius.circular(12),
-                    topRight: Radius.circular(12),
-                  ),
+        return Column(
+          children: [
+            // 自定義表頭
+            Container(
+              decoration: const BoxDecoration(
+                color: Color(0xFF6C4EB6),
+                borderRadius: BorderRadius.only(
+                  topLeft: Radius.circular(12),
+                  topRight: Radius.circular(12),
                 ),
-                padding: const EdgeInsets.symmetric(vertical: 10),
-                child: Row(
-                  children: [
-                    ..._getTableHeaders(tableData).map((header) => Expanded(
-                          flex: 1,
-                          child: Padding(
-                            padding: const EdgeInsets.symmetric(horizontal: 16),
-                            child: Text(
-                              header,
-                              style: const TextStyle(
-                                color: Colors.white,
-                                fontWeight: FontWeight.w600,
-                                fontSize: 14,
-                              ),
-                              textAlign: TextAlign.left,
+              ),
+              padding: const EdgeInsets.symmetric(vertical: 10),
+              child: Row(
+                children: [
+                  ..._getTableHeaders(tableData).map((header) => Expanded(
+                        flex: 1,
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 16),
+                          child: Text(
+                            header,
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontWeight: FontWeight.w600,
+                              fontSize: 14,
                             ),
+                            textAlign: TextAlign.left,
                           ),
-                        )),
-                  ],
-                ),
+                        ),
+                      )),
+                ],
               ),
-              // 數據區域
-              ...paginatedData.map((record) => Container(
-                    decoration: const BoxDecoration(
-                      border: Border(
-                        bottom: BorderSide(color: Color(0xFFF0F0F0)),
-                      ),
+            ),
+            // 數據區域
+            ...paginatedData.map((record) => Container(
+                  decoration: const BoxDecoration(
+                    border: Border(
+                      bottom: BorderSide(color: Color(0xFFF0F0F0)),
                     ),
-                    child: Row(
-                      children: [
-                        ..._getTableHeaders(tableData).map((header) => Expanded(
-                              flex: 1,
-                              child: Padding(
-                                padding: const EdgeInsets.symmetric(
-                                  vertical: 10,
-                                  horizontal: 16,
-                                ),
-                                child: header == '單位'
-                                    ? Align(
-                                        alignment: Alignment.centerLeft,
-                                        child: Text(
-                                          record[header]?.toString() ?? '-',
-                                          style: const TextStyle(
-                                            fontWeight: FontWeight.w500,
-                                            color: Colors.black87,
-                                            fontSize: 13,
-                                          ),
-                                        ),
-                                      )
-                                    : Align(
-                                        alignment: Alignment.centerLeft,
-                                        child: _buildStatusChip(record[header]),
-                                      ),
+                  ),
+                  child: Row(
+                    children: [
+                      ..._getTableHeaders(tableData).map((header) => Expanded(
+                            flex: 1,
+                            child: Padding(
+                              padding: const EdgeInsets.symmetric(
+                                vertical: 10,
+                                horizontal: 16,
                               ),
-                            )),
-                      ],
-                    ),
-                  )),
-              // 用Expanded自動填滿剩餘空間
-              Expanded(child: Container()),
-            ],
-          ),
+                              child: header == '單位'
+                                  ? Align(
+                                      alignment: Alignment.centerLeft,
+                                      child: Text(
+                                        record[header]?.toString() ?? '-',
+                                        style: const TextStyle(
+                                          fontWeight: FontWeight.w500,
+                                          color: Colors.black87,
+                                          fontSize: 13,
+                                        ),
+                                      ),
+                                    )
+                                  : Align(
+                                      alignment: Alignment.centerLeft,
+                                      child: _buildStatusChip(record[header]),
+                                    ),
+                            ),
+                          )),
+                    ],
+                  ),
+                )),
+            // 用Expanded自動填滿剩餘空間
+            Expanded(child: Container()),
+          ],
         );
       },
     );
@@ -413,7 +420,7 @@ class ArrearOtherTableWidgetState extends State<ArrearOtherTableWidget> {
           paginationHeight -
           headerHeight;
       actualItemsPerPage =
-          ((availableHeight / rowHeight).floor() - 2).clamp(7, 49);
+          ((availableHeight / rowHeight).floor() - 1).clamp(7, 49);
     }
 
     final totalPages = (totalItems / actualItemsPerPage).ceil();
@@ -421,8 +428,7 @@ class ArrearOtherTableWidgetState extends State<ArrearOtherTableWidget> {
     if (totalPages <= 1) return const SizedBox.shrink();
 
     return Container(
-      color: Colors.white,
-      padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 16),
+      padding: const EdgeInsets.only(top: 2, bottom: 8, left: 16, right: 16),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
@@ -438,9 +444,10 @@ class ArrearOtherTableWidgetState extends State<ArrearOtherTableWidget> {
             style: ElevatedButton.styleFrom(
               backgroundColor: _currentPage > 1
                   ? Theme.of(context).primaryColor
-                  : Colors.grey.shade300,
-              foregroundColor:
-                  _currentPage > 1 ? Colors.white : Colors.grey.shade600,
+                  : Theme.of(context).primaryColor.withOpacity(0.12),
+              foregroundColor: _currentPage > 1
+                  ? Colors.white
+                  : Theme.of(context).primaryColor,
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(6),
               ),
@@ -475,10 +482,10 @@ class ArrearOtherTableWidgetState extends State<ArrearOtherTableWidget> {
             style: ElevatedButton.styleFrom(
               backgroundColor: _currentPage < totalPages
                   ? Theme.of(context).primaryColor
-                  : Colors.grey.shade300,
+                  : Theme.of(context).primaryColor.withOpacity(0.12),
               foregroundColor: _currentPage < totalPages
                   ? Colors.white
-                  : Colors.grey.shade600,
+                  : Theme.of(context).primaryColor,
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(6),
               ),
@@ -513,7 +520,7 @@ class ArrearOtherTableWidgetState extends State<ArrearOtherTableWidget> {
           paginationHeight -
           headerHeight;
       final int dynamicRows =
-          ((availableHeight / rowHeight).floor() - 2).clamp(7, 49);
+          ((availableHeight / rowHeight).floor() - 1).clamp(7, 49);
 
       _itemsPerPage = dynamicRows;
 
@@ -605,19 +612,7 @@ class ArrearOtherTableWidgetState extends State<ArrearOtherTableWidget> {
   ///16, 构建空状态
   Widget _buildEmptyState() {
     return Container(
-      margin: const EdgeInsets.all(16),
       padding: const EdgeInsets.all(40),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.06),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
       child: const Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,

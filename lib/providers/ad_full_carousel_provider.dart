@@ -315,6 +315,7 @@ class FullscreenAdProvider extends ChangeNotifier {
     final currentAd = getCurrentAd();
     if (currentAd != null && currentAd.file.localFilePath != null) {
       try {
+        // 🎯 關鍵優化：直接釋放控制器，避免重複清理
         await _preciseVideoPoolManager.releaseController(
           filePath: currentAd.file.localFilePath!, // 使用本地文件路徑
           videoType: precise.VideoType.fullAd,

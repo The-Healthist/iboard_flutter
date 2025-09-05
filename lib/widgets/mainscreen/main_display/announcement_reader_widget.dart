@@ -8,6 +8,7 @@ import 'package:video_player/video_player.dart';
 import 'package:logger/logger.dart';
 import 'package:provider/provider.dart';
 import 'package:iboard_app/widgets/carousel_widget.dart'; // 添加輪播組件導入
+import 'package:iboard_app/widgets/simple_print_dialog.dart'; // 添加簡化版打印對話框導入
 
 class AnnouncementReaderWidget extends StatefulWidget {
   final AnnouncementModel announcement;
@@ -302,6 +303,33 @@ class AnnouncementReaderWidgetState extends State<AnnouncementReaderWidget> {
       child: Stack(
         children: [
           contentWidget,
+
+          // 打印按鈕（左上角）
+          Positioned(
+            top: 16,
+            left: 16,
+            child: Material(
+              color: Colors.transparent,
+              child: InkWell(
+                onTap: _showPrintDialog,
+                borderRadius: BorderRadius.circular(20),
+                child: Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: Colors.black.withOpacity(0.6),
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: const Icon(
+                    Icons.print,
+                    color: Colors.white,
+                    size: 24,
+                  ),
+                ),
+              ),
+            ),
+          ),
+
+          // 主頁按鈕（右上角）
           if (widget.onHomeButtonPressed != null)
             Positioned(
               top: 16,
@@ -397,5 +425,63 @@ class AnnouncementReaderWidgetState extends State<AnnouncementReaderWidget> {
       // 如果視頻控制器還沒準備好，先保存位置
       _savedPlaybackPosition = position;
     }
+  }
+
+  /// 11, 顯示打印對話框
+  void _showPrintDialog() {
+    // 只有PDF和圖片文件支持打印
+    final mimeType = widget.announcement.file.mimeType.toLowerCase();
+    if (!mimeType.startsWith('image/') && mimeType != 'application/pdf') {
+      _showUnsupportedFileDialog();
+      return;
+    }
+
+    if (_localFilePath == null) {
+      _showFileNotAvailableDialog();
+      return;
+    }
+
+    showDialog(
+      context: context,
+      builder: (context) => SimplePrintDialog(
+        announcement: widget.announcement,
+        localFilePath: _localFilePath,
+      ),
+    );
+  }
+
+  /// 12, 顯示不支持文件類型對話框
+  void _showUnsupportedFileDialog() {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('無法打印'),
+        content: Text(
+            '文件類型 "${widget.announcement.file.mimeType}" 不支持打印。\n\n僅支持打印 PDF 和圖片文件。'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('確定'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// 13, 顯示文件不可用對話框
+  void _showFileNotAvailableDialog() {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('無法打印'),
+        content: const Text('文件尚未下載完成或不可用，請稍後再試。'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('確定'),
+          ),
+        ],
+      ),
+    );
   }
 }

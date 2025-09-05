@@ -128,12 +128,10 @@ class ArrearManagementTableWidgetState
                     ),
                   ),
 
-                  // 表格内容区域
+                  // 表格内容区域和分頁组件的共同容器
                   Expanded(
-                    child: _buildTableContent(provider),
+                    child: _buildTableWithPagination(provider),
                   ),
-                  // 分頁欄放在表格下方
-                  _buildPagination(provider),
                 ],
               ),
             ),
@@ -169,7 +167,35 @@ class ArrearManagementTableWidgetState
     );
   }
 
-  ///2, 构建表格内容
+  ///2, 构建表格和分页的统一容器
+  Widget _buildTableWithPagination(ArrearProvider provider) {
+    return Container(
+      margin: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.06),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Column(
+        children: [
+          // 表格内容区域
+          Expanded(
+            child: _buildTableContent(provider),
+          ),
+          // 分頁组件
+          _buildPagination(provider),
+        ],
+      ),
+    );
+  }
+
+  ///3, 构建表格内容
   Widget _buildTableContent(ArrearProvider provider) {
     if (provider.isLoading) {
       return const Center(
@@ -184,22 +210,16 @@ class ArrearManagementTableWidgetState
 
     return LayoutBuilder(
       builder: (context, constraints) {
-        // 動態計算每頁顯示的行數，增加顯示行數以減少空白
-        const double outerPadding = 16 * 2; // 上下margin
-        const double titleHeight = 56; // 标题区域高度
-        const double paginationHeight = 56; // 分頁栏高度
-        const double rowHeight = 40; // 減少每行高度從48到40
+        // 動態計算每頁顯示的行數，基于实际容器高度
+        const double rowHeight = 40; // 每行高度
         const double headerHeight = 44; // 表头高度
+        const double paginationHeight = 42; // 分頁栏高度（减少了一些）
 
-        final double screenHeight = MediaQuery.of(context).size.height;
-        final double mainAreaHeight = screenHeight * 14 / 24;
-        final double availableHeight = mainAreaHeight -
-            outerPadding -
-            titleHeight -
-            paginationHeight -
-            headerHeight;
-        final int dynamicRows = ((availableHeight / rowHeight).floor() - 2)
-            .clamp(7, 49); // 行數減2防止溢出
+        // 获取当前容器的实际可用高度
+        final double availableHeight =
+            constraints.maxHeight - headerHeight - paginationHeight;
+        final int dynamicRows = ((availableHeight / rowHeight).floor() - 1)
+            .clamp(7, 49); // 行數減1防止溢出
 
         // 如果每頁项数发生变化，更新状态以确保分頁控件显示正确
         if (_itemsPerPage != dynamicRows) {
@@ -217,112 +237,98 @@ class ArrearManagementTableWidgetState
         final tableData = _buildTableData(provider);
         final paginatedData = _getPaginatedData(tableData);
 
-        return Container(
-          margin: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(12),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withOpacity(0.06),
-                blurRadius: 8,
-                offset: const Offset(0, 2),
+        return Column(
+          children: [
+            // 自定義表頭
+            Container(
+              decoration: const BoxDecoration(
+                color: Color(0xFF6C4EB6), // 你的主題色
+                borderRadius: BorderRadius.only(
+                  topLeft: Radius.circular(12),
+                  topRight: Radius.circular(12),
+                ),
               ),
-            ],
-          ),
-          child: Column(
-            children: [
-              // 自定義表頭
-              Container(
-                decoration: const BoxDecoration(
-                  color: Color(0xFF6C4EB6), // 你的主題色
-                  borderRadius: BorderRadius.only(
-                    topLeft: Radius.circular(12),
-                    topRight: Radius.circular(12),
+              padding: const EdgeInsets.symmetric(vertical: 10),
+              child: Row(
+                children: [
+                  const Expanded(
+                    flex: 1,
+                    child: Padding(
+                      padding: EdgeInsets.symmetric(horizontal: 16),
+                      child: Text(
+                        '單位',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.w600,
+                          fontSize: 14,
+                        ),
+                        textAlign: TextAlign.left,
+                      ),
+                    ),
                   ),
-                ),
-                padding: const EdgeInsets.symmetric(vertical: 10),
-                child: Row(
-                  children: [
-                    const Expanded(
-                      flex: 1,
-                      child: Padding(
-                        padding: EdgeInsets.symmetric(horizontal: 16),
-                        child: Text(
-                          '單位',
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontWeight: FontWeight.w600,
-                            fontSize: 14,
-                          ),
-                          textAlign: TextAlign.left,
-                        ),
-                      ),
-                    ),
-                    ..._getTableHeaders(tableData).map((header) => Expanded(
-                          flex: 1,
-                          child: Padding(
-                            padding: const EdgeInsets.symmetric(horizontal: 16),
-                            child: Text(
-                              header,
-                              style: const TextStyle(
-                                color: Colors.white,
-                                fontWeight: FontWeight.w600,
-                                fontSize: 14,
-                              ),
-                              textAlign: TextAlign.left,
+                  ..._getTableHeaders(tableData).map((header) => Expanded(
+                        flex: 1,
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 16),
+                          child: Text(
+                            header,
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontWeight: FontWeight.w600,
+                              fontSize: 14,
                             ),
+                            textAlign: TextAlign.left,
                           ),
-                        )),
-                  ],
-                ),
+                        ),
+                      )),
+                ],
               ),
-              // 數據區域
-              ...paginatedData.map((record) => Container(
-                    decoration: const BoxDecoration(
-                      border: Border(
-                        bottom: BorderSide(color: Color(0xFFF0F0F0)),
-                      ),
+            ),
+            // 數據區域
+            ...paginatedData.map((record) => Container(
+                  decoration: const BoxDecoration(
+                    border: Border(
+                      bottom: BorderSide(color: Color(0xFFF0F0F0)),
                     ),
-                    child: Row(
-                      children: [
-                        Expanded(
-                          flex: 1,
-                          child: Padding(
-                            padding: const EdgeInsets.symmetric(
-                              vertical: 10, // 減少垂直padding從12到10
-                              horizontal: 16,
-                            ),
-                            child: Text(
-                              record['單位']?.toString() ?? '-',
-                              style: const TextStyle(
-                                fontWeight: FontWeight.w500,
-                                color: Colors.black87,
-                                fontSize: 13,
-                              ),
+                  ),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        flex: 1,
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(
+                            vertical: 10, // 減少垂直padding從12到10
+                            horizontal: 16,
+                          ),
+                          child: Text(
+                            record['單位']?.toString() ?? '-',
+                            style: const TextStyle(
+                              fontWeight: FontWeight.w500,
+                              color: Colors.black87,
+                              fontSize: 13,
                             ),
                           ),
                         ),
-                        ..._getTableHeaders(tableData).map((header) => Expanded(
-                              flex: 1,
-                              child: Padding(
-                                padding: const EdgeInsets.symmetric(
-                                  vertical: 10,
-                                  horizontal: 16,
-                                ),
-                                child: Align(
-                                  alignment: Alignment.centerLeft,
-                                  child: _buildStatusChip(record[header]),
-                                ),
+                      ),
+                      ..._getTableHeaders(tableData).map((header) => Expanded(
+                            flex: 1,
+                            child: Padding(
+                              padding: const EdgeInsets.symmetric(
+                                vertical: 10,
+                                horizontal: 16,
                               ),
-                            )),
-                      ],
-                    ),
-                  )),
-              // 用Expanded自動填滿剩餘空間
-              Expanded(child: Container()),
-            ],
-          ),
+                              child: Align(
+                                alignment: Alignment.centerLeft,
+                                child: _buildStatusChip(record[header]),
+                              ),
+                            ),
+                          )),
+                    ],
+                  ),
+                )),
+            // 用Expanded自動填滿剩餘空間
+            Expanded(child: Container()),
+          ],
         );
       },
     );
@@ -450,7 +456,7 @@ class ArrearManagementTableWidgetState
           paginationHeight -
           headerHeight;
       actualItemsPerPage =
-          ((availableHeight / rowHeight).floor() - 2).clamp(7, 49);
+          ((availableHeight / rowHeight).floor() - 1).clamp(7, 49);
     }
 
     final totalPages = (totalItems / actualItemsPerPage).ceil();
@@ -458,8 +464,7 @@ class ArrearManagementTableWidgetState
     if (totalPages <= 1) return const SizedBox.shrink();
 
     return Container(
-      color: Colors.white,
-      padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 16),
+      padding: const EdgeInsets.only(top: 2, bottom: 8, left: 16, right: 16),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
@@ -475,9 +480,10 @@ class ArrearManagementTableWidgetState
             style: ElevatedButton.styleFrom(
               backgroundColor: _currentPage > 1
                   ? Theme.of(context).primaryColor
-                  : Colors.grey.shade300,
-              foregroundColor:
-                  _currentPage > 1 ? Colors.white : Colors.grey.shade600,
+                  : Theme.of(context).primaryColor.withOpacity(0.12),
+              foregroundColor: _currentPage > 1
+                  ? Colors.white
+                  : Theme.of(context).primaryColor,
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(6),
               ),
@@ -513,10 +519,10 @@ class ArrearManagementTableWidgetState
             style: ElevatedButton.styleFrom(
               backgroundColor: _currentPage < totalPages
                   ? Theme.of(context).primaryColor
-                  : Colors.grey.shade300,
+                  : Theme.of(context).primaryColor.withOpacity(0.12),
               foregroundColor: _currentPage < totalPages
                   ? Colors.white
-                  : Colors.grey.shade600,
+                  : Theme.of(context).primaryColor,
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(6),
               ),
@@ -554,7 +560,7 @@ class ArrearManagementTableWidgetState
           paginationHeight -
           headerHeight;
       final int dynamicRows =
-          ((availableHeight / rowHeight).floor() - 2).clamp(7, 49);
+          ((availableHeight / rowHeight).floor() - 1).clamp(7, 49);
 
       _itemsPerPage = dynamicRows;
 
@@ -582,7 +588,7 @@ class ArrearManagementTableWidgetState
 
   ///12, 启动实际的自动翻頁逻辑
   void _startActualAutoPagination() {
-    // 获取设置中的翻頁时间，默认为5秒
+    // 获取设置中的翻頁时间，默认为3秒
     final appDataProvider =
         Provider.of<AppDataProvider>(context, listen: false);
     final deviceSettings = appDataProvider.deviceSettings;
@@ -655,19 +661,7 @@ class ArrearManagementTableWidgetState
   ///16, 构建空状态
   Widget _buildEmptyState() {
     return Container(
-      margin: const EdgeInsets.all(16),
       padding: const EdgeInsets.all(40),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.06),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
       child: const Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,

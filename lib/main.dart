@@ -9,6 +9,7 @@ import 'package:iboard_app/providers/ad_top_carousel_provider.dart'; // Added To
 import 'package:iboard_app/providers/ad_full_carousel_provider.dart';
 import 'package:iboard_app/providers/rthk_news_provider.dart';
 import 'package:iboard_app/providers/app_update_provider.dart'; // 添加应用更新Provider导入
+import 'package:iboard_app/providers/printer_provider.dart'; // 添加打印機提供者導入
 import 'package:iboard_app/managers/file_manager.dart';
 import 'package:iboard_app/utils/device_id_util.dart';
 
@@ -118,6 +119,14 @@ void main() {
               updateProvider.initializePermissions();
               updateProvider.checkForUpdate(autoDownload: true);
               return updateProvider;
+            },
+          ),
+          ChangeNotifierProvider<PrinterProvider>(
+            create: (context) {
+              final printerProvider = PrinterProvider();
+              // 初始化打印機提供者
+              printerProvider.initialize();
+              return printerProvider;
             },
           ),
         ],
@@ -259,11 +268,11 @@ class HomePageState extends State<HomePage> {
                   announcementProvider.getCarouselAnnouncements();
               if (carouselAnnouncements.isNotEmpty) {
                 debugPrint(
-                    '🏠 [Main] 初始化轮播（有通告）: ${carouselAnnouncements.length} 个');
+                    ' [Main] 初始化轮播（有通告）: ${carouselAnnouncements.length} 个');
                 announcementCarouselProvider
                     .updateCarouselList(carouselAnnouncements);
               } else {
-                debugPrint('🏠 [Main] 初始化轮播（无通告），创建主屏幕+费用表格模式');
+                debugPrint(' [Main] 初始化轮播（无通告），创建主屏幕+费用表格模式');
                 announcementCarouselProvider.updateCarouselList([]);
                 announcementProvider.fetchNotices().then((_) {
                   final freshCarouselAnnouncements =
