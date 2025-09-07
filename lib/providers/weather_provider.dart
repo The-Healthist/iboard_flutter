@@ -218,7 +218,7 @@ class WeatherProvider extends ChangeNotifier {
     }
   }
 
-  ///4，获取天气预报数据
+  ///4，获取天气预报数据 - 優化：API失敗時使用緩存數據
   Future<void> fetchWeatherForecast() async {
     if (_isLoadingForecast) return;
 
@@ -236,16 +236,14 @@ class WeatherProvider extends ChangeNotifier {
         _forecastError = null;
         await _saveWeatherDataToCache();
         stopwatch.stop();
+        debugPrint('🌤️ 天氣預報數據獲取成功並已緩存');
       } else {
-        if (_weatherForecastData != null) {
-          stopwatch.stop();
-        } else {
-          _forecastError = '获取天气预报数据失败';
-          stopwatch.stop();
-        }
+        await _handleForecastFallback();
+        stopwatch.stop();
       }
     } catch (e) {
-      _forecastError = '获取天气预报数据异常: $e';
+      debugPrint('🌤️ 天氣預報API失敗: $e，嘗試使用緩存數據');
+      await _handleForecastFallback();
       stopwatch.stop();
     } finally {
       setState(() {
@@ -254,7 +252,26 @@ class WeatherProvider extends ChangeNotifier {
     }
   }
 
-  ///5，获取当前天气数据
+  ///4a，處理天氣預報失敗的回退邏輯
+  Future<void> _handleForecastFallback() async {
+    if (_weatherForecastData != null) {
+      // 已有緩存數據，清除錯誤狀態
+      _forecastError = null;
+      debugPrint('🌤️ 使用現有的天氣預報緩存數據');
+    } else {
+      // 嘗試從持久化緩存加載
+      await _loadWeatherDataFromCache();
+      if (_weatherForecastData != null) {
+        _forecastError = null;
+        debugPrint('🌤️ 從持久化緩存成功載入天氣預報數據');
+      } else {
+        _forecastError = '获取天气预报数据失败';
+        debugPrint('🌤️ 無可用的天氣預報緩存數據');
+      }
+    }
+  }
+
+  ///5，获取当前天气数据 - 優化：API失敗時使用緩存數據
   Future<void> fetchCurrentWeather() async {
     if (_isLoadingCurrent) return;
 
@@ -272,16 +289,14 @@ class WeatherProvider extends ChangeNotifier {
         _currentError = null;
         await _saveWeatherDataToCache();
         stopwatch.stop();
+        debugPrint('🌡️ 當前天氣數據獲取成功並已緩存');
       } else {
-        if (_currentWeatherData != null) {
-          stopwatch.stop();
-        } else {
-          _currentError = '获取当前天气数据失败';
-          stopwatch.stop();
-        }
+        await _handleCurrentFallback();
+        stopwatch.stop();
       }
     } catch (e) {
-      _currentError = '获取当前天气数据异常: $e';
+      debugPrint('🌡️ 當前天氣API失敗: $e，嘗試使用緩存數據');
+      await _handleCurrentFallback();
       stopwatch.stop();
     } finally {
       setState(() {
@@ -290,7 +305,26 @@ class WeatherProvider extends ChangeNotifier {
     }
   }
 
-  ///6，获取天气警告数据
+  ///5a，處理當前天氣失敗的回退邏輯
+  Future<void> _handleCurrentFallback() async {
+    if (_currentWeatherData != null) {
+      // 已有緩存數據，清除錯誤狀態
+      _currentError = null;
+      debugPrint('🌡️ 使用現有的當前天氣緩存數據');
+    } else {
+      // 嘗試從持久化緩存加載
+      await _loadWeatherDataFromCache();
+      if (_currentWeatherData != null) {
+        _currentError = null;
+        debugPrint('🌡️ 從持久化緩存成功載入當前天氣數據');
+      } else {
+        _currentError = '获取当前天气数据失败';
+        debugPrint('🌡️ 無可用的當前天氣緩存數據');
+      }
+    }
+  }
+
+  ///6，获取天气警告数据 - 優化：API失敗時使用緩存數據
   Future<void> fetchWeatherWarnings() async {
     if (_isLoadingWarning) return;
 
@@ -306,19 +340,17 @@ class WeatherProvider extends ChangeNotifier {
       if (warningData != null) {
         _weatherWarningData = warningData;
         _warningError = null;
-        stopwatch.stop();
         await _saveWeatherDataToCache();
+        stopwatch.stop();
+        debugPrint('⚠️ 天氣警告數據獲取成功並已緩存');
         _checkAndUpdateCurrentWeatherCardCarousel(); // 更新当前天气卡片轮播状态
       } else {
-        if (_weatherWarningData != null) {
-          stopwatch.stop();
-        } else {
-          _warningError = '获取天气警告数据失败';
-          stopwatch.stop();
-        }
+        await _handleWarningFallback();
+        stopwatch.stop();
       }
     } catch (e) {
-      _warningError = '获取天气警告数据异常: $e';
+      debugPrint('⚠️ 天氣警告API失敗: $e，嘗試使用緩存數據');
+      await _handleWarningFallback();
       stopwatch.stop();
     } finally {
       setState(() {
@@ -327,16 +359,44 @@ class WeatherProvider extends ChangeNotifier {
     }
   }
 
-  ///7，获取所有天气数据
+  ///6a，處理天氣警告失敗的回退邏輯
+  Future<void> _handleWarningFallback() async {
+    if (_weatherWarningData != null) {
+      // 已有緩存數據，清除錯誤狀態
+      _warningError = null;
+      debugPrint('⚠️ 使用現有的天氣警告緩存數據');
+      _checkAndUpdateCurrentWeatherCardCarousel(); // 確保轮播状态更新
+    } else {
+      // 嘗試從持久化緩存加載
+      await _loadWeatherDataFromCache();
+      if (_weatherWarningData != null) {
+        _warningError = null;
+        debugPrint('⚠️ 從持久化緩存成功載入天氣警告數據');
+        _checkAndUpdateCurrentWeatherCardCarousel(); // 確保轮播状态更新
+      } else {
+        _warningError = '获取天气警告数据失败';
+        debugPrint('⚠️ 無可用的天氣警告緩存數據');
+      }
+    }
+  }
+
+  ///7，获取所有天气数据 - 優化：確保緩存數據優先加載
   Future<void> fetchAllWeatherData() async {
     final stopwatch = Stopwatch()..start();
+
+    // 🔧 關鍵改進：先加載緩存數據，確保有基礎數據可用
+    await _loadWeatherDataFromCache();
+    debugPrint('🌤️ 已預載入緩存天氣數據作為基礎');
+
     try {
+      // 然後嘗試更新最新數據，但不會影響已載入的緩存
       await fetchWeatherForecast();
       await fetchCurrentWeather();
       await fetchWeatherWarnings();
+      debugPrint('🌤️ 所有天氣數據更新完成');
     } catch (e) {
-      debugPrint('获取所有天气数据失败: $e');
-      await _loadWeatherDataFromCache();
+      debugPrint('🌤️ 天氣數據更新失敗，但緩存數據已可用: $e');
+      // 不需要再次加載緩存，因為已經在開始時加載了
     }
     stopwatch.stop();
   }

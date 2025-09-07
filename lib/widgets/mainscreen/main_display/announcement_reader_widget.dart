@@ -304,7 +304,7 @@ class AnnouncementReaderWidgetState extends State<AnnouncementReaderWidget> {
         children: [
           contentWidget,
 
-          // 打印按鈕（左上角）
+          // 列印按鈕（左上角）
           Positioned(
             top: 16,
             left: 16,
@@ -427,9 +427,9 @@ class AnnouncementReaderWidgetState extends State<AnnouncementReaderWidget> {
     }
   }
 
-  /// 11, 顯示打印對話框
+  /// 11, 顯示列印對話框
   void _showPrintDialog() {
-    // 只有PDF和圖片文件支持打印
+    // 只有PDF和圖片文件支持列印
     final mimeType = widget.announcement.file.mimeType.toLowerCase();
     if (!mimeType.startsWith('image/') && mimeType != 'application/pdf') {
       _showUnsupportedFileDialog();
@@ -441,6 +441,12 @@ class AnnouncementReaderWidgetState extends State<AnnouncementReaderWidget> {
       return;
     }
 
+    // 直接顯示簡化版列印對話框
+    _showPrintDialogWithAutoClose();
+  }
+
+  /// 12, 顯示列印對話框並自動關閉
+  void _showPrintDialogWithAutoClose() {
     showDialog(
       context: context,
       builder: (context) => SimplePrintDialog(
@@ -448,16 +454,23 @@ class AnnouncementReaderWidgetState extends State<AnnouncementReaderWidget> {
         localFilePath: _localFilePath,
       ),
     );
+
+    // 10秒後自動關閉對話框
+    Future.delayed(const Duration(seconds: 10), () {
+      if (mounted && Navigator.of(context).canPop()) {
+        Navigator.of(context).pop();
+      }
+    });
   }
 
-  /// 12, 顯示不支持文件類型對話框
+  /// 16, 顯示不支持文件類型對話框
   void _showUnsupportedFileDialog() {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('無法打印'),
+        title: const Text('無法列印'),
         content: Text(
-            '文件類型 "${widget.announcement.file.mimeType}" 不支持打印。\n\n僅支持打印 PDF 和圖片文件。'),
+            '文件類型 "${widget.announcement.file.mimeType}" 不支持列印。\n\n僅支持列印 PDF 和圖片文件。'),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(context).pop(),
@@ -468,12 +481,12 @@ class AnnouncementReaderWidgetState extends State<AnnouncementReaderWidget> {
     );
   }
 
-  /// 13, 顯示文件不可用對話框
+  /// 17, 顯示文件不可用對話框
   void _showFileNotAvailableDialog() {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('無法打印'),
+        title: const Text('無法列印'),
         content: const Text('文件尚未下載完成或不可用，請稍後再試。'),
         actions: [
           TextButton(

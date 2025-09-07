@@ -486,6 +486,24 @@ class ArrearProvider extends ChangeNotifier {
     return false;
   }
 
+  ///9a，處理欠費API失敗的回退邏輯
+  Future<void> _handleArrearFallback() async {
+    if (hasData) {
+      // 已有緩存數據，標記待更新確保UI刷新
+      _hasPendingUpdate = true;
+      debugPrint('💰 使用現有的欠費緩存數據');
+    } else {
+      // 嘗試從持久化緩存重新加載
+      await loadFromCache();
+      if (hasData) {
+        _hasPendingUpdate = true;
+        debugPrint('💰 從持久化緩存成功載入欠費數據');
+      } else {
+        debugPrint('💰 無可用的欠費緩存數據');
+      }
+    }
+  }
+
   ///9, 从缓存加载数据
   Future<void> loadFromCache() async {
     try {
@@ -670,17 +688,22 @@ class ArrearProvider extends ChangeNotifier {
       _error = null;
       debugPrint('✅ 所有费用数据获取完成，数据版本: $_currentDataVersion');
     } catch (e) {
-      debugPrint('获取费用数据时发生异常: $e');
+      debugPrint('💰 获取费用数据时发生异常: $e');
+
+      // 🔧 優化：API失敗時優先使用緩存數據
+      await _handleArrearFallback();
 
       if (e.toString().contains('Building ID') ||
           e.toString().contains('只能包含数字和英文字母') ||
           e.toString().contains('格式无效')) {
         _error = '樓宇ID格式错误：只能包含数字和英文字母';
       } else {
-        if (hasData) {
-          debugPrint('网络请求失败，保持现有缓存数据');
+        // 只有在真的沒有任何數據時才設置錯誤
+        if (!hasData) {
+          _error = 'API失敗且無緩存數據可用';
         } else {
-          debugPrint('网络请求失败，且无缓存数据');
+          _error = null; // 有緩存數據，清除錯誤狀態
+          debugPrint('💰 網絡請求失敗，但緩存數據可用');
         }
       }
     } finally {

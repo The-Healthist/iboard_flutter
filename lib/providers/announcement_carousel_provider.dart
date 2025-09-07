@@ -1903,122 +1903,24 @@ class AnnouncementCarouselProvider extends ChangeNotifier {
   ///20，确保widget和我的数据同步(通告,主屏幕,管理费用表單,其他费用表單)
   void _ensureBasicContent() {
     try {
-      debugPrint('[AnnouncementCarousel] 尝试恢复基本轮播内容...');
+      debugPrint('[AnnouncementCarousel] 🔧 確保基本輪播內容可用（包括無通告的情況）...');
 
       // 如果正在初始化过程中，避免递归调用
       if (_isInitializing) {
         debugPrint('[AnnouncementCarousel] 🔄 初始化过程中，跳过基本内容恢复');
         return;
       }
-      // 0. 如果已有通告，直接走智能更新，通告與費用表格會一併處理
-      if (_carouselAnnouncements.isNotEmpty) {
-        _smartUpdateCarousel(_carouselAnnouncements);
-        return;
-      }
 
-      // 1. 主屏幕（固定加入）- 如已有則復用
-      const mainScreenKey = 'main_screen';
-      if (!_widgetCache.containsKey(mainScreenKey)) {
-        _widgetCache[mainScreenKey] =
-            _createMainScreenWidget(_homeButtonCallback);
-      }
+      // 🔧 關鍵修復：無論是否有通告，都要確保基本內容可用
+      // 無通告時也要有主屏幕和費用表格，不能顯示"正在初始化"
+      // 🔧 關鍵修復：強制使用當前的通告數據（包括空數組）進行智能更新
+      // 這會確保即使沒有通告也能創建主屏幕和費用表格
+      debugPrint('[AnnouncementCarousel] 🔧 強制觸發智能更新以確保基本內容');
+      _smartUpdateCarousel(_carouselAnnouncements);
 
-      final Map<String, Widget> widgetMap = {
-        mainScreenKey: _widgetCache[mainScreenKey]!,
-      };
-      final List<String> orderedKeys = [mainScreenKey];
-
-      // 2. 明確按數據加入「其他費用表」
-      try {
-        final otherDataVersion =
-            _arrearProvider?.currentDataVersion ?? 'default';
-        final otherKey = 'other_fee_table_$otherDataVersion';
-        final includeOther = _arrearProvider?.hasAnyOtherFeeRecords == true;
-
-        if (includeOther) {
-          if (_arrearProvider != null &&
-              (!_widgetCache.containsKey(otherKey) ||
-                  _arrearProvider?.hasPendingUpdate == true)) {
-            _widgetCache[otherKey] =
-                _arrearProvider!.createArrearOtherTableWidget(
-              onHomeButtonPressed: _homeButtonCallback, // 使用统一的回调
-              isInCarouselMode: true,
-              onPaginationComplete: (int totalPages) {
-                _isOtherTablePaginationActive = false;
-                _onOtherTablePaginationComplete();
-              },
-              onPaginationStart: (int totalPages) {
-                _isOtherTablePaginationActive = true;
-                _extendCurrentNoticeStayTime(totalPages);
-              },
-            );
-            _widgetCache.removeWhere((key, value) =>
-                key.startsWith('other_fee_table_') && key != otherKey);
-            _arrearProvider!.markUpdateApplied();
-          }
-
-          if (_widgetCache.containsKey(otherKey)) {
-            widgetMap[otherKey] = _widgetCache[otherKey]!;
-            orderedKeys.add(otherKey);
-          }
-        }
-      } catch (_) {}
-
-      // 3. 明確按數據加入「管理費用表」
-      try {
-        final mgmtDataVersion =
-            _arrearProvider?.currentDataVersion ?? 'default';
-        final mgmtKey = 'management_fee_table_$mgmtDataVersion';
-        final includeMgmt = _arrearProvider?.hasManagementFeeData == true;
-
-        if (includeMgmt) {
-          if (_arrearProvider != null &&
-              (!_widgetCache.containsKey(mgmtKey) ||
-                  _arrearProvider?.hasPendingUpdate == true)) {
-            _widgetCache[mgmtKey] =
-                _arrearProvider!.createArrearManagementTableWidget(
-              onHomeButtonPressed: _homeButtonCallback, // 使用统一的回调
-              isInCarouselMode: true,
-              onPaginationComplete: (int totalPages) {
-                _isManagementTablePaginationActive = false;
-                _onManagementTablePaginationComplete();
-              },
-              onPaginationStart: (int totalPages) {
-                _isManagementTablePaginationActive = true;
-                _extendCurrentNoticeStayTime(totalPages);
-              },
-            );
-            _widgetCache.removeWhere((key, value) =>
-                key.startsWith('management_fee_table_') && key != mgmtKey);
-            _arrearProvider!.markUpdateApplied();
-          }
-
-          if (_widgetCache.containsKey(mgmtKey)) {
-            widgetMap[mgmtKey] = _widgetCache[mgmtKey]!;
-            orderedKeys.add(mgmtKey);
-          }
-        }
-      } catch (_) {}
-
-      // 4. 更新輪播
-      _midCarouselController.smartUpdateCarousel(widgetMap, orderedKeys);
-
-      // 5. 跳轉到主屏幕
-      if (_midCarouselController.widgetCount > 0) {
-        _currentNoticeIndex = 0;
-        _midCarouselController.jumpToIndex(0);
-        try {
-          debugPrint(
-              '[AnnouncementCarousel] 基本內容恢復完成：${_midCarouselController.widgetCount} widgets');
-        } catch (_) {}
-      }
-
-      // 6. 通知
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (hasListeners) {
-          notifyListeners();
-        }
-      });
+      // 智能更新已經處理了所有必要的內容，直接返回
+      debugPrint('[AnnouncementCarousel] ✅ 基本内容确保完成');
+      return;
     } catch (e) {}
   }
 

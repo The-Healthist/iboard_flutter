@@ -187,7 +187,6 @@ class CarouselStateProvider extends ChangeNotifier {
 
   // 時間記錄
   DateTime? _lastUserInteractionTime; // 最後用戶操作時間
-  DateTime? _lastFullscreenAdEndTime; // 最後全屏廣告結束時間
   DateTime? _lastTimerResetTime; // 最後定時器重置時間（用於節流）
 
   // 状态切换控制
@@ -458,7 +457,7 @@ class CarouselStateProvider extends ChangeNotifier {
   }
 
   ///6， 切換到默認狀態
-  void enterDefaultState() {
+  Future<void> enterDefaultState() async {
     if (_currentState.canTransitionTo(AppState.defaultState)) {
       // 🔧 修复：设置状态切换标志，防止竞争条件
       _isStateTransitioning = true;
@@ -471,11 +470,10 @@ class CarouselStateProvider extends ChangeNotifier {
         debugPrint('[state_provider] 🚪 从全屏广告状态切换到默认状态，立即退出全屏广告');
         if (_fullscreenAdProvider != null) {
           debugPrint('[state_provider] ✅ 全屏广告提供者存在，调用退出方法');
-          _fullscreenAdProvider!.exitFullscreenMode();
+          await _fullscreenAdProvider!.exitFullscreenMode();
         } else {
           debugPrint('[state_provider] ❌ 全屏广告提供者为null，无法退出全屏广告');
         }
-        _lastFullscreenAdEndTime = DateTime.now();
       }
 
       _clearFullManualDefaultTimers();
@@ -495,11 +493,9 @@ class CarouselStateProvider extends ChangeNotifier {
 
       _onCloseFullscreenAd?.call();
 
-      // 🔧 修复：延迟重置状态切换标志，给UI足够时间完成更新，並添加額外保護時間
-      Future.delayed(const Duration(milliseconds: 1500), () {
-        _isStateTransitioning = false;
-        debugPrint('[state_provider] ✅ 狀態切換標誌已重置，允許用戶交互');
-      });
+      // 🔧 已取消：立即重置状态切换标志，允许用户立即交互
+      _isStateTransitioning = false;
+      debugPrint('[state_provider] ✅ 狀態切換標誌已立即重置，允許用戶交互');
     }
   }
 
@@ -550,14 +546,9 @@ class CarouselStateProvider extends ChangeNotifier {
     debugPrint(
         '[CarouselStateProvider] 🖱️ 用戶交互檢測 - 當前狀態: ${_currentState.currentAppState.name}');
     debugPrint('[CarouselStateProvider] 🖱️ 狀態切換中: $_isStateTransitioning');
-    debugPrint(
-        '[CarouselStateProvider] 🖱️ 全屏廣告結束時間: $_lastFullscreenAdEndTime');
 
-    // 🔧 修复：如果状态正在切换中，忽略用户交互
-    if (_isStateTransitioning) {
-      debugPrint('[CarouselStateProvider] 🚫 状态正在切换中，忽略用户交互');
-      return;
-    }
+    // 🔧 已取消：移除状态切换中的用户交互阻止机制
+    // 原先會在狀態切換時阻止用戶交互，現在允許立即響應
 
     if (_currentState.currentAppState == AppState.manualOperation) {
       _lastUserInteractionTime = now;
@@ -577,15 +568,8 @@ class CarouselStateProvider extends ChangeNotifier {
       // 🔧 修复：添加防误判逻辑，避免在状态切换过程中误触发手动操作
       // 只有在默认状态且距离上次全屏广告结束超过2秒时，才切换到手动状态
       if (_currentState.currentAppState == AppState.defaultState) {
-        // 检查是否刚从全屏广告状态切换过来 - 延長保護時間至5秒
-        if (_lastFullscreenAdEndTime != null &&
-            now.difference(_lastFullscreenAdEndTime!).inSeconds < 5) {
-          final remainingTime =
-              5 - now.difference(_lastFullscreenAdEndTime!).inSeconds;
-          debugPrint(
-              '[CarouselStateProvider] 🚫 刚从全屏广告切换到默认状态，忽略可能的误触发交互 (保護時間剩餘: ${remainingTime}秒)');
-          return;
-        }
+        // 🔧 已取消：移除全屏广告状态切换后的保护时间机制
+        // 原先有5秒保护时间，现在允许立即响应用户交互
       }
 
       // 只有在默认状态下才允许切换到手动操作状态
@@ -606,14 +590,12 @@ class CarouselStateProvider extends ChangeNotifier {
   void _startFullscreenAdTimer() {
     _fullscreenAdTimer?.cancel();
     final duration = Duration(seconds: fullscreenAdDuration);
-    _fullscreenAdTimer = Timer(duration, () {
+    _fullscreenAdTimer = Timer(duration, () async {
       if (_currentState.currentAppState == AppState.fullscreenAd) {
         // Fullscreen ad timer expired log (always available)
         debugPrint(
             '[state_provider] ⏰ 全屏廣告狀態定時器到期 (${fullscreenAdDuration}秒)，切換到默認狀態');
-        // 🔧 修复：在全屏广告定时器到期时记录结束时间，用于防误判
-        _lastFullscreenAdEndTime = DateTime.now();
-        enterDefaultState();
+        await enterDefaultState();
       }
     });
   }
@@ -683,11 +665,11 @@ class CarouselStateProvider extends ChangeNotifier {
   }
 
   ///14， 嘗試狀態轉換，返回是否成功
-  bool tryTransitionTo(AppState targetState) {
+  Future<bool> tryTransitionTo(AppState targetState) async {
     try {
       switch (targetState) {
         case AppState.defaultState:
-          enterDefaultState();
+          await enterDefaultState();
           return true;
         case AppState.fullscreenAd:
           enterFullscreenAd();
@@ -707,7 +689,6 @@ class CarouselStateProvider extends ChangeNotifier {
   void resetToDefault() {
     _clearFullManualDefaultTimers();
     _currentState = DefaultCarouselState();
-    _lastFullscreenAdEndTime = DateTime.now();
     _lastTimerResetTime = null; // 重置節流計時器
     _startDefaultStateTimer();
     notifyListeners();
@@ -732,12 +713,8 @@ class CarouselStateProvider extends ChangeNotifier {
         }
         break;
       case AppState.defaultState:
-        if (_lastFullscreenAdEndTime != null) {
-          final timeSinceAdEnd =
-              now.difference(_lastFullscreenAdEndTime!).inSeconds;
-          timerInfo =
-              'Default state timer: ${announcementCarouselToFullAdsCarouselDuration - timeSinceAdEnd}s remaining';
-        }
+        timerInfo =
+            'Default state timer: ${announcementCarouselToFullAdsCarouselDuration}s remaining';
         break;
     }
 
@@ -764,10 +741,9 @@ Timer Info: $timerInfo
     _clearFullManualDefaultTimers();
     _clearNoticeCarouselTimers();
 
-    // 只重置用户交互时间和节流时间，保留全屏广告结束时间以维持正确的状态逻辑
+    // 重置用户交互时间和节流时间
     _lastUserInteractionTime = null;
     _lastTimerResetTime = null; // 重置節流計時器
-    // 注意：不重置 _lastFullscreenAdEndTime，以保持状态转换逻辑的正确性
 
     // Pause all state timers log (always available)
     // print('⏸️ 已暂停所有状态定时器');

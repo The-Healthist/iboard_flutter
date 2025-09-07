@@ -76,6 +76,37 @@ class AppDataProvider extends ChangeNotifier {
       baseUrl: _baseUrl,
       onNeedsTokenRefresh: _handleTokenRefresh,
     );
+
+    // 🔧 優化：在構造時自動嘗試加載緩存數據，確保設置頁面能立即顯示緩存信息
+    _loadInitialCacheData();
+  }
+
+  ///0a，構造時加載初始緩存數據（不阻塞構造過程）
+  void _loadInitialCacheData() {
+    // 異步加載，不阻塞構造函數
+    Future.microtask(() async {
+      try {
+        final cachedData = await _loadLoginDeviceData();
+        if (cachedData != null) {
+          _settingsModel = SettingsModel.fromJson(cachedData);
+
+          // 設置API客戶端的token（如果有）
+          if (_settingsModel?.token != null) {
+            _apiClient.setAuthToken(_settingsModel!.token);
+          }
+
+          // 清除錯誤狀態，因為有緩存數據可用
+          _error = null;
+
+          // 通知聽眾緩存數據已加載
+          notifyListeners();
+          _logger.i('✅ 構造時成功加載緩存的設備數據');
+        }
+      } catch (e) {
+        _logger.w('⚠️ 構造時加載緩存數據失敗: $e');
+        // 不設置錯誤狀態，因為這只是預加載
+      }
+    });
   }
 
   ///1，保存登录设备数据到SharedPreferences缓存

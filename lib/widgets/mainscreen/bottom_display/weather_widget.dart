@@ -6,6 +6,7 @@ import 'package:iboard_app/providers/weather_provider.dart';
 import 'package:iboard_app/models/weather_warning_model.dart';
 import 'package:iboard_app/models/current_weather_model.dart';
 import 'package:iboard_app/utils/weather_icon_util.dart';
+import 'package:iboard_app/utils/weather_warning_mapping.dart';
 import 'package:intl/intl.dart';
 import 'package:intl/date_symbol_data_local.dart';
 import 'package:logger/logger.dart';
@@ -170,9 +171,12 @@ class WeatherWidgetState extends State<WeatherWidget> {
   }
 
   ///8，构建單个警告行
-  Widget _buildWarningRow(String warningCode, WeatherWarningInfo warningInfo) {
+  Widget _buildWarningRow(String warningKey, WeatherWarningInfo warningInfo) {
+    // 🔧 使用新的映射系统获取警告描述和图标
+    final warningDescription = WeatherWarningMapping.getWarningDescription(
+        warningKey, warningInfo.code, warningInfo.type);
     final iconPath =
-        WeatherIconUtil.getWeatherWarningIconPathByCode(warningCode);
+        WeatherIconUtil.getWeatherWarningIconPathByCode(warningInfo.code);
     const double fontSize = 13.0;
     const double iconSize = 15.0;
 
@@ -197,7 +201,7 @@ class WeatherWidgetState extends State<WeatherWidget> {
           const SizedBox(width: iconSize * 0.25),
           Flexible(
             child: Text(
-              warningInfo.name.isNotEmpty ? warningInfo.name : warningCode,
+              warningDescription,
               style: const TextStyle(
                 fontSize: fontSize,
                 fontWeight: FontWeight.bold,

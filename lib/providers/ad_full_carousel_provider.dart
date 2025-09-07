@@ -505,7 +505,7 @@ class FullscreenAdProvider extends ChangeNotifier {
   }
 
   ///15, 退出全屏广告模式
-  void exitFullscreenMode() {
+  Future<void> exitFullscreenMode() async {
     debugPrint(
         '[fullscreen_ad_carousel_provider] 🚪 开始退出全屏广告模式 - 当前状态: active=$_isActive, paused=$_isPaused');
 
@@ -533,6 +533,20 @@ class FullscreenAdProvider extends ChangeNotifier {
     // 清除所有视频进度记录
     _videoProgressMap.clear();
 
+    // 🔧 重要修复：先同步清理视频控制器，再清理Widget缓存
+    try {
+      await _cleanupPreviousControllers();
+      debugPrint('[fullscreen_ad_carousel_provider] ✅ 已同步清理所有视频控制器');
+    } catch (e) {
+      debugPrint('[fullscreen_ad_carousel_provider] ⚠️ 清理控制器失败: $e');
+    }
+
+    // 然后清理Widget缓存和FileManager缓存
+    _widgetCache.clear();
+    _fileManagerCache.clear();
+    _adWidgets.clear();
+    debugPrint('[fullscreen_ad_carousel_provider] ✅ 已清理所有Widget缓存和文件管理器');
+
     // 🎯 关键修改：将索引更新放在notifyListeners前面
     // 为下次进入准备下一个广告（但不触发切换逻辑）
     if (fullscreenAds.isNotEmpty) {
@@ -542,8 +556,10 @@ class FullscreenAdProvider extends ChangeNotifier {
     debugPrint(
         '[fullscreen_ad_carousel_provider] ✅ 全屏广告模式退出完成，下次进入索引: $_currentAdIndex');
 
-    // 🔧 立即通知状态变化，不使用延迟
-    notifyListeners();
+    // 延时通知状态变化
+    Future.delayed(const Duration(milliseconds: 500), () {
+      notifyListeners();
+    });
   }
 
   ///16, 启动调试定时器 - 每秒输出全屏广告的实时状态（已禁用）
@@ -605,6 +621,12 @@ class FullscreenAdProvider extends ChangeNotifier {
 
   ///24, 获取当前播放的Widget（懶加載策略）
   Widget? getCurrentWidget() {
+    // 🔧 重要修复：如果不在活跃状态，不返回任何Widget
+    if (!_isActive) {
+      debugPrint('[fullscreen_ad_carousel_provider] 🚫 全屏广告未活跃，不返回Widget');
+      return null;
+    }
+
     if (_currentAdIndex >= fullscreenAds.length) return null;
 
     // 🎯 優化：使用懶加載策略，只為當前廣告創建Widget

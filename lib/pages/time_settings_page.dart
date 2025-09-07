@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:iboard_app/providers/app_data_provider.dart';
 import 'package:iboard_app/providers/app_update_provider.dart'; // 导入更新Provider
 import 'package:iboard_app/widgets/debug_timer_widget.dart';
-import 'package:iboard_app/widgets/debug_update_time_widget.dart'; // 导入调试窗口
+import 'package:iboard_app/widgets/debug_update_time_widget.dart'; // 导入調試窗口
 
 import 'package:provider/provider.dart';
 import 'package:flutter/foundation.dart'; // 导入kDebugMode
@@ -18,6 +18,34 @@ class TimeSettingsPage extends StatefulWidget {
 class TimeSettingsPageState extends State<TimeSettingsPage> {
   bool _isLoading = false;
 
+  @override
+  void initState() {
+    super.initState();
+    // 🔧 優化：頁面初始化時嘗試加載緩存數據
+    _loadCacheDataIfNeeded();
+  }
+
+  ///0，如果需要，加載緩存數據
+  void _loadCacheDataIfNeeded() {
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      if (!mounted) return;
+      final appDataProvider =
+          Provider.of<AppDataProvider>(context, listen: false);
+
+      // 如果當前沒有任何數據，嘗試從緩存加載
+      if (appDataProvider.settingsModel == null &&
+          appDataProvider.deviceSettings == null &&
+          !appDataProvider.isLoading) {
+        try {
+          await appDataProvider.initializeFromCache();
+        } catch (e) {
+          // 靜默失敗，不影響用戶體驗
+          debugPrint('📱 時間設定頁面：嘗試加載緩存數據失敗: $e');
+        }
+      }
+    });
+  }
+
   Future<void> _refreshData() async {
     setState(() {
       _isLoading = true;
@@ -29,12 +57,37 @@ class TimeSettingsPageState extends State<TimeSettingsPage> {
           Provider.of<AppDataProvider>(context, listen: false);
       final prefs = await SharedPreferences.getInstance();
       final deviceId = prefs.getString('deviceId');
+
+      // 🔧 優化：使用優化後的初始化方法，失敗時保持緩存數據
       await appDataProvider.initialize(deviceId: deviceId);
-    } catch (e) {
-      // 處理錯誤，例如顯示SnackBar
+
       if (!mounted) return;
+      // 刷新成功提示
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('刷新失敗: $e')),
+        SnackBar(
+          content: const Text('數據刷新成功'),
+          backgroundColor: Colors.green.shade600,
+          duration: const Duration(seconds: 2),
+        ),
+      );
+    } catch (e) {
+      // 🔧 優化：刷新失敗時檢查是否有緩存數據可用
+      if (!mounted) return;
+      final appDataProvider =
+          Provider.of<AppDataProvider>(context, listen: false);
+      final hasCachedData = appDataProvider.settingsModel != null ||
+          appDataProvider.deviceSettings != null;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(hasCachedData
+              ? '網絡刷新失敗，當前顯示緩存數據: ${e.toString().length > 50 ? e.toString().substring(0, 50) + "..." : e.toString()}'
+              : '刷新失敗: $e'),
+          backgroundColor: hasCachedData
+              ? Colors.orange.shade600 // 有緩存數據時用橙色
+              : Colors.red.shade600, // 無緩存數據時用紅色
+          duration: const Duration(seconds: 3),
+        ),
       );
     } finally {
       if (mounted) {
@@ -49,7 +102,7 @@ class TimeSettingsPageState extends State<TimeSettingsPage> {
   Widget build(BuildContext context) {
     return PopScope(
       onPopInvoked: (didPop) {
-        // 直接返回，不恢复轮播，因为这只是返回到设置頁面
+        // 直接返回，不恢复轮播，因为这只是返回到設置頁面
         // PopScope handles the pop automatically
       },
       child: Consumer<AppDataProvider>(
@@ -59,6 +112,10 @@ class TimeSettingsPageState extends State<TimeSettingsPage> {
           final settingsModel = appDataProvider.settingsModel;
           final deviceSettings = appDataProvider.deviceSettings;
           final error = appDataProvider.error;
+
+          // 🔧 優化：檢查是否有緩存數據可用，即使登錄失敗
+          final hasCachedData = settingsModel != null || deviceSettings != null;
+          final shouldShowContent = isLoggedIn || hasCachedData;
 
           return Scaffold(
             backgroundColor: Colors.grey.shade50,
@@ -124,7 +181,7 @@ class TimeSettingsPageState extends State<TimeSettingsPage> {
                                     color: Colors.blue.shade600,
                                     size: 28,
                                   ),
-                            tooltip: '手动刷新设备信息和设置',
+                            tooltip: '手动刷新設備信息和設置',
                           ),
                           const SizedBox(width: 8), // 添加间距
                           IconButton(
@@ -142,7 +199,7 @@ class TimeSettingsPageState extends State<TimeSettingsPage> {
                               color: Colors.orange.shade600,
                               size: 28,
                             ),
-                            tooltip: '定时更新调试',
+                            tooltip: '定时更新調試',
                           ),
                         ],
                       ),
@@ -155,7 +212,7 @@ class TimeSettingsPageState extends State<TimeSettingsPage> {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            // 设备基本信息卡片
+                            // 設備基本信息卡片
                             Container(
                               width: double.infinity,
                               margin: const EdgeInsets.only(top: 8),
@@ -199,17 +256,21 @@ class TimeSettingsPageState extends State<TimeSettingsPage> {
                                           color: Colors.grey.shade800,
                                         ),
                                       ),
+                                      const Spacer(),
+                                      // 🔧 新增：數據來源指示器
+                                      _buildDataSourceIndicator(
+                                          isLoggedIn, hasCachedData),
                                     ],
                                   ),
                                   const SizedBox(height: 24),
-                                  _buildInfoRow('設備ID', deviceId ?? '未获取'),
+                                  _buildInfoRow('設備ID', deviceId ?? '未獲取'),
                                   const SizedBox(height: 12),
                                   _buildInfoRow(
                                     '登錄狀態',
-                                    isLoggedIn ? '已登錄' : '未登錄',
-                                    isLoggedIn
-                                        ? Colors.green.shade700
-                                        : Colors.red.shade700,
+                                    _getLoginStatusText(
+                                        isLoggedIn, hasCachedData),
+                                    _getLoginStatusColor(
+                                        isLoggedIn, hasCachedData),
                                   ),
                                   if (settingsModel?.building != null) ...[
                                     const SizedBox(height: 12),
@@ -238,7 +299,7 @@ class TimeSettingsPageState extends State<TimeSettingsPage> {
                             const SizedBox(height: 24),
                             _buildVersionInfoCard(context),
 
-                            // 时间设置卡片
+                            // 时间設置卡片 - 🔧 優化：基於緩存數據而非登錄狀態
                             if (deviceSettings != null) ...[
                               const SizedBox(height: 24),
                               Container(
@@ -374,11 +435,14 @@ class TimeSettingsPageState extends State<TimeSettingsPage> {
                                     ),
                                     const SizedBox(height: 16),
                                     Text(
-                                      '請先登錄設備以查看時間設定',
+                                      shouldShowContent
+                                          ? '時間設定數據載入中...'
+                                          : '無可用的設備配置數據\n請檢查網絡連接或聯系管理員',
                                       style: TextStyle(
                                         fontSize: 16,
                                         color: Colors.grey.shade600,
                                       ),
+                                      textAlign: TextAlign.center,
                                     ),
                                   ],
                                 ),
@@ -389,7 +453,7 @@ class TimeSettingsPageState extends State<TimeSettingsPage> {
                       ),
                     ),
 
-                    // 在debug模式下显示定时更新调试窗口
+                    // 在debug模式下显示定时更新調試窗口
                     if (kDebugMode) ...[
                       const SizedBox(height: 24),
                       Container(
@@ -412,7 +476,7 @@ class TimeSettingsPageState extends State<TimeSettingsPage> {
                                 ),
                                 const SizedBox(width: 16),
                                 Text(
-                                  '定时更新调试信息',
+                                  '定时更新調試信息',
                                   style: TextStyle(
                                     fontSize: 18,
                                     fontWeight: FontWeight.bold,
@@ -422,7 +486,7 @@ class TimeSettingsPageState extends State<TimeSettingsPage> {
                               ],
                             ),
                             const SizedBox(height: 16),
-                            // 调试窗口
+                            // 調試窗口
                             const DebugUpdateTimeWidget(),
                           ],
                         ),
@@ -438,12 +502,123 @@ class TimeSettingsPageState extends State<TimeSettingsPage> {
     );
   }
 
+  ///9, 獲取登錄狀態文本
+  String _getLoginStatusText(bool isLoggedIn, bool hasCachedData) {
+    if (isLoggedIn) {
+      return '已登錄';
+    } else if (hasCachedData) {
+      return '離線模式（使用緩存數據）';
+    } else {
+      return '未登錄';
+    }
+  }
+
+  ///10, 獲取登錄狀態顏色
+  Color _getLoginStatusColor(bool isLoggedIn, bool hasCachedData) {
+    if (isLoggedIn) {
+      return Colors.green.shade700;
+    } else if (hasCachedData) {
+      return Colors.orange.shade600; // 橙色表示離線模式
+    } else {
+      return Colors.red.shade700;
+    }
+  }
+
+  ///11, 構建數據來源指示器
+  Widget _buildDataSourceIndicator(bool isLoggedIn, bool hasCachedData) {
+    if (isLoggedIn) {
+      return Container(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+        decoration: BoxDecoration(
+          color: Colors.green.shade50,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: Colors.green.shade200),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              Icons.cloud_done,
+              size: 16,
+              color: Colors.green.shade600,
+            ),
+            const SizedBox(width: 4),
+            Text(
+              '實時數據',
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w500,
+                color: Colors.green.shade700,
+              ),
+            ),
+          ],
+        ),
+      );
+    } else if (hasCachedData) {
+      return Container(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+        decoration: BoxDecoration(
+          color: Colors.orange.shade50,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: Colors.orange.shade200),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              Icons.offline_bolt,
+              size: 16,
+              color: Colors.orange.shade600,
+            ),
+            const SizedBox(width: 4),
+            Text(
+              '緩存數據',
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w500,
+                color: Colors.orange.shade700,
+              ),
+            ),
+          ],
+        ),
+      );
+    } else {
+      return Container(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+        decoration: BoxDecoration(
+          color: Colors.red.shade50,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: Colors.red.shade200),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              Icons.cloud_off,
+              size: 16,
+              color: Colors.red.shade600,
+            ),
+            const SizedBox(width: 4),
+            Text(
+              '無數據',
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w500,
+                color: Colors.red.shade700,
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+  }
+
   Widget _buildInfoRow(String label, String value, [Color? valueColor]) {
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         SizedBox(
-          width: 140, // 扩大宽度，与时间设置保持一致
+          width: 140, // 扩大宽度，与时间設置保持一致
           child: Text(
             '$label:',
             style: TextStyle(
@@ -496,7 +671,7 @@ class TimeSettingsPageState extends State<TimeSettingsPage> {
     );
   }
 
-  ///13. 构建版本信息卡片 - 参考设备信息样式
+  ///13. 构建版本信息卡片 - 参考設備信息样式
   Widget _buildVersionInfoCard(BuildContext context) {
     return Consumer<AppUpdateProvider>(
       builder: (context, updateProvider, child) {
@@ -518,7 +693,7 @@ class TimeSettingsPageState extends State<TimeSettingsPage> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // 标题行 - 与设备信息样式一致
+              // 标题行 - 与設備信息样式一致
               Row(
                 children: [
                   Container(
@@ -544,7 +719,7 @@ class TimeSettingsPageState extends State<TimeSettingsPage> {
                       ),
                     ),
                   ),
-                  // 检查更新按钮
+                  // 檢查更新按钮
                   IconButton(
                     onPressed: updateProvider.canCheckUpdate
                         ? () async {
@@ -564,11 +739,11 @@ class TimeSettingsPageState extends State<TimeSettingsPage> {
                           )
                         : Icon(
                             Icons.refresh,
-                            color: updateProvider.canCheckUpdate 
+                            color: updateProvider.canCheckUpdate
                                 ? Colors.blue.shade600
                                 : Colors.grey.shade400, // 禁用时显示灰色
                           ),
-                    tooltip: updateProvider.canCheckUpdate 
+                    tooltip: updateProvider.canCheckUpdate
                         ? '檢查更新'
                         : '請稍後再試', // 禁用时显示不同提示
                   ),

@@ -7,7 +7,7 @@ import 'package:provider/provider.dart';
 import 'package:logger/logger.dart';
 import 'package:printing/printing.dart';
 
-/// 簡化版打印對話框
+/// 簡化版列印對話框
 class SimplePrintDialog extends StatefulWidget {
   final AnnouncementModel announcement;
   final String? localFilePath;
@@ -35,6 +35,13 @@ class SimplePrintDialogState extends State<SimplePrintDialog> {
     super.initState();
     _printerProvider = Provider.of<PrinterProvider>(context, listen: false);
     _initializeDialog();
+
+    // 10秒後自動關閉對話框
+    Future.delayed(const Duration(seconds: 10), () {
+      if (mounted && Navigator.of(context).canPop()) {
+        Navigator.of(context).pop();
+      }
+    });
   }
 
   /// 1, 初始化對話框
@@ -56,22 +63,17 @@ class SimplePrintDialogState extends State<SimplePrintDialog> {
         _isLoading = false;
       });
 
-      _logger.i('🖨️ 簡化打印對話框初始化完成，載入 ${_printers.length} 個打印機');
+      _logger.i('🖨️ 簡化列印對話框初始化完成，載入 ${_printers.length} 個列印機');
     } catch (e) {
       setState(() {
         _isLoading = false;
       });
-      _logger.e('初始化簡化打印對話框失敗: $e');
+      _logger.e('初始化簡化列印對話框失敗: $e');
     }
   }
 
-  /// 2, 開始打印 - 直接調用系統打印服務
+  /// 2, 開始列印 - 直接調用系統列印服務
   Future<void> _startPrint() async {
-    if (_selectedPrinter == null) {
-      _showErrorDialog('請選擇打印機');
-      return;
-    }
-
     if (widget.localFilePath == null) {
       _showErrorDialog('文件未準備就緒，請稍後再試');
       return;
@@ -85,25 +87,32 @@ class SimplePrintDialogState extends State<SimplePrintDialog> {
       final file = File(widget.localFilePath!);
       final pdfBytes = await file.readAsBytes();
 
-      // 直接調用系統打印服務，不顯示任何成功/失敗提示
+      // 直接調用系統列印服務，不顯示任何成功/失敗提示
       await Printing.layoutPdf(
         onLayout: (format) async => pdfBytes,
         name: widget.announcement.title,
       );
 
-      _logger.i('🖨️ 已調用系統打印服務: ${widget.announcement.title}');
+      _logger.i('🖨️ 已調用系統列印服務: ${widget.announcement.title}');
+
+      // 20秒後自動關閉系統列印界面
+      Future.delayed(const Duration(seconds: 20), () {
+        if (mounted && Navigator.of(context).canPop()) {
+          Navigator.of(context).pop();
+        }
+      });
     } catch (e) {
       // 即使出錯也不顯示錯誤對話框，只記錄日誌
-      _logger.e('調用系統打印服務失敗: $e');
+      _logger.e('調用系統列印服務失敗: $e');
     }
   }
 
-  /// 3, 顯示錯誤對話框（僅在選擇打印機或文件問題時顯示）
+  /// 3, 顯示錯誤對話框（僅在選擇列印機或文件問題時顯示）
   void _showErrorDialog(String message) {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('打印提示'),
+        title: const Text('列印提示'),
         content: Text(message),
         actions: [
           TextButton(
@@ -140,7 +149,7 @@ class SimplePrintDialogState extends State<SimplePrintDialog> {
                   SizedBox(width: 8),
                   Expanded(
                     child: Text(
-                      '打印文件',
+                      '列印文件',
                       style: TextStyle(
                         color: Colors.white,
                         fontSize: 18,
@@ -209,7 +218,7 @@ class SimplePrintDialogState extends State<SimplePrintDialog> {
 
                           // 打印機選擇
                           const Text(
-                            '選擇打印機:',
+                            '選擇列印機:',
                             style: TextStyle(
                               fontWeight: FontWeight.w600,
                               fontSize: 14,
@@ -226,7 +235,7 @@ class SimplePrintDialogState extends State<SimplePrintDialog> {
                             ),
                             child: DropdownButton<PrinterDevice>(
                               value: _selectedPrinter,
-                              hint: const Text('請選擇打印機'),
+                              hint: const Text('請選擇列印機'),
                               isExpanded: true,
                               underline: const SizedBox(),
                               items: _printers.map((printer) {
@@ -283,21 +292,20 @@ class SimplePrintDialogState extends State<SimplePrintDialog> {
                               margin: const EdgeInsets.only(top: 12),
                               padding: const EdgeInsets.all(12),
                               decoration: BoxDecoration(
-                                color: Colors.orange.shade50,
+                                color: Colors.blue.shade50,
                                 borderRadius: BorderRadius.circular(8),
-                                border:
-                                    Border.all(color: Colors.orange.shade200),
+                                border: Border.all(color: Colors.blue.shade200),
                               ),
                               child: Row(
                                 children: [
                                   Icon(Icons.info_outline,
-                                      color: Colors.orange.shade600, size: 16),
+                                      color: Colors.blue.shade600, size: 16),
                                   const SizedBox(width: 8),
                                   Expanded(
                                     child: Text(
-                                      '未找到打印機，請先在設置中添加',
+                                      '未找到列印機，將使用系統列印服務',
                                       style: TextStyle(
-                                        color: Colors.orange.shade700,
+                                        color: Colors.blue.shade700,
                                         fontSize: 12,
                                       ),
                                     ),
@@ -330,7 +338,7 @@ class SimplePrintDialogState extends State<SimplePrintDialog> {
                     ),
                     const SizedBox(width: 12),
                     ElevatedButton(
-                      onPressed: _selectedPrinter == null ? null : _startPrint,
+                      onPressed: _startPrint,
                       style: ElevatedButton.styleFrom(
                         backgroundColor: Theme.of(context).primaryColor,
                         foregroundColor: Colors.white,
@@ -342,7 +350,7 @@ class SimplePrintDialogState extends State<SimplePrintDialog> {
                         children: [
                           Icon(Icons.print, size: 18),
                           SizedBox(width: 8),
-                          Text('開始打印'),
+                          Text('開始列印'),
                         ],
                       ),
                     ),
@@ -355,4 +363,3 @@ class SimplePrintDialogState extends State<SimplePrintDialog> {
     );
   }
 }
-

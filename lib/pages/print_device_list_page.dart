@@ -33,7 +33,7 @@ class PrintDeviceListPageState extends State<PrintDeviceListPage> {
     _loadPrinters();
   }
 
-  /// 1, 載入打印機列表
+  /// 1, 載入列印機列表
   Future<void> _loadPrinters() async {
     if (!mounted) return;
 
@@ -43,20 +43,24 @@ class PrintDeviceListPageState extends State<PrintDeviceListPage> {
     });
 
     try {
-      // 確保打印機提供者已初始化
+      // 確保列印機提供者已初始化
       if (_printerProvider != null) {
         await _printerProvider!.initialize();
 
-        // 先載入已保存的打印機
+        // 先載入已保存的列印機
         List<PrinterDevice> printers = _printerProvider!.printers;
 
-        // 如果沒有已保存的打印機，掃描新的
+        // 刷新已保存列印機的狀態
+        await _printerProvider!.refreshPrinterStatus();
+        printers = _printerProvider!.printers;
+
+        // 如果沒有已保存的列印機，掃描新的
         if (printers.isEmpty) {
           printers = await _printerService.getAvailablePrinters();
-        } else {
-          // 刷新已保存打印機的狀態
-          await _printerProvider!.refreshPrinterStatus();
-          printers = _printerProvider!.printers;
+          // 將掃描到的列印機保存到提供者
+          for (final printer in printers) {
+            await _printerProvider!.addPrinter(printer);
+          }
         }
 
         if (!mounted) return;
@@ -67,22 +71,22 @@ class PrintDeviceListPageState extends State<PrintDeviceListPage> {
         });
       }
 
-      _logger.i('📱 載入了 ${_printers.length} 個打印機');
+      _logger.i('📱 載入了 ${_printers.length} 個列印機');
     } catch (e) {
       if (!mounted) return;
 
       setState(() {
-        _error = '載入打印機失敗: $e';
+        _error = '載入列印機失敗: $e';
         _isLoading = false;
       });
 
-      _logger.e('載入打印機失敗: $e');
+      _logger.e('載入列印機失敗: $e');
     }
   }
 
-  /// 2, 測試打印機連接
+  /// 2, 測試列印機連接
   Future<void> _testPrinter(PrinterDevice printer) async {
-    _logger.i('🖨️ 測試打印機: ${printer.name}');
+    _logger.i('🖨️ 測試列印機: ${printer.name}');
 
     showDialog(
       context: context,
@@ -109,8 +113,8 @@ class PrintDeviceListPageState extends State<PrintDeviceListPage> {
         builder: (context) => AlertDialog(
           title: Text(isConnected ? '連接成功' : '連接失敗'),
           content: Text(isConnected
-              ? '打印機 "${printer.name}" 連接正常'
-              : '無法連接到打印機 "${printer.name}"'),
+              ? '列印機 "${printer.name}" 連接正常'
+              : '無法連接到列印機 "${printer.name}"'),
           actions: [
             TextButton(
               onPressed: () => Navigator.of(context).pop(),
@@ -140,15 +144,30 @@ class PrintDeviceListPageState extends State<PrintDeviceListPage> {
     }
   }
 
-  /// 3, 構建打印機項目
+  /// 3, 構建列印機項目
   Widget _buildPrinterItem(PrinterDevice printer) {
-    return Card(
-      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.grey.shade50,
+        borderRadius: BorderRadius.circular(6),
+        border: Border.all(color: Colors.grey.shade200),
+      ),
       child: ListTile(
-        leading: Icon(
-          Icons.print,
-          color: printer.isConnected ? Colors.green : Colors.grey,
-          size: 32,
+        leading: Container(
+          padding: const EdgeInsets.all(8),
+          decoration: BoxDecoration(
+            color: printer.isConnected
+                ? Colors.green.shade50
+                : Colors.grey.shade50,
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Icon(
+            Icons.print,
+            color: printer.isConnected
+                ? Colors.green.shade600
+                : Colors.grey.shade600,
+            size: 24,
+          ),
         ),
         title: Text(
           printer.name,
@@ -160,11 +179,26 @@ class PrintDeviceListPageState extends State<PrintDeviceListPage> {
         subtitle: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            if (printer.model != null) Text('型號: ${printer.model}'),
-            if (printer.ipAddress != null) Text('IP: ${printer.ipAddress}'),
+            if (printer.model != null)
+              Text(
+                '型號: ${printer.model}',
+                style: TextStyle(
+                  fontSize: 12,
+                  color: Colors.grey.shade600,
+                ),
+              ),
+            if (printer.ipAddress != null)
+              Text(
+                'IP: ${printer.ipAddress}',
+                style: TextStyle(
+                  fontSize: 12,
+                  color: Colors.grey.shade600,
+                ),
+              ),
             Text(
               printer.isConnected ? '已連接' : '未連接',
               style: TextStyle(
+                fontSize: 12,
                 color: printer.isConnected ? Colors.green : Colors.red,
                 fontWeight: FontWeight.w500,
               ),
@@ -175,20 +209,22 @@ class PrintDeviceListPageState extends State<PrintDeviceListPage> {
           mainAxisSize: MainAxisSize.min,
           children: [
             IconButton(
-              icon: const Icon(Icons.wifi_find),
+              icon: const Icon(Icons.wifi_find, size: 20),
               onPressed: () => _testPrinter(printer),
               tooltip: '測試連接',
+              color: Colors.blue.shade600,
             ),
             if (printer.isConnected)
               IconButton(
-                icon: const Icon(Icons.print_outlined),
+                icon: const Icon(Icons.print_outlined, size: 20),
                 onPressed: () => _showTestPrintDialog(printer),
-                tooltip: '測試打印',
-                color: Colors.blue,
+                tooltip: '測試列印',
+                color: Colors.blue.shade600,
               ),
             Icon(
               printer.isConnected ? Icons.check_circle : Icons.error,
               color: printer.isConnected ? Colors.green : Colors.red,
+              size: 20,
             ),
           ],
         ),
@@ -197,7 +233,7 @@ class PrintDeviceListPageState extends State<PrintDeviceListPage> {
     );
   }
 
-  /// 4, 顯示打印機詳細信息
+  /// 4, 顯示列印機詳細信息
   void _showPrinterDetails(PrinterDevice printer) {
     showDialog(
       context: context,
@@ -254,7 +290,7 @@ class PrintDeviceListPageState extends State<PrintDeviceListPage> {
     );
   }
 
-  /// 6, 顯示手動添加打印機對話框
+  /// 6, 顯示手動添加列印機對話框
   void _showAddPrinterDialog() {
     final ipController = TextEditingController();
     final nameController = TextEditingController();
@@ -262,7 +298,7 @@ class PrintDeviceListPageState extends State<PrintDeviceListPage> {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('手動添加WiFi打印機'),
+        title: const Text('手動添加WiFi列印機'),
         content: SizedBox(
           width: 400,
           child: Column(
@@ -271,7 +307,7 @@ class PrintDeviceListPageState extends State<PrintDeviceListPage> {
               TextField(
                 controller: nameController,
                 decoration: const InputDecoration(
-                  labelText: '打印機名稱',
+                  labelText: '列印機名稱',
                   hintText: '例如: HP LaserJet 7200',
                   border: OutlineInputBorder(),
                 ),
@@ -289,7 +325,7 @@ class PrintDeviceListPageState extends State<PrintDeviceListPage> {
               ),
               const SizedBox(height: 16),
               const Text(
-                '提示：請確保打印機已連接到相同的WiFi網絡',
+                '提示：請確保列印機已連接到相同的WiFi網絡',
                 style: TextStyle(color: Colors.grey, fontSize: 12),
               ),
             ],
@@ -341,7 +377,7 @@ class PrintDeviceListPageState extends State<PrintDeviceListPage> {
     return true;
   }
 
-  /// 8, 手動添加打印機
+  /// 8, 手動添加列印機
   Future<void> _addManualPrinter(String name, String ip) async {
     showDialog(
       context: context,
@@ -358,16 +394,16 @@ class PrintDeviceListPageState extends State<PrintDeviceListPage> {
     );
 
     try {
-      // 創建手動打印機設備
+      // 創建手動列印機設備
       final printer = PrinterDevice(
         id: 'manual_$ip',
         name: name,
         ipAddress: ip,
         isConnected: false,
-        model: 'WiFi打印機',
+        model: 'WiFi列印機',
       );
 
-      // 保存到打印機提供者
+      // 保存到列印機提供者
       if (_printerProvider != null) {
         final success = await _printerProvider!.addPrinter(printer);
 
@@ -384,7 +420,7 @@ class PrintDeviceListPageState extends State<PrintDeviceListPage> {
             context: context,
             builder: (context) => AlertDialog(
               title: const Text('添加成功'),
-              content: Text('打印機 "$name" 已成功添加並連接'),
+              content: Text('列印機 "$name" 已成功添加並連接'),
               actions: [
                 TextButton(
                   onPressed: () => Navigator.of(context).pop(),
@@ -394,14 +430,14 @@ class PrintDeviceListPageState extends State<PrintDeviceListPage> {
             ),
           );
 
-          _logger.i('🖨️ 手動添加打印機成功: $name ($ip)');
+          _logger.i('🖨️ 手動添加列印機成功: $name ($ip)');
         } else {
           showDialog(
             context: context,
             builder: (context) => AlertDialog(
               title: const Text('連接失敗'),
               content: Text(
-                  '無法連接到打印機 "$name" ($ip)\n\n請檢查：\n• IP地址是否正確\n• 打印機是否開啟\n• 是否在同一WiFi網絡'),
+                  '無法連接到列印機 "$name" ($ip)\n\n請檢查：\n• IP地址是否正確\n• 列印機是否開啟\n• 是否在同一WiFi網絡'),
               actions: [
                 TextButton(
                   onPressed: () => Navigator.of(context).pop(),
@@ -420,7 +456,7 @@ class PrintDeviceListPageState extends State<PrintDeviceListPage> {
         context: context,
         builder: (context) => AlertDialog(
           title: const Text('添加失敗'),
-          content: Text('添加打印機時發生錯誤: $e'),
+          content: Text('添加列印機時發生錯誤: $e'),
           actions: [
             TextButton(
               onPressed: () => Navigator.of(context).pop(),
@@ -430,121 +466,11 @@ class PrintDeviceListPageState extends State<PrintDeviceListPage> {
         ),
       );
 
-      _logger.e('手動添加打印機失敗: $e');
+      _logger.e('手動添加列印機失敗: $e');
     }
   }
 
-  /// 9, 快速添加HP ENVY Inspire 7200
-  Future<void> _quickAddHP7200() async {
-    const ip = '192.168.3.74';
-    const name = 'HP ENVY Inspire 7200';
-
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (context) => const AlertDialog(
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            CircularProgressIndicator(),
-            SizedBox(height: 16),
-            Text('正在連接 HP ENVY Inspire 7200...'),
-            SizedBox(height: 8),
-            Text(
-              'IP: 192.168.3.74',
-              style: TextStyle(
-                fontSize: 12,
-                color: Colors.grey,
-                fontFamily: 'monospace',
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-
-    try {
-      // 創建打印機設備
-      final printer = PrinterDevice(
-        id: 'hp_envy_7200_$ip',
-        name: name,
-        ipAddress: ip,
-        isConnected: false,
-        model: 'HP ENVY Inspire 7200 All-in-One',
-      );
-
-      // 保存到打印機提供者
-      if (_printerProvider != null) {
-        final success = await _printerProvider!.addPrinter(printer);
-
-        if (!mounted) return;
-        Navigator.of(context).pop(); // 關閉進度對話框
-
-        if (success) {
-          // 刷新列表
-          setState(() {
-            _printers = _printerProvider!.printers;
-          });
-
-          showDialog(
-            context: context,
-            builder: (context) => AlertDialog(
-              title: const Row(
-                children: [
-                  Icon(Icons.check_circle, color: Colors.green),
-                  SizedBox(width: 8),
-                  Text('連接成功！'),
-                ],
-              ),
-              content: const Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text('🖨️ HP ENVY Inspire 7200 已成功添加'),
-                  SizedBox(height: 8),
-                  Text('📍 IP地址: 192.168.3.74',
-                      style: TextStyle(fontFamily: 'monospace')),
-                  SizedBox(height: 8),
-                  Text('✅ 現在可以使用打印功能了'),
-                ],
-              ),
-              actions: [
-                TextButton(
-                  onPressed: () => Navigator.of(context).pop(),
-                  child: const Text('確定'),
-                ),
-              ],
-            ),
-          );
-
-          _logger.i('🖨️ HP ENVY Inspire 7200 添加成功: $ip');
-        } else {
-          _showConnectionFailureDialog();
-        }
-      }
-    } catch (e) {
-      if (!mounted) return;
-      Navigator.of(context).pop(); // 關閉進度對話框
-
-      showDialog(
-        context: context,
-        builder: (context) => AlertDialog(
-          title: const Text('添加失敗'),
-          content: Text('添加 HP ENVY Inspire 7200 時發生錯誤: $e'),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(),
-              child: const Text('確定'),
-            ),
-          ],
-        ),
-      );
-
-      _logger.e('快速添加HP 7200失敗: $e');
-    }
-  }
-
-  /// 10, 顯示測試打印對話框
+  /// 10, 顯示測試列印對話框
   void _showTestPrintDialog(PrinterDevice printer) {
     showDialog(
       context: context,
@@ -553,7 +479,7 @@ class PrintDeviceListPageState extends State<PrintDeviceListPage> {
           children: [
             Icon(Icons.print, color: Colors.blue),
             SizedBox(width: 8),
-            Text('測試打印'),
+            Text('測試列印'),
           ],
         ),
         content: SizedBox(
@@ -562,7 +488,7 @@ class PrintDeviceListPageState extends State<PrintDeviceListPage> {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text('打印機: ${printer.name}'),
+              Text('列印機: ${printer.name}'),
               if (printer.ipAddress != null)
                 Text('IP地址: ${printer.ipAddress}',
                     style: const TextStyle(fontFamily: 'monospace')),
@@ -582,7 +508,7 @@ class PrintDeviceListPageState extends State<PrintDeviceListPage> {
                     _printTestPage(printer);
                   },
                   icon: const Icon(Icons.description),
-                  label: const Text('打印測試頁面'),
+                  label: const Text('列印測試頁面'),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: Colors.green,
                     foregroundColor: Colors.white,
@@ -592,7 +518,7 @@ class PrintDeviceListPageState extends State<PrintDeviceListPage> {
 
               const SizedBox(height: 8),
 
-              // 打印通告PDF按鈕
+              // 列印通告PDF按鈕
               SizedBox(
                 width: double.infinity,
                 child: ElevatedButton.icon(
@@ -601,7 +527,7 @@ class PrintDeviceListPageState extends State<PrintDeviceListPage> {
                     _selectAnnouncementToPrint(printer);
                   },
                   icon: const Icon(Icons.picture_as_pdf),
-                  label: const Text('選擇通告PDF打印'),
+                  label: const Text('選擇通告PDF列印'),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: Colors.blue,
                     foregroundColor: Colors.white,
@@ -621,7 +547,7 @@ class PrintDeviceListPageState extends State<PrintDeviceListPage> {
     );
   }
 
-  /// 11, 打印測試頁面
+  /// 11, 列印測試頁面
   Future<void> _printTestPage(PrinterDevice printer) async {
     showDialog(
       context: context,
@@ -650,15 +576,15 @@ class PrintDeviceListPageState extends State<PrintDeviceListPage> {
           '${tempDir.path}/printer_test_${DateTime.now().millisecondsSinceEpoch}.pdf');
       await testFile.writeAsBytes(testPdfBytes);
 
-      // 打印設置
+      // 列印設置
       final printSettings = PrintSettings(
         isDoubleSided: false,
         isColorPrint: false, // 測試頁面使用黑白
-        fileName: '打印機測試頁面',
+        fileName: '列印機測試頁面',
         selectedPrinter: printer,
       );
 
-      // 執行打印
+      // 執行列印
       final success = await _printerService.printPDF(
         pdfFile: testFile,
         settings: printSettings,
@@ -674,10 +600,10 @@ class PrintDeviceListPageState extends State<PrintDeviceListPage> {
               children: [
                 Icon(Icons.check_circle, color: Colors.green),
                 SizedBox(width: 8),
-                Text('測試打印成功'),
+                Text('測試列印成功'),
               ],
             ),
-            content: Text('測試頁面已發送到 ${printer.name}\n\n請檢查打印機是否正常出紙。'),
+            content: Text('測試頁面已發送到 ${printer.name}\n\n請檢查列印機是否正常出紙。'),
             actions: [
               TextButton(
                 onPressed: () => Navigator.of(context).pop(),
@@ -703,7 +629,7 @@ class PrintDeviceListPageState extends State<PrintDeviceListPage> {
       showDialog(
         context: context,
         builder: (context) => AlertDialog(
-          title: const Text('測試打印失敗'),
+          title: const Text('測試列印失敗'),
           content: Text('生成測試頁面時發生錯誤: $e'),
           actions: [
             TextButton(
@@ -714,7 +640,7 @@ class PrintDeviceListPageState extends State<PrintDeviceListPage> {
         ),
       );
 
-      _logger.e('測試打印失敗: $e');
+      _logger.e('測試列印失敗: $e');
     }
   }
 
@@ -731,15 +657,15 @@ class PrintDeviceListPageState extends State<PrintDeviceListPage> {
               mainAxisAlignment: pw.MainAxisAlignment.center,
               children: [
                 pw.Text(
-                  '打印機測試頁面',
+                  '列印機測試頁面',
                   style: pw.TextStyle(
                       fontSize: 24, fontWeight: pw.FontWeight.bold),
                 ),
                 pw.SizedBox(height: 20),
-                pw.Text('打印機: ${printer?.name ?? "HP ENVY Inspire 7200"}'),
+                pw.Text('列印機: ${printer?.name ?? "HP ENVY Inspire 7200"}'),
                 pw.Text('測試時間: ${DateTime.now().toString()}'),
                 pw.SizedBox(height: 20),
-                pw.Text('如果您能看到此頁面，說明打印機工作正常！'),
+                pw.Text('如果您能看到此頁面，說明列印機工作正常！'),
                 pw.SizedBox(height: 40),
                 pw.Container(
                   width: 200,
@@ -761,7 +687,7 @@ class PrintDeviceListPageState extends State<PrintDeviceListPage> {
     return await pdf.save();
   }
 
-  /// 13, 選擇通告PDF進行打印
+  /// 13, 選擇通告PDF進行列印
   Future<void> _selectAnnouncementToPrint(PrinterDevice printer) async {
     try {
       // 獲取通告列表
@@ -795,7 +721,7 @@ class PrintDeviceListPageState extends State<PrintDeviceListPage> {
           context: context,
           builder: (context) => AlertDialog(
             title: const Text('暫無PDF通告'),
-            content: const Text('當前沒有PDF格式的通告文件可供打印。'),
+            content: const Text('當前沒有PDF格式的通告文件可供列印。'),
             actions: [
               TextButton(
                 onPressed: () => Navigator.of(context).pop(),
@@ -811,7 +737,7 @@ class PrintDeviceListPageState extends State<PrintDeviceListPage> {
       showDialog(
         context: context,
         builder: (context) => AlertDialog(
-          title: const Text('選擇要打印的通告'),
+          title: const Text('選擇要列印的通告'),
           content: SizedBox(
             width: 400,
             height: 300,
@@ -859,7 +785,7 @@ class PrintDeviceListPageState extends State<PrintDeviceListPage> {
     }
   }
 
-  /// 14, 打印選中的通告
+  /// 14, 列印選中的通告
   Future<void> _printSelectedAnnouncement(
       PrinterDevice printer, AnnouncementModel announcement) async {
     showDialog(
@@ -871,7 +797,7 @@ class PrintDeviceListPageState extends State<PrintDeviceListPage> {
           children: [
             const CircularProgressIndicator(),
             const SizedBox(height: 16),
-            Text('正在打印: ${announcement.title}'),
+            Text('正在列印: ${announcement.title}'),
             const SizedBox(height: 8),
             const Text('請稍候...', style: TextStyle(color: Colors.grey)),
           ],
@@ -910,7 +836,7 @@ class PrintDeviceListPageState extends State<PrintDeviceListPage> {
         return;
       }
 
-      // 打印設置
+      // 列印設置
       final printSettings = PrintSettings(
         isDoubleSided: false,
         isColorPrint: true,
@@ -918,7 +844,7 @@ class PrintDeviceListPageState extends State<PrintDeviceListPage> {
         selectedPrinter: printer,
       );
 
-      // 執行打印
+      // 執行列印
       final success = await _printerService.printPDF(
         pdfFile: pdfFile,
         settings: printSettings,
@@ -935,7 +861,7 @@ class PrintDeviceListPageState extends State<PrintDeviceListPage> {
               children: [
                 Icon(Icons.check_circle, color: Colors.green),
                 SizedBox(width: 8),
-                Text('打印成功'),
+                Text('列印成功'),
               ],
             ),
             content: Text('通告 "${announcement.title}" 已發送到 ${printer.name}'),
@@ -948,7 +874,7 @@ class PrintDeviceListPageState extends State<PrintDeviceListPage> {
           ),
         );
 
-        _logger.i('🖨️ 通告打印成功: ${announcement.title}');
+        _logger.i('🖨️ 通告列印成功: ${announcement.title}');
       } else {
         _showPrintFailureDialog(printer);
       }
@@ -959,8 +885,8 @@ class PrintDeviceListPageState extends State<PrintDeviceListPage> {
       showDialog(
         context: context,
         builder: (context) => AlertDialog(
-          title: const Text('打印失敗'),
-          content: Text('打印通告時發生錯誤: $e'),
+          title: const Text('列印失敗'),
+          content: Text('列印通告時發生錯誤: $e'),
           actions: [
             TextButton(
               onPressed: () => Navigator.of(context).pop(),
@@ -970,11 +896,11 @@ class PrintDeviceListPageState extends State<PrintDeviceListPage> {
         ),
       );
 
-      _logger.e('打印通告失敗: $e');
+      _logger.e('列印通告失敗: $e');
     }
   }
 
-  /// 15, 顯示打印失敗對話框
+  /// 15, 顯示列印失敗對話框
   void _showPrintFailureDialog(PrinterDevice printer) {
     showDialog(
       context: context,
@@ -983,20 +909,20 @@ class PrintDeviceListPageState extends State<PrintDeviceListPage> {
           children: [
             Icon(Icons.error_outline, color: Colors.red),
             SizedBox(width: 8),
-            Text('打印失敗'),
+            Text('列印失敗'),
           ],
         ),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('無法完成打印任務到 ${printer.name}'),
+            Text('無法完成列印任務到 ${printer.name}'),
             const SizedBox(height: 16),
             const Text('可能原因：'),
-            const Text('• 打印機缺紙或卡紙'),
-            const Text('• 打印機處於離線狀態'),
+            const Text('• 列印機缺紙或卡紙'),
+            const Text('• 列印機處於離線狀態'),
             const Text('• 網絡連接中斷'),
-            const Text('• 打印隊列已滿'),
+            const Text('• 列印隊列已滿'),
           ],
         ),
         actions: [
@@ -1009,221 +935,314 @@ class PrintDeviceListPageState extends State<PrintDeviceListPage> {
     );
   }
 
-  /// 16, 顯示新的添加打印機對話框
+  /// 16, 顯示新的添加列印機對話框
   Future<void> _showNewAddPrinterDialog() async {
     final result = await showDialog<bool>(
       context: context,
       builder: (context) => const AddPrinterDialog(),
     );
 
-    // 如果成功添加了打印機，刷新列表
+    // 如果成功添加了列印機，刷新列表
     if (result == true) {
       await _loadPrinters();
     }
   }
 
-  /// 17, 顯示連接失敗的詳細診斷對話框
-  void _showConnectionFailureDialog() {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Row(
-          children: [
-            Icon(Icons.error_outline, color: Colors.red),
-            SizedBox(width: 8),
-            Text('連接失敗'),
-          ],
-        ),
-        content: const SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text('無法連接到 HP ENVY Inspire 7200 (192.168.3.74)'),
-              SizedBox(height: 16),
-              Text(
-                '請檢查以下項目：',
-                style: TextStyle(fontWeight: FontWeight.w600),
-              ),
-              SizedBox(height: 8),
-              Text('🔌 打印機是否已開啟電源'),
-              Text('📶 打印機是否已連接到WiFi網絡'),
-              Text('🌐 設備和打印機是否在同一WiFi網絡'),
-              Text('📱 IP地址是否正確 (192.168.3.74)'),
-              Text('🔥 防火牆是否阻止連接'),
-            ],
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(),
-            child: const Text('確定'),
-          ),
-        ],
-      ),
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('打印機設備'),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.add),
-            onPressed: _showNewAddPrinterDialog,
-            tooltip: '添加網絡打印機',
+    return PopScope(
+      onPopInvoked: (didPop) {
+        // 直接返回，不恢复轮播，因为这只是返回到設置頁面
+      },
+      child: Scaffold(
+        backgroundColor: Colors.grey.shade50,
+        body: SizedBox(
+          width: double.infinity,
+          height: double.infinity,
+          child: SafeArea(
+            child: Column(
+              children: [
+                // 顶部标题区域
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(20),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.grey.withOpacity(0.05),
+                        spreadRadius: 1,
+                        blurRadius: 3,
+                        offset: const Offset(0, 2),
+                      ),
+                    ],
+                  ),
+                  child: Row(
+                    children: [
+                      IconButton(
+                        onPressed: () {
+                          Navigator.pop(context);
+                        },
+                        icon: const Icon(Icons.arrow_back, size: 28),
+                      ),
+                      const SizedBox(width: 16),
+                      Icon(
+                        Icons.print,
+                        size: 32,
+                        color: Colors.blue.shade600,
+                      ),
+                      const SizedBox(width: 16),
+                      Text(
+                        '列印機設置',
+                        style: TextStyle(
+                          fontSize: 28,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.grey.shade800,
+                        ),
+                      ),
+                      const Spacer(),
+                    ],
+                  ),
+                ),
+                // 主要内容区域
+                Expanded(
+                  child: _buildBody(),
+                ),
+              ],
+            ),
           ),
-          IconButton(
-            icon: const Icon(Icons.refresh),
-            onPressed: _loadPrinters,
-            tooltip: '重新掃描',
-          ),
-        ],
+        ),
       ),
-      body: _buildBody(),
     );
   }
 
   /// 17, 構建主體內容
   Widget _buildBody() {
-    if (_isLoading) {
-      return const Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            CircularProgressIndicator(),
-            SizedBox(height: 16),
-            Text('掃描打印機中...'),
-          ],
-        ),
-      );
-    }
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(20),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const SizedBox(height: 40),
 
-    if (_error != null) {
-      return Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            const Icon(
-              Icons.error_outline,
-              color: Colors.red,
-              size: 64,
+          // 說明文字
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: Colors.blue.shade50,
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: Colors.blue.shade200),
             ),
-            const SizedBox(height: 16),
-            Text(
-              _error!,
-              style: const TextStyle(color: Colors.red, fontSize: 16),
-              textAlign: TextAlign.center,
+            child: Row(
+              children: [
+                Icon(
+                  Icons.info_outline,
+                  color: Colors.blue.shade600,
+                  size: 20,
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    '系統會自動掃描網絡中的WiFi列印機，您也可以手動添加已知IP地址的列印機。',
+                    style: TextStyle(
+                      fontSize: 14,
+                      color: Colors.blue.shade700,
+                    ),
+                  ),
+                ),
+              ],
             ),
-            const SizedBox(height: 16),
-            ElevatedButton(
-              onPressed: _loadPrinters,
-              child: const Text('重新嘗試'),
-            ),
-          ],
-        ),
-      );
-    }
+          ),
 
-    if (_printers.isEmpty) {
-      return Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            const Icon(
-              Icons.print_disabled,
-              color: Colors.grey,
-              size: 64,
-            ),
-            const SizedBox(height: 16),
-            const Text(
-              '未找到可用的打印機',
-              style: TextStyle(fontSize: 18, color: Colors.grey),
-            ),
-            const SizedBox(height: 8),
-            const Text(
-              '請確保打印機已連接並開啟',
-              style: TextStyle(fontSize: 14, color: Colors.grey),
-            ),
-            const SizedBox(height: 16),
+          const SizedBox(height: 24),
 
-            // 快速添加HP ENVY Inspire 7200按鈕
+          if (_isLoading)
             Container(
-              margin: const EdgeInsets.symmetric(horizontal: 20),
-              padding: const EdgeInsets.all(16),
+              width: double.infinity,
+              padding: const EdgeInsets.all(24),
               decoration: BoxDecoration(
-                color: Colors.blue.shade50,
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: Colors.blue.shade200),
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(8),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.grey.withOpacity(0.05),
+                    spreadRadius: 1,
+                    blurRadius: 3,
+                    offset: const Offset(0, 2),
+                  ),
+                ],
+              ),
+              child: const Center(
+                child: Column(
+                  children: [
+                    CircularProgressIndicator(),
+                    SizedBox(height: 16),
+                    Text('掃描列印機中...'),
+                  ],
+                ),
+              ),
+            )
+          else if (_error != null)
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(24),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(8),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.grey.withOpacity(0.05),
+                    spreadRadius: 1,
+                    blurRadius: 3,
+                    offset: const Offset(0, 2),
+                  ),
+                ],
+              ),
+              child: Center(
+                child: Column(
+                  children: [
+                    const Icon(
+                      Icons.error_outline,
+                      color: Colors.red,
+                      size: 48,
+                    ),
+                    const SizedBox(height: 16),
+                    Text(
+                      _error!,
+                      style: const TextStyle(color: Colors.red, fontSize: 16),
+                      textAlign: TextAlign.center,
+                    ),
+                    const SizedBox(height: 16),
+                    ElevatedButton(
+                      onPressed: _loadPrinters,
+                      child: const Text('重新嘗試'),
+                    ),
+                  ],
+                ),
+              ),
+            )
+          else if (_printers.isEmpty)
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(24),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(8),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.grey.withOpacity(0.05),
+                    spreadRadius: 1,
+                    blurRadius: 3,
+                    offset: const Offset(0, 2),
+                  ),
+                ],
+              ),
+              child: Center(
+                child: Column(
+                  children: [
+                    const Icon(
+                      Icons.print_disabled,
+                      color: Colors.grey,
+                      size: 48,
+                    ),
+                    const SizedBox(height: 16),
+                    const Text(
+                      '未找到可用的列印機',
+                      style: TextStyle(fontSize: 18, color: Colors.grey),
+                    ),
+                    const SizedBox(height: 8),
+                    const Text(
+                      '請確保列印機已連接並開啟',
+                      style: TextStyle(fontSize: 14, color: Colors.grey),
+                    ),
+                    const SizedBox(height: 16),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        ElevatedButton.icon(
+                          onPressed: _loadPrinters,
+                          icon: const Icon(Icons.refresh),
+                          label: const Text('重新掃描'),
+                        ),
+                        const SizedBox(width: 12),
+                        ElevatedButton.icon(
+                          onPressed: _showNewAddPrinterDialog,
+                          icon: const Icon(Icons.add),
+                          label: const Text('添加列印機'),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.blue.shade600,
+                            foregroundColor: Colors.white,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            )
+          else
+            // 列印機列表
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(24),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(8),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.grey.withOpacity(0.05),
+                    spreadRadius: 1,
+                    blurRadius: 3,
+                    offset: const Offset(0, 2),
+                  ),
+                ],
               ),
               child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      Icon(Icons.print, color: Colors.blue.shade600),
-                      const SizedBox(width: 8),
+                      Container(
+                        padding: const EdgeInsets.all(10),
+                        decoration: BoxDecoration(
+                          color: Colors.blue.shade50,
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Icon(
+                          Icons.print,
+                          color: Colors.blue.shade600,
+                          size: 24,
+                        ),
+                      ),
+                      const SizedBox(width: 16),
                       Text(
-                        'HP ENVY Inspire 7200',
+                        '已添加的列印機',
                         style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.w600,
-                          color: Colors.blue.shade800,
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.grey.shade800,
+                        ),
+                      ),
+                      const Spacer(),
+                      Text(
+                        '${_printers.length} 個列印機',
+                        style: TextStyle(
+                          fontSize: 14,
+                          color: Colors.grey.shade600,
                         ),
                       ),
                     ],
                   ),
-                  const SizedBox(height: 8),
-                  Text(
-                    '檢測到您的打印機型號，點擊快速添加',
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: Colors.blue.shade600,
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  ElevatedButton.icon(
-                    onPressed: () => _quickAddHP7200(),
-                    icon: const Icon(Icons.add),
-                    label: const Text('快速添加 192.168.3.74'),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.blue.shade600,
-                      foregroundColor: Colors.white,
-                    ),
-                  ),
+                  const SizedBox(height: 16),
+                  ..._printers.map((printer) => Padding(
+                        padding: const EdgeInsets.only(bottom: 8),
+                        child: _buildPrinterItem(printer),
+                      )),
                 ],
               ),
             ),
-
-            const SizedBox(height: 16),
-
-            Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                ElevatedButton(
-                  onPressed: _loadPrinters,
-                  child: const Text('重新掃描'),
-                ),
-                const SizedBox(width: 12),
-                ElevatedButton(
-                  onPressed: _showNewAddPrinterDialog,
-                  child: const Text('手動添加'),
-                ),
-              ],
-            ),
-          ],
-        ),
-      );
-    }
-
-    return RefreshIndicator(
-      onRefresh: _loadPrinters,
-      child: ListView.builder(
-        padding: const EdgeInsets.symmetric(vertical: 8),
-        itemCount: _printers.length,
-        itemBuilder: (context, index) => _buildPrinterItem(_printers[index]),
+        ],
       ),
     );
   }

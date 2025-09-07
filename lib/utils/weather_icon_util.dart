@@ -1,4 +1,5 @@
 import 'package:flutter/services.dart';
+import 'package:iboard_app/utils/weather_warning_mapping.dart';
 
 /// 天气图标工具类 - 管理本地和网络天气图标资源
 class WeatherIconUtil {
@@ -77,14 +78,9 @@ class WeatherIconUtil {
     }
   }
 
-  ///6，根据警告代码获取天气警告图标路径（直接映射警告代码到图标文件）
+  ///6，根据警告代码获取天气警告图标路径（使用新的映射系统）
   static String getWeatherWarningIconPathByCode(String warningCode) {
-    // 将警告代码直接映射到图标文件名（转换为小写）
-    final iconFileName = warningCode.toLowerCase();
-    final iconPath = 'assets/images/hko/$iconFileName.png';
-
-    // _logger.d('🌦️ 获取警告图标: $warningCode -> $iconPath');
-    return iconPath;
+    return WeatherWarningMapping.getWarningIconPath(warningCode);
   }
 
   ///7，获取温湿度图标路径

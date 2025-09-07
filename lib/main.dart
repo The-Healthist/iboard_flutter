@@ -203,52 +203,91 @@ class HomePageState extends State<HomePage> {
           final weatherProvider =
               Provider.of<WeatherProvider>(context, listen: false);
 
-          appDataProvider.setCarouselStateProvider(carouselStateProvider);
-
           // 获取Provider引用（现在通过构造函数注入，无需手动设置）
           final arrearProvider =
               Provider.of<ArrearProvider>(context, listen: false);
           appDataProvider.setArrearProvider(arrearProvider);
-          // 2.登录
-          await appDataProvider.initialize(deviceId: deviceId);
-          // 3.初始化天气数据（不需要登录，公开API）
-          await weatherProvider.fetchAllWeatherData();
 
-          // 3.1 启动天气数据定时更新（120分鈡一次）
-          weatherProvider.startPeriodicUpdate(
-              interval: const Duration(minutes: 120));
+          // 🔧 关键修改：登录逻辑优化，确保即使失败也能进入应用
+          try {
+            await appDataProvider.initialize(deviceId: deviceId);
+          } catch (loginError) {
+            debugPrint('🚨 登錄失敗但繼續初始化其他組件: $loginError');
+            // 登录失败不阻止应用启动，继续后续初始化
+          }
+
+          // 设置状态管理器引用（无论登录是否成功都要设置）
+          appDataProvider.setCarouselStateProvider(carouselStateProvider);
+
+          // 3.初始化天气数据（不需要登录，公开API） - 失败不影响应用启动
+          try {
+            await weatherProvider.fetchAllWeatherData();
+            // 3.1 启动天气数据定时更新（120分鈡一次）
+            weatherProvider.startPeriodicUpdate(
+                interval: const Duration(minutes: 120));
+          } catch (weatherError) {
+            debugPrint('🌤️ 天氣數據初始化失敗，將使用默認數據: $weatherError');
+          }
+
+          // 🔧 优化：无论登录是否成功都尝试启动相关服务
           if (appDataProvider.deviceSettings != null) {
             // 启动定时登录任务（12小时一次）
-            appDataProvider.startPeriodicLogin();
-            // 启动健康检查定时任务（30分鈡一次）
-            appDataProvider.startPeriodicHealthCheck();
-
-            // 4. 統一輪播數據初始化區塊
             try {
-              // 4.1. 首先初始化所有基礎數據
+              appDataProvider.startPeriodicLogin();
+            } catch (e) {
+              debugPrint('🔄 定時登錄任務啟動失敗: $e');
+            }
+
+            // 启动健康检查定时任务（30分鈡一次）
+            try {
+              appDataProvider.startPeriodicHealthCheck();
+            } catch (e) {
+              debugPrint('💓 健康檢查任務啟動失敗: $e');
+            }
+
+            // 4. 統一輪播數據初始化區塊 - 各项初始化失败不互相影响
+            // 4.1. 初始化廣告數據
+            try {
               await advertisementProvider.fetchAdvertisements(forceInit: true);
+            } catch (adError) {
+              debugPrint('📺 廣告數據初始化失敗，將使用默認或緩存數據: $adError');
+            }
 
-              // 4.2 確保欠費數據先初始化完成
+            // 4.2 初始化欠費數據
+            try {
               await arrearProvider.fetchFeeData();
+            } catch (arrearError) {
+              debugPrint('💰 欠費數據初始化失敗，將使用默認或緩存數據: $arrearError');
+            }
 
-              // 4.3 获取通告数据初始化
+            // 4.3 初始化通告數據
+            try {
               await announcementProvider.fetchNotices(forceInit: true);
+            } catch (noticeError) {
+              debugPrint('📢 通告數據初始化失敗，將使用默認或緩存數據: $noticeError');
+            }
 
-              // 3. 設置Provider引用
-              final topAdCarouselProvider =
-                  Provider.of<TopAdCarouselProvider>(context, listen: false);
-              final fullscreenAdProvider =
-                  Provider.of<FullscreenAdProvider>(context, listen: false);
-              final announcementCarouselProvider =
-                  Provider.of<AnnouncementCarouselProvider>(context,
-                      listen: false);
-              // 設置廣告輪播提供者的依賴引用
+            // 5. 設置Provider引用（無論上述初始化是否成功都要設置）
+            final topAdCarouselProvider =
+                Provider.of<TopAdCarouselProvider>(context, listen: false);
+            final fullscreenAdProvider =
+                Provider.of<FullscreenAdProvider>(context, listen: false);
+            final announcementCarouselProvider =
+                Provider.of<AnnouncementCarouselProvider>(context,
+                    listen: false);
+
+            // 設置廣告輪播提供者的依賴引用
+            try {
               advertisementProvider.setCarouselProviders(
                 topAdCarouselProvider: topAdCarouselProvider,
                 fullscreenAdProvider: fullscreenAdProvider,
               );
+            } catch (e) {
+              debugPrint('🔗 廣告輪播提供者依賴設置失敗: $e');
+            }
 
-              // 設置通告輪播提供者的依賴引用
+            // 設置通告輪播提供者的依賴引用
+            try {
               announcementCarouselProvider.setAppDataProvider(appDataProvider);
               announcementCarouselProvider.setArrearProvider(arrearProvider);
 
@@ -262,8 +301,12 @@ class HomePageState extends State<HomePage> {
               // 設置通告提供者的輪播提供者引用
               announcementProvider
                   .setCarouselProvider(announcementCarouselProvider);
+            } catch (e) {
+              debugPrint('🔗 通告輪播提供者依賴設置失敗: $e');
+            }
 
-              // 4. 最後初始化通告輪播數據（此時所有依賴都已準備好）
+            // 6. 初始化通告輪播數據（失敗不影響應用啟動）
+            try {
               final carouselAnnouncements =
                   announcementProvider.getCarouselAnnouncements();
               if (carouselAnnouncements.isNotEmpty) {
@@ -274,6 +317,7 @@ class HomePageState extends State<HomePage> {
               } else {
                 debugPrint(' [Main] 初始化轮播（无通告），创建主屏幕+费用表格模式');
                 announcementCarouselProvider.updateCarouselList([]);
+                // 異步獲取通告數據，失敗不影響主流程
                 announcementProvider.fetchNotices().then((_) {
                   final freshCarouselAnnouncements =
                       announcementProvider.getCarouselAnnouncements();
@@ -287,42 +331,40 @@ class HomePageState extends State<HomePage> {
                   debugPrint('異步獲取通告數據失敗: $e');
                 });
               }
-            } catch (e) {
-              debugPrint('輪播數據初始化過程中發生錯誤: $e');
-              // 即使部分初始化失敗，也要確保基本的輪播組件可用
+            } catch (carouselError) {
+              debugPrint('🎠 通告輪播初始化失敗，將使用默認配置: $carouselError');
               try {
-                final announcementCarouselProvider =
-                    Provider.of<AnnouncementCarouselProvider>(context,
-                        listen: false);
                 announcementCarouselProvider.updateCarouselList([]);
-                debugPrint('🔧 錯誤恢復：已初始化基本輪播組件');
-              } catch (recoveryError) {
-                debugPrint('錯誤恢復失敗: $recoveryError');
+              } catch (e) {
+                debugPrint('🔧 通告輪播默認配置也失敗: $e');
               }
             }
 
-            // 启动广告定时更新
-            advertisementProvider.startPeriodicUpdate();
-
-            // 启动通告定时更新
-            announcementProvider.startPeriodicUpdate();
-
-            final deviceSettings = appDataProvider.deviceSettings;
-            final arrearUpdateInterval =
-                deviceSettings?.arrearageUpdateDuration ?? 1;
-            arrearProvider.startPeriodicUpdate(
-                updateIntervalMinutes: arrearUpdateInterval);
-            debugPrint('欠費數據定時更新已啟動，間隔: $arrearUpdateInterval分鐘');
-
-            // 初始化欠费数据
+            // 7. 启动定时更新任务（失敗不影響應用啟動）
             try {
-              await arrearProvider.fetchFeeData();
-              debugPrint('欠費數據初始化完成');
+              advertisementProvider.startPeriodicUpdate();
             } catch (e) {
-              debugPrint('欠費數據初始化失敗: $e');
+              debugPrint('📺 廣告定時更新啟動失敗: $e');
             }
 
-            // 檢查應用更新
+            try {
+              announcementProvider.startPeriodicUpdate();
+            } catch (e) {
+              debugPrint('📢 通告定時更新啟動失敗: $e');
+            }
+
+            try {
+              final deviceSettings = appDataProvider.deviceSettings;
+              final arrearUpdateInterval =
+                  deviceSettings?.arrearageUpdateDuration ?? 1;
+              arrearProvider.startPeriodicUpdate(
+                  updateIntervalMinutes: arrearUpdateInterval);
+              debugPrint('欠費數據定時更新已啟動，間隔: $arrearUpdateInterval分鐘');
+            } catch (e) {
+              debugPrint('💰 欠費數據定時更新啟動失敗: $e');
+            }
+
+            // 8. 檢查應用更新（失敗不影響應用啟動）
             try {
               if (!mounted) return;
               final updateProvider =
@@ -336,27 +378,67 @@ class HomePageState extends State<HomePage> {
                 debugPrint('📦 更新包將自動下載到應用緩存目錄');
               }
             } catch (e) {
-              debugPrint('檢查應用更新失敗: $e');
-            }
-
-            // 自動跳轉到主頁面
-            if (mounted) {
-              Navigator.pushReplacementNamed(context, '/main');
+              debugPrint('📱 檢查應用更新失敗: $e');
             }
           } else {
-            // 既没有登录成功也没有可用的缓存数据
-            final error = appDataProvider.error ?? '无法获取设备配置数据';
+            // 沒有設備設置但可能有緩存數據，初始化基本組件並加載緩存
+            debugPrint('⚠️ 無設備設置，嘗試從緩存初始化組件');
 
-            setState(() {
-              _initializationError = _getUserFriendlyError(error);
-            });
+            // 🔧 關鍵修復：即使沒有設備設置，也要嘗試加載和使用緩存數據
+            await _initializeFromCache(
+              announcementProvider,
+              announcementCarouselProvider:
+                  Provider.of<AnnouncementCarouselProvider>(context,
+                      listen: false),
+              arrearProvider: arrearProvider,
+              weatherProvider: weatherProvider,
+            );
+          }
+
+          // 🎯 關鍵：無論上述任何步驟是否失敗，都嘗試進入主頁面
+          try {
+            if (mounted) {
+              Navigator.pushReplacementNamed(context, '/main');
+              debugPrint('🏠 成功跳轉到主頁面');
+            }
+          } catch (navigationError) {
+            debugPrint('🚫 跳轉主頁面失敗: $navigationError');
+            // 即使跳轉失敗，也不再拋出異常阻止用戶使用
           }
         } catch (e) {
-          debugPrint('Auto login failed: $e');
-          final error = e.toString();
+          debugPrint('🚨 應用初始化過程中出現嚴重錯誤: $e');
 
+          // 🔧 優化：即使出現錯誤，也嘗試最基本的組件初始化並加載緩存
+          try {
+            debugPrint('🆘 進入緊急模式，嘗試加載緊急緩存數據');
+
+            // 緊急模式：嘗試加載所有可用的緩存數據
+            final emergencyAnnouncementProvider =
+                Provider.of<AnnouncementProvider>(context, listen: false);
+            final emergencyArrearProvider =
+                Provider.of<ArrearProvider>(context, listen: false);
+            final emergencyWeatherProvider =
+                Provider.of<WeatherProvider>(context, listen: false);
+
+            await _emergencyInitializeFromCache(
+              emergencyAnnouncementProvider,
+              emergencyArrearProvider,
+              emergencyWeatherProvider,
+            );
+
+            // 嘗試進入主頁面，哪怕是最基本的狀態
+            if (mounted) {
+              Navigator.pushReplacementNamed(context, '/main');
+              debugPrint('🏠 緊急模式：成功跳轉到主頁面');
+              return; // 成功跳转就不设置错误了
+            }
+          } catch (emergencyError) {
+            debugPrint('🆘 緊急模式也失敗: $emergencyError');
+          }
+
+          // 只有在所有嘗試都失敗時才設置錯誤狀態
           setState(() {
-            _initializationError = _getUserFriendlyError(error);
+            _initializationError = _getUserFriendlyError(e.toString());
           });
         }
       }
@@ -375,6 +457,128 @@ class HomePageState extends State<HomePage> {
   void _retryInitialization() async {
     // 重新尝试初始化
     await _initializeDeviceId();
+  }
+
+  ///0a, 從緩存初始化組件（當API失敗但有緩存數據時使用）
+  Future<void> _initializeFromCache(
+    AnnouncementProvider announcementProvider, {
+    required AnnouncementCarouselProvider announcementCarouselProvider,
+    required ArrearProvider arrearProvider,
+    required WeatherProvider weatherProvider,
+  }) async {
+    try {
+      debugPrint('🗄️ 開始從緩存初始化各項組件...');
+
+      // 1. 加載天氣緩存數據
+      try {
+        await weatherProvider.fetchAllWeatherData(); // 這個方法已經優化過，會優先使用緩存
+        debugPrint('🌤️ 天氣緩存數據加載完成');
+      } catch (e) {
+        debugPrint('🌤️ 天氣緩存數據加載失敗: $e');
+      }
+
+      // 2. 加載通告緩存數據
+      try {
+        // 通告Provider在構造時已自動加載緩存，這裡確保輪播Provider被正確更新
+        final carouselAnnouncements =
+            announcementProvider.getCarouselAnnouncements();
+        announcementCarouselProvider.setAppDataProvider(
+            Provider.of<AppDataProvider>(context, listen: false));
+        announcementCarouselProvider.setArrearProvider(arrearProvider);
+
+        // 🔧 關鍵修復：設置回調函數，確保輪播組件能正常工作
+        announcementCarouselProvider.setHomeButtonCallback(() {
+          announcementCarouselProvider.jumpToAnnouncementIndex(0);
+          debugPrint('🏠 [緩存初始化] 通过返回按钮跳转到主屏幕');
+        });
+
+        announcementCarouselProvider.updateCarouselList(carouselAnnouncements);
+        debugPrint('📢 通告緩存數據加載完成: ${carouselAnnouncements.length} 個');
+      } catch (e) {
+        debugPrint('📢 通告緩存數據加載失敗: $e');
+        // 即使失敗也要確保基本內容可用
+        try {
+          // 設置基本回調並更新空列表
+          announcementCarouselProvider.setHomeButtonCallback(() {
+            announcementCarouselProvider.jumpToAnnouncementIndex(0);
+            debugPrint('🏠 [緩存初始化錯誤處理] 通过返回按钮跳转到主屏幕');
+          });
+          announcementCarouselProvider.updateCarouselList([]);
+        } catch (fallbackError) {
+          debugPrint('📢 通告輪播基本內容設置失敗: $fallbackError');
+        }
+      }
+
+      // 3. 加載欠費緩存數據
+      try {
+        await arrearProvider.loadFromCache();
+        debugPrint('💰 欠費緩存數據加載完成');
+      } catch (e) {
+        debugPrint('💰 欠費緩存數據加載失敗: $e');
+      }
+
+      debugPrint('🗄️ 緩存初始化完成');
+    } catch (e) {
+      debugPrint('🗄️ 緩存初始化過程中發生錯誤: $e');
+    }
+  }
+
+  ///0b, 緊急模式下的緊急緩存初始化
+  Future<void> _emergencyInitializeFromCache(
+    AnnouncementProvider announcementProvider,
+    ArrearProvider arrearProvider,
+    WeatherProvider weatherProvider,
+  ) async {
+    try {
+      debugPrint('🆘 緊急模式：嘗試加載基本緩存數據...');
+
+      // 1. 嘗試加載天氣緩存
+      try {
+        await weatherProvider.fetchAllWeatherData();
+        debugPrint('🆘 緊急模式：天氣緩存已加載');
+      } catch (e) {
+        debugPrint('🆘 緊急模式：天氣緩存加載失敗: $e');
+      }
+
+      // 2. 嘗試加載欠費緩存
+      try {
+        await arrearProvider.loadFromCache();
+        debugPrint('🆘 緊急模式：欠費緩存已加載');
+      } catch (e) {
+        debugPrint('🆘 緊急模式：欠費緩存加載失敗: $e');
+      }
+
+      // 3. 嘗試設置基本的輪播組件
+      try {
+        final announcementCarouselProvider =
+            Provider.of<AnnouncementCarouselProvider>(context, listen: false);
+
+        // 設置基本依賴
+        final appDataProvider =
+            Provider.of<AppDataProvider>(context, listen: false);
+        announcementCarouselProvider.setAppDataProvider(appDataProvider);
+        announcementCarouselProvider.setArrearProvider(arrearProvider);
+
+        // 🔧 緊急模式：設置緊急回調函數
+        announcementCarouselProvider.setHomeButtonCallback(() {
+          announcementCarouselProvider.jumpToAnnouncementIndex(0);
+          debugPrint('🏠 [緊急模式] 通过返回按钮跳转到主屏幕');
+        });
+
+        // 獲取緩存的通告數據
+        final carouselAnnouncements =
+            announcementProvider.getCarouselAnnouncements();
+        announcementCarouselProvider.updateCarouselList(carouselAnnouncements);
+
+        debugPrint('🆘 緊急模式：輪播組件已設置，通告數量: ${carouselAnnouncements.length}');
+      } catch (e) {
+        debugPrint('🆘 緊急模式：輪播組件設置失敗: $e');
+      }
+
+      debugPrint('🆘 緊急模式緩存初始化完成');
+    } catch (e) {
+      debugPrint('🆘 緊急模式緩存初始化失敗: $e');
+    }
   }
 
   ///1, 检查是否为网络错误

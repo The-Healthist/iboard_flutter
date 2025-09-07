@@ -65,6 +65,19 @@ class AnnouncementProvider extends ChangeNotifier {
     }
   }
 
+  ///2a，處理通告API失敗的回退邏輯
+  Future<void> _handleAnnouncementFallback() async {
+    if (_announcements.isNotEmpty) {
+      // 已有緩存數據，確保輪播數據是最新的
+      _updateCarouselAnnouncements();
+      _logger.i('📢 使用現有的通告緩存數據: ${_announcements.length} 個');
+    } else {
+      // 嘗試從持久化緩存重新加載
+      await _loadAnnouncementsFromCache();
+      _logger.i('📢 從持久化緩存重新載入通告數據: ${_announcements.length} 個');
+    }
+  }
+
   ///2，從SharedPreferences緩存加載通告數據
   Future<void> _loadAnnouncementsFromCache() async {
     try {
@@ -419,30 +432,32 @@ class AnnouncementProvider extends ChangeNotifier {
           _error = 'Token expired and refresh failed: $refreshError';
         }
       } else {
-        _error = 'Failed to fetch notices: ${e.message}';
+        // 🔧 優化：API失敗時優先使用緩存數據，降低錯誤影響
+        await _handleAnnouncementFallback();
+        _error = null; // 清除錯誤，因為有緩存數據可用
+        _logger.i('📢 API失敗但已使用緩存數據: ${e.message}');
       }
-      // 网络错误或其他错误时不清除现有数据，保持现状
     } catch (e, stackTrace) {
       _logger.e('An unexpected error occurred while fetching notices',
           error: e, stackTrace: stackTrace);
 
-      // 详细的网络错误处理
-      String errorMessage;
+      // 🔧 优化：所有异常都优先使用缓存数据，不显示错误状态
+      await _handleAnnouncementFallback();
+      _error = null; // 清除錯誤狀態，因為緩存數據可用
 
+      // 记录详细错误但不影响用户体验
       if (e.toString().contains('SocketException') ||
           e.toString().contains('Connection timed out') ||
           e.toString().contains('ClientException')) {
-        errorMessage = '網絡連線失敗，使用快取的通告資料繼續輪播';
+        _logger.i('📢 網絡連線失敗，已使用緩存通告數據');
       } else if (e.toString().contains('TimeoutException') ||
           e.toString().contains('請求超時')) {
-        errorMessage = '請求超時，使用快取的通告資料繼續輪播';
+        _logger.i('📢 請求超時，已使用緩存通告數據');
       } else if (e.toString().contains('FormatException')) {
-        errorMessage = '伺服器返回資料格式錯誤，保持現有通告資料';
+        _logger.i('📢 伺服器數據格式錯誤，已使用緩存通告數據');
       } else {
-        errorMessage = '發生未知錯誤，保持現有通告資料: $e';
+        _logger.i('📢 發生異常，已使用緩存通告數據: $e');
       }
-
-      _error = errorMessage;
     } finally {
       _isLoading = false;
 
