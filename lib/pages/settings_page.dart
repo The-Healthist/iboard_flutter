@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:iboard_app/pages/time_settings_page.dart';
+import 'package:iboard_app/pages/print_device_list_page.dart'; // 添加打印機頁面導入
 import 'package:iboard_app/providers/announcement_carousel_provider.dart';
 import 'package:iboard_app/providers/ad_full_carousel_provider.dart';
 import 'package:iboard_app/providers/state_provider.dart';
@@ -270,6 +271,14 @@ class SettingsPageState extends State<SettingsPage> {
                           title: '網絡設置',
                           subtitle: '配置網絡連接',
                           onTap: () {},
+                        ),
+                        const SizedBox(height: 16),
+                        _buildSettingsItem(
+                          icon: Icons.print,
+                          title: '打印機設置',
+                          subtitle: '管理WiFi打印機設備',
+                          onTap: () =>
+                              _navigateToSubPage(const PrintDeviceListPage()),
                         ),
                         const SizedBox(height: 16),
                         _buildVersionUpdateItem(),

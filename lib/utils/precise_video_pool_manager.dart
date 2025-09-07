@@ -35,6 +35,12 @@ class PreciseVideoPoolManager {
 
   PreciseVideoPoolManager._internal();
 
+  // 用於減少重複日誌輸出的狀態記錄
+  String? _lastStatusOutput;
+  final Map<String, DateTime> _lastDisposeLogTime = {}; // 用于防止重复输出dispose日志
+  final Set<String> _recentlyCheckedNonExistentKeys =
+      {}; // 🎯 新增：記錄最近檢查過的不存在控制器，避免重複檢查
+
   /// 0.获取未初始化的视频控制器（不占用解码器资源）
   Future<VideoPlayerController?> getUninitializedController({
     required String filePath,
@@ -101,15 +107,26 @@ class PreciseVideoPoolManager {
     //1.1 获取key并且释放上一个控制器(确保)
     final key = _generateControllerKey(filePath, videoType);
 
-    // 🎯 優雅的自動清理邏輯：根據視頻類型自動dispose上一個控制器
+    // 🎯 優化：根據視頻類型自動dispose上一個控制器，但避免與顯式清理衝突
     if (videoType == VideoType.topAd) {
-      if (key != _lastTopAdKey && _lastTopAdKey != null) {
+      if (key != _lastTopAdKey &&
+          _lastTopAdKey != null &&
+          !_recentlyCheckedNonExistentKeys.contains(_lastTopAdKey!) &&
+          !_releasingKeys.contains(_lastTopAdKey!)) {
         await _autoDisposeController(_lastTopAdKey!, '頂部廣告');
       }
       _lastTopAdKey = key; // 更新當前頂部廣告key
     } else if (videoType == VideoType.fullAd) {
-      if (key != _lastFullAdKey && _lastFullAdKey != null) {
-        await _autoDisposeController(_lastFullAdKey!, '全屏廣告');
+      // 🎯 關鍵優化：全屏廣告通常由Provider顯式管理，減少自動清理干擾
+      if (key != _lastFullAdKey &&
+          _lastFullAdKey != null &&
+          !_recentlyCheckedNonExistentKeys.contains(_lastFullAdKey!) &&
+          !_releasingKeys.contains(_lastFullAdKey!)) {
+        // 🎯 對全屏廣告採用更保守的清理策略，避免干擾Provider的顯式管理
+        final wrapper = _controllerPool[_lastFullAdKey];
+        if (wrapper != null && !_playingControllers.contains(_lastFullAdKey!)) {
+          await _autoDisposeController(_lastFullAdKey!, '全屏廣告');
+        }
       }
       _lastFullAdKey = key; // 更新當前全屏廣告key
     }
@@ -274,6 +291,9 @@ class PreciseVideoPoolManager {
     if (_releasingKeys.contains(key)) return;
     _releasingKeys.add(key);
 
+    // 🎯 優化：立即標記為已檢查過的不存在控制器，避免其他地方重複嘗試清理
+    _recentlyCheckedNonExistentKeys.add(key);
+
     try {
       if (_controllerPool.containsKey(key)) {
         final wrapper = _controllerPool[key]!;
@@ -317,6 +337,12 @@ class PreciseVideoPoolManager {
     } catch (e) {
     } finally {
       _releasingKeys.remove(key);
+
+      // 🎯 優化：設置定時器清除快取標記，避免永久阻止重新初始化
+      Timer(const Duration(seconds: 30), () {
+        _recentlyCheckedNonExistentKeys.remove(key);
+      });
+
       _printDecoderStatus();
     }
   }
@@ -602,15 +628,22 @@ class PreciseVideoPoolManager {
   }
 
   /// 8. 📊 打印解码器状态（增强版 - 包含完整性验证）
-  void _printDecoderStatus() {
+  void _printDecoderStatus({bool forceOutput = false}) {
     // 🔍 验证状态一致性
     _validateStateConsistency();
 
-    debugPrint('[controllerpool_manager] 📊 解码器状态: '
-        '控制器池 ${_controllerPool.length}/$_maxControllerPool, '
-        '已初始化 ${_initializedControllers.length}/$_maxInitializedDecoders, '
-        '正在初始化 ${_initializingKeys.length}, '
-        '播放中 ${_playingControllers.length}/$_maxConcurrentPlaying');
+    // 只在強制輸出或狀態有變化時輸出
+    final currentStatus =
+        '${_controllerPool.length}/${_maxControllerPool}_${_initializedControllers.length}/${_maxInitializedDecoders}_${_initializingKeys.length}_${_playingControllers.length}/${_maxConcurrentPlaying}';
+
+    if (forceOutput || _lastStatusOutput != currentStatus) {
+      debugPrint('[controllerpool_manager] 📊 解码器状态: '
+          '控制器池 ${_controllerPool.length}/$_maxControllerPool, '
+          '已初始化 ${_initializedControllers.length}/$_maxInitializedDecoders, '
+          '正在初始化 ${_initializingKeys.length}, '
+          '播放中 ${_playingControllers.length}/$_maxConcurrentPlaying');
+      _lastStatusOutput = currentStatus;
+    }
   }
 
   /// 8a. 🔍 验证状态一致性
@@ -727,16 +760,44 @@ class PreciseVideoPoolManager {
   /// 9b. 🎯 自動dispose控制器（優雅版本）
   Future<void> _autoDisposeController(
       String keyToDispose, String videoTypeName) async {
-    if (!_controllerPool.containsKey(keyToDispose)) {
-      debugPrint(
-          '[controllerpool_manager] ℹ️ $videoTypeName控制器不存在，無需清理: $keyToDispose');
+    // 🎯 優化：防止重複檢查已知不存在的控制器
+    if (_recentlyCheckedNonExistentKeys.contains(keyToDispose)) {
       return;
     }
+
+    // 添加防重复调用的保护
+    if (_releasingKeys.contains(keyToDispose)) {
+      return;
+    }
+
+    if (!_controllerPool.containsKey(keyToDispose)) {
+      // 🎯 優化：將不存在的控制器加入快取，避免重複檢查（60秒後自動清除）
+      _recentlyCheckedNonExistentKeys.add(keyToDispose);
+
+      // 設置定時器清除快取
+      Timer(const Duration(seconds: 60), () {
+        _recentlyCheckedNonExistentKeys.remove(keyToDispose);
+      });
+
+      // 🎯 優化：防止重複輸出相同的日誌（30秒內只輸出一次，減少日誌噪音）
+      final now = DateTime.now();
+      final lastLogTime = _lastDisposeLogTime[keyToDispose];
+      if (lastLogTime == null || now.difference(lastLogTime).inSeconds > 30) {
+        debugPrint(
+            '[controllerpool_manager] ℹ️ $videoTypeName控制器不存在，無需清理: $keyToDispose');
+        _lastDisposeLogTime[keyToDispose] = now;
+      }
+      return;
+    }
+
+    // 标记正在释放，防止重复调用
+    _releasingKeys.add(keyToDispose);
 
     // 🎯 關鍵保護：檢查是否為正在播放的重要控制器
     if (_playingControllers.contains(keyToDispose)) {
       debugPrint(
           '[controllerpool_manager] ⚠️ $videoTypeName控制器正在播放，跳過自動清理: $keyToDispose');
+      _releasingKeys.remove(keyToDispose); // 移除释放标记
 
       // 特別保護全屏廣告
       if (keyToDispose.startsWith('fullAd_')) {
@@ -750,6 +811,7 @@ class PreciseVideoPoolManager {
     if (keyToDispose.startsWith('fullAd_')) {
       // 只有當前正在播放的全屏廣告才需要保護，上一個全屏廣告應該被清理
       if (_playingControllers.contains(keyToDispose)) {
+        _releasingKeys.remove(keyToDispose); // 移除释放标记
         return;
       }
     }
@@ -801,6 +863,12 @@ class PreciseVideoPoolManager {
     if (conflictingKeys.isNotEmpty) {
       // 根據優先級決定處理策略
       for (final conflictingKey in conflictingKeys) {
+        // 🚨 重要：不要清理刚刚设置的当前控制器
+        if (conflictingKey == _lastTopAdKey ||
+            conflictingKey == _lastFullAdKey) {
+          continue;
+        }
+
         final isConflictingPlaying =
             _playingControllers.contains(conflictingKey);
 

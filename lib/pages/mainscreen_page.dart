@@ -18,7 +18,6 @@ import 'package:iboard_app/widgets/carousel_widget.dart' as custom_carousel;
 import 'package:iboard_app/widgets/mainscreen/bottom_display/bottom_display_widget.dart';
 import 'package:iboard_app/widgets/rthk_news_ticker_widget.dart';
 import 'package:iboard_app/pages/settings_page.dart';
-import 'package:logger/logger.dart';
 import 'package:provider/provider.dart';
 import 'package:iboard_app/providers/arrear_provider.dart';
 
@@ -30,7 +29,6 @@ class AnnouncementPage extends StatefulWidget {
 }
 
 class AnnouncementPageState extends State<AnnouncementPage> {
-  final Logger _logger = Logger();
   late custom_carousel.CarouselController _bottomCarouselController;
 
   Timer? _bottomTimer;
@@ -124,24 +122,22 @@ class AnnouncementPageState extends State<AnnouncementPage> {
       // 🔧 修复：初始化时强制确保应用进入默认状态
       final carouselStateProvider = context.read<CarouselStateProvider>();
       carouselStateProvider.enterDefaultState();
-      _logger.i('🚀 应用初始化，强制进入默认轮播状态');
+      debugPrint('[MainScreenPage] 应用初始化，强制进入默认轮播状态');
 
       _setupProviderReferences();
-
-      _initializeMidWidgets();
       _initializeTopWidgets();
       _initializeBottomWidgets();
       _initializeNewsAnnouncements();
       _startDebugTimer();
       _startCarouselWatchdog();
 
-      // 🔧 修复：初始化时主动获取费用数据，确保轮播内容完整
+      //  初始化时主动获取费用数据，确保轮播内容完整
       _arrearProvider.initGetFeeData().then((_) {
-        _logger.i('✅ 费用数据初始化完成');
+        debugPrint('[MainScreenPage] 费用数据初始化完成');
         // 费用数据加载完成后，重新初始化中部轮播以包含费用表格
         _initializeMidWidgets();
       }).catchError((error) {
-        _logger.e('❌ 费用数据初始化失败: $error');
+        debugPrint('[MainScreenPage] 费用数据初始化失败: $error');
       });
 
       // Trigger data fetching
@@ -158,22 +154,26 @@ class AnnouncementPageState extends State<AnnouncementPage> {
     // 启动RTHK新闻的定时更新
     rthkNewsProvider.fetchRthkNews();
 
-    _logger.i('📰 RTHK新闻初始化完成');
+    debugPrint('[MainScreenPage] RTHK新闻初始化完成');
   }
 
   ///2.3，设置Provider引用
   void _setupProviderReferences() {
     final stateProvider = context.read<CarouselStateProvider>();
     final topAdProvider = context.read<TopAdCarouselProvider>();
+    final fullscreenAdProvider = context.read<FullscreenAdProvider>(); // 🔧 新增
     final rthkNewsProvider = context.read<RthkNewsProvider>();
 
     // 设置顶部广告轮播Provider引用（修复音视频不同步问题）
     stateProvider.setTopCarouselProvider(topAdProvider);
 
+    // 🔧 重要修复：设置全屏广告轮播Provider引用
+    stateProvider.setFullscreenAdProvider(fullscreenAdProvider);
+
     // 设置RTHK新闻Provider引用（用于直接控制跑马灯暂停恢复）
     stateProvider.setRthkNewsProvider(rthkNewsProvider);
 
-    _logger.i('🔗 Provider引用设置完成');
+    debugPrint('[MainScreenPage] Provider引用设置完成，包括全屏广告Provider');
   }
 
   @override
@@ -213,7 +213,7 @@ class AnnouncementPageState extends State<AnnouncementPage> {
 
       // 只在应用状态变化时输出日志
       if (_lastLoggedAppState != currentAppState) {
-        // _logger.i(
+        // debugPrint('[MainScreenPage] 应用状态变化: ${_lastLoggedAppState?.name ?? "初始"} -> ${currentAppState.name}');
         //     '🕐 [调试] 应用状态变化: ${_lastLoggedAppState?.name ?? "初始"} -> ${currentAppState.name}');
         _lastLoggedAppState = currentAppState;
       }
@@ -249,7 +249,7 @@ class AnnouncementPageState extends State<AnnouncementPage> {
 
   ///5.1，进入设置页面前暂停所有轮播和计时器
   void _pauseAllCarouselsForSettings() {
-    // _logger.i('⚙️ 进入设置页面 - 暂停所有轮播和计时器');
+    // debugPrint('[MainScreenPage] 进入设置页面 - 暂停所有轮播和计时器');
 
     final topAdProvider = context.read<TopAdCarouselProvider>();
     final announcementCarouselProvider =
@@ -287,29 +287,28 @@ class AnnouncementPageState extends State<AnnouncementPage> {
     final carouselStateProvider = context.read<CarouselStateProvider>();
     carouselStateProvider.enterManualOperation();
 
-    // _logger.i('⚙️ 设置页面模式 - 所有轮播已暂停');
+    // debugPrint('[MainScreenPage] 设置页面模式 - 所有轮播已暂停');
   }
 
   ///6，正常退出全屏广告状态，恢复所有轮播
   void _resumeAllCarousels() {
     final fullAdCarouselProvider =
         Provider.of<FullscreenAdProvider>(context, listen: false);
-    final topAdCarouselProvider =
-        Provider.of<TopAdCarouselProvider>(context, listen: false);
+
     final announcementCarouselProvider =
         Provider.of<AnnouncementCarouselProvider>(context, listen: false);
     final stateProvider =
         Provider.of<CarouselStateProvider>(context, listen: false);
 
-    // 退出全屏广告模式
-    fullAdCarouselProvider.exitFullscreenMode();
+    // 🔧 修复：判断是否从手动操作状态恢复
+    final isFromManual = _previousAppState == AppState.manualOperation;
+    debugPrint(
+        '[MainScreenPage] 恢复轮播 - 来自手动操作: $isFromManual, 上一个状态: ${_previousAppState?.name}');
 
-    // 恢复顶部广告轮播
-    topAdCarouselProvider.resumeTopCarousel();
-
-    // 恢复通告轮播 - 🔧 修复：不强制跳转索引，保持之前的轮播位置
-    announcementCarouselProvider
-        .resumeMidCarousel(stateProvider.normalToAnnouncementCarouselDuration);
+    // 恢复通告轮播 - 根据上一个状态决定是否为手动操作恢复
+    announcementCarouselProvider.resumeMidCarousel(
+        stateProvider.noticeStayDuration,
+        isFromManualOperation: isFromManual);
 
     // 设置日志输出标志 - 默认状态下只显示顶部广告和通告轮播的日志
     fullAdCarouselProvider.startDebugTimer();
@@ -340,12 +339,12 @@ class AnnouncementPageState extends State<AnnouncementPage> {
             .checkAndRestoreMidCarousel(apiNoticeStayDuration);
       }
     });
-    // _logger.i('🔍 [启动] 轮播监控定时器 (30s间隔检查) - 确保轮播不中断');
+    // debugPrint('[MainScreenPage] 轮播监控定时器 (30s间隔检查) - 确保轮播不中断');
   }
 
   ///6，进入手动操作模式
   void _handleManualOperationMode() {
-    // _logger.i('🖱️ 进入手动操作模式 - 暂停通告轮播，恢复顶部和底部轮播');
+    debugPrint('[MainScreenPage] 🖱️ 进入手动操作模式 - 暂停通告轮播，恢复顶部和底部轮播');
 
     final announcementCarouselProvider =
         context.read<AnnouncementCarouselProvider>();
@@ -354,13 +353,13 @@ class AnnouncementPageState extends State<AnnouncementPage> {
     announcementCarouselProvider.pauseMidCarousel();
 
     // 恢复顶部广告轮播（如果被暂停了）
-    final topAdProvider = context.read<TopAdCarouselProvider>();
-    // 确保顶部广告能够立即恢复视频播放和轮播
-    if (topAdProvider.isTopCarouselPaused) {
-      topAdProvider.resumeTopCarousel();
-    } else {
-      topAdProvider.checkAndRestoreTopCarousel();
-    }
+    // final topAdProvider = context.read<TopAdCarouselProvider>();
+    // // 确保顶部广告能够立即恢复视频播放和轮播
+    // if (topAdProvider.isTopCarouselPaused) {
+    //   topAdProvider.resumeTopCarousel();
+    // } else {
+    //   topAdProvider.checkAndRestoreTopCarousel();
+    // }
 
     // 恢复底部轮播（如果被暂停了）
     if (_bottomCarouselController.widgetCount > 1 && !_isBottomCarouselPaused) {
@@ -397,36 +396,33 @@ class AnnouncementPageState extends State<AnnouncementPage> {
 
     // 获取API配置的通告停留时间
     final apiNoticeStayDuration = carouselStateProvider.noticeStayDuration;
-    final delayBeforeNotice = carouselStateProvider.noActivityTimeout;
+    final delayBeforeNotice =
+        carouselStateProvider.announcementCarouselToFullAdsCarouselDuration;
 
     // 即使没有通告数据也要初始化轮播组件，确保主屏幕能正常显示
     if (carouselAnnouncements.isEmpty) {
-      _logger.w('⚠️ 通告数据为空，初始化费用表格轮播模式');
+      debugPrint('[MainScreenPage] 初始化首次进入,通告数据为空，初始化费用表格轮播模式');
     } else {
-      _logger.i('✅ 通告轮播数据初始化: ${carouselAnnouncements.length} 个通告');
+      debugPrint(
+          '[MainScreenPage] 初始化通告轮播数据: ${carouselAnnouncements.length} 个通告');
     }
-
-    // 🔧 修复：无论是否有通告，都确保应用保持在默认轮播状态
-    // 不要让应用进入手动操作模式，而是保持轮播状态
     carouselStateProvider.enterDefaultState();
-
     // 初始化通告轮播
     announcementCarouselProvider.initializeMidWidgets(
       carouselAnnouncements: carouselAnnouncements,
       apiNoticeStayDuration: apiNoticeStayDuration,
       delayBeforeNotice: delayBeforeNotice,
       onAnnouncementTap: (AnnouncementModel? announcement) {
-        // 🔧 修复：点击通告时保持默认状态，不进入手动操作模式
         if (announcement == null) {
           // 点击主屏幕时，不改变应用状态，保持轮播继续
-          _logger.d('🏠 点击主屏幕，保持轮播状态');
+          debugPrint('[MainScreenPage] 点击主屏幕，保持轮播状态');
         } else {
           announcementCarouselProvider.showIndependentAnnouncement(announcement,
               () {
             announcementCarouselProvider.jumpToAnnouncementIndex(0);
           });
           // 显示独立通告时也不进入手动模式，让轮播继续
-          _logger.d('📢 显示独立通告，保持轮播状态');
+          debugPrint('[MainScreenPage] 显示独立通告，保持轮播状态');
         }
       },
       onHomeButtonPressed: () {
@@ -434,7 +430,8 @@ class AnnouncementPageState extends State<AnnouncementPage> {
       },
     );
 
-    _logger.i('✅ 中部轮播初始化完成，应用状态: ${carouselStateProvider.currentAppState}');
+    debugPrint(
+        '[MainScreenPage] 中部轮播初始化完成，应用状态: ${carouselStateProvider.currentAppState}');
   }
 
   ///9，初始化顶部轮播
@@ -449,16 +446,16 @@ class AnnouncementPageState extends State<AnnouncementPage> {
     // 如果輪播數據為空，則使用舊的廣告數據作為後備
     if (topAds.isEmpty) {
       topAds = advertisementProvider.topAdvertisements;
-      _logger.w('⚠️ 輪播專用數據為空，使用舊廣告數據作為後備: ${topAds.length} 個廣告');
+      debugPrint('[MainScreenPage] 輪播專用數據為空，使用舊廣告數據作為後備: ${topAds.length} 個廣告');
     } else {
-      _logger.i('✅ 使用輪播專用數據: ${topAds.length} 個廣告');
+      debugPrint('[MainScreenPage] 使用輪播專用數據: ${topAds.length} 個廣告');
     }
 
     if (topAds.isNotEmpty) {
       topAdProvider.initializeTopWidgets(topAds);
-      _logger.i('✅ 頂部廣告輪播初始化完成: ${topAds.length} 個廣告');
+      debugPrint('[MainScreenPage] 頂部廣告輪播初始化完成: ${topAds.length} 個廣告');
     } else {
-      _logger.w('⚠️ 沒有可用的頂部廣告數據');
+      debugPrint('[MainScreenPage] 沒有可用的頂部廣告數據');
     }
   }
 
@@ -467,20 +464,20 @@ class AnnouncementPageState extends State<AnnouncementPage> {
     // 底部轮播现在由BottomWeatherQrcodeNewsCarouselProvider管理
     final bottomProvider = context.read<WeatherProvider>();
     bottomProvider.initializeBottomCarousel();
-    // _logger.i('🌤️ [初始化] 底部天气二维码轮播初始化完成');
+    // debugPrint('[MainScreenPage] 底部天气二维码轮播初始化完成');
   }
 
   ///11，处理设备ID点击事件
   void _handleDeviceIdClick() {
     _deviceIdClickCount++;
-    // _logger.i('📱 设备ID点击次数: $_deviceIdClickCount/8');
+    // debugPrint('[MainScreenPage] 设备ID点击次数: $_deviceIdClickCount/8');
 
     // 取消之前的重置定时器
     _clickResetTimer?.cancel();
 
     if (_deviceIdClickCount >= 8) {
       // 达到8次点击，进入设置页面
-      // _logger.i('🔧 连续点击8次，进入设置页面');
+      // debugPrint('[MainScreenPage] 连续点击8次，进入设置页面');
       _deviceIdClickCount = 0; // 重置计数
 
       // 进入设置页面前暂停所有轮播和计时器
@@ -494,7 +491,7 @@ class AnnouncementPageState extends State<AnnouncementPage> {
       // 设置5秒后重置计数器
       _clickResetTimer = Timer(const Duration(seconds: 5), () {
         _deviceIdClickCount = 0;
-        // _logger.i('⏰ 点击计数器已重置');
+        // debugPrint('[MainScreenPage] 点击计数器已重置');
       });
     }
   }
@@ -508,7 +505,7 @@ class AnnouncementPageState extends State<AnnouncementPage> {
     final currentCarouselAnnouncements =
         announcementProvider.carouselAnnouncements; // 监听轮播专用通告数组
 
-    // Listen to AdvertisementProvider for changes
+    // listen to AdvertisementProvider for changes
     final advertisementProvider = context.watch<AdvertisementProvider>();
     final currentAdvertisements = advertisementProvider.topAdvertisements;
 
@@ -520,12 +517,12 @@ class AnnouncementPageState extends State<AnnouncementPage> {
     final carouselStateProvider = context.watch<CarouselStateProvider>();
     final currentAppState = carouselStateProvider.currentAppState;
 
-    // Handle state changes for carousel and media control
+    // listen to state changes for carousel and media control
     if (_previousAppState != currentAppState) {
-      // _logger.i(
-      //     '🔄 应用状态变化: ${_previousAppState?.name ?? "初始"} -> ${currentAppState.name}');
+      debugPrint(
+          '[MainScreenPage] 🔄 应用状态变化: ${_previousAppState?.name ?? "初始"} -> ${currentAppState.name}');
 
-      // 使用 addPostFrameCallback 延迟执行所有状态更新操作，避免 setState during build
+      // use addPostFrameCallback to delay all state update operations, avoid setState during build
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (!mounted) return;
 
@@ -533,13 +530,13 @@ class AnnouncementPageState extends State<AnnouncementPage> {
         _updateCarouselStateBasedOnAppState(currentAppState);
 
         if (currentAppState == AppState.fullscreenAd) {
-          // _logger.i('📺 进入全屏广告状态');
+          debugPrint('[MainScreenPage] 📺 进入全屏广告状态');
           _pauseAllCarousels();
         } else if (currentAppState == AppState.manualOperation) {
-          // _logger.i('🖱️ 进入手动操作状态');
+          debugPrint('[MainScreenPage] 🖱️ 进入手动操作状态');
           _handleManualOperationMode();
         } else if (currentAppState == AppState.defaultState) {
-          // _logger.i('🏠 进入默认状态');
+          debugPrint('[MainScreenPage] 🏠 进入默认状态');
           // 確保通告輪播在默認狀態下恢復
           _resumeAllCarousels();
         }
@@ -569,19 +566,21 @@ class AnnouncementPageState extends State<AnnouncementPage> {
             _initializeMidWidgets();
             _previousAnnouncementsForBuild =
                 List.from(currentCarouselAnnouncements); // 更新存储的轮播通告列表
-            _logger.i('通告轮播更新成功: ${currentCarouselAnnouncements.length} 个通告');
+            debugPrint(
+                '[MainScreenPage] 通告轮播更新成功: ${currentCarouselAnnouncements.length} 个通告');
           } catch (e) {
-            _logger.e('初始化中部轮播失败，保持现有状态', error: e);
+            debugPrint('[MainScreenPage] 初始化中部轮播失败，保持现有状态: $e');
             // 不更新 _previousAnnouncementsForBuild，保持现有状态
           }
         } else {
           // 新数据为空但有旧数据，记录警告但不更新（保持现有轮播继续工作）
-          _logger.w('收到空的通告数据，保持现有轮播继续工作。'
+          debugPrint('[MainScreenPage] 收到空的通告数据，保持现有轮播继续工作。'
               '当前轮播: ${_previousAnnouncementsForBuild?.length ?? 0} 个通告');
 
           // 检查是否有网络错误信息
           if (announcementProvider.error != null) {
-            _logger.w('通告获取错误: ${announcementProvider.error}');
+            debugPrint(
+                '[MainScreenPage] 通告获取错误: ${announcementProvider.error}');
           }
         }
       });
@@ -605,23 +604,24 @@ class AnnouncementPageState extends State<AnnouncementPage> {
             final fullAdCarouselProvider = context.read<FullscreenAdProvider>();
             final fullAds = advertisementProvider.fullAdvertisements;
             fullAdCarouselProvider.updateFullscreenAds(fullAds);
-            // _logger.i('全屏广告数据已更新: ${fullAds.length} 个全屏广告');
+            // debugPrint('[MainScreenPage] 全屏广告数据已更新: ${fullAds.length} 个全屏广告');
 
             _previousAdvertisementsForBuild =
                 List.from(currentAdvertisements); // Update the stored list
-            // _logger.i('广告轮播更新成功: ${currentAdvertisements.length} 个广告');
+            // debugPrint('[MainScreenPage] 广告轮播更新成功: ${currentAdvertisements.length} 个广告');
           } catch (e) {
-            _logger.e('初始化顶部轮播失败，保持现有状态', error: e);
+            debugPrint('[MainScreenPage] 初始化顶部轮播失败，保持现有状态: $e');
             // 不更新 _previousAdvertisementsForBuild，保持现有状态
           }
         } else {
           // 新数据为空但有旧数据，记录警告但不更新
-          _logger.w('收到空的广告数据，保持现有轮播继续工作。'
+          debugPrint('[MainScreenPage] 收到空的广告数据，保持现有轮播继续工作。'
               '当前轮播: ${_previousAdvertisementsForBuild?.length ?? 0} 个广告');
 
           // 检查是否有网络错误信息
           if (advertisementProvider.error != null) {
-            _logger.w('广告获取错误: ${advertisementProvider.error}');
+            debugPrint(
+                '[MainScreenPage] 广告获取错误: ${advertisementProvider.error}');
           }
         }
       });
@@ -665,7 +665,7 @@ class AnnouncementPageState extends State<AnnouncementPage> {
                     // 轮播内容 - 始终存在，不被销毁
                     Consumer<AnnouncementCarouselProvider>(
                       builder: (context, announcementCarouselProvider, child) {
-                        // _logger.i('🎬 [MainScreenPage] 轮播组件构建中');
+                        // debugPrint('🎬 [MainScreenPage] 轮播组件构建中');
                         return custom_carousel.CarouselWidget(
                           controller: announcementCarouselProvider
                               .midCarouselController,

@@ -254,9 +254,11 @@ class FullscreenAdProvider extends ChangeNotifier {
 
   ///9, 启动全屏广告计时（简化版本 - 只管理定时器）
   void startFullscreenAdTimer(int currentIndex) {
-    _fullscreenTimer?.cancel(); // 取消之前的计时器
+    // 🔧 强化清理：确保完全取消之前的计时器
+    _fullscreenTimer?.cancel();
+    _fullscreenTimer = null;
 
-    // 改进的边界检查逻辑
+    // 🔧 强化边界检查：多重状态验证
     if (fullscreenAds.isEmpty) {
       debugPrint('[fullscreen_ad_carousel_provider] ⚠️ 全屏广告列表为空，无法启动计时器');
       return;
@@ -271,6 +273,13 @@ class FullscreenAdProvider extends ChangeNotifier {
       return;
     }
 
+    // 🔧 索引边界检查
+    if (currentIndex < 0 || currentIndex >= fullscreenAds.length) {
+      debugPrint(
+          '[fullscreen_ad_carousel_provider] ⚠️ 广告索引超出范围: $currentIndex/${fullscreenAds.length}');
+      return;
+    }
+
     final ad = fullscreenAds[currentIndex];
     _currentAdStartTime = DateTime.now();
     _adDuration = ad.durationObject;
@@ -278,36 +287,64 @@ class FullscreenAdProvider extends ChangeNotifier {
 
     // 🎯 简化：不在Provider中初始化视频控制器，让Widget自己处理
 
+    // 🔧 强化定时器回调：在回调中再次检查状态
     if (_adDuration.inSeconds < fullscreenAdDuration) {
       _fullscreenTimer =
           Timer(Duration(seconds: _adDuration.inSeconds), () async {
-        if (_isActive && !_isPaused) {
+        // 🔧 多重状态检查：防止退出状态后的延迟回调
+        if (_isActive &&
+            !_isPaused &&
+            fullscreenAds.isNotEmpty &&
+            _fullscreenTimer != null) {
+          debugPrint('[fullscreen_ad_carousel_provider] ⏰ 广告时长计时器到期，切换到下一个');
           await _nextAd();
         } else {
           debugPrint(
-              '[fullscreen_ad_carousel_provider] ⚠️ 计时器到期但条件不满足: active=$_isActive, paused=$_isPaused');
+              '[fullscreen_ad_carousel_provider] ⚠️ 广告时长计时器到期但条件不满足或已退出: active=$_isActive, paused=$_isPaused, adsCount=${fullscreenAds.length}, timer=${_fullscreenTimer != null}');
+          // 🔧 如果状态不满足，强制清理定时器
+          _fullscreenTimer?.cancel();
+          _fullscreenTimer = null;
         }
       });
     } else {
       _fullscreenTimer =
           Timer(Duration(seconds: fullscreenAdDuration), () async {
-        if (_isActive && !_isPaused) {
-          // 标准广告计时器到期，切换到下一个
+        // 🔧 多重状态检查：防止退出状态后的延迟回调
+        if (_isActive &&
+            !_isPaused &&
+            fullscreenAds.isNotEmpty &&
+            _fullscreenTimer != null) {
+          debugPrint('[fullscreen_ad_carousel_provider] ⏰ 标准广告计时器到期，切换到下一个');
           await _nextAd();
-        } else {}
+        } else {
+          debugPrint(
+              '[fullscreen_ad_carousel_provider] ⚠️ 标准广告计时器到期但条件不满足或已退出: active=$_isActive, paused=$_isPaused, adsCount=${fullscreenAds.length}, timer=${_fullscreenTimer != null}');
+          // 🔧 如果状态不满足，强制清理定时器
+          _fullscreenTimer?.cancel();
+          _fullscreenTimer = null;
+        }
       });
     }
   }
 
   ///10, 切换到下一个广告（私有方法）- 简化版本，移除通知机制避免冲突
   Future<void> _nextAd() async {
-    if (fullscreenAds.isEmpty || _isPaused || !_isActive) {
-      // _nextAd被阻止: isEmpty=${fullscreenAds.isEmpty}, paused=$_isPaused, active=$_isActive
+    // 🔧 首要检查：如果已经退出全屏广告模式，直接返回
+    if (!_isActive) {
+      debugPrint('[fullscreen_ad_carousel_provider] ⚠️ 全屏广告已退出，停止切换');
       return;
     }
 
+    // 🔧 强化状态检查：确保在每次操作前都检查状态
+    if (fullscreenAds.isEmpty || _isPaused) {
+      debugPrint(
+          '[fullscreen_ad_carousel_provider] ⚠️ _nextAd被阻止: isEmpty=${fullscreenAds.isEmpty}, paused=$_isPaused, active=$_isActive');
+      return;
+    }
+
+    // 🔧 双重检查：防止异步操作中的状态变化
     if (fullscreenAds.isEmpty) {
-      // 全屏广告列表为空，无法切换广告
+      debugPrint('[fullscreen_ad_carousel_provider] ⚠️ 全屏广告列表为空，无法切换广告');
       return;
     }
 
@@ -350,9 +387,18 @@ class FullscreenAdProvider extends ChangeNotifier {
 
     notifyListeners();
 
-    // 🎯 立即启动新广告的定时器，不延迟
-    if (_isActive && !_isPaused) {
+    // 🔧 强化状态检查：在启动新定时器前再次确认状态
+    if (_isActive && !_isPaused && fullscreenAds.isNotEmpty) {
+      debugPrint('[fullscreen_ad_carousel_provider] ✅ 状态检查通过，启动新广告定时器');
       startFullscreenAdTimer(_currentAdIndex);
+    } else {
+      debugPrint(
+          '[fullscreen_ad_carousel_provider] ⚠️ 状态检查失败，跳过定时器启动: active=$_isActive, paused=$_isPaused, adsCount=${fullscreenAds.length}');
+      // 🔧 如果状态不满足，强制清理所有定时器
+      _fullscreenTimer?.cancel();
+      _fullscreenTimer = null;
+      _debugTimer?.cancel();
+      _debugTimer = null;
     }
   }
 
@@ -460,12 +506,25 @@ class FullscreenAdProvider extends ChangeNotifier {
 
   ///15, 退出全屏广告模式
   void exitFullscreenMode() {
-    if (!_isActive) return;
+    debugPrint(
+        '[fullscreen_ad_carousel_provider] 🚪 开始退出全屏广告模式 - 当前状态: active=$_isActive, paused=$_isPaused');
 
-    // 确保取消所有定时器
+    // 🔧 强制设置状态：无论当前状态如何，都强制退出
     _isActive = false;
-    _fullscreenTimer?.cancel();
-    _debugTimer?.cancel();
+    _isPaused = false;
+
+    // 🔧 强化清理：确保完全取消所有定时器，添加多重保护
+    if (_fullscreenTimer != null) {
+      _fullscreenTimer!.cancel();
+      _fullscreenTimer = null;
+      debugPrint('[fullscreen_ad_carousel_provider] ✅ 全屏广告定时器已取消');
+    }
+
+    if (_debugTimer != null) {
+      _debugTimer!.cancel();
+      _debugTimer = null;
+      debugPrint('[fullscreen_ad_carousel_provider] ✅ 调试定时器已取消');
+    }
 
     _currentAdStartTime = null;
     _currentAdPauseTime = null;
@@ -480,12 +539,11 @@ class FullscreenAdProvider extends ChangeNotifier {
       _currentAdIndex = (_currentAdIndex + 1) % fullscreenAds.length;
     }
 
-    // 🎯 延迟通知，避免Dialog关闭前显示下一个广告的闪现
-    Future.delayed(const Duration(milliseconds: 500), () {
-      if (hasListeners) {
-        notifyListeners();
-      }
-    });
+    debugPrint(
+        '[fullscreen_ad_carousel_provider] ✅ 全屏广告模式退出完成，下次进入索引: $_currentAdIndex');
+
+    // 🔧 立即通知状态变化，不使用延迟
+    notifyListeners();
   }
 
   ///16, 启动调试定时器 - 每秒输出全屏广告的实时状态（已禁用）

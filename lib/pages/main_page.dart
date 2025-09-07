@@ -2,7 +2,7 @@ import 'dart:async'; // Added import for Timer
 
 import 'package:flutter/foundation.dart' show listEquals;
 import 'package:flutter/material.dart';
-import 'dart:developer'; // Added for log function
+import 'package:flutter/gestures.dart'; // Added for PointerDeviceKind
 import 'package:iboard_app/models/announcement_model.dart';
 import 'package:iboard_app/pages/fullscreen_ads_page.dart';
 import 'package:iboard_app/pages/mainscreen_page.dart';
@@ -104,15 +104,25 @@ class MainPageState extends State<MainPage> {
       setState(() {
         _isAdsDialogOpen = false;
       });
-      // 關閉全屏廣告彈窗後，自動切換到手動操作狀態
+      // 🔧 修復：只有在真正由用戶關閉時才切換到手動操作狀態
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted) {
           final carouselProvider = context.read<CarouselStateProvider>();
           final wasInFullscreenAd =
               carouselProvider.currentAppState == AppState.fullscreenAd;
-          carouselProvider.enterManualOperation();
-          if (wasInFullscreenAd) {
-            Logger().i('🔄 通過showAdsDialog關閉全屏廣告，自動切換到手動操作狀態');
+
+          // 🔧 重要修復：檢查當前狀態，如果已經是默認狀態說明是定時器自動退出
+          if (carouselProvider.currentAppState == AppState.defaultState) {
+            Logger().i('🔄 全屏廣告已自動退出到默認狀態，保持默認狀態不變');
+
+            // 通知通告轮播提供者回到主屏幕
+            final announcementCarouselProvider =
+                context.read<AnnouncementCarouselProvider>();
+            announcementCarouselProvider.jumpToAnnouncementIndex(0);
+          } else if (wasInFullscreenAd) {
+            // 只有仍在全屏廣告狀態時才認為是用戶手動關閉
+            Logger().i('🔄 用戶手動關閉全屏廣告，切換到手動操作狀態');
+            carouselProvider.enterManualOperation();
 
             // 通知通告轮播提供者回到主屏幕
             final announcementCarouselProvider =
@@ -121,9 +131,6 @@ class MainPageState extends State<MainPage> {
           }
         }
       });
-
-      // Fullscreen ad dialog closed log (always available)
-      log('Fullscreen ad dialog closed');
     });
   }
 
@@ -141,7 +148,7 @@ class MainPageState extends State<MainPage> {
       if (wasInFullscreenAd) {
         WidgetsBinding.instance.addPostFrameCallback((_) {
           if (mounted) {
-            Logger().i('🔄 通過closeAdsDialog關閉全屏廣告，自動切換到手動操作狀態');
+            debugPrint('� [MainPage] 通過closeAdsDialog關閉全屏廣告，自動切換到手動操作狀態');
             carouselProvider.enterManualOperation();
 
             // 通知通告轮播提供者回到主屏幕
@@ -179,15 +186,8 @@ class MainPageState extends State<MainPage> {
             child: Listener(
               onPointerDown: (PointerDownEvent event) {
                 // 檢測到按下後，調用用戶交互方法
-                // 使用 addPostFrameCallback 延迟执行，避免在构建过程中调用 setState()
-                WidgetsBinding.instance.addPostFrameCallback((_) {
-                  if (mounted) {
-                    carouselState.onUserInteraction();
-                    // User interaction detected log (always available)
-                    // print('User interaction detected');
-                    // print(carouselState.getStateDescription());
-                  }
-                });
+                carouselState.onUserInteraction();
+                debugPrint('[main_page] 🖱️ 檢測到用戶交互');
               },
               child: const AnnouncementPage(),
             ),

@@ -284,7 +284,8 @@ class _TimerDebugWidgetState extends State<TimerDebugWidget> {
     content.add('当前应用状态: ${carouselStateProvider.currentAppState.name}');
     content.add('全屏广告时长: ${carouselStateProvider.fullscreenAdDuration}秒');
     content.add('手动操作超时: ${carouselStateProvider.manualOperationTimeout}秒');
-    content.add('空闲时长: ${carouselStateProvider.noActivityTimeout}秒');
+    content.add(
+        '空闲时长: ${carouselStateProvider.announcementCarouselToFullAdsCarouselDuration}秒');
 
     // 通告轮播状态
     content.add(
