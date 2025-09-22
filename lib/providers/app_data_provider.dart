@@ -100,10 +100,8 @@ class AppDataProvider extends ChangeNotifier {
 
           // 通知聽眾緩存數據已加載
           notifyListeners();
-          _logger.i('✅ 構造時成功加載緩存的設備數據');
         }
       } catch (e) {
-        _logger.w('⚠️ 構造時加載緩存數據失敗: $e');
         // 不設置錯誤狀態，因為這只是預加載
       }
     });
@@ -165,11 +163,17 @@ class AppDataProvider extends ChangeNotifier {
       try {
         await initializeAndLogin();
       } catch (loginError) {
+        _logger.w('⚠️ [应用初始化] 设备登录失败，尝试从缓存加载数据', error: loginError);
+
         // 登录失败，尝试从缓存加载数据
         await _loadFromCacheAsFallback();
+
+        if (_settingsModel == null) {
+          // 缓存中也没有可用的设备数据
+        }
       }
     } catch (e) {
-      _logger.e('应用初始化过程中发生异常', error: e);
+      _logger.e('❌ [应用初始化] 应用初始化过程中发生异常', error: e);
 
       // 即使发生异常，也尝试从缓存加载数据作为最后的备选方案
       try {
@@ -178,7 +182,6 @@ class AppDataProvider extends ChangeNotifier {
           _error = 'Application initialization failed: $e';
         }
       } catch (cacheError) {
-        _logger.e('缓存备选方案也失败', error: cacheError);
         _error = 'Application initialization failed: $e';
       }
     }
@@ -187,6 +190,9 @@ class AppDataProvider extends ChangeNotifier {
     await _loadValidatedSettingsFromCacheAndApply();
 
     _isLoading = false;
+
+    // 初始化完成
+
     notifyListeners();
   }
 
@@ -339,8 +345,6 @@ class AppDataProvider extends ChangeNotifier {
   /// 11，验证并持久化Settings配置 - 确保所有时间字段都有合理的默认值
   Future<void> _validateAndPersistSettings(Settings settings) async {
     try {
-      _logger.i('🔧 [设置验证] 开始验证和持久化Settings配置');
-
       // 创建验证后的Settings对象，确保所有字段都有合理的默认值
       final validatedSettings = Settings(
         arrearageUpdateDuration: settings.arrearageUpdateDuration > 0
@@ -357,9 +361,6 @@ class AppDataProvider extends ChangeNotifier {
         advertisementPlayDuration: settings.advertisementPlayDuration > 0
             ? settings.advertisementPlayDuration
             : 10,
-        noticePlayDuration:
-            settings.noticePlayDuration > 0 ? settings.noticePlayDuration : 15,
-        spareDuration: settings.spareDuration > 0 ? settings.spareDuration : 30,
         noticeStayDuration:
             settings.noticeStayDuration > 0 ? settings.noticeStayDuration : 5,
         bottomCarouselDuration: settings.bottomCarouselDuration > 0
@@ -376,6 +377,9 @@ class AppDataProvider extends ChangeNotifier {
             settings.announcementCarouselToFullAdsCarouselDuration > 0
                 ? settings.announcementCarouselToFullAdsCarouselDuration
                 : 5,
+        printPassWord: (settings.printPassWord.isNotEmpty)
+            ? settings.printPassWord
+            : '1090119',
       );
 
       // 检查是否有字段被修正为默认值
@@ -394,12 +398,6 @@ class AppDataProvider extends ChangeNotifier {
       }
       if (settings.advertisementPlayDuration == 0) {
         corrections.add('advertisementPlayDuration: 0 -> 10');
-      }
-      if (settings.noticePlayDuration == 0) {
-        corrections.add('noticePlayDuration: 0 -> 15');
-      }
-      if (settings.spareDuration == 0) {
-        corrections.add('spareDuration: 0 -> 30');
       }
       if (settings.noticeStayDuration == 0) {
         corrections.add('noticeStayDuration: 0 -> 5');
@@ -442,8 +440,6 @@ class AppDataProvider extends ChangeNotifier {
         'advertisementUpdateDuration': settings.advertisementUpdateDuration,
         'appUpdateDuration': settings.appUpdateDuration,
         'advertisementPlayDuration': settings.advertisementPlayDuration,
-        'noticePlayDuration': settings.noticePlayDuration,
-        'spareDuration': settings.spareDuration,
         'noticeStayDuration': settings.noticeStayDuration,
         'bottomCarouselDuration': settings.bottomCarouselDuration,
         'paymentTableOnePageDuration': settings.paymentTableOnePageDuration,
@@ -451,6 +447,7 @@ class AppDataProvider extends ChangeNotifier {
             settings.normalToAnnouncementCarouselDuration,
         'announcementCarouselToFullAdsCarouselDuration':
             settings.announcementCarouselToFullAdsCarouselDuration,
+        'printPassWord': settings.printPassWord,
         'lastUpdated': DateTime.now().toIso8601String(),
       };
 
@@ -492,8 +489,6 @@ class AppDataProvider extends ChangeNotifier {
           appUpdateDuration: settingsData['appUpdateDuration'] ?? 60,
           advertisementPlayDuration:
               settingsData['advertisementPlayDuration'] ?? 10,
-          noticePlayDuration: settingsData['noticePlayDuration'] ?? 15,
-          spareDuration: settingsData['spareDuration'] ?? 30,
           noticeStayDuration: settingsData['noticeStayDuration'] ?? 5,
           bottomCarouselDuration: settingsData['bottomCarouselDuration'] ?? 10,
           paymentTableOnePageDuration:
@@ -503,12 +498,13 @@ class AppDataProvider extends ChangeNotifier {
           announcementCarouselToFullAdsCarouselDuration:
               settingsData['announcementCarouselToFullAdsCarouselDuration'] ??
                   5,
+          printPassWord: settingsData['printPassWord'] ?? '1090119',
         );
 
         return settings;
       }
     } catch (e) {
-      _logger.e('🔧 [设置缓存] 从缓存加载Settings配置失败', error: e);
+      // 从缓存加载Settings配置失败
     }
     return null;
   }
@@ -574,21 +570,39 @@ class AppDataProvider extends ChangeNotifier {
       _logger.e('Initial login failed',
           error: e, stackTrace: e.errorData is StackTrace ? e.errorData : null);
 
-      // 15.4，检查是否是设备ID无效错误
+      // 15.4，检查是否是设备ID无效错误（增强错误检测逻辑）
       bool isInvalidDeviceIdError = false;
-      if (e.statusCode == 400) {
+
+      // 扩展状态码检查范围（400, 404, 422等）
+      if (e.statusCode == 400 || e.statusCode == 404 || e.statusCode == 422) {
         String errorMessage = '';
+        String errorType = '';
+
+        // 从错误数据中提取错误信息
         if (e.errorData is Map) {
-          errorMessage = e.errorData['message']?.toString() ?? '';
+          final errorData = e.errorData as Map;
+          errorMessage = errorData['message']?.toString() ?? '';
+          errorType = errorData['error']?.toString() ?? '';
         } else if (e.message.isNotEmpty) {
           errorMessage = e.message;
         }
-        isInvalidDeviceIdError =
-            errorMessage.toLowerCase().contains('invalid device id') ||
-                errorMessage.toLowerCase().contains('device not found') ||
-                errorMessage.toLowerCase().contains('device id not found') ||
-                errorMessage.toLowerCase().contains('设备不存在') ||
-                errorMessage.toLowerCase().contains('设备id无效');
+
+        // 合并错误消息和错误类型进行检查
+        final fullErrorText = '$errorType $errorMessage'.toLowerCase();
+
+        // 增强的错误匹配逻辑
+        isInvalidDeviceIdError = fullErrorText.contains('invalid device id') ||
+            fullErrorText.contains('device not found') ||
+            fullErrorText.contains('device id not found') ||
+            fullErrorText
+                .contains('record not found') || // 🔧 新增：record not found 检查
+            fullErrorText.contains('设备不存在') ||
+            fullErrorText.contains('设备id无效') ||
+            fullErrorText.contains('设备未找到') ||
+            fullErrorText.contains('未找到设备') ||
+            (fullErrorText.contains('record') &&
+                fullErrorText.contains('not') &&
+                fullErrorText.contains('found')); // 更宽泛的record not found检查
       }
 
       if (isInvalidDeviceIdError) {
@@ -601,7 +615,6 @@ class AppDataProvider extends ChangeNotifier {
               await _apiClient.login(deviceId: loginDeviceId);
           try {
             _settingsModel = SettingsModel.fromJson(retryResponseData);
-            _logger.i('Login successful after device registration.');
           } catch (parseError) {
             _logger.e('Failed to parse retry login response data',
                 error: parseError);
@@ -631,8 +644,7 @@ class AppDataProvider extends ChangeNotifier {
 
           _error = null;
         } catch (registrationError) {
-          _logger.e('Device registration or retry login failed',
-              error: registrationError);
+          _logger.e('❌ [设备注册] 设备注册或重试登录失败', error: registrationError);
           _error = 'Device registration failed: $registrationError';
           _settingsModel = backupSettingsModel;
           if (backupSettingsModel?.token != null) {
@@ -819,9 +831,19 @@ class AppDataProvider extends ChangeNotifier {
         buildingId: 20, // 固定值
       );
     } catch (e, stackTrace) {
-      _logger.e('Device registration failed for deviceId: $deviceId',
+      _logger.e('❌ [设备注册] 设备注册失败，设备ID: $deviceId',
           error: e, stackTrace: stackTrace);
-      throw Exception('Failed to register device: $e');
+
+      // 提供更详细的错误信息
+      String detailedError = 'Failed to register device: $e';
+      if (e.toString().contains('admin')) {
+        detailedError = '管理员登录失败，请检查管理员凭据: $e';
+      } else if (e.toString().contains('create') ||
+          e.toString().contains('device')) {
+        detailedError = '设备创建失败，可能设备ID已存在或服务器错误: $e';
+      }
+
+      throw Exception(detailedError);
     }
   }
 
@@ -859,7 +881,6 @@ class AppDataProvider extends ChangeNotifier {
       // 构建投诉二维码的目标URL
       final targetUrl =
           'https://ismart.legend-in.com.hk/blg_cs_public/$ismartId';
-      _logger.i('🔗 投诉二维码目标URL: $targetUrl');
 
       // 使用本地二维码生成工具
       final qrCodeUtil = QrCodeUtil();
@@ -993,7 +1014,7 @@ class AppDataProvider extends ChangeNotifier {
       _cachedComplaintQrCode = prefs.getString(_complaintQrCodeKey);
       _cachedRegistrationQrCode = prefs.getString(_registrationQrCodeKey);
     } catch (e) {
-      debugPrint('从缓存加载二维码失败: $e');
+      debugPrint('[AppDataProvider] ❌ 从缓存加载二维码路径失败: $e');
     }
   }
 
@@ -1017,7 +1038,6 @@ class AppDataProvider extends ChangeNotifier {
           generateComplaintQrCode().timeout(
             const Duration(seconds: 30),
             onTimeout: () {
-              debugPrint('⚠️ 投訴二維碼生成超時（30秒）');
               return;
             },
           ),
@@ -1030,7 +1050,6 @@ class AppDataProvider extends ChangeNotifier {
           generateRegistrationQrCode().timeout(
             const Duration(seconds: 30),
             onTimeout: () {
-              debugPrint('⚠️ 登記二維碼生成超時（30秒）');
               return;
             },
           ),
@@ -1054,7 +1073,6 @@ class AppDataProvider extends ChangeNotifier {
       _cachedComplaintQrCode = null;
       _cachedRegistrationQrCode = null;
 
-      _logger.i('🗑️ 二维码缓存已清除');
       notifyListeners();
     } catch (e) {
       _logger.e('❌ 清除二维码缓存失败', error: e);
@@ -1092,11 +1110,13 @@ class AppDataProvider extends ChangeNotifier {
     }
 
     _isPeriodicLoginActive = true;
+    debugPrint('[AppDataProvider] ⏰ 启动定时登录任务，间隔: ${_loginIntervalHours}小时');
 
     // 设置定时器进行周期性登录
     _loginTimer = Timer.periodic(const Duration(hours: _loginIntervalHours),
         (timer) async {
       if (_isPeriodicLoginActive && _deviceId != null) {
+        debugPrint('[AppDataProvider] 🔄 执行定时登录任务');
         final loginSuccess = await _safeLogin(context: '定时登录');
         if (loginSuccess) {
           // 定时登录成功后，刷新设置以确保配置是最新的
@@ -1115,6 +1135,7 @@ class AppDataProvider extends ChangeNotifier {
       _loginTimer = null;
     }
     _isPeriodicLoginActive = false;
+    debugPrint('[AppDataProvider] ⏹️ 停止定时登录任务');
   }
 
   /// 34，开始健康检查定时任务
@@ -1124,11 +1145,14 @@ class AppDataProvider extends ChangeNotifier {
     }
 
     _isPeriodicHealthCheckActive = true;
+    debugPrint(
+        '[AppDataProvider] ⏰ 启动健康检查定时任务，间隔: ${_healthCheckIntervalMinutes}分钟');
 
     // 设置定时器进行周期性健康检查
     _healthCheckTimer = Timer.periodic(
         const Duration(minutes: _healthCheckIntervalMinutes), (timer) async {
       if (_isPeriodicHealthCheckActive && isLoggedIn) {
+        debugPrint('[AppDataProvider] 🔄 执行定时健康检查任务');
         await performHealthCheck();
       } else {
         if (!_isPeriodicHealthCheckActive) {
@@ -1150,13 +1174,12 @@ class AppDataProvider extends ChangeNotifier {
       _healthCheckTimer = null;
     }
     _isPeriodicHealthCheckActive = false;
-    _logger.i('Periodic health check stopped.');
+    debugPrint('[AppDataProvider] ⏹️ 停止健康检查定时任务');
   }
 
   /// 36，执行健康检查
   Future<void> performHealthCheck() async {
     if (!isLoggedIn) {
-      _logger.w('Device not logged in, cannot perform health check');
       _lastHealthCheckResult = '设备未登录，无法执行健康检查';
       _lastHealthCheckTime = DateTime.now();
       notifyListeners();
@@ -1218,22 +1241,15 @@ class AppDataProvider extends ChangeNotifier {
     try {
       final prefs = await SharedPreferences.getInstance();
       final keys = prefs.getKeys();
-      _logger.i('SharedPreferences中的所有键: ${keys.toList()}');
-
       for (final key in keys) {
         try {
-          final value = prefs.get(key);
-          final valueStr = value.toString();
-          final truncated = valueStr.length > 100
-              ? '${valueStr.substring(0, 100)}...'
-              : valueStr;
-          _logger.d('键: $key, 值类型: ${value.runtimeType}, 值预览: $truncated');
+          prefs.get(key);
         } catch (e) {
-          _logger.w('无法读取键 $key 的值: $e');
+          debugPrint('[AppDataProvider] ❌ 获取SharedPreferences键失败: $e');
         }
       }
     } catch (e) {
-      _logger.e('获取SharedPreferences键失败', error: e);
+      debugPrint('[AppDataProvider] ❌ 获取所有SharedPreferences键失败: $e');
     }
   }
 
@@ -1276,8 +1292,6 @@ class AppDataProvider extends ChangeNotifier {
       _error = null;
       return true;
     } catch (e) {
-      _logger.e('登录失败，保持原有数据状态', error: e);
-
       // 恢复原有的设置模型，不清除缓存数据
       _settingsModel = backupSettingsModel;
 
@@ -1338,9 +1352,6 @@ class AppDataProvider extends ChangeNotifier {
       advertisementPlayDuration: settings.advertisementPlayDuration > 0
           ? settings.advertisementPlayDuration
           : 10,
-      noticePlayDuration:
-          settings.noticePlayDuration > 0 ? settings.noticePlayDuration : 15,
-      spareDuration: settings.spareDuration > 0 ? settings.spareDuration : 30,
       noticeStayDuration:
           settings.noticeStayDuration > 0 ? settings.noticeStayDuration : 5,
       bottomCarouselDuration: settings.bottomCarouselDuration > 0
@@ -1357,6 +1368,9 @@ class AppDataProvider extends ChangeNotifier {
           settings.announcementCarouselToFullAdsCarouselDuration > 0
               ? settings.announcementCarouselToFullAdsCarouselDuration
               : 5,
+      printPassWord: (settings.printPassWord.isNotEmpty)
+          ? settings.printPassWord
+          : '1090119',
     );
   }
 }

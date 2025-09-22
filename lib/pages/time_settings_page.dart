@@ -40,7 +40,6 @@ class TimeSettingsPageState extends State<TimeSettingsPage> {
           await appDataProvider.initializeFromCache();
         } catch (e) {
           // 靜默失敗，不影響用戶體驗
-          debugPrint('📱 時間設定頁面：嘗試加載緩存數據失敗: $e');
         }
       }
     });
@@ -365,16 +364,6 @@ class TimeSettingsPageState extends State<TimeSettingsPage> {
                                     _buildTimeSettingRow(
                                       '廣告播放時長',
                                       '${deviceSettings.advertisementPlayDuration}秒',
-                                    ),
-                                    const SizedBox(height: 12),
-                                    _buildTimeSettingRow(
-                                      '通告播放時長',
-                                      '${deviceSettings.noticePlayDuration}秒',
-                                    ),
-                                    const SizedBox(height: 12),
-                                    _buildTimeSettingRow(
-                                      '空閒時長',
-                                      '${deviceSettings.spareDuration}秒',
                                     ),
                                     const SizedBox(height: 12),
                                     _buildTimeSettingRow(

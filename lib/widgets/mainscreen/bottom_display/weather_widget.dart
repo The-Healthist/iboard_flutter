@@ -154,19 +154,52 @@ class WeatherWidgetState extends State<WeatherWidget> {
 
   ///7，构建天气警告组件
   Widget _buildWeatherWarningWidget(WeatherWarningModel? warningData) {
-    if (warningData == null || warningData.warnings.isEmpty) {
-      return const SizedBox.shrink();
+    List<Widget> warningWidgets = [];
+
+    // 添加實際的天氣警告數據
+    if (warningData != null && warningData.warnings.isNotEmpty) {
+      final warnings = warningData.warnings;
+      final warningEntries = warnings.entries.toList();
+
+      warningWidgets.addAll(warningEntries.map((entry) {
+        return _buildWarningRow(entry.key, entry.value);
+      }).toList());
     }
 
-    final warnings = warningData.warnings;
-    final warningEntries = warnings.entries.toList();
+    // 8, 固定添加測試用的新界北部水浸特別報告警告信號 (已註釋)
+    // final testWarningInfo1 = WeatherWarningInfo(
+    //   name: "新界北部水浸特別報告",
+    //   code: "WFNTSA",
+    //   actionCode: "ISSUE",
+    //   type: "", // 根據實際需要設置
+    //   issueTime: "2020-09-24T11:40:00+08:00",
+    //   updateTime: "2020-09-24T11:40:00+08:00",
+    // );
+
+    // warningWidgets.add(_buildWarningRow("WFNTSA", testWarningInfo1));
+
+    // 9, 固定添加測試用的熱帶氣旋警告信號
+    // 10, 固定添加測試用的黃色暴雨警告信號 (已註釋)
+    // final testWarningInfo3 = WeatherWarningInfo(
+    //   name: "暴雨警告信號",
+    //   code: "WRAINA",
+    //   actionCode: "ISSUE",
+    //   type: "黃色",
+    //   issueTime: "2020-09-24T09:30:00+08:00",
+    //   updateTime: "2020-09-24T09:30:00+08:00",
+    // );
+
+    // warningWidgets.add(_buildWarningRow("WRAIN", testWarningInfo3));
+
+    // 如果沒有任何警告（包括測試警告），返回空組件
+    if (warningWidgets.isEmpty) {
+      return const SizedBox.shrink();
+    }
 
     return Column(
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.center,
-      children: warningEntries.map((entry) {
-        return _buildWarningRow(entry.key, entry.value);
-      }).toList(),
+      children: warningWidgets,
     );
   }
 
@@ -177,8 +210,8 @@ class WeatherWidgetState extends State<WeatherWidget> {
         warningKey, warningInfo.code, warningInfo.type);
     final iconPath =
         WeatherIconUtil.getWeatherWarningIconPathByCode(warningInfo.code);
-    const double fontSize = 13.0;
-    const double iconSize = 15.0;
+    const double fontSize = 15.0;
+    const double iconSize = 45.0;
 
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 1.0),

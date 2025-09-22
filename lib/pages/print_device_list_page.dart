@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:iboard_app/utils/wifi_printer_service.dart';
 import 'package:iboard_app/providers/printer_provider.dart';
@@ -25,6 +26,9 @@ class PrintDeviceListPageState extends State<PrintDeviceListPage> {
   List<PrinterDevice> _printers = [];
   bool _isLoading = true;
   String? _error;
+
+  /// 0, 掃描超時秒數
+  static const int _scanTimeoutSeconds = 3;
 
   @override
   void initState() {
@@ -54,9 +58,17 @@ class PrintDeviceListPageState extends State<PrintDeviceListPage> {
         await _printerProvider!.refreshPrinterStatus();
         printers = _printerProvider!.printers;
 
-        // 如果沒有已保存的列印機，掃描新的
+        // 如果沒有已保存的列印機，掃描新的（加入超時）
         if (printers.isEmpty) {
-          printers = await _printerService.getAvailablePrinters();
+          try {
+            printers = await _printerService
+                .getAvailablePrinters()
+                .timeout(const Duration(seconds: _scanTimeoutSeconds));
+          } on TimeoutException {
+            _logger.w('🕒 掃描可用列印機超時(${_scanTimeoutSeconds}s)');
+            printers = [];
+          }
+
           // 將掃描到的列印機保存到提供者
           for (final printer in printers) {
             await _printerProvider!.addPrinter(printer);
@@ -1230,6 +1242,16 @@ class PrintDeviceListPageState extends State<PrintDeviceListPage> {
                         style: TextStyle(
                           fontSize: 14,
                           color: Colors.grey.shade600,
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      ElevatedButton.icon(
+                        onPressed: _showNewAddPrinterDialog,
+                        icon: const Icon(Icons.add),
+                        label: const Text('添加列印機'),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.blue.shade600,
+                          foregroundColor: Colors.white,
                         ),
                       ),
                     ],

@@ -248,6 +248,8 @@ class AdvertisementProvider extends ChangeNotifier {
             5; // 默认5分钟
     final updateIntervalSeconds = updateIntervalMinutes * 60; // 转换为秒
     _isPeriodicUpdateActive = true;
+    debugPrint(
+        '[AdvertisementProvider] ⏰ 启动广告数据定时更新，间隔: ${updateIntervalSeconds}秒');
 
     // 立即执行一次更新
     fetchAdvertisements();
@@ -256,6 +258,7 @@ class AdvertisementProvider extends ChangeNotifier {
     _updateTimer =
         Timer.periodic(Duration(seconds: updateIntervalSeconds), (timer) {
       if (_isPeriodicUpdateActive) {
+        debugPrint('[AdvertisementProvider] 🔄 执行定时广告数据更新');
         fetchAdvertisements();
       } else {
         timer.cancel();
@@ -270,6 +273,7 @@ class AdvertisementProvider extends ChangeNotifier {
       _updateTimer = null;
     }
     _isPeriodicUpdateActive = false;
+    debugPrint('[AdvertisementProvider] ⏹️ 停止广告数据定时更新');
   }
 
   /// 重新初始化Provider（当依赖变化时调用）

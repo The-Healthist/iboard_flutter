@@ -316,4 +316,3 @@ class AddPrinterDialogState extends State<AddPrinterDialog> {
     );
   }
 }
-

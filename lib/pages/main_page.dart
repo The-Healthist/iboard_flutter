@@ -148,7 +148,7 @@ class MainPageState extends State<MainPage> {
       if (wasInFullscreenAd) {
         WidgetsBinding.instance.addPostFrameCallback((_) {
           if (mounted) {
-            debugPrint('� [MainPage] 通過closeAdsDialog關閉全屏廣告，自動切換到手動操作狀態');
+            debugPrint('[MainPage] 通過closeAdsDialog關閉全屏廣告，自動切換到手動操作狀態');
             carouselProvider.enterManualOperation();
 
             // 通知通告轮播提供者回到主屏幕

@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:iboard_app/utils/wifi_printer_service.dart';
 import 'package:iboard_app/providers/printer_provider.dart';
@@ -6,6 +7,7 @@ import 'package:iboard_app/models/announcement_model.dart';
 import 'package:provider/provider.dart';
 import 'package:logger/logger.dart';
 import 'package:printing/printing.dart';
+import 'package:iboard_app/providers/app_data_provider.dart';
 
 /// 簡化版列印對話框
 class SimplePrintDialog extends StatefulWidget {
@@ -29,6 +31,8 @@ class SimplePrintDialogState extends State<SimplePrintDialog> {
   List<PrinterDevice> _printers = [];
   PrinterDevice? _selectedPrinter;
   bool _isLoading = true;
+  final TextEditingController _codeController = TextEditingController();
+  bool _hasCodeError = false;
 
   @override
   void initState() {
@@ -36,24 +40,43 @@ class SimplePrintDialogState extends State<SimplePrintDialog> {
     _printerProvider = Provider.of<PrinterProvider>(context, listen: false);
     _initializeDialog();
 
-    // 10秒後自動關閉對話框
-    Future.delayed(const Duration(seconds: 10), () {
+    // 20秒後自動關閉對話框
+    Future.delayed(const Duration(seconds: 20), () {
       if (mounted && Navigator.of(context).canPop()) {
         Navigator.of(context).pop();
       }
     });
   }
 
+  @override
+  void dispose() {
+    _codeController.dispose();
+    super.dispose();
+  }
+
   /// 1, 初始化對話框
   Future<void> _initializeDialog() async {
     try {
       if (_printerProvider != null) {
-        await _printerProvider!.initialize();
+        // 初始化與刷新各自加入 3s 超時
+        try {
+          await _printerProvider!
+              .initialize()
+              .timeout(const Duration(seconds: 3));
+        } on TimeoutException {
+          _logger.w('🕒 列印對話框: 初始化超時 (3s)');
+        }
         _printers = _printerProvider!.printers;
         _selectedPrinter = _printerProvider!.defaultPrinter;
 
         if (_printers.isEmpty) {
-          await _printerProvider!.refreshPrinterStatus();
+          try {
+            await _printerProvider!
+                .refreshPrinterStatus()
+                .timeout(const Duration(seconds: 3));
+          } on TimeoutException {
+            _logger.w('🕒 列印對話框: 刷新列印機狀態超時 (3s)');
+          }
           _printers = _printerProvider!.printers;
           _selectedPrinter = _printerProvider!.defaultPrinter;
         }
@@ -61,6 +84,16 @@ class SimplePrintDialogState extends State<SimplePrintDialog> {
 
       setState(() {
         _isLoading = false;
+        // 掃描完成後，若當前選中不在列表中，糾正為默認或空
+        if (!_printers.any(
+            (p) => identical(p, _selectedPrinter) || p == _selectedPrinter)) {
+          _selectedPrinter = _printerProvider?.defaultPrinter;
+          if (_selectedPrinter != null &&
+              !_printers.any((p) =>
+                  identical(p, _selectedPrinter) || p == _selectedPrinter)) {
+            _selectedPrinter = null;
+          }
+        }
       });
 
       _logger.i('🖨️ 簡化列印對話框初始化完成，載入 ${_printers.length} 個列印機');
@@ -72,14 +105,29 @@ class SimplePrintDialogState extends State<SimplePrintDialog> {
     }
   }
 
-  /// 2, 開始列印 - 直接調用系統列印服務
+  /// 2, 開始列印 - 校驗列印碼後調用系統列印服務
   Future<void> _startPrint() async {
     if (widget.localFilePath == null) {
-      _showErrorDialog('文件未準備就緒，請稍後再試');
+      // 內聯錯誤顯示：維持當前對話框
+      setState(() {
+        _hasCodeError = true;
+      });
       return;
     }
 
     try {
+      final expected = Provider.of<AppDataProvider>(context, listen: false)
+              .deviceSettings
+              ?.printPassWord ??
+          '1090119';
+      final input = _codeController.text.trim();
+      if (input.isEmpty || input != expected) {
+        setState(() {
+          _hasCodeError = true;
+        });
+        return;
+      }
+
       // 關閉當前對話框
       Navigator.of(context).pop();
 
@@ -127,31 +175,44 @@ class SimplePrintDialogState extends State<SimplePrintDialog> {
   @override
   Widget build(BuildContext context) {
     return Dialog(
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(8),
+      ),
       child: Container(
         width: 400,
-        constraints: const BoxConstraints(maxHeight: 400),
+        constraints: const BoxConstraints(maxHeight: 460),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
             // 標題欄
             Container(
               padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: Theme.of(context).primaryColor,
-                borderRadius: const BorderRadius.only(
-                  topLeft: Radius.circular(4),
-                  topRight: Radius.circular(4),
+              decoration: const BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.only(
+                  topLeft: Radius.circular(8),
+                  topRight: Radius.circular(8),
                 ),
               ),
-              child: const Row(
+              child: Row(
                 children: [
-                  Icon(Icons.print, color: Colors.white),
-                  SizedBox(width: 8),
-                  Expanded(
+                  Container(
+                    width: 28,
+                    height: 28,
+                    decoration: BoxDecoration(
+                      color: Theme.of(context).primaryColor,
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Center(
+                      child: Icon(Icons.print, color: Colors.white, size: 16),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  const Expanded(
                     child: Text(
                       '列印文件',
                       style: TextStyle(
-                        color: Colors.white,
+                        color: Colors.black,
                         fontSize: 18,
                         fontWeight: FontWeight.w600,
                       ),
@@ -170,150 +231,221 @@ class SimplePrintDialogState extends State<SimplePrintDialog> {
                     )
                   : Padding(
                       padding: const EdgeInsets.all(20),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          // 文件信息
-                          Container(
-                            padding: const EdgeInsets.all(12),
-                            decoration: BoxDecoration(
-                              color: Colors.grey.shade100,
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                            child: Row(
-                              children: [
-                                const Icon(Icons.picture_as_pdf,
-                                    color: Colors.red, size: 24),
-                                const SizedBox(width: 12),
-                                Expanded(
-                                  child: Column(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.start,
-                                    children: [
-                                      Text(
-                                        widget.announcement.title,
-                                        style: const TextStyle(
-                                          fontWeight: FontWeight.w600,
-                                          fontSize: 14,
-                                        ),
-                                        maxLines: 2,
-                                        overflow: TextOverflow.ellipsis,
-                                      ),
-                                      const SizedBox(height: 4),
-                                      Text(
-                                        'PDF 文件',
-                                        style: TextStyle(
-                                          color: Colors.grey.shade600,
-                                          fontSize: 12,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-
-                          const SizedBox(height: 20),
-
-                          // 打印機選擇
-                          const Text(
-                            '選擇列印機:',
-                            style: TextStyle(
-                              fontWeight: FontWeight.w600,
-                              fontSize: 14,
-                            ),
-                          ),
-                          const SizedBox(height: 8),
-
-                          Container(
-                            width: double.infinity,
-                            padding: const EdgeInsets.symmetric(horizontal: 12),
-                            decoration: BoxDecoration(
-                              border: Border.all(color: Colors.grey.shade300),
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                            child: DropdownButton<PrinterDevice>(
-                              value: _selectedPrinter,
-                              hint: const Text('請選擇列印機'),
-                              isExpanded: true,
-                              underline: const SizedBox(),
-                              items: _printers.map((printer) {
-                                return DropdownMenuItem<PrinterDevice>(
-                                  value: printer,
-                                  child: Row(
-                                    children: [
-                                      Icon(
-                                        Icons.print,
-                                        color: printer.isConnected
-                                            ? Colors.green
-                                            : Colors.grey,
-                                        size: 18,
-                                      ),
-                                      const SizedBox(width: 8),
-                                      Expanded(
-                                        child: Text(
-                                          printer.name,
-                                          style: const TextStyle(fontSize: 14),
-                                        ),
-                                      ),
-                                      if (!printer.isConnected)
-                                        Container(
-                                          padding: const EdgeInsets.symmetric(
-                                              horizontal: 6, vertical: 2),
-                                          decoration: BoxDecoration(
-                                            color: Colors.red.shade100,
-                                            borderRadius:
-                                                BorderRadius.circular(4),
-                                          ),
-                                          child: Text(
-                                            '離線',
-                                            style: TextStyle(
-                                              color: Colors.red.shade700,
-                                              fontSize: 10,
-                                            ),
-                                          ),
-                                        ),
-                                    ],
-                                  ),
-                                );
-                              }).toList(),
-                              onChanged: (value) {
-                                setState(() {
-                                  _selectedPrinter = value;
-                                });
-                              },
-                            ),
-                          ),
-
-                          // 如果沒有打印機的提示
-                          if (_printers.isEmpty)
+                      child: SingleChildScrollView(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            // 文件信息
                             Container(
-                              margin: const EdgeInsets.only(top: 12),
                               padding: const EdgeInsets.all(12),
                               decoration: BoxDecoration(
-                                color: Colors.blue.shade50,
+                                color: Colors.grey.shade100,
                                 borderRadius: BorderRadius.circular(8),
-                                border: Border.all(color: Colors.blue.shade200),
                               ),
                               child: Row(
                                 children: [
-                                  Icon(Icons.info_outline,
-                                      color: Colors.blue.shade600, size: 16),
-                                  const SizedBox(width: 8),
+                                  const Icon(Icons.picture_as_pdf,
+                                      color: Colors.red, size: 24),
+                                  const SizedBox(width: 12),
                                   Expanded(
-                                    child: Text(
-                                      '未找到列印機，將使用系統列印服務',
-                                      style: TextStyle(
-                                        color: Colors.blue.shade700,
-                                        fontSize: 12,
-                                      ),
+                                    child: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                          widget.announcement.title,
+                                          style: const TextStyle(
+                                            fontWeight: FontWeight.w600,
+                                            fontSize: 14,
+                                          ),
+                                          maxLines: 2,
+                                          overflow: TextOverflow.ellipsis,
+                                        ),
+                                        const SizedBox(height: 4),
+                                        Text(
+                                          'PDF 文件',
+                                          style: TextStyle(
+                                            color: Colors.grey.shade600,
+                                            fontSize: 12,
+                                          ),
+                                        ),
+                                      ],
                                     ),
                                   ),
                                 ],
                               ),
                             ),
-                        ],
+
+                            const SizedBox(height: 20),
+
+                            // 打印機選擇
+                            const Text(
+                              '選擇列印機:',
+                              style: TextStyle(
+                                fontWeight: FontWeight.w600,
+                                fontSize: 14,
+                              ),
+                            ),
+                            const SizedBox(height: 8),
+
+                            Container(
+                              width: double.infinity,
+                              padding:
+                                  const EdgeInsets.symmetric(horizontal: 12),
+                              decoration: BoxDecoration(
+                                border: Border.all(color: Colors.grey.shade300),
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: DropdownButton<PrinterDevice>(
+                                value: _printers.any((p) =>
+                                        identical(p, _selectedPrinter) ||
+                                        p == _selectedPrinter)
+                                    ? _selectedPrinter
+                                    : null,
+                                hint: const Text('請選擇列印機'),
+                                isExpanded: true,
+                                underline: const SizedBox(),
+                                items: _printers.map((printer) {
+                                  return DropdownMenuItem<PrinterDevice>(
+                                    value: printer,
+                                    child: Row(
+                                      children: [
+                                        Container(
+                                          width: 20,
+                                          height: 20,
+                                          decoration: BoxDecoration(
+                                            color: printer.isConnected
+                                                ? Colors.green
+                                                : Colors.grey,
+                                            shape: BoxShape.circle,
+                                          ),
+                                          child: const Center(
+                                            child: Icon(
+                                              Icons.print,
+                                              color: Colors.white,
+                                              size: 12,
+                                            ),
+                                          ),
+                                        ),
+                                        const SizedBox(width: 8),
+                                        Expanded(
+                                          child: Text(
+                                            printer.name,
+                                            style:
+                                                const TextStyle(fontSize: 14),
+                                          ),
+                                        ),
+                                        if (!printer.isConnected)
+                                          Container(
+                                            padding: const EdgeInsets.symmetric(
+                                                horizontal: 6, vertical: 2),
+                                            decoration: BoxDecoration(
+                                              color: Colors.red.shade100,
+                                              borderRadius:
+                                                  BorderRadius.circular(4),
+                                            ),
+                                            child: Text(
+                                              '離線',
+                                              style: TextStyle(
+                                                color: Colors.red.shade700,
+                                                fontSize: 10,
+                                              ),
+                                            ),
+                                          ),
+                                      ],
+                                    ),
+                                  );
+                                }).toList(),
+                                onChanged: (value) {
+                                  setState(() {
+                                    _selectedPrinter = value;
+                                  });
+                                },
+                              ),
+                            ),
+
+                            // 僅在未找到列印機時顯示提示
+                            if (_printers.isEmpty)
+                              Container(
+                                margin: const EdgeInsets.only(top: 2),
+                                padding: const EdgeInsets.all(4),
+                                decoration: BoxDecoration(
+                                  // color: Colors.blue.shade50,
+                                  borderRadius: BorderRadius.circular(8),
+                                  // border: Border.all(color: Colors.blue.shade200),
+                                ),
+                                child: Row(
+                                  children: [
+                                    Icon(Icons.info_outline,
+                                        color: Colors.blue.shade600, size: 16),
+                                    const SizedBox(width: 8),
+                                    Expanded(
+                                      child: Text(
+                                        '未找到列印機，將使用系統列印服務',
+                                        style: TextStyle(
+                                          color: Colors.blue.shade700,
+                                          fontSize: 12,
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+
+                            const SizedBox(height: 16),
+
+                            // 列印碼輸入（移至打印機列表下方）
+                            const Text(
+                              '列印密碼:',
+                              style: TextStyle(
+                                fontWeight: FontWeight.w600,
+                                fontSize: 14,
+                              ),
+                            ),
+                            const SizedBox(height: 8),
+                            TextField(
+                              controller: _codeController,
+                              obscureText: true,
+                              textInputAction: TextInputAction.done,
+                              keyboardType: TextInputType.visiblePassword,
+                              decoration: InputDecoration(
+                                hintText: '請輸入列印碼',
+                                isDense: true,
+                                border: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                // 使用下方自定義錯誤行，不使用內建 errorText
+                              ),
+                              onChanged: (_) {
+                                if (_hasCodeError) {
+                                  setState(() {
+                                    _hasCodeError = false;
+                                  });
+                                }
+                              },
+                            ),
+
+                            SizedBox(
+                              height: 20,
+                              child: Visibility(
+                                visible: _hasCodeError,
+                                maintainSize: true,
+                                maintainAnimation: true,
+                                maintainState: true,
+                                child: Align(
+                                  alignment: Alignment.centerLeft,
+                                  child: Text(
+                                    '請輸入正確的列印密碼',
+                                    style: TextStyle(
+                                      color: Colors.red.shade700,
+                                      fontSize: 14,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
                     ),
             ),
@@ -321,12 +453,13 @@ class SimplePrintDialogState extends State<SimplePrintDialog> {
             // 按鈕區域
             if (!_isLoading)
               Container(
-                padding: const EdgeInsets.all(16),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 6, vertical: 10),
                 decoration: BoxDecoration(
                   color: Colors.grey.shade50,
                   borderRadius: const BorderRadius.only(
-                    bottomLeft: Radius.circular(4),
-                    bottomRight: Radius.circular(4),
+                    bottomLeft: Radius.circular(8),
+                    bottomRight: Radius.circular(8),
                   ),
                 ),
                 child: Row(
@@ -343,7 +476,10 @@ class SimplePrintDialogState extends State<SimplePrintDialog> {
                         backgroundColor: Theme.of(context).primaryColor,
                         foregroundColor: Colors.white,
                         padding: const EdgeInsets.symmetric(
-                            horizontal: 20, vertical: 12),
+                            horizontal: 8, vertical: 10),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
                       ),
                       child: const Row(
                         mainAxisSize: MainAxisSize.min,

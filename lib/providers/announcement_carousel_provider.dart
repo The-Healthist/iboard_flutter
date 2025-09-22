@@ -26,7 +26,6 @@ class AnnouncementCarouselProvider extends ChangeNotifier {
 
   // 状态管理
   bool _isMidCarouselPaused = false;
-  // bool _isShowingArrearQue
   bool _isShowingArrearTable = false;
 
   // 时间记录相关 - 用于全屏广告暂停恢复
@@ -37,21 +36,18 @@ class AnnouncementCarouselProvider extends ChangeNotifier {
   int _currentNoticeIndex = 0; // 当前通告索引
 
   int? _savedCarouselIndex; // 保存進入手動模式前的輪播索引
-  bool _isInManualOperationMode = false; // 標記是否處於手動操作模式
   int? _lastValidCarouselIndex; // 最后有效的轮播索引（不包括主屏幕索引0）
 
   // AppDataProvider引用 - 用于获取动态设置
-  late AppDataProvider _appDataProvider; // AppDataProvider引用
+  late AppDataProvider _appDataProvider;
   late VoidCallback _homeButtonCallback = () {
     // 默认的安全回调，避免应用崩溃
-    debugPrint('[AnnouncementCarousel] ⚠️ 使用默认回调，可能还未设置正确的回调');
-    // 尝试跳转到主屏幕（如果轮播组件已初始化）
     try {
       if (_midCarouselController.widgetCount > 0) {
         jumpToAnnouncementIndex(0);
       }
     } catch (e) {
-      debugPrint('[AnnouncementCarousel] ❌ 默认回调执行失败: $e');
+      debugPrint('[AnnouncementCarousel] ❌ 默认安全回调失败: $e');
     }
   };
 
@@ -115,9 +111,6 @@ class AnnouncementCarouselProvider extends ChangeNotifier {
     final hasManagementData = _arrearProvider?.hasManagementFeeData == true;
     final hasOtherData = _arrearProvider?.hasAnyOtherFeeRecords == true;
 
-    debugPrint(
-        '[AnnouncementCarousel] 🔍 检查轮播内容: widgetCount=$widgetCount, 通告=$hasAnnouncements, 管理费用=$hasManagementData, 其他费用=$hasOtherData');
-
     // 至少需要主屏幕 + 任意一种内容（通告或费用表格）
     return widgetCount >= 2 &&
         (hasAnnouncements || hasManagementData || hasOtherData);
@@ -149,8 +142,6 @@ class AnnouncementCarouselProvider extends ChangeNotifier {
 
     // 🔧 修复：回调设置后，清除缓存的Widget以强制重新创建，确保使用新的回调
     _clearWidgetCacheForHomeButton();
-
-    debugPrint('[AnnouncementCarousel] 🏠 已设置主屏幕按钮回调并清除相关缓存');
   }
 
   ///0，清除涉及返回按钮的Widget缓存（私有辅助方法）
@@ -162,15 +153,12 @@ class AnnouncementCarouselProvider extends ChangeNotifier {
     _widgetCache.removeWhere((key, value) =>
         key.startsWith('management_fee_table_') ||
         key.startsWith('other_fee_table_'));
-
-    debugPrint('[AnnouncementCarousel] 🔄 已清除返回按钮相关Widget缓存');
   }
 
   ///1，更新轮播通告列表（由AnnouncementProvider调用）
   void updateCarouselList(List<AnnouncementModel> newCarouselAnnouncements) {
     // 如果正在初始化，延迟处理更新请求
     if (_isInitializing) {
-      debugPrint('[AnnouncementCarousel] ⏳ 正在初始化中，延迟处理更新请求');
       Future.delayed(const Duration(milliseconds: 100), () {
         if (!_isInitializing) {
           updateCarouselList(newCarouselAnnouncements);
@@ -179,10 +167,6 @@ class AnnouncementCarouselProvider extends ChangeNotifier {
       return;
     }
 
-    try {
-      debugPrint(
-          '[AnnouncementCarousel] 🔔 收到更新請求：傳入通告數=${newCarouselAnnouncements.length}');
-    } catch (_) {}
     // 使用智能增量更新
     _smartUpdateCarousel(newCarouselAnnouncements);
   }
@@ -194,9 +178,6 @@ class AnnouncementCarouselProvider extends ChangeNotifier {
         _carouselAnnouncements, newCarouselAnnouncements);
     final bool arrearPending = _arrearProvider?.hasPendingUpdate == true;
     if (annEqual && !arrearPending) {
-      try {
-        debugPrint('[AnnouncementCarousel] ℹ️ 資料無變更（通告未變且欠費無待更新），跳過重建');
-      } catch (_) {}
       return;
     }
 
@@ -411,7 +392,9 @@ class AnnouncementCarouselProvider extends ChangeNotifier {
 
           widgetMap[arrearTableKey] = _widgetCache[arrearTableKey]!;
           orderedKeys.add(arrearTableKey);
-        } catch (e) {}
+        } catch (e) {
+          debugPrint('[AnnouncementCarousel] ❌ 强制创建缴费表單widget失败: $e');
+        }
       }
     }
 
@@ -427,21 +410,14 @@ class AnnouncementCarouselProvider extends ChangeNotifier {
         // 当前索引无效，需要校正
         int initialIndex = _determineInitialCarouselIndex();
         _currentNoticeIndex = initialIndex;
-        debugPrint(
-            '[AnnouncementCarousel] 📍 当前索引无效，校正到: $_currentNoticeIndex');
 
         // 跳转到校正后的索引
         _midCarouselController.jumpToIndex(_currentNoticeIndex);
-        debugPrint(
-            '[AnnouncementCarousel] 🎯 校正完成，跳转到索引: $_currentNoticeIndex');
       } else {
         // 当前索引有效，保持不变
-        debugPrint('[AnnouncementCarousel] ✅ 保持当前轮播位置: $_currentNoticeIndex');
         // 不进行跳转，保持当前位置
       }
-    } else {
-      debugPrint('[AnnouncementCarousel] ⚠️ 没有轮播内容');
-    }
+    } else {}
 
     notifyListeners();
   }
@@ -453,26 +429,18 @@ class AnnouncementCarouselProvider extends ChangeNotifier {
     final bool hasManagementData =
         _arrearProvider?.hasManagementFeeData == true;
 
-    debugPrint(
-        '[AnnouncementCarousel] 🎯 确定初始索引: 通告=$hasAnnouncements, 其他费用=$hasOtherData, 管理费用=$hasManagementData');
-
     if (hasAnnouncements) {
-      // 有通告的情况，从第一个通告开始
-      debugPrint('[AnnouncementCarousel] 📢 从第一个通告开始: 索引1');
       return 1;
     } else if (hasOtherData && hasManagementData) {
       // 无通告但有两种费用表單，从其他费用表單开始
       final otherIndex = _getFirstArrearTableIndex();
-      debugPrint('[AnnouncementCarousel] 📊 双表模式，从其他费用表單开始: 索引$otherIndex');
       return otherIndex != -1 ? otherIndex : 1;
     } else if (hasManagementData) {
       // 只有管理费用表單，从管理费用表單开始
       final mgmtIndex = _findManagementTableIndex();
-      debugPrint('[AnnouncementCarousel] 📊 只有管理费用表單，从管理表單开始: 索引$mgmtIndex');
       return mgmtIndex != -1 ? mgmtIndex : 1;
     } else {
       // 没有任何内容，从主屏幕开始
-      debugPrint('[AnnouncementCarousel] 🏠 没有轮播内容，从主屏幕开始: 索引0');
       return 0;
     }
   }
@@ -519,12 +487,10 @@ class AnnouncementCarouselProvider extends ChangeNotifier {
   }) {
     // 防止重复初始化
     if (_isInitializing) {
-      debugPrint('[AnnouncementCarousel] 🚫 正在初始化中，跳过重复调用');
       return;
     }
 
     _isInitializing = true;
-    debugPrint('[AnnouncementCarousel] 🚀 开始初始化中部轮播');
 
     try {
       // 保存主頁回调
@@ -546,14 +512,10 @@ class AnnouncementCarouselProvider extends ChangeNotifier {
             _startCarouselFromAnnouncements(apiNoticeStayDuration);
           }
         } else {
-          debugPrint('[AnnouncementCarousel] 🚀 无通告，立即开始费用表格轮播');
           _startCarouselFromFeeTables();
         }
       }
-
-      debugPrint('[AnnouncementCarousel] ✅ 中部轮播初始化完成');
     } catch (e) {
-      debugPrint('[AnnouncementCarousel] ❌ 初始化失败: $e');
     } finally {
       // 确保在任何情况下都能重置初始化标志位
       _isInitializing = false;
@@ -573,12 +535,10 @@ class AnnouncementCarouselProvider extends ChangeNotifier {
 
       _recordValidCarouselIndex(_currentNoticeIndex); // 记录有效索引
 
-      debugPrint(
-          '[AnnouncementCarousel] 🎯 从通告开始轮播，跳转到索引: $_currentNoticeIndex');
       _midCarouselController.jumpToIndex(_currentNoticeIndex);
       _scheduleNextCarousel(apiNoticeStayDuration);
     } catch (e) {
-      debugPrint('[AnnouncementCarousel] ❌ 通告轮播启动失败: $e');
+      debugPrint('[AnnouncementCarousel] ❌ 从通告开始轮播失败: $e');
     }
   }
 
@@ -595,15 +555,9 @@ class AnnouncementCarouselProvider extends ChangeNotifier {
 
       _recordValidCarouselIndex(_currentNoticeIndex); // 记录有效索引
 
-      debugPrint(
-          '[AnnouncementCarousel] 🎯 从费用表格开始轮播，跳转到索引: $_currentNoticeIndex');
       _midCarouselController.jumpToIndex(_currentNoticeIndex);
-
-      // 费用表格不需要定时切换，它们通过翻頁完成自动切换
-      // 所以这里不调用 _scheduleNextCarousel
-      debugPrint('[AnnouncementCarousel] 📊 费用表格轮播已启动，等待翻頁完成触发切换');
     } catch (e) {
-      debugPrint('[AnnouncementCarousel] ❌ 费用表格轮播启动失败: $e');
+      debugPrint('[AnnouncementCarousel] ❌ 从费用表格开始轮播失败: $e');
     }
   }
 
@@ -616,7 +570,7 @@ class AnnouncementCarouselProvider extends ChangeNotifier {
         return;
       }
 
-      // 验证轮播组件状态
+      // 验证轮播组件状态 不需要验证
       if (!isCarouselHealthy) {
         _ensureBasicContent();
         return;
@@ -708,7 +662,6 @@ class AnnouncementCarouselProvider extends ChangeNotifier {
         // 🔧 修复关键问题：检查是否有费用表格正在翻页
         if (_isOtherTablePaginationActive ||
             _isManagementTablePaginationActive) {
-          debugPrint('[AnnouncementCarousel] 📊 费用表格正在翻页，延迟切换');
           // 重新调度，等待费用表格翻页完成
           _scheduleNextCarousel(apiNoticeStayDuration);
           return;
@@ -717,7 +670,6 @@ class AnnouncementCarouselProvider extends ChangeNotifier {
         // 🔧 修复关键问题：当前在费用表格时，不应该由时间触发切换
         // 费用表格有自己的翻页机制，翻页完成后会通过回调触发切换
         if (_isCurrentIndexInArrearTables()) {
-          debugPrint('[AnnouncementCarousel] 📊 当前在费用表格，等待翻页完成触发切换');
           // 重新调度，等待费用表格翻页完成
           _scheduleNextCarousel(apiNoticeStayDuration);
           return;
@@ -735,7 +687,6 @@ class AnnouncementCarouselProvider extends ChangeNotifier {
         if (nextIndex != -1 && nextIndex != _currentNoticeIndex) {
           _currentNoticeIndex = nextIndex;
           _recordValidCarouselIndex(_currentNoticeIndex); // 记录有效索引
-          debugPrint('[AnnouncementCarousel] 🎯 智能切换到索引: $_currentNoticeIndex');
         } else {
           // 后备方案：简单递增
           _currentNoticeIndex++;
@@ -744,7 +695,6 @@ class AnnouncementCarouselProvider extends ChangeNotifier {
             _currentNoticeIndex = contentStart;
           }
           _recordValidCarouselIndex(_currentNoticeIndex); // 记录有效索引
-          debugPrint('[AnnouncementCarousel] 🔄 后备切换到索引: $_currentNoticeIndex');
         }
 
         // 3.6 判斷是否切到欠費總覽頁（最後一頁）
@@ -830,10 +780,6 @@ class AnnouncementCarouselProvider extends ChangeNotifier {
   ///4，恢复通告轮播 - 修复时间计算逻辑
   void resumeMidCarousel(int apiNoticeStayDuration,
       {bool forceJumpToIndex = false, bool isFromManualOperation = false}) {
-    final widgetCount = _midCarouselController.widgetCount;
-    debugPrint(
-        '[AnnouncementCarousel] 🔄 恢复通告轮播 - Widget数量: $widgetCount, 是否暂停: $_isMidCarouselPaused, 來自手動操作: $isFromManualOperation] 通告停留时间: $apiNoticeStayDuration');
-
     // 显式取消旧的定时器，避免重复启动
     _pauseAllTimers();
 
@@ -855,13 +801,9 @@ class AnnouncementCarouselProvider extends ChangeNotifier {
       _noticeElapsedTime = Duration.zero;
 
       // 🔧 统一恢复逻辑：优先使用保存的索引，无论是手动操作还是默认状态恢复
-      debugPrint(
-          '[AnnouncementCarousel] 🔄 开始统一恢复逻辑，来自手动操作: $isFromManualOperation');
 
       // 1. 优先尝试恢复保存的索引
       if (_savedCarouselIndex != null) {
-        debugPrint(
-            '[AnnouncementCarousel] 📍 找到保存的索引: $_savedCarouselIndex，开始恢复');
         restoreManualOperationState();
       }
       // 2. 如果没有保存的索引，使用最后有效索引
@@ -870,7 +812,6 @@ class AnnouncementCarouselProvider extends ChangeNotifier {
           _lastValidCarouselIndex! < _midCarouselController.widgetCount) {
         _currentNoticeIndex = _lastValidCarouselIndex!;
         _midCarouselController.jumpToIndex(_currentNoticeIndex);
-        debugPrint('[AnnouncementCarousel] 🔧 使用最后有效索引: $_currentNoticeIndex');
       }
       // 3. 如果是从全屏广告恢复且当前在通告中，尝试切换到下一个通告
       else if (!isFromManualOperation && _isCurrentIndexInAnnouncements()) {
@@ -879,10 +820,6 @@ class AnnouncementCarouselProvider extends ChangeNotifier {
           _currentNoticeIndex = nextIndex;
           _recordValidCarouselIndex(_currentNoticeIndex);
           _midCarouselController.jumpToIndex(_currentNoticeIndex);
-          debugPrint(
-              '[AnnouncementCarousel] 📺 全屏广告恢复，切换到下一个通告: $_currentNoticeIndex');
-        } else {
-          debugPrint('[AnnouncementCarousel] ⚠️ 无法确定下一个索引，保持当前位置');
         }
       }
       // 4. 兜底逻辑：检查当前索引是否有效
@@ -894,27 +831,17 @@ class AnnouncementCarouselProvider extends ChangeNotifier {
             _currentNoticeIndex = 1;
           }
           _midCarouselController.jumpToIndex(_currentNoticeIndex);
-          debugPrint(
-              '[AnnouncementCarousel] 🔧 兜底恢复：跳转到内容索引: $_currentNoticeIndex');
-        } else {
-          debugPrint(
-              '[AnnouncementCarousel] 🔄 保持当前轮播位置: $_currentNoticeIndex');
         }
       }
 
       // 开始正常的轮播调度，给当前内容完整的展示时间
-      debugPrint(
-          '[AnnouncementCarousel] ⏰ [恢复] 重新开始当前内容，停留时长: $apiNoticeStayDuration 秒');
 
       _scheduleNextCarousel(apiNoticeStayDuration);
     } else {
       // 条件不满足的情况
-      debugPrint(
-          '[AnnouncementCarousel] ❌ 不满足轮播条件 - widgetCount: ${_midCarouselController.widgetCount}, 暂停状态: $_isMidCarouselPaused');
 
       // 即使不能轮播，也要确保当前显示正确的内容
       if (_midCarouselController.widgetCount >= 2 && _currentNoticeIndex < 1) {
-        debugPrint('[AnnouncementCarousel] 🔧 修正当前索引到管理费用表格');
         _currentNoticeIndex = 1; // 跳转到第一个内容（管理费用表格）
         _midCarouselController.jumpToIndex(_currentNoticeIndex);
       }
@@ -935,7 +862,9 @@ class AnnouncementCarouselProvider extends ChangeNotifier {
       }
       final remainingFromElapsed = _noticeDuration - _noticeElapsedTime;
       if (remainingFromElapsed.inSeconds > 0) return remainingFromElapsed;
-    } catch (e) {}
+    } catch (e) {
+      debugPrint('[AnnouncementCarousel] ❌ 计算剩余时间失败: $e');
+    }
     return Duration.zero;
   }
 
@@ -963,15 +892,15 @@ class AnnouncementCarouselProvider extends ChangeNotifier {
       }
 
       // 無影片：不需要記錄視頻進度
-    } catch (e) {}
+    } catch (e) {
+      debugPrint('[AnnouncementCarousel] ❌ 保存暂停状态失败: $e');
+    }
   }
 
   /// 🆕 记录有效的轮播索引（不包括主屏幕索引0）
   void _recordValidCarouselIndex(int index) {
     if (index > 0) {
       _lastValidCarouselIndex = index;
-      debugPrint(
-          '[AnnouncementCarousel] 📝 记录有效轮播索引: $_lastValidCarouselIndex');
     }
   }
 
@@ -979,75 +908,52 @@ class AnnouncementCarouselProvider extends ChangeNotifier {
   void saveManualOperationState() {
     try {
       // 標記進入手動操作模式
-      _isInManualOperationMode = true;
 
       // 优先使用最后有效的轮播索引，避免保存主屏幕索引0
       if (_lastValidCarouselIndex != null && _lastValidCarouselIndex! > 0) {
         _savedCarouselIndex = _lastValidCarouselIndex!;
-        debugPrint(
-            '[AnnouncementCarousel] 💾 保存手动操作前有效轮播索引: $_savedCarouselIndex');
       } else if (_currentNoticeIndex > 0) {
         // 如果当前索引不是主屏幕，也可以保存
         _savedCarouselIndex = _currentNoticeIndex;
-        debugPrint(
-            '[AnnouncementCarousel] 💾 保存手动操作前当前轮播索引: $_savedCarouselIndex');
-      } else {
-        debugPrint('[AnnouncementCarousel] ⚠️ 当前在主屏幕，不保存索引');
-      }
+      } else {}
     } catch (e) {
-      debugPrint('[AnnouncementCarousel] ❌ 保存手动操作状态失败: $e');
+      debugPrint('[AnnouncementCarousel] ❌ 保存手动操作前有效轮播索引失败: $e');
     }
   }
 
   /// 🆕 恢復手動操作模式前的狀態
   void restoreManualOperationState() {
-    try {
-      if (_savedCarouselIndex != null) {
-        // 验证保存的索引是否有效
-        final totalWidgets = _midCarouselController.widgetCount;
-        if (_savedCarouselIndex! >= 0 && _savedCarouselIndex! < totalWidgets) {
-          // 恢复到之前的轮播索引
-          _currentNoticeIndex = _savedCarouselIndex!;
+    if (_savedCarouselIndex != null) {
+      // 验证保存的索引是否有效
+      final totalWidgets = _midCarouselController.widgetCount;
+      if (_savedCarouselIndex! >= 0 && _savedCarouselIndex! < totalWidgets) {
+        // 恢复到之前的轮播索引
+        _currentNoticeIndex = _savedCarouselIndex!;
 
-          // 🔧 重点：从头开始展示当前内容（重置时间）
-          _noticeElapsedTime = Duration.zero;
-          _currentNoticeStartTime = DateTime.now();
-          _currentNoticePauseTime = null;
+        // 🔧 重点：从头开始展示当前内容（重置时间）
+        _noticeElapsedTime = Duration.zero;
+        _currentNoticeStartTime = DateTime.now();
+        _currentNoticePauseTime = null;
 
-          debugPrint(
-              '[AnnouncementCarousel] 🔄 恢复到保存的轮播索引: $_currentNoticeIndex (共${totalWidgets}个组件)');
+        // 跳转到保存的索引
+        _midCarouselController.jumpToIndex(_currentNoticeIndex);
 
-          // 跳转到保存的索引
-          _midCarouselController.jumpToIndex(_currentNoticeIndex);
-
-          // 🎯 关键：如果是表单，用户之前停留在某一页，现在恢复后会继续从那一页开始
-          // 不需要特殊处理，表单Widget内部会保持其页码状态
-
-          debugPrint('[AnnouncementCarousel] ✅ 手动操作状态恢复完成');
-        } else {
-          debugPrint(
-              '[AnnouncementCarousel] ⚠️ 保存的索引无效: $_savedCarouselIndex，使用默认索引1');
-          _currentNoticeIndex = totalWidgets > 1 ? 1 : 0;
-          _midCarouselController.jumpToIndex(_currentNoticeIndex);
-        }
-
-        // 清除保存的状态
-        _savedCarouselIndex = null;
-        _isInManualOperationMode = false;
-        return;
+        // 🎯 关键：如果是表单，用户之前停留在某一页，现在恢复后会继续从那一页开始
+        // 不需要特殊处理，表单Widget内部会保持其页码状态
       } else {
-        debugPrint('[AnnouncementCarousel] ⚠️ 没有保存的手动操作状态');
+        _currentNoticeIndex = totalWidgets > 1 ? 1 : 0;
+        _midCarouselController.jumpToIndex(_currentNoticeIndex);
       }
-    } catch (e) {
-      debugPrint('[AnnouncementCarousel] ❌ 恢复手动操作状态失败: $e');
+
+      // 清除保存的状态
+      _savedCarouselIndex = null;
+      return;
     }
   }
 
   /// 🆕 清除保存的手動操作狀態
   void _clearSavedManualOperationState() {
     _savedCarouselIndex = null;
-    _isInManualOperationMode = false;
-    debugPrint('[AnnouncementCarousel] 🗑️ 已清除保存的手动操作状态');
   }
 
   /// 獲取當前通告組件（輔助方法）
@@ -1059,14 +965,15 @@ class AnnouncementCarouselProvider extends ChangeNotifier {
         // 由於技術限制，暫時返回null
         return null;
       }
-    } catch (e) {}
+    } catch (e) {
+      debugPrint('[AnnouncementCarousel] ❌ 获取当前通告组件失败: $e');
+    }
     return null;
   }
 
   ///5，更新轮播暂停状态
   void updateCarouselPauseState(bool isPaused) {
     _isMidCarouselPaused = isPaused;
-    // _logger.i('🎛️ 通告轮播状态更新: ${!_isMidCarouselPaused ? "运行" : "暂停"}'); // _logger is not defined
 
     // 使用 addPostFrameCallback 延迟通知，避免 setState during build 错误
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -1078,26 +985,18 @@ class AnnouncementCarouselProvider extends ChangeNotifier {
 
   ///6，检查并恢复轮播状态（监控定时器使用）
   void checkAndRestoreMidCarousel(int apiNoticeStayDuration) {
-    //  _logger.i(
-    // '🔍 检查通告轮播恢复条件: announcements=${_carouselAnnouncements.length}, paused=$_isMidCarouselPaused'); // _logger is not defined
-
     // 修复：确保即使没有通告也能轮播（至少要有主屏幕和缴费表單）
     if ((_midCarouselController.widgetCount - 1) > 0 && !_isMidCarouselPaused) {
       // 检查当前定时器是否活跃
       if (_midTimer == null || !_midTimer!.isActive) {
-        // _logger.w('🔧 检测到通告轮播定时器已停止，尝试重新启动...'); // _logger is not defined
-
         // 确保当前索引在内容范围内
         if (_currentNoticeIndex < 1) {
           _currentNoticeIndex = 1;
           _midCarouselController.jumpToIndex(_currentNoticeIndex);
         }
 
-        // _logger.i('🔄 恢复通告轮播，当前索引: $_currentNoticeIndex'); // _logger is not defined
         _scheduleNextCarousel(apiNoticeStayDuration);
       }
-    } else {
-      // 不满足通告轮播恢复条件
     }
   }
 
@@ -1115,7 +1014,6 @@ class AnnouncementCarouselProvider extends ChangeNotifier {
 
   ///9，暂停所有计时器（用于设置頁面）
   void pauseAllTimersForSettings() {
-    debugPrint('[AnnouncementCarousel] ⚙️ 通告轮播 - 暂停所有计时器（设置頁面）');
     _pauseAllTimers();
     _midCarouselController.pauseAllMedia();
     _isMidCarouselPaused = true;
@@ -1124,7 +1022,6 @@ class AnnouncementCarouselProvider extends ChangeNotifier {
 
   ///10，从设置頁面恢复所有计时器
   void resumeAllTimersFromSettings(int apiNoticeStayDuration) {
-    debugPrint('[AnnouncementCarousel] ↩️ 通告轮播 - 从设置頁面恢复所有计时器');
     _isMidCarouselPaused = false;
     _midCarouselController.resumeAllMedia();
 
@@ -1156,6 +1053,7 @@ class AnnouncementCarouselProvider extends ChangeNotifier {
       _midCarouselController.jumpToIndex(index);
       _currentNoticeStartTime = DateTime.now();
       // _logger.i('�� 跳转到通告索引: $index'); // _logger is not defined
+      // //debugPrint('[AnnouncementCarousel] 🎯 跳转到通告索引: $index'); // _logger is not defined
       notifyListeners();
     }
   }
@@ -1223,7 +1121,7 @@ class AnnouncementCarouselProvider extends ChangeNotifier {
 
   ///16，创建管理費用表單輪播Widget（新增方法）
   Widget _createArrearTableCarouselWidget(VoidCallback onHomeButtonPressed) {
-    debugPrint('[AnnouncementCarousel] 🏗️ 创建管理费用表單 Widget');
+    ////debugPrint('[AnnouncementCarousel] 🏗️ 创建管理费用表單 Widget');
 
     return Container(
       width: double.infinity,
@@ -1236,11 +1134,11 @@ class AnnouncementCarouselProvider extends ChangeNotifier {
           jumpToAnnouncementIndex(0);
         },
         onPaginationComplete: (int totalPages) {
-          debugPrint('[AnnouncementCarousel] 📊 管理费用表單翻頁完成，总頁数: $totalPages');
+          //debugPrint('[AnnouncementCarousel] 📊 管理费用表單翻頁完成，总頁数: $totalPages');
 
           // 标记分頁结束
           _isManagementTablePaginationActive = false;
-          debugPrint('[AnnouncementCarousel] 🏁 管理费用表單分頁结束');
+          //debugPrint('[AnnouncementCarousel] 🏁 管理费用表單分頁结束');
 
           // 然后切换到下一个通告
           _goToNextCarouselItem();
@@ -1248,7 +1146,7 @@ class AnnouncementCarouselProvider extends ChangeNotifier {
         onPaginationStart: (int totalPages) {
           // 管理費用表單開始翻頁，動態延長當前通告停留時間，並標記分頁中
           _isManagementTablePaginationActive = true;
-          debugPrint('[AnnouncementCarousel] 🚦 管理费用表單开始翻頁，总頁数: $totalPages');
+          //debugPrint('[AnnouncementCarousel] 🚦 管理费用表單开始翻頁，总頁数: $totalPages');
           _extendCurrentNoticeStayTime(totalPages);
         },
       ),
@@ -1259,12 +1157,12 @@ class AnnouncementCarouselProvider extends ChangeNotifier {
   void _extendCurrentNoticeStayTime(int totalPages) {
     // 🔧 修复：只有当前正在显示费用表单时，才延长停留时间
     if (!_isCurrentIndexInArrearTables()) {
-      debugPrint('[AnnouncementCarousel] 🚫 当前不在费用表单，不延长停留时间');
+      //debugPrint('[AnnouncementCarousel] 🚫 当前不在费用表单，不延长停留时间');
       return;
     }
 
     // 该方法现在主要用于动态延长轮播时间
-    debugPrint('[AnnouncementCarousel] 🕒 延长停留时间，总頁数: $totalPages');
+    //debugPrint('[AnnouncementCarousel] 🕒 延长停留时间，总頁数: $totalPages');
 
     // 计算需要延长的时间：根据当前表格类型使用不同的翻页间隔
     final deviceSettings = _appDataProvider.deviceSettings;
@@ -1314,23 +1212,23 @@ class AnnouncementCarouselProvider extends ChangeNotifier {
 
   ///17.1，其他费用表單翻頁完成处理
   void _onOtherTablePaginationComplete() {
-    debugPrint('[AnnouncementCarousel] 📊 其他费用表單翻頁完成');
+    //debugPrint('[AnnouncementCarousel] 📊 其他费用表單翻頁完成');
 
     // 检查当前轮播模式
     final bool hasAnnouncements = _carouselAnnouncements.isNotEmpty;
     final bool hasManagementData =
         _arrearProvider?.hasManagementFeeData == true;
 
-    debugPrint(
-        '[AnnouncementCarousel] 📊 当前数据状态: 通告=$hasAnnouncements, 管理费用=$hasManagementData');
+    // debugPrint(
+    //     '[AnnouncementCarousel] 📊 当前数据状态: 通告=$hasAnnouncements, 管理费用=$hasManagementData');
 
     if (hasManagementData) {
       // 如果有管理费用数据，跳转到管理费用表單
-      debugPrint('[AnnouncementCarousel] 🔄 跳转到管理费用表單');
+      //debugPrint('[AnnouncementCarousel] 🔄 跳转到管理费用表單');
       _jumpToManagementTable();
     } else if (hasAnnouncements) {
       // 🔧 修复：如果没有管理费用数据但有通告，应该使用智能切换
-      debugPrint('[AnnouncementCarousel] 🔄 没有管理费用，使用智能切换到通告');
+      //debugPrint('[AnnouncementCarousel] 🔄 没有管理费用，使用智能切换到通告');
       final nextIndex = _determineNextCarouselIndex();
       if (nextIndex != -1) {
         _currentNoticeIndex = nextIndex;
@@ -1340,18 +1238,18 @@ class AnnouncementCarouselProvider extends ChangeNotifier {
             '[AnnouncementCarousel] ✅ 其他费用表單完成，切换到索引: $_currentNoticeIndex');
         _scheduleNextCarousel(_noticeDuration.inSeconds);
       } else {
-        debugPrint('[AnnouncementCarousel] ⚠️ 无法确定下一个索引，使用默认切换');
+        //debugPrint('[AnnouncementCarousel] ⚠️ 无法确定下一个索引，使用默认切换');
         _goToNextCarouselItem();
       }
     } else {
       // 这种情况不应该出现，但为了安全起见
-      debugPrint('[AnnouncementCarousel] ⚠️ 异常状态：其他费用表單完成但没有后续内容');
+      //debugPrint('[AnnouncementCarousel] ⚠️ 异常状态：其他费用表單完成但没有后续内容');
     }
   }
 
   ///17.2，管理费用表單翻頁完成处理
   void _onManagementTablePaginationComplete() {
-    debugPrint('[AnnouncementCarousel] 📊 管理费用表單翻頁完成');
+    //debugPrint('[AnnouncementCarousel] 📊 管理费用表單翻頁完成');
 
     // 检查当前轮播模式
     final bool hasAnnouncements = _carouselAnnouncements.isNotEmpty;
@@ -1359,20 +1257,20 @@ class AnnouncementCarouselProvider extends ChangeNotifier {
     final bool hasManagementData =
         _arrearProvider?.hasManagementFeeData == true;
 
-    debugPrint(
-        '[AnnouncementCarousel] 📊 当前数据状态: 通告=$hasAnnouncements, 其他费用=$hasOtherData, 管理费用=$hasManagementData');
+    // debugPrint(
+    //     '[AnnouncementCarousel] 📊 当前数据状态: 通告=$hasAnnouncements, 其他费用=$hasOtherData, 管理费用=$hasManagementData');
 
     if (!hasAnnouncements && !hasOtherData && hasManagementData) {
       // 情况4：只有管理费用表單，应该在表單内部循环，不切换轮播
-      debugPrint('[AnnouncementCarousel] 🔄 只有管理费用表單模式，不切换轮播');
+      //debugPrint('[AnnouncementCarousel] 🔄 只有管理费用表單模式，不切换轮播');
       return;
     } else if (!hasAnnouncements && hasOtherData && hasManagementData) {
       // 情况3：无通告+两种table，跳转到其他费用表單
-      debugPrint('[AnnouncementCarousel] 🔄 无通告双表模式，跳转到其他费用表單');
+      //debugPrint('[AnnouncementCarousel] 🔄 无通告双表模式，跳转到其他费用表單');
       _jumpToOtherTable();
     } else if (hasAnnouncements) {
       // 🔧 修复：有通告的情况，管理费用表格已经完成所有页面翻页，现在切换到下一个通告
-      debugPrint('[AnnouncementCarousel] 🔄 有通告模式，管理费用表格翻页完成，切换到下一个通告');
+      //debugPrint('[AnnouncementCarousel] 🔄 有通告模式，管理费用表格翻页完成，切换到下一个通告');
       final nextIndex = _determineNextCarouselIndex();
       if (nextIndex != -1) {
         _currentNoticeIndex = nextIndex;
@@ -1383,19 +1281,19 @@ class AnnouncementCarouselProvider extends ChangeNotifier {
             '[AnnouncementCarousel] ✅ 管理费用表單完成，切换到索引: $_currentNoticeIndex');
         _scheduleNextCarousel(_noticeDuration.inSeconds);
       } else {
-        debugPrint('[AnnouncementCarousel] ⚠️ 无法确定下一个索引，使用默认切换');
+        //debugPrint('[AnnouncementCarousel] ⚠️ 无法确定下一个索引，使用默认切换');
         _goToNextCarouselItem();
       }
     } else {
       // 其他异常情况
-      debugPrint('[AnnouncementCarousel] ⚠️ 未知的轮播状态');
+      //debugPrint('[AnnouncementCarousel] ⚠️ 未知的轮播状态');
       _goToNextCarouselItem();
     }
   }
 
   ///17.3.1，跳转到其他费用表單
   void _jumpToOtherTable() {
-    debugPrint('[AnnouncementCarousel] 🔄 跳转到其他费用表單');
+    //debugPrint('[AnnouncementCarousel] 🔄 跳转到其他费用表單');
 
     try {
       // 查找其他费用表單的索引
@@ -1412,7 +1310,7 @@ class AnnouncementCarouselProvider extends ChangeNotifier {
         // 重置开始时间
         _currentNoticeStartTime = DateTime.now();
       } else {
-        debugPrint('[AnnouncementCarousel] ⚠️ 未找到其他费用表單，保持当前状态');
+        //debugPrint('[AnnouncementCarousel] ⚠️ 未找到其他费用表單，保持当前状态');
         // 如果找不到其他费用表單，可能数据有问题，保持当前状态
       }
     } catch (e) {
@@ -1429,12 +1327,12 @@ class AnnouncementCarouselProvider extends ChangeNotifier {
           .toList();
 
       if (otherKeys.isEmpty) {
-        debugPrint('[AnnouncementCarousel] ⚠️ 其他费用表單不存在');
+        //debugPrint('[AnnouncementCarousel] ⚠️ 其他费用表單不存在');
         return -1;
       }
 
       final otherKey = otherKeys.first;
-      debugPrint('[AnnouncementCarousel] 🔍 查找其他费用表單key: $otherKey');
+      //debugPrint('[AnnouncementCarousel] 🔍 查找其他费用表單key: $otherKey');
 
       // 计算其他费用表單的索引：主屏幕(0) → 通告们 → 其他费用表
       int index = 1; // 从索引1开始（跳过主屏幕）
@@ -1443,7 +1341,7 @@ class AnnouncementCarouselProvider extends ChangeNotifier {
       index += _carouselAnnouncements.length;
 
       // 现在index应该指向其他费用表單
-      debugPrint('[AnnouncementCarousel] 🎯 计算出的其他费用表單索引: $index');
+      //debugPrint('[AnnouncementCarousel] 🎯 计算出的其他费用表單索引: $index');
 
       // 验证索引是否在有效范围内
       if (index < _midCarouselController.widgetCount) {
@@ -1461,7 +1359,7 @@ class AnnouncementCarouselProvider extends ChangeNotifier {
 
   ///17.3，跳转到管理费用表單
   void _jumpToManagementTable() {
-    debugPrint('[AnnouncementCarousel] 🔄 跳转到管理费用表單');
+    //debugPrint('[AnnouncementCarousel] 🔄 跳转到管理费用表單');
 
     try {
       // 查找管理费用表單的索引
@@ -1478,7 +1376,7 @@ class AnnouncementCarouselProvider extends ChangeNotifier {
         // 重置开始时间
         _currentNoticeStartTime = DateTime.now();
       } else {
-        debugPrint('[AnnouncementCarousel] ⚠️ 未找到管理费用表單，跳转到通告');
+        //debugPrint('[AnnouncementCarousel] ⚠️ 未找到管理费用表單，跳转到通告');
         _goToNextCarouselItem();
       }
     } catch (e) {
@@ -1496,12 +1394,12 @@ class AnnouncementCarouselProvider extends ChangeNotifier {
           .toList();
 
       if (managementKeys.isEmpty) {
-        debugPrint('[AnnouncementCarousel] ⚠️ 管理费用表單不存在');
+        //debugPrint('[AnnouncementCarousel] ⚠️ 管理费用表單不存在');
         return -1;
       }
 
       final managementKey = managementKeys.first;
-      debugPrint('[AnnouncementCarousel] 🔍 查找管理费用表單key: $managementKey');
+      //debugPrint('[AnnouncementCarousel] 🔍 查找管理费用表單key: $managementKey');
 
       // 在轮播控制器中查找该key对应的索引
       // 这里需要根据实际的轮播组件顺序来确定索引
@@ -1518,7 +1416,7 @@ class AnnouncementCarouselProvider extends ChangeNotifier {
       }
 
       // 现在index应该指向管理费用表單
-      debugPrint('[AnnouncementCarousel] 🎯 计算出的管理费用表單索引: $index');
+      //debugPrint('[AnnouncementCarousel] 🎯 计算出的管理费用表單索引: $index');
 
       // 验证索引是否在有效范围内
       if (index < _midCarouselController.widgetCount) {
@@ -1536,16 +1434,16 @@ class AnnouncementCarouselProvider extends ChangeNotifier {
 
   ///17.5，确定下一个轮播索引
   int _determineNextCarouselIndex() {
-    debugPrint(
-        '[AnnouncementCarousel] 🔍 确定下一个轮播索引，当前索引: $_currentNoticeIndex');
+    // debugPrint(
+    //     '[AnnouncementCarousel] 🔍 确定下一个轮播索引，当前索引: $_currentNoticeIndex');
 
     final bool hasAnnouncements = _carouselAnnouncements.isNotEmpty;
     final bool hasOtherData = _arrearProvider?.hasAnyOtherFeeRecords == true;
     final bool hasManagementData =
         _arrearProvider?.hasManagementFeeData == true;
 
-    debugPrint(
-        '[AnnouncementCarousel] 📊 数据状态: 通告=$hasAnnouncements, 其他费用=$hasOtherData, 管理费用=$hasManagementData');
+    // debugPrint(
+    //     '[AnnouncementCarousel] 📊 数据状态: 通告=$hasAnnouncements, 其他费用=$hasOtherData, 管理费用=$hasManagementData');
 
     // 情况1：有通告的各种组合
     if (hasAnnouncements) {
@@ -1600,8 +1498,8 @@ class AnnouncementCarouselProvider extends ChangeNotifier {
           _currentNoticeIndex <= announcementEndIndex) {
         int nextIndex = _currentNoticeIndex + 1;
 
-        debugPrint(
-            '[AnnouncementCarousel] 🔍 通告切换逻辑: 当前索引=$_currentNoticeIndex, 下一个索引=$nextIndex, 通告结束索引=$announcementEndIndex');
+        // debugPrint(
+        //     '[AnnouncementCarousel] 🔍 通告切换逻辑: 当前索引=$_currentNoticeIndex, 下一个索引=$nextIndex, 通告结束索引=$announcementEndIndex');
 
         // 🔧 修复：正确计算通告结束位置
         if (nextIndex > announcementEndIndex) {
@@ -1620,7 +1518,7 @@ class AnnouncementCarouselProvider extends ChangeNotifier {
             return announcementStartIndex;
           }
         } else {
-          debugPrint('[AnnouncementCarousel] 📢 跳转到下一个通告: $nextIndex');
+          //debugPrint('[AnnouncementCarousel] 📢 跳转到下一个通告: $nextIndex');
           return nextIndex;
         }
       }
@@ -1640,7 +1538,7 @@ class AnnouncementCarouselProvider extends ChangeNotifier {
           // 当前在其他费用表單，应该已经通过回调跳转到管理费用表單
           // 这里不应该被调用，但为了安全返回管理费用表單索引
           final mgmtIndex = _findManagementTableIndex();
-          debugPrint('[AnnouncementCarousel] 🔄 双表模式，从其他表單跳转到管理表單: $mgmtIndex');
+          //debugPrint('[AnnouncementCarousel] 🔄 双表模式，从其他表單跳转到管理表單: $mgmtIndex');
           return mgmtIndex != -1 ? mgmtIndex : 1;
         } else if (_isCurrentIndexManagementTable()) {
           // 当前在管理费用表單，应该已经通过回调跳转到其他费用表單
@@ -1652,16 +1550,16 @@ class AnnouncementCarouselProvider extends ChangeNotifier {
         } else {
           // 不在任何费用表單，跳转到第一个费用表單（其他费用）
           final firstArrearIndex = _getFirstArrearTableIndex();
-          debugPrint('[AnnouncementCarousel] 🎯 跳转到第一个费用表單: $firstArrearIndex');
+          //debugPrint('[AnnouncementCarousel] 🎯 跳转到第一个费用表單: $firstArrearIndex');
           return firstArrearIndex != -1 ? firstArrearIndex : 1;
         }
       } else if (hasManagementData) {
         // 只有管理费用表單，应该由表單内部循环，这里不应该被调用
-        debugPrint('[AnnouncementCarousel] ⚠️ 只有管理费用表單，不应该进入此方法');
+        //debugPrint('[AnnouncementCarousel] ⚠️ 只有管理费用表單，不应该进入此方法');
         return _currentNoticeIndex; // 保持当前索引
       } else {
         // 没有任何费用数据，返回主屏幕
-        debugPrint('[AnnouncementCarousel] ⚠️ 没有任何轮播内容，返回主屏幕');
+        //debugPrint('[AnnouncementCarousel] ⚠️ 没有任何轮播内容，返回主屏幕');
         return 0;
       }
     }
@@ -1687,8 +1585,8 @@ class AnnouncementCarouselProvider extends ChangeNotifier {
 
     bool isInArrear = _currentNoticeIndex >= arrearStartIndex &&
         _currentNoticeIndex <= arrearEndIndex;
-    debugPrint(
-        '[AnnouncementCarousel] 🔍 检查是否在费用表單: 当前索引=$_currentNoticeIndex, 费用表單范围=[$arrearStartIndex, $arrearEndIndex], 结果=$isInArrear');
+    // debugPrint(
+    //     '[AnnouncementCarousel] 🔍 检查是否在费用表單: 当前索引=$_currentNoticeIndex, 费用表單范围=[$arrearStartIndex, $arrearEndIndex], 结果=$isInArrear');
 
     return isInArrear;
   }
@@ -1705,8 +1603,8 @@ class AnnouncementCarouselProvider extends ChangeNotifier {
     bool isInAnnouncement = _currentNoticeIndex >= announcementStartIndex &&
         _currentNoticeIndex <= announcementEndIndex;
 
-    debugPrint(
-        '[AnnouncementCarousel] 🔍 检查是否在通告中: 当前索引=$_currentNoticeIndex, 通告范围=[$announcementStartIndex, $announcementEndIndex], 结果=$isInAnnouncement');
+    // debugPrint(
+    //     '[AnnouncementCarousel] 🔍 检查是否在通告中: 当前索引=$_currentNoticeIndex, 通告范围=[$announcementStartIndex, $announcementEndIndex], 结果=$isInAnnouncement');
 
     return isInAnnouncement;
   }
@@ -1714,7 +1612,7 @@ class AnnouncementCarouselProvider extends ChangeNotifier {
   ///25，从全屏广告恢复时的通告切换逻辑
   int _getNextAnnouncementIndexFromFullscreen() {
     if (_carouselAnnouncements.isEmpty) {
-      debugPrint('[AnnouncementCarousel] ⚠️ 没有通告，无法切换');
+      //debugPrint('[AnnouncementCarousel] ⚠️ 没有通告，无法切换');
       return -1;
     }
 
@@ -1730,7 +1628,7 @@ class AnnouncementCarouselProvider extends ChangeNotifier {
 
       // 如果下一个索引仍在通告范围内，切换到下一个通告
       if (nextIndex <= announcementEndIndex) {
-        debugPrint('[AnnouncementCarousel] 📢 切换到下一个通告: $nextIndex');
+        //debugPrint('[AnnouncementCarousel] 📢 切换到下一个通告: $nextIndex');
         return nextIndex;
       } else {
         // 如果是最后一个通告，切换到费用表格
@@ -1782,26 +1680,26 @@ class AnnouncementCarouselProvider extends ChangeNotifier {
     final bool hasManagementData =
         _arrearProvider?.hasManagementFeeData == true;
 
-    debugPrint(
-        '[AnnouncementCarousel] 🔍 查找第一个费用表單: 通告数=${_carouselAnnouncements.length}, 计算起始索引=$arrearStartIndex');
-    debugPrint(
-        '[AnnouncementCarousel] 📊 费用表單数据状态: 其他费用=$hasOtherData, 管理费用=$hasManagementData');
+    // debugPrint(
+    //     '[AnnouncementCarousel] 🔍 查找第一个费用表單: 通告数=${_carouselAnnouncements.length}, 计算起始索引=$arrearStartIndex');
+    // debugPrint(
+    //     '[AnnouncementCarousel] 📊 费用表單数据状态: 其他费用=$hasOtherData, 管理费用=$hasManagementData');
 
     if (hasOtherData) {
-      debugPrint('[AnnouncementCarousel] 🎯 返回其他费用表單索引: $arrearStartIndex');
+      //debugPrint('[AnnouncementCarousel] 🎯 返回其他费用表單索引: $arrearStartIndex');
       return arrearStartIndex; // 其他费用表單在前
     } else if (hasManagementData) {
-      debugPrint('[AnnouncementCarousel] 🎯 返回管理费用表單索引: $arrearStartIndex');
+      //debugPrint('[AnnouncementCarousel] 🎯 返回管理费用表單索引: $arrearStartIndex');
       return arrearStartIndex; // 只有管理费用表單
     }
 
-    debugPrint('[AnnouncementCarousel] ⚠️ 没有费用表單数据');
+    //debugPrint('[AnnouncementCarousel] ⚠️ 没有费用表單数据');
     return -1; // 没有费用表單
   }
 
   ///18，切换到下一个轮播项（管理費用表單翻頁完成後調用）
   void _goToNextCarouselItem() {
-    debugPrint('[AnnouncementCarousel] 🔍 进入 _goToNextCarouselItem 方法');
+    //debugPrint('[AnnouncementCarousel] 🔍 进入 _goToNextCarouselItem 方法');
     debugPrint('[AnnouncementCarousel] 当前状态: '
         'isPaused=$_isMidCarouselPaused, '
         'isOtherTablePaginationActive=$_isOtherTablePaginationActive, '
@@ -1809,24 +1707,24 @@ class AnnouncementCarouselProvider extends ChangeNotifier {
         'onlyManagementTableMode=$_onlyManagementTableMode');
 
     if (_isMidCarouselPaused) {
-      debugPrint('[AnnouncementCarousel] ⏸️ 轮播已暂停，跳过切换');
+      //debugPrint('[AnnouncementCarousel] ⏸️ 轮播已暂停，跳过切换');
       return;
     }
 
     // 僅管理費用模式：不切換輪播，由表內自行首末頁循環
     if (_onlyManagementTableMode) {
-      debugPrint('[AnnouncementCarousel] 🧭 僅管理費用模式，跳过切换');
+      //debugPrint('[AnnouncementCarousel] 🧭 僅管理費用模式，跳过切换');
       return;
     }
 
     // 如果任何费用表單仍在翻頁，则不进行轮播切换
     if (_isOtherTablePaginationActive || _isManagementTablePaginationActive) {
-      debugPrint('[AnnouncementCarousel] 🔄 仍有费用表單在活跃翻頁，跳过切换');
+      //debugPrint('[AnnouncementCarousel] 🔄 仍有费用表單在活跃翻頁，跳过切换');
       return;
     }
 
     try {
-      debugPrint('[AnnouncementCarousel] 🔍 开始切换到下一个轮播项');
+      //debugPrint('[AnnouncementCarousel] 🔍 开始切换到下一个轮播项');
       debugPrint(
           '[AnnouncementCarousel] 当前索引: $_currentNoticeIndex, 总widget数: ${_midCarouselController.widgetCount}');
       debugPrint(
@@ -1836,12 +1734,12 @@ class AnnouncementCarouselProvider extends ChangeNotifier {
       int targetIndex = _determineNextCarouselIndex();
 
       if (targetIndex == -1) {
-        debugPrint('[AnnouncementCarousel] ⚠️ 无法确定下一个轮播索引');
+        //debugPrint('[AnnouncementCarousel] ⚠️ 无法确定下一个轮播索引');
         return;
       }
 
       _currentNoticeIndex = targetIndex;
-      debugPrint('[AnnouncementCarousel] 🎯 目标索引: $_currentNoticeIndex');
+      //debugPrint('[AnnouncementCarousel] 🎯 目标索引: $_currentNoticeIndex');
 
       _midCarouselController.jumpToIndex(_currentNoticeIndex);
 
@@ -1851,14 +1749,14 @@ class AnnouncementCarouselProvider extends ChangeNotifier {
             '[AnnouncementCarousel] ✅ 跳转完成，目标索引: $_currentNoticeIndex, 实际索引: $actualIndex');
 
         if (actualIndex != _currentNoticeIndex) {
-          debugPrint('[AnnouncementCarousel] ⚠️ 跳转失败，强制重新跳转');
+          //debugPrint('[AnnouncementCarousel] ⚠️ 跳转失败，强制重新跳转');
           _midCarouselController.jumpToIndex(_currentNoticeIndex);
         }
       });
 
       _currentNoticeStartTime = DateTime.now();
 
-      debugPrint('[AnnouncementCarousel] 缴费表單翻頁完成，切换到索引: $_currentNoticeIndex');
+      //debugPrint('[AnnouncementCarousel] 缴费表單翻頁完成，切换到索引: $_currentNoticeIndex');
 
       _scheduleNextCarousel(_noticeDuration.inSeconds);
     } catch (e) {
@@ -1873,7 +1771,7 @@ class AnnouncementCarouselProvider extends ChangeNotifier {
 
   ///19，强制恢复轮播组件
   void forceRecovery() {
-    debugPrint('[AnnouncementCarousel] 强制恢复轮播组件...');
+    //debugPrint('[AnnouncementCarousel] 强制恢复轮播组件...');
 
     try {
       // 清理所有定时器
@@ -1896,57 +1794,57 @@ class AnnouncementCarouselProvider extends ChangeNotifier {
         }
       });
 
-      debugPrint('[AnnouncementCarousel] 强制恢复完成');
-    } catch (e) {}
+      //debugPrint('[AnnouncementCarousel] 强制恢复完成');
+    } catch (e) {
+      debugPrint('[AnnouncementCarousel] ❌ 强制恢复失败: $e');
+    }
   }
 
   ///20，确保widget和我的数据同步(通告,主屏幕,管理费用表單,其他费用表單)
   void _ensureBasicContent() {
     try {
-      debugPrint('[AnnouncementCarousel] 🔧 確保基本輪播內容可用（包括無通告的情況）...');
+      //debugPrint('[AnnouncementCarousel] 🔧 確保基本輪播內容可用（包括無通告的情況）...');
 
       // 如果正在初始化过程中，避免递归调用
       if (_isInitializing) {
-        debugPrint('[AnnouncementCarousel] 🔄 初始化过程中，跳过基本内容恢复');
+        //debugPrint('[AnnouncementCarousel] 🔄 初始化过程中，跳过基本内容恢复');
         return;
       }
 
-      // 🔧 關鍵修復：無論是否有通告，都要確保基本內容可用
-      // 無通告時也要有主屏幕和費用表格，不能顯示"正在初始化"
-      // 🔧 關鍵修復：強制使用當前的通告數據（包括空數組）進行智能更新
-      // 這會確保即使沒有通告也能創建主屏幕和費用表格
-      debugPrint('[AnnouncementCarousel] 🔧 強制觸發智能更新以確保基本內容');
+      //debugPrint('[AnnouncementCarousel] 🔧 強制觸發智能更新以確保基本內容');
       _smartUpdateCarousel(_carouselAnnouncements);
 
       // 智能更新已經處理了所有必要的內容，直接返回
-      debugPrint('[AnnouncementCarousel] ✅ 基本内容确保完成');
+      //debugPrint('[AnnouncementCarousel] ✅ 基本内容确保完成');
       return;
-    } catch (e) {}
+    } catch (e) {
+      debugPrint('[AnnouncementCarousel] ❌ 确保基本内容失败: $e');
+    }
   }
 
   ///21，诊断轮播组件问题
   void diagnoseCarouselIssues() {
-    debugPrint('[AnnouncementCarousel] === 轮播组件诊断开始 ===');
-    debugPrint('[AnnouncementCarousel] 状态: $carouselStatus');
-    debugPrint('[AnnouncementCarousel] 是否健康: $isCarouselHealthy');
-    debugPrint('[AnnouncementCarousel] 缓存Widget数量: ${_widgetCache.length}');
+    //debugPrint('[AnnouncementCarousel] === 轮播组件诊断开始 ===');
+    //debugPrint('[AnnouncementCarousel] 状态: $carouselStatus');
+    //debugPrint('[AnnouncementCarousel] 是否健康: $isCarouselHealthy');
+    //debugPrint('[AnnouncementCarousel] 缓存Widget数量: ${_widgetCache.length}');
     debugPrint(
         '[AnnouncementCarousel] 缓存FileManager数量: ${_fileManagerCache.length}');
-    debugPrint('[AnnouncementCarousel] 通告数量: ${_carouselAnnouncements.length}');
+    //debugPrint('[AnnouncementCarousel] 通告数量: ${_carouselAnnouncements.length}');
     debugPrint(
         '[AnnouncementCarousel] 轮播组件Widget总数: ${_midCarouselController.widgetCount}');
-    debugPrint('[AnnouncementCarousel] 轮播模式: $carouselModeInfo');
-    debugPrint('[AnnouncementCarousel] 支持无通告模式: $supportsNoAnnouncementMode');
+    //debugPrint('[AnnouncementCarousel] 轮播模式: $carouselModeInfo');
+    //debugPrint('[AnnouncementCarousel] 支持无通告模式: $supportsNoAnnouncementMode');
 
     // 診斷：基於時間的輪播狀態
-    debugPrint('[AnnouncementCarousel] 當前索引: $_currentNoticeIndex');
+    //debugPrint('[AnnouncementCarousel] 當前索引: $_currentNoticeIndex');
     debugPrint(
         '[AnnouncementCarousel] 已播放時間: ${_noticeElapsedTime.inSeconds}s');
-    debugPrint('[AnnouncementCarousel] 總時長: ${_noticeDuration.inSeconds}s');
-    debugPrint('[AnnouncementCarousel] 當前開始時間: $_currentNoticeStartTime');
-    debugPrint('[AnnouncementCarousel] 暫停時間: $_currentNoticePauseTime');
+    //debugPrint('[AnnouncementCarousel] 總時長: ${_noticeDuration.inSeconds}s');
+    //debugPrint('[AnnouncementCarousel] 當前開始時間: $_currentNoticeStartTime');
+    //debugPrint('[AnnouncementCarousel] 暫停時間: $_currentNoticePauseTime');
 
-    debugPrint('[AnnouncementCarousel] === 轮播组件诊断结束 ===');
+    //debugPrint('[AnnouncementCarousel] === 轮播组件诊断结束 ===');
   }
 
   ///22，检查轮播组件是否支持无通告模式

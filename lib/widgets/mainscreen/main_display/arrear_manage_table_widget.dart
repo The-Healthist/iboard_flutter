@@ -31,6 +31,28 @@ class ArrearManagementTableWidgetState
   Timer? _autoPaginationTimer; // 自动翻頁定时器
   bool _isPaginationPaused = false; // 翻頁是否暂停
   int _totalPages = 0; // 总頁数
+  ///0, 固定樣式的主頁按鈕
+  Widget _buildHomeButton(VoidCallback onTap) => Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: onTap,
+          customBorder: const CircleBorder(),
+          child: Container(
+            width: 40,
+            height: 40,
+            decoration: BoxDecoration(
+              color: Colors.black.withOpacity(0.6),
+              shape: BoxShape.circle,
+            ),
+            alignment: Alignment.center,
+            child: const Icon(
+              Icons.home,
+              color: Colors.white,
+              size: 22,
+            ),
+          ),
+        ),
+      );
 
   // 数据版本跟踪 - 用于检测数据更新
   String? _lastDataVersion;
@@ -117,14 +139,28 @@ class ArrearManagementTableWidgetState
                         ),
                       ],
                     ),
-                    child: const Text(
-                      '繳費表單',
-                      style: TextStyle(
-                        fontSize: 22,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.black87,
-                      ),
-                      textAlign: TextAlign.center,
+                    child: Stack(
+                      children: [
+                        const Center(
+                          child: Text(
+                            '繳費表單',
+                            style: TextStyle(
+                              fontSize: 22,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.black87,
+                            ),
+                            textAlign: TextAlign.center,
+                          ),
+                        ),
+                        if (widget.onHomeButtonPressed != null)
+                          Positioned(
+                            right: 8,
+                            top: 0,
+                            bottom: 0,
+                            child:
+                                _buildHomeButton(widget.onHomeButtonPressed!),
+                          ),
+                      ],
                     ),
                   ),
 
@@ -136,31 +172,7 @@ class ArrearManagementTableWidgetState
               ),
             ),
 
-            // 主頁按鈕 - 位於右上角
-            if (widget.onHomeButtonPressed != null)
-              Positioned(
-                top: 16,
-                right: 16,
-                child: Material(
-                  color: Colors.transparent,
-                  child: InkWell(
-                    onTap: widget.onHomeButtonPressed,
-                    borderRadius: BorderRadius.circular(20),
-                    child: Container(
-                      padding: const EdgeInsets.all(8),
-                      decoration: BoxDecoration(
-                        color: Colors.black.withOpacity(0.6),
-                        borderRadius: BorderRadius.circular(20),
-                      ),
-                      child: const Icon(
-                        Icons.home,
-                        color: Colors.white,
-                        size: 24,
-                      ),
-                    ),
-                  ),
-                ),
-              ),
+            // 主頁按鈕已移入標題容器內以確保垂直居中
           ],
         );
       },

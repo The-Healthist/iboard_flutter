@@ -5,7 +5,6 @@ import 'package:iboard_app/managers/managers.dart';
 import 'package:iboard_app/providers/state_provider.dart';
 import 'package:flutter_pdfview/flutter_pdfview.dart';
 import 'package:video_player/video_player.dart';
-import 'package:logger/logger.dart';
 import 'package:provider/provider.dart';
 import 'package:iboard_app/widgets/carousel_widget.dart'; // 添加輪播組件導入
 import 'package:iboard_app/widgets/simple_print_dialog.dart'; // 添加簡化版打印對話框導入
@@ -34,13 +33,10 @@ class AnnouncementReaderWidget extends StatefulWidget {
 }
 
 class AnnouncementReaderWidgetState extends State<AnnouncementReaderWidget> {
-  final Logger _logger = Logger();
   VideoPlayerController? _videoController;
   bool _isLoading = true;
   String? _localFilePath;
   String? _error;
-
-  // 新增：記錄視頻播放進度
   Duration? _savedPlaybackPosition;
 
   @override
@@ -73,8 +69,6 @@ class AnnouncementReaderWidgetState extends State<AnnouncementReaderWidget> {
         _localFilePath = downloadedFile.path;
       } else {
         _error = 'Failed to load file.';
-        _logger.e(
-            'Failed to download file for announcement: ${widget.announcement.title}');
       }
     }
 
@@ -140,7 +134,7 @@ class AnnouncementReaderWidgetState extends State<AnnouncementReaderWidget> {
     });
   }
 
-  /// 新增：視頻播放進度變化監聽器
+  /// 視頻播放進度變化監聽器
   void _onVideoProgressChanged() {
     if (_videoController != null &&
         _videoController!.value.isInitialized &&
@@ -149,7 +143,7 @@ class AnnouncementReaderWidgetState extends State<AnnouncementReaderWidget> {
         final position = _videoController!.value.position;
         widget.onVideoProgressChanged!(position);
       } catch (e) {
-        // debugPrint('[AnnouncementReader] 報告播放進度失敗: $e');
+        // 靜默處理播放進度報告失敗
       }
     }
   }
@@ -165,12 +159,9 @@ class AnnouncementReaderWidgetState extends State<AnnouncementReaderWidget> {
 
   @override
   Widget build(BuildContext context) {
-    // 监听媒體暂停状态 - 仅监听中部通告区域
     final carouselStateProvider = context.watch<CarouselStateProvider>();
     final isMediaPaused =
         carouselStateProvider.isMediaPausedForArea(AreaType.middleNotice);
-
-    // 根据媒體状态控制视频播放
     if (_videoController != null && _videoController!.value.isInitialized) {
       if (isMediaPaused && _videoController!.value.isPlaying) {
         _videoController!.pause();
@@ -237,7 +228,6 @@ class AnnouncementReaderWidgetState extends State<AnnouncementReaderWidget> {
         filePath: _localFilePath!,
         fitPolicy: FitPolicy.HEIGHT, // Add this line
         onError: (error) {
-          _logger.e('Error displaying PDF', error: error);
           if (mounted) {
             setState(() {
               _error = 'Could not display PDF.';
@@ -253,8 +243,6 @@ class AnnouncementReaderWidgetState extends State<AnnouncementReaderWidget> {
           width: double.infinity,
           height: double.infinity,
           errorBuilder: (context, error, stackTrace) {
-            _logger.e('Error displaying image',
-                error: error, stackTrace: stackTrace);
             return const Center(child: Text('Could not display image.'));
           },
         ),
@@ -278,27 +266,24 @@ class AnnouncementReaderWidgetState extends State<AnnouncementReaderWidget> {
       contentWidget = Center(child: Text('Unsupported file type: $mimeType'));
     }
 
-    // 使用NotificationListener監聽媒體暫停和恢復通知
     return NotificationListener<Notification>(
       onNotification: (notification) {
         if (notification is MediaPauseNotification) {
-          // 防抖動執行，避免重複調用
           Future.delayed(const Duration(milliseconds: 50), () {
             if (mounted && _videoController != null) {
               _pauseVideo();
             }
           });
-          return true; // 阻止通知繼續傳遞
+          return true;
         } else if (notification is MediaResumeNotification) {
-          // 防抖動執行，避免重複調用
           Future.delayed(const Duration(milliseconds: 50), () {
             if (mounted && _videoController != null) {
               _resumeVideo();
             }
           });
-          return true; // 阻止通知繼續傳遞
+          return true;
         }
-        return false; // 其他通知繼續傳遞
+        return false;
       },
       child: Stack(
         children: [
@@ -329,7 +314,7 @@ class AnnouncementReaderWidgetState extends State<AnnouncementReaderWidget> {
             ),
           ),
 
-          // 主頁按鈕（右上角）
+          // 主頁按鈕（右上角，統一樣式）
           if (widget.onHomeButtonPressed != null)
             Positioned(
               top: 16,
@@ -338,17 +323,19 @@ class AnnouncementReaderWidgetState extends State<AnnouncementReaderWidget> {
                 color: Colors.transparent,
                 child: InkWell(
                   onTap: widget.onHomeButtonPressed,
-                  borderRadius: BorderRadius.circular(20),
+                  customBorder: const CircleBorder(),
                   child: Container(
-                    padding: const EdgeInsets.all(8),
+                    width: 40,
+                    height: 40,
                     decoration: BoxDecoration(
                       color: Colors.black.withOpacity(0.6),
-                      borderRadius: BorderRadius.circular(20),
+                      shape: BoxShape.circle,
                     ),
+                    alignment: Alignment.center,
                     child: const Icon(
                       Icons.home,
                       color: Colors.white,
-                      size: 24,
+                      size: 22,
                     ),
                   ),
                 ),
@@ -364,20 +351,16 @@ class AnnouncementReaderWidgetState extends State<AnnouncementReaderWidget> {
     if (_videoController != null && _videoController!.value.isInitialized) {
       try {
         if (_videoController!.value.isPlaying) {
-          // 記錄當前播放位置
           _savedPlaybackPosition = _videoController!.value.position;
 
-          // 通過回調報告播放進度
           if (widget.onVideoProgressChanged != null) {
             widget.onVideoProgressChanged!(_savedPlaybackPosition!);
           }
 
           _videoController!.pause();
-          _logger.d(
-              '📱 通告視頻已暫停，保存播放位置: ${_savedPlaybackPosition?.inMilliseconds}ms - ${widget.announcement.title}');
         }
       } catch (e) {
-        _logger.e('暫停視頻失敗: $e');
+        // 靜默處理暫停視頻失敗
       }
     }
   }
@@ -387,17 +370,13 @@ class AnnouncementReaderWidgetState extends State<AnnouncementReaderWidget> {
     if (_videoController != null && _videoController!.value.isInitialized) {
       try {
         if (!_videoController!.value.isPlaying) {
-          // 如果有保存的播放位置，先跳轉到該位置
           if (_savedPlaybackPosition != null) {
             _videoController!.seekTo(_savedPlaybackPosition!);
-            _logger.d(
-                '📱 通告視頻恢復，跳轉到保存位置: ${_savedPlaybackPosition?.inMilliseconds}ms - ${widget.announcement.title}');
           }
           _videoController!.play();
-          _logger.d('📱 通告視頻已恢復播放 - ${widget.announcement.title}');
         }
       } catch (e) {
-        _logger.e('恢復視頻失敗: $e');
+        // 靜默處理恢復視頻失敗
       }
     }
   }
@@ -416,13 +395,10 @@ class AnnouncementReaderWidgetState extends State<AnnouncementReaderWidget> {
       try {
         _videoController!.seekTo(position);
         _savedPlaybackPosition = position;
-        _logger.d(
-            '📱 通告視頻設置播放位置: ${position.inMilliseconds}ms - ${widget.announcement.title}');
       } catch (e) {
-        _logger.e('設置視頻播放位置失敗: $e');
+        // 靜默處理設置視頻播放位置失敗
       }
     } else {
-      // 如果視頻控制器還沒準備好，先保存位置
       _savedPlaybackPosition = position;
     }
   }

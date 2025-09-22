@@ -79,17 +79,24 @@ class WeatherWarningMapping {
   ///1，獲取警告的完整描述（包含子類型）
   static String getWarningDescription(
       String warningKey, String warningCode, String? type) {
-    // 如果有type字段，優先使用type（適用於熱帶氣旋警告信號）
-    if (type != null && type.isNotEmpty) {
-      return type;
-    }
-
-    // 檢查是否有子類型映射
+    // 12, 優先檢查子類型映射，組合完整描述
     if (warningSubtypes.containsKey(warningKey)) {
       final subtypes = warningSubtypes[warningKey]!;
       if (subtypes.containsKey(warningCode)) {
-        return subtypes[warningCode]!;
+        return subtypes[warningCode]!; // 返回完整描述，如 "黃色暴雨警告信號"
       }
+    }
+
+    // 13, 如果沒有子類型映射，但有type字段，嘗試組合描述
+    if (type != null && type.isNotEmpty) {
+      // 獲取主警告描述
+      final mainDescription = mainWarningDescriptions[warningKey];
+      if (mainDescription != null) {
+        // 組合 type + 主警告描述，如 "黃色" + "暴雨警告信號"
+        return '$type$mainDescription';
+      }
+      // 如果沒有主警告描述，只返回type
+      return type;
     }
 
     // 檢查主警告描述
@@ -291,4 +298,3 @@ class WeatherWarningMapping {
     }
   }
 }
-

@@ -191,4 +191,3 @@ class PrinterProvider extends ChangeNotifier {
     await initialize();
   }
 }
-

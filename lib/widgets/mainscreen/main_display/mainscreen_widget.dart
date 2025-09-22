@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:iboard_app/models/announcement_model.dart';
 import 'package:iboard_app/providers/announcement_provider.dart';
 import 'package:iboard_app/providers/arrear_provider.dart';
+import 'package:iboard_app/widgets/mainscreen/main_display/payment_widget.dart';
 import 'package:provider/provider.dart';
 import 'package:logger/logger.dart';
 
@@ -187,65 +188,7 @@ class MainScreenWidgetState extends State<MainScreenWidget> {
 
   ///3, 構建電子繳費頁面
   Widget _buildElectronicPaymentPage() {
-    return Container(
-      padding: const EdgeInsets.fromLTRB(16.0, 20.0, 16.0, 20.0), // 移除上下內邊距
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Expanded(
-            child: Container(
-              width: double.infinity,
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: Colors.grey.shade300),
-                color: Colors.white, // 改为白色背景，让图片更清晰
-              ),
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(8), // 保持圆角
-                child: Image.asset(
-                  'assets/images/payment.png',
-                  width: double.infinity, // 宽度填满容器
-                  height: double.infinity, // 高度填满容器
-                  fit: BoxFit.cover, // 填满容器，不保持比例
-                  errorBuilder: (context, error, stackTrace) {
-                    // 如果图片加载失败，显示备用内容
-                    return const Center(
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(
-                            Icons.payment,
-                            size: 64,
-                            color: Colors.grey,
-                          ),
-                          SizedBox(height: 16),
-                          Text(
-                            '電子繳費功能',
-                            style: TextStyle(
-                              fontSize: 18,
-                              color: Colors.black87,
-                              fontWeight: FontWeight.w500,
-                            ),
-                          ),
-                          SizedBox(height: 8),
-                          Text(
-                            '該大廈尚未開通此功能',
-                            style: TextStyle(
-                              fontSize: 14,
-                              color: Colors.grey,
-                            ),
-                          ),
-                        ],
-                      ),
-                    );
-                  },
-                ),
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
+    return const PaymentWidget();
   }
 
   ///4, 構建欠費查詢內容
@@ -577,27 +520,27 @@ class MainScreenWidgetState extends State<MainScreenWidget> {
   Widget _buildArrearQueryButton(ArrearProvider provider) {
     // 判斷當前是否可以查詢
     final bool hasValidSelection = _hasValidArrearSelection(provider);
-    final bool canQuery =
-        hasValidSelection && _hasDataForSelectedFeeType(provider);
+    final bool hasDataForSelection =
+        hasValidSelection && provider.hasDataForCurrentSelection;
 
     return SizedBox(
       width: double.infinity,
       child: ElevatedButton(
         onPressed: () {
-          if (canQuery) {
+          if (hasDataForSelection) {
             _handleArrearQuery();
           }
         },
         style: ElevatedButton.styleFrom(
-          backgroundColor: canQuery
+          backgroundColor: hasDataForSelection
               ? Theme.of(context).primaryColor
               : Theme.of(context).colorScheme.primary.withOpacity(0.12),
-          foregroundColor: canQuery ? Colors.white : Colors.black87,
+          foregroundColor: hasDataForSelection ? Colors.white : Colors.black87,
           padding: const EdgeInsets.symmetric(vertical: 8), // 保持原有 padding
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(8),
           ),
-          elevation: canQuery ? 2 : 0,
+          elevation: hasDataForSelection ? 2 : 0,
         ),
         child: Column(
           children: [
@@ -667,13 +610,9 @@ class MainScreenWidgetState extends State<MainScreenWidget> {
     return 'Please Select Floor and Unit';
   }
 
-  ///9.1, 检查选中的费用类型是否有数据
+  ///9.1, 檢查當前選擇是否有數據（委託 provider）
   bool _hasDataForSelectedFeeType(ArrearProvider provider) {
-    if (provider.selectedFeeType == FeeType.management) {
-      return provider.hasManagementFeeData;
-    } else {
-      return provider.hasOtherFeeData && !provider.isOtherFeeDataEmpty;
-    }
+    return provider.hasDataForCurrentSelection;
   }
 
   ///9.2, 获取查询按钮文本
@@ -681,18 +620,11 @@ class MainScreenWidgetState extends State<MainScreenWidget> {
     if (_selectedBuilding == null || _selectedFloor == null) {
       return '請選擇樓層和單位';
     }
-
-    if (provider.selectedFeeType == FeeType.management) {
-      if (!provider.hasManagementFeeData) {
-        return '暫無管理費用數據';
-      }
-    } else {
-      if (!provider.hasOtherFeeData) {
-        return '暫無其他費用數據';
-      }
-      if (provider.isOtherFeeDataEmpty) {
-        return '無其他費用記錄';
-      }
+    // 針對當前選擇
+    if (!provider.hasDataForCurrentSelection) {
+      return provider.selectedFeeType == FeeType.management
+          ? '暫無管理費用數據'
+          : '暫無其他費用數據';
     }
 
     return '查詢繳費記錄';
@@ -709,6 +641,10 @@ class MainScreenWidgetState extends State<MainScreenWidget> {
 
   ///11, 構建查詢結果容器
   Widget _buildArrearResultsContainer(ArrearProvider provider) {
+    // 若當前選擇沒有數據，直接不顯示結果容器
+    if (!provider.hasDataForCurrentSelection) {
+      return const SizedBox.shrink();
+    }
     if (provider.isLoading) {
       return Container(
         padding: const EdgeInsets.all(0),
@@ -722,12 +658,8 @@ class MainScreenWidgetState extends State<MainScreenWidget> {
       return _buildArrearErrorContainer(provider.error!);
     }
 
-    // 根据费用类型检查是否有数据
-    final hasData = provider.selectedFeeType == FeeType.management
-        ? provider.hasManagementFeeData
-        : (provider.hasOtherFeeData && !provider.isOtherFeeDataEmpty);
-
-    if (hasData) {
+    // 當前選擇有數據
+    if (provider.hasDataForCurrentSelection) {
       return _buildArrearDataContent(provider);
     }
 

@@ -3,7 +3,6 @@ import 'package:iboard_app/models/arrear_model.dart';
 import 'package:iboard_app/http/api_client.dart';
 import 'package:iboard_app/widgets/mainscreen/main_display/arrear_manage_table_widget.dart'; // Added import for ArrearTableWidget
 import 'package:iboard_app/providers/app_data_provider.dart';
-import 'package:logger/logger.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:convert';
 import 'dart:async';
@@ -13,7 +12,6 @@ import 'package:iboard_app/widgets/mainscreen/main_display/arrear_other_table_wi
 enum FeeType { management, other }
 
 class ArrearProvider extends ChangeNotifier {
-  final Logger _logger = Logger();
   final ApiClient _apiClient;
   final AppDataProvider _appDataProvider;
 
@@ -21,16 +19,16 @@ class ArrearProvider extends ChangeNotifier {
   String? _error;
 
   // 两种数据源
-  ManagementFeeModel? _managementFeeData; // 物业管理费用数据
-  OtherFeeModel? _otherFeeData; // 其他分摊费用数据
+  ManagementFeeModel? _managementFeeData;
+  OtherFeeModel? _otherFeeData;
 
-  String? _ismartId; // 实际存储的是ismartId，用于API调用
-  String? _selectedBlock; // 新增：选中的樓座
-  String? _selectedFloor; // 存储用户选择的樓层，用于UI显示和数据筛选
+  String? _ismartId;
+  String? _selectedBlock;
+  String? _selectedFloor;
   String? _selectedUnit;
 
   // 费用类型选择
-  FeeType _selectedFeeType = FeeType.management; // 默认选中管理费用
+  FeeType _selectedFeeType = FeeType.management;
 
   // 缓存键
   static const String _managementFeeCacheKey = 'management_fee_cache';
@@ -47,23 +45,19 @@ class ArrearProvider extends ChangeNotifier {
         _appDataProvider = appDataProvider;
 
   // 定时更新相关
-  Timer? _updateTimer; // 定时更新定时器
-  bool _isPeriodicUpdateActive = false; // 是否正在进行定期更新
+  Timer? _updateTimer;
+  bool _isPeriodicUpdateActive = false;
 
-  // Widget缓存机制 - 为欠费表單轮播优化
+  // Widget缓存机制
   final Map<String, Widget> _widgetCache = {};
-  final Map<String, dynamic> _cachedTableData = {}; // 缓存表格数据
-  String? _currentDataVersion; // 数据版本标识
-  bool _hasPendingUpdate = false; // 是否有待更新的数据
+  final Map<String, dynamic> _cachedTableData = {};
+  String? _currentDataVersion;
+  bool _hasPendingUpdate = false;
 
-  // 检查Provider是否已被销毁的简單方法
   bool get isDisposed => _disposed;
   bool _disposed = false;
 
-  // 定时更新状态getter
   bool get isPeriodicUpdateActive => _isPeriodicUpdateActive;
-
-  // Widget缓存相关getter
   bool get hasPendingUpdate => _hasPendingUpdate;
   String? get currentDataVersion => _currentDataVersion;
 
@@ -486,20 +480,28 @@ class ArrearProvider extends ChangeNotifier {
     return false;
   }
 
+  ///39, 當前選擇是否有數據（基於樓層+單位+費用類型）
+  bool get hasDataForCurrentSelection {
+    if (_selectedFloor == null || _selectedUnit == null) return false;
+    if (_selectedFeeType == FeeType.management) {
+      final map = getFeesByUnitAndType(
+          _selectedFloor!, _selectedUnit!, FeeType.management);
+      return map != null && map.isNotEmpty;
+    } else {
+      final list = getDetailedFeesByUnitAndType(
+          _selectedFloor!, _selectedUnit!, FeeType.other);
+      return list != null && list.isNotEmpty;
+    }
+  }
+
   ///9a，處理欠費API失敗的回退邏輯
   Future<void> _handleArrearFallback() async {
     if (hasData) {
-      // 已有緩存數據，標記待更新確保UI刷新
       _hasPendingUpdate = true;
-      debugPrint('💰 使用現有的欠費緩存數據');
     } else {
-      // 嘗試從持久化緩存重新加載
       await loadFromCache();
       if (hasData) {
         _hasPendingUpdate = true;
-        debugPrint('💰 從持久化緩存成功載入欠費數據');
-      } else {
-        debugPrint('💰 無可用的欠費緩存數據');
       }
     }
   }
@@ -509,30 +511,25 @@ class ArrearProvider extends ChangeNotifier {
     try {
       final prefs = await SharedPreferences.getInstance();
 
-      // 加载物业管理费用数据
       final managementFeeCache = prefs.getString(_managementFeeCacheKey);
       if (managementFeeCache != null) {
         final decodedData = json.decode(managementFeeCache);
         _managementFeeData = ManagementFeeModel.fromJson(decodedData);
-        _logger.i('✅ 从缓存加载物业管理费用数据成功');
       }
 
-      // 加载其他分摊费用数据
       final otherFeeCache = prefs.getString(_otherFeeCacheKey);
       if (otherFeeCache != null) {
         final decodedData = json.decode(otherFeeCache);
         _otherFeeData = OtherFeeModel.fromJson(decodedData);
-        _logger.i('✅ 从缓存加载其他分摊费用数据成功');
       }
 
-      // 自动选择第一个樓座（如果有多个）
       if (blocks.isNotEmpty && _selectedBlock == null) {
         setSelectedBlock(blocks[0]);
       }
 
       notifyListeners();
     } catch (e) {
-      _logger.e('❌ 从缓存加载数据失败: $e');
+      _error = '從緩存加載數據失敗';
     }
   }
 
@@ -542,24 +539,19 @@ class ArrearProvider extends ChangeNotifier {
       final prefs = await SharedPreferences.getInstance();
       final now = DateTime.now().toIso8601String();
 
-      // 保存物业管理费用数据
       if (_managementFeeData != null) {
         final jsonData = json.encode(_managementFeeData!.toJson());
         await prefs.setString(_managementFeeCacheKey, jsonData);
-        _logger.i('✅ 物业管理费用数据已保存到缓存');
       }
 
-      // 保存其他分摊费用数据
       if (_otherFeeData != null) {
         final jsonData = json.encode(_otherFeeData!.toJson());
         await prefs.setString(_otherFeeCacheKey, jsonData);
-        _logger.i('✅ 其他分摊费用数据已保存到缓存');
       }
 
       await prefs.setString(_lastUpdateKey, now);
-      _logger.i('📅 缓存更新时间: $now');
     } catch (e) {
-      _logger.e('❌ 保存数据到缓存失败: $e');
+      _error = '保存緩存失敗';
     }
   }
 
@@ -569,7 +561,6 @@ class ArrearProvider extends ChangeNotifier {
       final prefs = await SharedPreferences.getInstance();
       return prefs.getString(_lastUpdateKey);
     } catch (e) {
-      _logger.e('❌ 获取缓存更新时间失败: $e');
       return null;
     }
   }
@@ -581,10 +572,8 @@ class ArrearProvider extends ChangeNotifier {
       await prefs.remove(_managementFeeCacheKey);
       await prefs.remove(_otherFeeCacheKey);
       await prefs.remove(_lastUpdateKey);
-
-      _logger.i('🗑️ 费用数据缓存已清除');
     } catch (e) {
-      _logger.e('❌ 清除缓存失败: $e');
+      _error = '清除緩存失敗';
     }
   }
 
@@ -604,7 +593,6 @@ class ArrearProvider extends ChangeNotifier {
         'otherFeeDataExists': _otherFeeData != null,
       };
     } catch (e) {
-      _logger.e('❌ 获取缓存状态失败: $e');
       return {
         'hasManagementFeeCache': false,
         'hasOtherFeeCache': false,
@@ -619,27 +607,14 @@ class ArrearProvider extends ChangeNotifier {
   ///14, 获取目标ismartId
   String _getTargetIsmartId() {
     final correctIsmartId = _appDataProvider.settingsModel?.building.ismartId;
-    final targetId = (correctIsmartId != null && correctIsmartId.isNotEmpty)
+    return (correctIsmartId != null && correctIsmartId.isNotEmpty)
         ? correctIsmartId
         : _fallbackIsmartId;
-
-    if (targetId == _fallbackIsmartId) {
-      _logger.w('⚠️ 使用固定备选ismartId: $targetId');
-    } else {
-      _logger.i('✅ 使用正确的ismartId: $targetId');
-    }
-
-    return targetId;
   }
 
   ///15, 初始化获取费用数据
   Future<void> initGetFeeData() async {
-    _logger.i('🚀 开始初始化获取费用数据');
-
-    // 首先尝试从缓存加载数据
     await loadFromCache();
-
-    // 使用强制刷新方法确保获取正确的ismartId
     await forceRefreshWithCorrectIsmartId();
   }
 
@@ -668,29 +643,13 @@ class ArrearProvider extends ChangeNotifier {
         _apiClient.getOtherFeeStatus(buildingId: targetBuildingId),
       ]);
 
-      // 处理物业管理费用数据
       _managementFeeData = ManagementFeeModel.fromJson(results[0]);
-      debugPrint('✅ 成功获取物业管理费用数据');
-
-      // 处理其他分摊费用数据
       _otherFeeData = OtherFeeModel.fromJson(results[1]);
-      debugPrint('✅ 成功获取其他分摊费用数据');
-
-      // 保存到缓存
       await saveToCache();
-
-      // 更新数据版本标识
       _updateDataVersion();
-
-      // 标记有待更新的数据（在轮播中会延迟应用）
       _hasPendingUpdate = true;
-
       _error = null;
-      debugPrint('✅ 所有费用数据获取完成，数据版本: $_currentDataVersion');
     } catch (e) {
-      debugPrint('💰 获取费用数据时发生异常: $e');
-
-      // 🔧 優化：API失敗時優先使用緩存數據
       await _handleArrearFallback();
 
       if (e.toString().contains('Building ID') ||
@@ -698,12 +657,10 @@ class ArrearProvider extends ChangeNotifier {
           e.toString().contains('格式无效')) {
         _error = '樓宇ID格式错误：只能包含数字和英文字母';
       } else {
-        // 只有在真的沒有任何數據時才設置錯誤
         if (!hasData) {
           _error = 'API失敗且無緩存數據可用';
         } else {
-          _error = null; // 有緩存數據，清除錯誤狀態
-          debugPrint('💰 網絡請求失敗，但緩存數據可用');
+          _error = null;
         }
       }
     } finally {
@@ -720,13 +677,11 @@ class ArrearProvider extends ChangeNotifier {
   ///18, 设置樓宇ismartId
   void setIsmartId(String? buildingId) {
     _ismartId = buildingId;
-    _selectedBlock = null; // 重置樓座选择
+    _selectedBlock = null;
     _selectedFloor = null;
     _selectedUnit = null;
-    _logger.i('设置樓宇ismartId: $buildingId');
 
     if (buildingId != null) {
-      // 自动选择第一个樓座（如果有多个）
       final blockList = blocks;
       if (blockList.isNotEmpty) {
         setSelectedBlock(blockList[0]);
@@ -741,7 +696,6 @@ class ArrearProvider extends ChangeNotifier {
     _selectedBlock = block;
     _selectedFloor = null;
     _selectedUnit = null;
-    _logger.i('🔍 [setSelectedBlock] 设置樓座: "$block"');
 
     if (block != null) {
       // 自动选择第一个樓层
@@ -758,17 +712,10 @@ class ArrearProvider extends ChangeNotifier {
   void setSelectedFloor(String? floor) {
     _selectedFloor = floor;
     _selectedUnit = null;
-    _logger.i('🔍 [setSelectedFloor] 设置显示樓层: "$floor"');
-
     if (floor != null) {
       final units = getFloors(floor);
-      _logger.i('🔍 [setSelectedFloor] 樓层 "$floor" 的所有單位: $units');
-
       if (units.isNotEmpty) {
         _selectedUnit = units[0];
-        _logger.i('🔍 [setSelectedFloor] 自动选择第一个單位: "${units[0]}"');
-      } else {
-        _logger.w('⚠️ [setSelectedFloor] 樓层 "$floor" 没有找到任何單位');
       }
     }
 
@@ -778,14 +725,11 @@ class ArrearProvider extends ChangeNotifier {
   ///21, 设置选中的單元
   void setSelectedUnit(String? unit) {
     _selectedUnit = unit;
-    _logger.i('🔍 [setSelectedUnit] 设置單元: "$unit"');
     notifyListeners();
   }
 
   ///21, 强制刷新并使用正确的ismartId
   Future<void> forceRefreshWithCorrectIsmartId() async {
-    _logger.i('🔄 强制刷新费用数据，使用正确的ismartId');
-
     int attempts = 0;
     const maxAttempts = 10;
 
@@ -793,45 +737,36 @@ class ArrearProvider extends ChangeNotifier {
       final correctIsmartId = _appDataProvider.settingsModel?.building.ismartId;
 
       if (correctIsmartId != null && correctIsmartId.isNotEmpty) {
-        _logger.i('✅ 获得有效ismartId: $correctIsmartId，开始刷新数据');
         await fetchFeeData(reset: true, buildingId: correctIsmartId);
         return;
       }
 
       attempts++;
-      _logger.w('⏳ 等待有效ismartId... 尝试 $attempts/$maxAttempts');
       await Future.delayed(const Duration(milliseconds: 500));
     }
 
-    _logger.e('❌ 无法获得有效ismartId，使用备选ID');
     await fetchFeeData(reset: true, buildingId: _fallbackIsmartId);
   }
 
   ///22, 开始定期更新费用数据
   void startPeriodicUpdate({int? updateIntervalMinutes}) {
     if (_isPeriodicUpdateActive) {
-      _logger.i('Periodic fee update is already active.');
       return;
     }
 
     final intervalMinutes = updateIntervalMinutes ?? 1;
     final intervalSeconds = intervalMinutes * 60;
-    _logger.i(
-        'Starting periodic fee update with interval: $intervalMinutes minutes ($intervalSeconds seconds)');
-
     _isPeriodicUpdateActive = true;
+    debugPrint('[ArrearProvider] ⏰ 启动欠费数据定时更新，间隔: ${intervalMinutes}分钟');
 
-    // 立即执行一次强制刷新
     forceRefreshWithCorrectIsmartId();
 
-    // 设置定时器进行周期性更新
     _updateTimer = Timer.periodic(Duration(seconds: intervalSeconds), (timer) {
       if (_isPeriodicUpdateActive) {
-        _logger.i('🔄 执行定期费用数据更新...');
+        debugPrint('[ArrearProvider] 🔄 执行定时欠费数据更新');
         final currentTargetId = _getTargetIsmartId();
 
         if (currentTargetId == _fallbackIsmartId) {
-          _logger.w('⚠️ 检测到使用备选ID，尝试强制刷新获取正确ismartId');
           Future.microtask(() => forceRefreshWithCorrectIsmartId());
         } else {
           fetchFeeData(reset: false, buildingId: currentTargetId);
@@ -849,25 +784,20 @@ class ArrearProvider extends ChangeNotifier {
       _updateTimer = null;
     }
     _isPeriodicUpdateActive = false;
-    _logger.i('Periodic fee update stopped.');
+    debugPrint('[ArrearProvider] ⏹️ 停止欠费数据定时更新');
   }
 
   ///24, 重新初始化Provider
   void reinitialize() {
-    _logger.i('🔄 ArrearProvider重新初始化...');
-
     stopPeriodicUpdate();
     loadFromCache();
 
     Future.delayed(const Duration(milliseconds: 100), () {
       if (_appDataProvider.isLoggedIn) {
-        _logger.i('✅ 重新初始化完成，重启费用数据定时更新');
         final deviceSettings = _appDataProvider.deviceSettings;
         final arrearUpdateInterval =
             deviceSettings?.arrearageUpdateDuration ?? 1;
         startPeriodicUpdate(updateIntervalMinutes: arrearUpdateInterval);
-      } else {
-        _logger.w('⚠️ AppDataProvider未登录，跳过定时更新');
       }
     });
   }
@@ -953,13 +883,10 @@ class ArrearProvider extends ChangeNotifier {
     final dataVersion = _currentDataVersion ?? 'initial';
     final key = 'management_fee_table_$dataVersion';
 
-    // 检查缓存中是否已有此Widget
     if (_widgetCache.containsKey(key)) {
-      _logger.i('💾 使用缓存的管理费用表單Widget: $key');
       return _widgetCache[key]!;
     }
 
-    // 创建新的Widget并缓存
     final widget = ArrearManagementTableWidget(
       key: ValueKey(key),
       onHomeButtonPressed: onHomeButtonPressed,
@@ -968,21 +895,16 @@ class ArrearProvider extends ChangeNotifier {
       onPaginationStart: onPaginationStart,
     );
 
-    // 缓存Widget和数据
     _widgetCache[key] = widget;
     _cachedTableData[key] = getTableData();
-
-    // 清理旧缓存（保留最新的2个版本）
     _cleanupOldCache();
 
-    _logger.i('🆕 创建新的欠费表單Widget: $key');
     return widget;
   }
 
   ///30, 清理旧缓存
   void _cleanupOldCache() {
     if (_widgetCache.length > 2) {
-      // 保留最新的2个版本，删除更旧的
       final keys = _widgetCache.keys.toList()..sort();
       final keysToRemove = keys.take(keys.length - 2);
 
@@ -990,15 +912,12 @@ class ArrearProvider extends ChangeNotifier {
         _widgetCache.remove(key);
         _cachedTableData.remove(key);
       }
-
-      _logger.i('🗑️ 清理旧欠费表單缓存: ${keysToRemove.length}个');
     }
   }
 
   ///31, 标记数据更新完成（由ArrearTableWidget调用）
   void markUpdateApplied() {
     _hasPendingUpdate = false;
-    _logger.i('✅ 欠费数据更新已应用');
   }
 
   ///36, 获取其他费用表格数据（缓存版本）
@@ -1042,13 +961,10 @@ class ArrearProvider extends ChangeNotifier {
     final dataVersion = _currentDataVersion ?? 'initial';
     final key = 'other_fee_table_$dataVersion';
 
-    // 检查缓存中是否已有此Widget
     if (_widgetCache.containsKey(key)) {
-      _logger.i('💾 使用缓存的其他费用表單Widget: $key');
       return _widgetCache[key]!;
     }
 
-    // 创建新的Widget并缓存
     final widget = ArrearOtherTableWidget(
       key: ValueKey(key),
       onHomeButtonPressed: onHomeButtonPressed,
@@ -1057,14 +973,10 @@ class ArrearProvider extends ChangeNotifier {
       onPaginationStart: onPaginationStart,
     );
 
-    // 缓存Widget和数据
     _widgetCache[key] = widget;
     _cachedTableData[key] = getOtherTableData();
-
-    // 清理旧缓存（保留最新的2个版本）
     _cleanupOldCache();
 
-    _logger.i('🆕 创建新的其他费用表單Widget: $key');
     return widget;
   }
 }

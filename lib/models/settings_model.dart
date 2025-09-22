@@ -103,13 +103,12 @@ class Settings {
   final int advertisementUpdateDuration; // 廣告更新時間(分鐘)
   final int appUpdateDuration; // 應用更新時間(分鐘)
   final int advertisementPlayDuration; // 全屏廣告播放時間(秒)
-  final int noticePlayDuration; // 通告輪播總時間（先不管）
-  final int spareDuration; // 手動操作超時時間/無操作進入全屏廣告時間(秒)
   final int noticeStayDuration; // 通知停留時間
   final int bottomCarouselDuration; // 底部輪播時間(秒)
   final int paymentTableOnePageDuration; // 付款表格一頁顯示時間(秒)
   final int normalToAnnouncementCarouselDuration; // 正常到通告輪播轉換時間(秒)
   final int announcementCarouselToFullAdsCarouselDuration; // 通告輪播到全屏廣告輪播轉換時間(秒)
+  final String printPassWord; // 打印密碼
 
   Settings({
     required this.arrearageUpdateDuration,
@@ -117,13 +116,12 @@ class Settings {
     required this.advertisementUpdateDuration,
     required this.appUpdateDuration,
     required this.advertisementPlayDuration,
-    required this.noticePlayDuration,
-    required this.spareDuration,
     required this.noticeStayDuration,
     required this.bottomCarouselDuration,
     required this.paymentTableOnePageDuration,
     required this.normalToAnnouncementCarouselDuration,
     required this.announcementCarouselToFullAdsCarouselDuration,
+    required this.printPassWord,
   });
 
   factory Settings.fromJson(Map<String, dynamic> json) {
@@ -133,8 +131,6 @@ class Settings {
       advertisementUpdateDuration: json['advertisementUpdateDuration'] ?? 10,
       appUpdateDuration: json['appUpdateDuration'] ?? 60,
       advertisementPlayDuration: json['advertisementPlayDuration'] ?? 10,
-      noticePlayDuration: json['noticePlayDuration'] ?? 15,
-      spareDuration: json['spareDuration'] ?? 30,
       noticeStayDuration: json['noticeStayDuration'] ?? 5,
       bottomCarouselDuration: json['bottomCarouselDuration'] ?? 10,
       paymentTableOnePageDuration: json['paymentTableOnePageDuration'] ?? 10,
@@ -142,6 +138,7 @@ class Settings {
           json['normalToAnnouncementCarouselDuration'] ?? 5,
       announcementCarouselToFullAdsCarouselDuration:
           json['announcementCarouselToFullAdsCarouselDuration'] ?? 5,
+      printPassWord: json['printPassWord'] ?? '1090119',
     );
   }
 }

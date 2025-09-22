@@ -153,8 +153,8 @@ class WeatherProvider extends ChangeNotifier {
           final forecastData = json.decode(forecastJson);
           _weatherForecastData = WeatherData.fromJson(forecastData);
         } catch (e) {
-          // 解析缓存的天气预报数据失败
-          debugPrint('解析缓存的天气预报数据失败: $e');
+          // 忽略缓存解析错误
+          debugPrint('[WeatherProvider] ❌ 天气预报数据解析失败: $e');
         }
       }
 
@@ -165,8 +165,8 @@ class WeatherProvider extends ChangeNotifier {
           final currentData = json.decode(currentJson);
           _currentWeatherData = CurrentWeatherDataModel.fromJson(currentData);
         } catch (e) {
-          // 解析缓存的当前天气数据失败
-          debugPrint('解析缓存的当前天气数据失败: $e');
+          // 忽略缓存解析错误
+          debugPrint('[WeatherProvider] ❌ 当前天气数据解析失败: $e');
         }
       }
 
@@ -177,14 +177,14 @@ class WeatherProvider extends ChangeNotifier {
           final warningData = json.decode(warningJson);
           _weatherWarningData = WeatherWarningModel.fromJson(warningData);
         } catch (e) {
-          // 解析缓存的天气警告数据失败
-          debugPrint('解析缓存的天气警告数据失败: $e');
+          // 忽略缓存解析错误
+          debugPrint('[WeatherProvider] ❌ 天气警告数据解析失败: $e');
         }
       }
 
       notifyListeners();
     } catch (e) {
-      debugPrint('从缓存加载天气数据失败: $e');
+      // 忽略缓存加载错误
     }
   }
 
@@ -236,13 +236,11 @@ class WeatherProvider extends ChangeNotifier {
         _forecastError = null;
         await _saveWeatherDataToCache();
         stopwatch.stop();
-        debugPrint('🌤️ 天氣預報數據獲取成功並已緩存');
       } else {
         await _handleForecastFallback();
         stopwatch.stop();
       }
     } catch (e) {
-      debugPrint('🌤️ 天氣預報API失敗: $e，嘗試使用緩存數據');
       await _handleForecastFallback();
       stopwatch.stop();
     } finally {
@@ -257,16 +255,13 @@ class WeatherProvider extends ChangeNotifier {
     if (_weatherForecastData != null) {
       // 已有緩存數據，清除錯誤狀態
       _forecastError = null;
-      debugPrint('🌤️ 使用現有的天氣預報緩存數據');
     } else {
       // 嘗試從持久化緩存加載
       await _loadWeatherDataFromCache();
       if (_weatherForecastData != null) {
         _forecastError = null;
-        debugPrint('🌤️ 從持久化緩存成功載入天氣預報數據');
       } else {
         _forecastError = '获取天气预报数据失败';
-        debugPrint('🌤️ 無可用的天氣預報緩存數據');
       }
     }
   }
@@ -289,13 +284,11 @@ class WeatherProvider extends ChangeNotifier {
         _currentError = null;
         await _saveWeatherDataToCache();
         stopwatch.stop();
-        debugPrint('🌡️ 當前天氣數據獲取成功並已緩存');
       } else {
         await _handleCurrentFallback();
         stopwatch.stop();
       }
     } catch (e) {
-      debugPrint('🌡️ 當前天氣API失敗: $e，嘗試使用緩存數據');
       await _handleCurrentFallback();
       stopwatch.stop();
     } finally {
@@ -310,16 +303,13 @@ class WeatherProvider extends ChangeNotifier {
     if (_currentWeatherData != null) {
       // 已有緩存數據，清除錯誤狀態
       _currentError = null;
-      debugPrint('🌡️ 使用現有的當前天氣緩存數據');
     } else {
       // 嘗試從持久化緩存加載
       await _loadWeatherDataFromCache();
       if (_currentWeatherData != null) {
         _currentError = null;
-        debugPrint('🌡️ 從持久化緩存成功載入當前天氣數據');
       } else {
         _currentError = '获取当前天气数据失败';
-        debugPrint('🌡️ 無可用的當前天氣緩存數據');
       }
     }
   }
@@ -342,14 +332,12 @@ class WeatherProvider extends ChangeNotifier {
         _warningError = null;
         await _saveWeatherDataToCache();
         stopwatch.stop();
-        debugPrint('⚠️ 天氣警告數據獲取成功並已緩存');
         _checkAndUpdateCurrentWeatherCardCarousel(); // 更新当前天气卡片轮播状态
       } else {
         await _handleWarningFallback();
         stopwatch.stop();
       }
     } catch (e) {
-      debugPrint('⚠️ 天氣警告API失敗: $e，嘗試使用緩存數據');
       await _handleWarningFallback();
       stopwatch.stop();
     } finally {
@@ -364,18 +352,15 @@ class WeatherProvider extends ChangeNotifier {
     if (_weatherWarningData != null) {
       // 已有緩存數據，清除錯誤狀態
       _warningError = null;
-      debugPrint('⚠️ 使用現有的天氣警告緩存數據');
       _checkAndUpdateCurrentWeatherCardCarousel(); // 確保轮播状态更新
     } else {
       // 嘗試從持久化緩存加載
       await _loadWeatherDataFromCache();
       if (_weatherWarningData != null) {
         _warningError = null;
-        debugPrint('⚠️ 從持久化緩存成功載入天氣警告數據');
         _checkAndUpdateCurrentWeatherCardCarousel(); // 確保轮播状态更新
       } else {
         _warningError = '获取天气警告数据失败';
-        debugPrint('⚠️ 無可用的天氣警告緩存數據');
       }
     }
   }
@@ -384,19 +369,14 @@ class WeatherProvider extends ChangeNotifier {
   Future<void> fetchAllWeatherData() async {
     final stopwatch = Stopwatch()..start();
 
-    // 🔧 關鍵改進：先加載緩存數據，確保有基礎數據可用
     await _loadWeatherDataFromCache();
-    debugPrint('🌤️ 已預載入緩存天氣數據作為基礎');
 
     try {
-      // 然後嘗試更新最新數據，但不會影響已載入的緩存
       await fetchWeatherForecast();
       await fetchCurrentWeather();
       await fetchWeatherWarnings();
-      debugPrint('🌤️ 所有天氣數據更新完成');
     } catch (e) {
-      debugPrint('🌤️ 天氣數據更新失敗，但緩存數據已可用: $e');
-      // 不需要再次加載緩存，因為已經在開始時加載了
+      // 忽略更新错误，使用缓存数据
     }
     stopwatch.stop();
   }
@@ -407,7 +387,9 @@ class WeatherProvider extends ChangeNotifier {
       return;
     }
     _isPeriodicUpdateActive = true;
+    debugPrint('[WeatherProvider] ⏰ 启动天气数据定时更新，间隔: ${interval.inHours}小时');
     _updateTimer = Timer.periodic(interval, (timer) {
+      debugPrint('[WeatherProvider] 🔄 执行定时天气数据更新');
       fetchAllWeatherData();
     });
 
@@ -423,6 +405,7 @@ class WeatherProvider extends ChangeNotifier {
     _updateTimer?.cancel();
     _updateTimer = null;
     _isPeriodicUpdateActive = false;
+    debugPrint('[WeatherProvider] ⏹️ 停止天气数据定时更新');
 
     notifyListeners();
   }
@@ -471,7 +454,6 @@ class WeatherProvider extends ChangeNotifier {
 
   ///12，初始化底部轮播
   void initializeBottomCarousel() {
-    // _logger.i('🌤️ [初始化] 底部轮播初始化');
     _currentState = CarouselState.weather;
     _isBottomCarouselPaused = false;
     _bottomDuration = Duration(seconds: _getCarouselInterval());
@@ -497,11 +479,9 @@ class WeatherProvider extends ChangeNotifier {
 
   ///14，启动底部轮播计时器
   void startBottomTimer() {
-    //_logger.d('🌤️ 开始底部轮播计时器: paused=$_isBottomCarouselPaused');
     _bottomTimer?.cancel();
 
     if (_isBottomCarouselPaused) {
-      // _logger.w('⚠️ 底部轮播计时器条件不满足: paused=$_isBottomCarouselPaused');
       return;
     }
 
@@ -509,13 +489,8 @@ class WeatherProvider extends ChangeNotifier {
     _bottomDuration = Duration(seconds: _getCarouselInterval());
     _bottomElapsedTime = Duration.zero;
 
-    //.d('▶️ 启动底部轮播计时器: state=$_currentState, duration=$_bottomDuration');
-    //_logger.i(
-    //   '📝 记录底部轮播开始时间: $_currentBottomStartTime, 时长: ${_bottomDuration.inSeconds}秒');
-
     _bottomTimer = Timer(_bottomDuration, () {
       if (!_isBottomCarouselPaused) {
-        // _logger.d('⏭️ 底部轮播计时器到期，切换到下一个状态');
         _switchToNextState();
       }
     });
@@ -550,12 +525,8 @@ class WeatherProvider extends ChangeNotifier {
       if (totalElapsed >= _bottomDuration) {
         _bottomElapsedTime = _bottomDuration;
         Duration.zero;
-        //    _logger.i(
-        //      '📊 [暂停] 底部轮播 - 已播放: ${_bottomElapsedTime.inSeconds}s/${_bottomDuration.inSeconds}s, 剩余: ${remaining.inSeconds}s (轮播已完成)');
       } else {
         _bottomElapsedTime = totalElapsed;
-        //  _logger.i(
-        //    '📊 [暂停] 底部轮播 - 已播放: ${_bottomElapsedTime.inSeconds}s/${_bottomDuration.inSeconds}s, 剩余: ${remaining.inSeconds}s');
       }
     }
 
@@ -572,14 +543,10 @@ class WeatherProvider extends ChangeNotifier {
 
   ///17，恢复底部轮播
   void resumeBottomCarousel() {
-    // _logger.i('▶️ 恢复底部轮播');
-
     _isBottomCarouselPaused = false;
 
     if (_currentBottomStartTime != null) {
       final remainingTime = _bottomDuration - _bottomElapsedTime;
-      // _logger.i(
-      //   '🔄 [恢复] 底部轮播 - 继续播放剩余时间：${remainingTime.inSeconds}s (已播放: ${_bottomElapsedTime.inSeconds}s)');
 
       if (remainingTime > Duration.zero) {
         _bottomTimer = Timer(remainingTime, () {

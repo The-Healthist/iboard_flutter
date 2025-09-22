@@ -168,6 +168,8 @@ class AnnouncementProvider extends ChangeNotifier {
         _appDataProvider.deviceSettings?.noticeUpdateDuration ?? 5;
     final updateIntervalSeconds = updateIntervalMinutes * 60;
     _isPeriodicUpdateActive = true;
+    debugPrint(
+        '[AnnouncementProvider] ⏰ 启动通告数据定时更新，间隔: ${updateIntervalSeconds}秒');
 
     fetchNotices();
 
@@ -175,6 +177,7 @@ class AnnouncementProvider extends ChangeNotifier {
     _updateTimer =
         Timer.periodic(Duration(seconds: updateIntervalSeconds), (timer) {
       if (_isPeriodicUpdateActive) {
+        debugPrint('[AnnouncementProvider] 🔄 执行定时通告数据更新');
         fetchNotices();
       } else {
         timer.cancel();
@@ -189,6 +192,7 @@ class AnnouncementProvider extends ChangeNotifier {
       _updateTimer = null;
     }
     _isPeriodicUpdateActive = false;
+    debugPrint('[AnnouncementProvider] ⏹️ 停止通告数据定时更新');
   }
 
   /// 重新初始化Provider（当依赖变化时调用）

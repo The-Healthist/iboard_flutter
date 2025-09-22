@@ -194,7 +194,6 @@ class _TimerDebugWidgetState extends State<TimerDebugWidget> {
     content.add('登录状态: ${appDataProvider.isLoggedIn ? '✅ 已登录' : '❌ 未登录'}');
     content.add('通告总数: ${provider.announcements.length}');
     content.add('轮播通告数: ${provider.carouselAnnouncements.length}');
-    content.add('播放时长: ${deviceSettings?.noticePlayDuration ?? 5}秒');
     content.add('停留时长: ${deviceSettings?.noticeStayDuration ?? 3}秒');
 
     if (provider.error != null) {
@@ -322,8 +321,8 @@ class _TimerDebugWidgetState extends State<TimerDebugWidget> {
     content.add('通告更新间隔: ${deviceSettings.noticeUpdateDuration}分鈡');
     content.add('广告更新间隔: ${deviceSettings.advertisementUpdateDuration}分鈡');
     content.add('广告播放时长: ${deviceSettings.advertisementPlayDuration}秒');
-    content.add('通告播放时长: ${deviceSettings.noticePlayDuration}秒');
-    content.add('空闲时长: ${deviceSettings.spareDuration}秒');
+    // 移除通告播放/空閒字段
+    // 移除通告播放/空閒字段
     content.add('通告停留时长: ${deviceSettings.noticeStayDuration}秒');
 
     _debugInfo.add({
