@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:iboard_app/models/announcement_model.dart'; // Changed import
@@ -18,6 +19,12 @@ class AnnouncementReaderWidget extends StatefulWidget {
   final Function(Duration)? onVideoProgressChanged;
   final Duration? initialPlaybackPosition;
 
+  // 新增：PDF多頁完成回調
+  final VoidCallback? onPdfCompleted;
+
+  // 新增：PDF多頁開始回調（用於延長停留時間）
+  final Function(int totalPages)? onPdfPaginationStart;
+
   const AnnouncementReaderWidget({
     super.key,
     required this.announcement,
@@ -25,6 +32,8 @@ class AnnouncementReaderWidget extends StatefulWidget {
     this.onHomeButtonPressed,
     this.onVideoProgressChanged,
     this.initialPlaybackPosition,
+    this.onPdfCompleted,
+    this.onPdfPaginationStart,
   });
 
   @override
@@ -34,10 +43,17 @@ class AnnouncementReaderWidget extends StatefulWidget {
 
 class AnnouncementReaderWidgetState extends State<AnnouncementReaderWidget> {
   VideoPlayerController? _videoController;
+  PDFViewController? _pdfController;
   bool _isLoading = true;
   String? _localFilePath;
   String? _error;
   Duration? _savedPlaybackPosition;
+
+  // PDF 控制相關
+  int _totalPages = 0;
+  int _currentPage = 0;
+  Timer? _pdfPageTimer;
+  bool _isPdfAutoPlaying = false;
 
   @override
   void initState() {
@@ -154,6 +170,11 @@ class AnnouncementReaderWidgetState extends State<AnnouncementReaderWidget> {
     _videoController?.removeListener(_onVideoProgressChanged);
     _videoController?.dispose();
     _videoController = null;
+
+    // 清理PDF相關
+    _stopPdfAutoPlay();
+    _pdfController = null;
+
     super.dispose();
   }
 
@@ -162,11 +183,24 @@ class AnnouncementReaderWidgetState extends State<AnnouncementReaderWidget> {
     final carouselStateProvider = context.watch<CarouselStateProvider>();
     final isMediaPaused =
         carouselStateProvider.isMediaPausedForArea(AreaType.middleNotice);
+
+    // 視頻控制
     if (_videoController != null && _videoController!.value.isInitialized) {
       if (isMediaPaused && _videoController!.value.isPlaying) {
         _videoController!.pause();
       } else if (!isMediaPaused && !_videoController!.value.isPlaying) {
         _videoController!.play();
+      }
+    }
+
+    // PDF控制
+    if (_totalPages > 1) {
+      if (isMediaPaused && _isPdfAutoPlaying) {
+        _pausePdf();
+      } else if (!isMediaPaused &&
+          !_isPdfAutoPlaying &&
+          _currentPage < _totalPages - 1) {
+        _resumePdf();
       }
     }
 
@@ -224,16 +258,53 @@ class AnnouncementReaderWidgetState extends State<AnnouncementReaderWidget> {
     Widget contentWidget;
 
     if (mimeType == 'application/pdf') {
-      contentWidget = PDFView(
-        filePath: _localFilePath!,
-        fitPolicy: FitPolicy.HEIGHT, // Add this line
-        onError: (error) {
-          if (mounted) {
-            setState(() {
-              _error = 'Could not display PDF.';
-            });
-          }
-        },
+      contentWidget = Stack(
+        children: [
+          PDFView(
+            filePath: _localFilePath!,
+            fitPolicy: FitPolicy.HEIGHT,
+            enableSwipe: false, // 禁用手動滑動，使用程式控制
+            onViewCreated: (PDFViewController vc) {
+              _pdfController = vc;
+            },
+            onRender: _onPdfRender,
+            onPageChanged: (int? page, int? total) {
+              if (page != null) {
+                setState(() {
+                  _currentPage = page;
+                });
+              }
+            },
+            onError: (error) {
+              if (mounted) {
+                setState(() {
+                  _error = 'Could not display PDF.';
+                });
+              }
+            },
+          ),
+          // PDF頁數指示器（右下角）
+          if (_totalPages > 1)
+            Positioned(
+              bottom: 16,
+              right: 16,
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  color: Colors.black.withOpacity(0.7),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Text(
+                  '${_currentPage + 1}/$_totalPages',
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ),
+            ),
+        ],
       );
     } else if (mimeType.startsWith('image/')) {
       contentWidget = InteractiveViewer(
@@ -273,12 +344,18 @@ class AnnouncementReaderWidgetState extends State<AnnouncementReaderWidget> {
             if (mounted && _videoController != null) {
               _pauseVideo();
             }
+            if (mounted && _totalPages > 1) {
+              _pausePdf();
+            }
           });
           return true;
         } else if (notification is MediaResumeNotification) {
           Future.delayed(const Duration(milliseconds: 50), () {
             if (mounted && _videoController != null) {
               _resumeVideo();
+            }
+            if (mounted && _totalPages > 1) {
+              _resumePdf();
             }
           });
           return true;
@@ -473,4 +550,100 @@ class AnnouncementReaderWidgetState extends State<AnnouncementReaderWidget> {
       ),
     );
   }
+
+  ///18, PDF渲染完成回調
+  void _onPdfRender(int? pages) {
+    if (pages != null && pages > 0) {
+      setState(() {
+        _totalPages = pages;
+        _currentPage = 0; // 從第0頁開始
+      });
+
+      // 如果PDF有多頁，啟動自動翻頁並通知延長時間
+      if (_totalPages > 1) {
+        // 通知外部延長停留時間
+        if (widget.onPdfPaginationStart != null) {
+          widget.onPdfPaginationStart!(_totalPages);
+        }
+        _startPdfAutoPlay();
+      }
+    }
+  }
+
+  ///19, 啟動PDF自動翻頁
+  void _startPdfAutoPlay() {
+    if (_isPdfAutoPlaying || _totalPages <= 1) return;
+
+    // 通知AnnouncementCarouselProvider開始PDF多頁翻頁，延長停留時間
+    if (widget.onPdfPaginationStart != null) {
+      widget.onPdfPaginationStart!(_totalPages);
+    }
+
+    _isPdfAutoPlaying = true;
+    final carouselStateProvider = context.read<CarouselStateProvider>();
+    final pageStayDuration = carouselStateProvider.noticeStayDuration;
+
+    _schedulePdfPageChange(pageStayDuration);
+  }
+
+  ///20, 調度PDF頁面切換
+  void _schedulePdfPageChange(int pageStayDuration) {
+    _pdfPageTimer?.cancel();
+
+    _pdfPageTimer = Timer(Duration(seconds: pageStayDuration), () async {
+      if (!mounted || !_isPdfAutoPlaying) return;
+
+      if (_currentPage < _totalPages - 1) {
+        // 切換到下一頁
+        final nextPage = _currentPage + 1;
+        final success = await _pdfController?.setPage(nextPage);
+
+        if (success == true) {
+          setState(() {
+            _currentPage = nextPage;
+          });
+          // 繼續調度下一頁
+          _schedulePdfPageChange(pageStayDuration);
+        }
+      } else {
+        // 已到最後一頁，通知外部可以切換通告了
+        _isPdfAutoPlaying = false;
+        if (widget.onPdfCompleted != null) {
+          widget.onPdfCompleted!();
+        }
+      }
+    });
+  }
+
+  ///21, 停止PDF自動播放
+  void _stopPdfAutoPlay() {
+    _isPdfAutoPlaying = false;
+    _pdfPageTimer?.cancel();
+  }
+
+  ///22, 暫停PDF播放
+  void _pausePdf() {
+    if (_isPdfAutoPlaying) {
+      _stopPdfAutoPlay();
+    }
+  }
+
+  ///23, 恢復PDF播放
+  void _resumePdf() {
+    if (_totalPages > 1 &&
+        !_isPdfAutoPlaying &&
+        _currentPage < _totalPages - 1) {
+      _startPdfAutoPlay();
+    }
+  }
+
+  ///24, 獲取PDF總頁數
+  int get totalPdfPages => _totalPages;
+
+  ///25, 獲取當前PDF頁數
+  int get currentPdfPage => _currentPage;
+
+  ///26, 檢查PDF是否已完成播放
+  bool get isPdfCompleted =>
+      _totalPages <= 1 || _currentPage >= _totalPages - 1;
 }

@@ -53,9 +53,10 @@ class AnnouncementCarouselProvider extends ChangeNotifier {
 
   late ArrearProvider? _arrearProvider;
 
-  // 新增：跟踪当前费用表單的轮播状态
+  // 新增：跟踪当前费用表單和PDF的轮播状态
   bool _isOtherTablePaginationActive = false; // 其他费用表單是否在翻頁中
   bool _isManagementTablePaginationActive = false; // 管理费用表單是否在翻頁中
+  bool _isPdfPaginationActive = false; // PDF多頁是否在翻頁中
 
   // 緩存Widget實例和FileManager - 优化内存管理
   final Map<String, Widget> _widgetCache = {};
@@ -231,6 +232,14 @@ class AnnouncementCarouselProvider extends ChangeNotifier {
               announcement: announcement,
               fileManager: fileManager,
               onHomeButtonPressed: _homeButtonCallback,
+              onPdfCompleted: () {
+                // PDF多頁播放完成回調
+                _onPdfPaginationComplete();
+              },
+              onPdfPaginationStart: (int totalPages) {
+                // PDF多頁開始回調，延長停留時間
+                _onPdfPaginationStart(totalPages);
+              },
             ),
           );
         } catch (e) {
@@ -659,10 +668,11 @@ class AnnouncementCarouselProvider extends ChangeNotifier {
       try {
         // 無影片：不需要記錄播放進度
 
-        // 🔧 修复关键问题：检查是否有费用表格正在翻页
+        // 🔧 修复关键问题：检查是否有费用表格或PDF正在翻页
         if (_isOtherTablePaginationActive ||
-            _isManagementTablePaginationActive) {
-          // 重新调度，等待费用表格翻页完成
+            _isManagementTablePaginationActive ||
+            _isPdfPaginationActive) {
+          // 重新调度，等待费用表格或PDF翻页完成
           _scheduleNextCarousel(apiNoticeStayDuration);
           return;
         }
@@ -1081,6 +1091,14 @@ class AnnouncementCarouselProvider extends ChangeNotifier {
               // 默认返回主頁行为：跳转到主屏幕
               jumpToAnnouncementIndex(0);
             },
+        onPdfCompleted: () {
+          // PDF多頁播放完成回調
+          _onPdfPaginationComplete();
+        },
+        onPdfPaginationStart: (int totalPages) {
+          // PDF多頁開始回調，延長停留時間
+          _onPdfPaginationStart(totalPages);
+        },
       ),
     );
 
@@ -1153,46 +1171,67 @@ class AnnouncementCarouselProvider extends ChangeNotifier {
     );
   }
 
-  ///17，动态延长当前通告停留时间（费用表單開始翻頁時調用）
+  ///17，动态延长当前通告停留时间（费用表單和PDF開始翻頁時調用）
   void _extendCurrentNoticeStayTime(int totalPages) {
-    // 🔧 修复：只有当前正在显示费用表单时，才延长停留时间
-    if (!_isCurrentIndexInArrearTables()) {
-      //debugPrint('[AnnouncementCarousel] 🚫 当前不在费用表单，不延长停留时间');
+    // 檢查是否在費用表格或PDF翻頁狀態
+    final isInArrearTables = _isCurrentIndexInArrearTables();
+    final isInPdfPagination = _isPdfPaginationActive;
+    final isInAnnouncements = _isCurrentIndexInAnnouncements();
+
+    // 允許通告中的PDF翻頁或費用表格翻頁
+    if (!isInArrearTables && !isInPdfPagination && !isInAnnouncements) {
+      debugPrint('[AnnouncementCarousel] 🚫 当前不在费用表单、PDF翻页或通告状态，不延长停留时间');
       return;
     }
 
     // 该方法现在主要用于动态延长轮播时间
-    //debugPrint('[AnnouncementCarousel] 🕒 延长停留时间，总頁数: $totalPages');
+    debugPrint('[AnnouncementCarousel] 🕒 延长停留时间，总頁数: $totalPages');
 
-    // 计算需要延长的时间：根据当前表格类型使用不同的翻页间隔
+    // 计算需要延长的时间：根据当前类型使用不同的翻页间隔
     final deviceSettings = _appDataProvider.deviceSettings;
-    final baseDuration = deviceSettings?.paymentTableOnePageDuration ?? 3;
 
-    // 判断当前是哪种费用表格
     int paginationDuration;
-    final currentIndex = _currentNoticeIndex;
-    final otherTableIndex = _findOtherTableIndex();
-    final managementTableIndex = _findManagementTableIndex();
 
-    if (currentIndex == otherTableIndex) {
-      // 其他费用表格，翻页较慢（乘以2）
-      paginationDuration = baseDuration * 2;
+    if (isInPdfPagination) {
+      // PDF翻頁：使用通告停留時間 (noticeStayDuration)
+      paginationDuration = deviceSettings?.noticeStayDuration ?? 5;
       debugPrint(
-          '[AnnouncementCarousel] 📊 其他费用表格，翻页间隔: ${paginationDuration}秒');
-    } else if (currentIndex == managementTableIndex) {
-      // 管理费用表格，翻页较快（乘以1）
-      paginationDuration = baseDuration * 1;
-      debugPrint(
-          '[AnnouncementCarousel] 📊 管理费用表格，翻页间隔: ${paginationDuration}秒');
+          '[AnnouncementCarousel] 📄 PDF翻页，翻页间隔: ${paginationDuration}秒');
     } else {
-      // 默认情况
-      paginationDuration = baseDuration;
-      debugPrint(
-          '[AnnouncementCarousel] 📊 默认费用表格，翻页间隔: ${paginationDuration}秒');
+      // 費用表格翻頁：使用費用表格時間間隔
+      final baseDuration = deviceSettings?.paymentTableOnePageDuration ?? 3;
+      // 判断当前是哪种费用表格
+      final currentIndex = _currentNoticeIndex;
+      final otherTableIndex = _findOtherTableIndex();
+      final managementTableIndex = _findManagementTableIndex();
+
+      if (currentIndex == otherTableIndex) {
+        // 其他费用表格，翻页较慢（乘以2）
+        paginationDuration = baseDuration * 2;
+        debugPrint(
+            '[AnnouncementCarousel] 📊 其他费用表格，翻页间隔: ${paginationDuration}秒');
+      } else if (currentIndex == managementTableIndex) {
+        // 管理费用表格，翻页较快（乘以1）
+        paginationDuration = baseDuration * 1;
+        debugPrint(
+            '[AnnouncementCarousel] 📊 管理费用表格，翻页间隔: ${paginationDuration}秒');
+      } else {
+        // 默认情况
+        paginationDuration = baseDuration;
+        debugPrint(
+            '[AnnouncementCarousel] 📊 默认费用表格，翻页间隔: ${paginationDuration}秒');
+      }
     }
-    // 🔧 修复：为管理费用表格增加额外的缓冲时间，确保能完成所有页面翻页
-    final int extensionSeconds =
-        totalPages * paginationDuration + 3; // 额外增加3秒缓冲时间
+
+    // 🔧 修复：增加额外的缓冲时间，确保能完成所有页面翻页
+    int bufferTime;
+    if (isInPdfPagination) {
+      bufferTime = 1; // PDF多頁緩衝時間設為1秒
+    } else {
+      bufferTime = 3; // 費用表格保持3秒緩衝時間
+    }
+
+    final int extensionSeconds = totalPages * paginationDuration + bufferTime;
 
     // 取消现有的定时器，避免冲突
     _midTimer?.cancel();
@@ -1203,8 +1242,13 @@ class AnnouncementCarouselProvider extends ChangeNotifier {
     // 使用延长后的时间重新调度轮播
     final extendedDuration = _noticeDuration.inSeconds + extensionSeconds;
 
-    debugPrint(
-        '[AnnouncementCarousel] 费用表單翻頁开始，延长停留时间: ${extensionSeconds}秒（含3秒缓冲），总时长: ${extendedDuration}秒');
+    if (isInPdfPagination) {
+      debugPrint(
+          '[AnnouncementCarousel] PDF翻頁开始，延长停留时间: ${extensionSeconds}秒（含${bufferTime}秒缓冲），总时长: ${extendedDuration}秒');
+    } else {
+      debugPrint(
+          '[AnnouncementCarousel] 费用表單翻頁开始，延长停留时间: ${extensionSeconds}秒（含${bufferTime}秒缓冲），总时长: ${extendedDuration}秒');
+    }
 
     // 使用延长后的时间调度下一次轮播
     _scheduleNextCarousel(extendedDuration);
@@ -1245,6 +1289,24 @@ class AnnouncementCarouselProvider extends ChangeNotifier {
       // 这种情况不应该出现，但为了安全起见
       //debugPrint('[AnnouncementCarousel] ⚠️ 异常状态：其他费用表單完成但没有后续内容');
     }
+  }
+
+  ///17.1.1，PDF多頁翻頁開始處理
+  void _onPdfPaginationStart(int totalPages) {
+    _isPdfPaginationActive = true;
+    debugPrint('[AnnouncementCarousel] 📄 PDF多頁翻頁開始，總頁數: $totalPages');
+
+    // 使用與費用表格相同的延長時間邏輯
+    _extendCurrentNoticeStayTime(totalPages);
+  }
+
+  ///17.1.2，PDF多頁翻頁完成處理
+  void _onPdfPaginationComplete() {
+    _isPdfPaginationActive = false;
+    debugPrint('[AnnouncementCarousel] 📄 PDF多頁翻頁完成');
+
+    // PDF播放完成，切換到下一個通告
+    _goToNextCarouselItem();
   }
 
   ///17.2，管理费用表單翻頁完成处理
