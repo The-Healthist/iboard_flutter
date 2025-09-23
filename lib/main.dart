@@ -236,10 +236,13 @@ class HomePageState extends State<HomePage> {
 
           // 3.初始化天气数据（不需要登录，公开API） - 失败不影响应用启动
           try {
-            await weatherProvider.fetchAllWeatherData();
-            // 3.1 启动天气数据定时更新（120分鈡一次）
+            await weatherProvider.fetchAllWeatherDataWithWarnings();
+            // 3.1 启动天气预报和当前天气定时更新（120分鈡一次）
             weatherProvider.startPeriodicUpdate(
                 interval: const Duration(minutes: 120));
+            // 3.2 启动天气警告独立定时更新（15分鈡一次）
+            weatherProvider.startWarningPeriodicUpdate(
+                interval: const Duration(minutes: 15));
           } catch (weatherError) {
             debugPrint('[初始化]天氣數據初始化失敗，將使用默認數據: $weatherError');
           }
@@ -458,7 +461,7 @@ class HomePageState extends State<HomePage> {
     try {
       // 1. 加載天氣緩存數據
       try {
-        await weatherProvider.fetchAllWeatherData(); // 這個方法已經優化過，會優先使用緩存
+        await weatherProvider.fetchAllWeatherDataWithWarnings(); // 使用包含警告的完整方法
       } catch (e) {
         debugPrint('[初始化]天氣緩存數據加載失敗: $e');
       }
@@ -516,7 +519,7 @@ class HomePageState extends State<HomePage> {
 
       // 1. 嘗試加載天氣緩存
       try {
-        await weatherProvider.fetchAllWeatherData();
+        await weatherProvider.fetchAllWeatherDataWithWarnings();
         debugPrint('[初始化]緊急模式：天氣緩存已加載');
       } catch (e) {
         debugPrint('[初始化]緊急模式：天氣緩存加載失敗: $e');

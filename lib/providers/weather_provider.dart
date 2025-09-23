@@ -39,6 +39,10 @@ class WeatherProvider extends ChangeNotifier {
   Timer? _updateTimer;
   bool _isPeriodicUpdateActive = false;
 
+  // 天气警告独立定时更新
+  Timer? _warningUpdateTimer;
+  bool _isWarningPeriodicUpdateActive = false;
+
   // 轮播状态管理
   Timer? _bottomTimer;
   Timer? _debugTimer;
@@ -85,6 +89,7 @@ class WeatherProvider extends ChangeNotifier {
   bool get hasWarningData => _weatherWarningData != null;
 
   bool get isPeriodicUpdateActive => _isPeriodicUpdateActive;
+  bool get isWarningPeriodicUpdateActive => _isWarningPeriodicUpdateActive;
 
   // 轮播相关getters
   bool get isBottomCarouselPaused => _isBottomCarouselPaused;
@@ -132,6 +137,8 @@ class WeatherProvider extends ChangeNotifier {
   void dispose() {
     _updateTimer?.cancel();
     _updateTimer = null;
+    _warningUpdateTimer?.cancel();
+    _warningUpdateTimer = null;
     _bottomTimer?.cancel();
     _bottomTimer = null;
     _debugTimer?.cancel();
@@ -365,8 +372,25 @@ class WeatherProvider extends ChangeNotifier {
     }
   }
 
-  ///7，获取所有天气数据 - 優化：確保緩存數據優先加載
+  ///7，获取所有天气数据 - 優化：確保緩存數據優先加載（不包括天气警告）
   Future<void> fetchAllWeatherData() async {
+    final stopwatch = Stopwatch()..start();
+
+    await _loadWeatherDataFromCache();
+
+    try {
+      await fetchWeatherForecast();
+      await fetchCurrentWeather();
+      // 31, 天气警告已分离到独立定时器，此处不再调用
+      // await fetchWeatherWarnings();
+    } catch (e) {
+      // 忽略更新错误，使用缓存数据
+    }
+    stopwatch.stop();
+  }
+
+  ///7a，获取所有天气数据（包括天气警告）- 仅用于初始化
+  Future<void> fetchAllWeatherDataWithWarnings() async {
     final stopwatch = Stopwatch()..start();
 
     await _loadWeatherDataFromCache();
@@ -410,6 +434,36 @@ class WeatherProvider extends ChangeNotifier {
     notifyListeners();
   }
 
+  ///9a，启动天气警告独立定时更新
+  void startWarningPeriodicUpdate(
+      {Duration interval = const Duration(minutes: 15)}) {
+    if (_isWarningPeriodicUpdateActive) {
+      return;
+    }
+    _isWarningPeriodicUpdateActive = true;
+    debugPrint('[WeatherProvider] ⏰ 启动天气警告独立定时更新，间隔: ${interval.inMinutes}分钟');
+    _warningUpdateTimer = Timer.periodic(interval, (timer) {
+      debugPrint('[WeatherProvider] 🔄 执行定时天气警告更新');
+      fetchWeatherWarnings();
+    });
+
+    notifyListeners();
+  }
+
+  ///9b，停止天气警告独立定时更新
+  void stopWarningPeriodicUpdate() {
+    if (!_isWarningPeriodicUpdateActive) {
+      return;
+    }
+
+    _warningUpdateTimer?.cancel();
+    _warningUpdateTimer = null;
+    _isWarningPeriodicUpdateActive = false;
+    debugPrint('[WeatherProvider] ⏹️ 停止天气警告定时更新');
+
+    notifyListeners();
+  }
+
   ///10，清除缓存
   Future<void> clearCache() async {
     try {
@@ -441,6 +495,7 @@ class WeatherProvider extends ChangeNotifier {
         'hasWarningCache': _weatherWarningData != null,
         'lastUpdate': lastUpdate,
         'isPeriodicUpdateActive': _isPeriodicUpdateActive,
+        'isWarningPeriodicUpdateActive': _isWarningPeriodicUpdateActive,
         'forecastError': _forecastError,
         'currentError': _currentError,
         'warningError': _warningError,
