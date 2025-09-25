@@ -231,6 +231,7 @@ class AnnouncementCarouselProvider extends ChangeNotifier {
               key: ValueKey(key),
               announcement: announcement,
               fileManager: fileManager,
+              isInCarouselMode: true, // 轮播模式
               onHomeButtonPressed: _homeButtonCallback,
               onPdfCompleted: () {
                 // PDF多頁播放完成回調
@@ -1086,6 +1087,7 @@ class AnnouncementCarouselProvider extends ChangeNotifier {
       child: AnnouncementReaderWidget(
         announcement: announcement,
         fileManager: fileManager,
+        isInCarouselMode: false, // 独立显示模式
         onHomeButtonPressed: onHomeButtonPressed ??
             () {
               // 默认返回主頁行为：跳转到主屏幕
@@ -1224,14 +1226,15 @@ class AnnouncementCarouselProvider extends ChangeNotifier {
     }
 
     // 🔧 修复：增加额外的缓冲时间，确保能完成所有页面翻页
-    int bufferTime;
+    double bufferTime;
     if (isInPdfPagination) {
-      bufferTime = 1; // PDF多頁緩衝時間設為1秒
+      bufferTime = 0.5; // PDF多頁緩衝時間設為0.5秒
     } else {
       bufferTime = 3; // 費用表格保持3秒緩衝時間
     }
 
-    final int extensionSeconds = totalPages * paginationDuration + bufferTime;
+    final int extensionSeconds =
+        (totalPages * paginationDuration + bufferTime).round();
 
     // 取消现有的定时器，避免冲突
     _midTimer?.cancel();
@@ -1247,7 +1250,7 @@ class AnnouncementCarouselProvider extends ChangeNotifier {
           '[AnnouncementCarousel] PDF翻頁开始，延长停留时间: ${extensionSeconds}秒（含${bufferTime}秒缓冲），总时长: ${extendedDuration}秒');
     } else {
       debugPrint(
-          '[AnnouncementCarousel] 费用表單翻頁开始，延长停留时间: ${extensionSeconds}秒（含${bufferTime}秒缓冲），总时长: ${extendedDuration}秒');
+          '[AnnouncementCarousel] 费用表單翻頁开始，延长停留时间: ${extensionSeconds}秒（含${bufferTime.round()}秒缓冲），总时长: ${extendedDuration}秒');
     }
 
     // 使用延长后的时间调度下一次轮播
@@ -1305,8 +1308,56 @@ class AnnouncementCarouselProvider extends ChangeNotifier {
     _isPdfPaginationActive = false;
     debugPrint('[AnnouncementCarousel] 📄 PDF多頁翻頁完成');
 
-    // PDF播放完成，切換到下一個通告
-    _goToNextCarouselItem();
+    // PDF播放完成，强制切換到下一個通告（不受表格翻页状态影响）
+    _forceGoToNextCarouselItem();
+  }
+
+  ///17.1.3，强制切換到下一個轮播项（PDF完成专用）
+  void _forceGoToNextCarouselItem() {
+    debugPrint('[AnnouncementCarousel] 当前状态: '
+        'isPaused=$_isMidCarouselPaused, '
+        'isOtherTablePaginationActive=$_isOtherTablePaginationActive, '
+        'isManagementTablePaginationActive=$_isManagementTablePaginationActive, '
+        'onlyManagementTableMode=$_onlyManagementTableMode');
+
+    if (_isMidCarouselPaused) {
+      return;
+    }
+
+    // 僅管理費用模式：不切換輪播
+    if (_onlyManagementTableMode) {
+      return;
+    }
+
+    try {
+      debugPrint(
+          '[AnnouncementCarousel] 当前索引: $_currentNoticeIndex, 总widget数: ${_midCarouselController.widgetCount}');
+      debugPrint(
+          '[AnnouncementCarousel] 轮播控制器状态: isAttached=${_midCarouselController.isAttached}, currentIndex=${_midCarouselController.currentIndex}');
+
+      // 确定下一个目标索引 - 从通告跳转到费用表單或下一个通告
+      int targetIndex = _determineNextCarouselIndex();
+
+      if (targetIndex == -1) {
+        return;
+      }
+
+      _currentNoticeIndex = targetIndex;
+
+      _midCarouselController.jumpToIndex(_currentNoticeIndex);
+
+      Future.delayed(const Duration(milliseconds: 100), () {
+        final actualIndex = _midCarouselController.currentIndex;
+        debugPrint(
+            '[AnnouncementCarousel] ✅ PDF完成后跳转完成，目标索引: $_currentNoticeIndex, 实际索引: $actualIndex');
+
+        // 重新调度轮播，使用标准时间
+        _currentNoticeStartTime = DateTime.now();
+        _scheduleNextCarousel(_noticeDuration.inSeconds);
+      });
+    } catch (e) {
+      debugPrint('[AnnouncementCarousel] ❌ PDF完成后强制切换失败: $e');
+    }
   }
 
   ///17.2，管理费用表單翻頁完成处理

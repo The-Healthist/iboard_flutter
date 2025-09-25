@@ -152,105 +152,123 @@ class WeatherWidgetState extends State<WeatherWidget> {
     }
   }
 
-  ///7，构建天气警告组件
+  ///6，判断是否应该跳过显示某个警告信号
+  bool _shouldSkipWarning(String warningCode) {
+    // 不显示的警告信号列表
+    const skipWarnings = {
+      'CANCEL', // 取消所有熱帶氣旋警告信號
+      'WTCPRE8', // 預警八號熱帶氣旋警告信號之特別報告
+    };
+
+    return skipWarnings.contains(warningCode.toUpperCase());
+  }
+
+  ///7，构建天气警告组件 - 新布局：上方图标，中间文字，下方温度
   Widget _buildWeatherWarningWidget(WeatherWarningModel? warningData) {
-    List<Widget> warningWidgets = [];
+    List<Widget> warningIcons = [];
+    List<Widget> warningTexts = [];
 
     // 添加實際的天氣警告數據
     if (warningData != null && warningData.warnings.isNotEmpty) {
       final warnings = warningData.warnings;
       final warningEntries = warnings.entries.toList();
 
-      warningWidgets.addAll(warningEntries.map((entry) {
-        return _buildWarningRow(entry.key, entry.value);
-      }).toList());
+      for (final entry in warningEntries) {
+        final warningKey = entry.key;
+        final warningInfo = entry.value;
+
+        // 🔧 过滤掉不需要显示的警告信号
+        if (_shouldSkipWarning(warningInfo.code)) {
+          continue; // 跳过CANCEL和WTCPRE8警告
+        }
+
+        // 构建图标
+        final iconWidget = _buildWarningIcon(warningKey, warningInfo);
+        warningIcons.add(iconWidget);
+
+        // 构建文字描述
+        final textWidget = _buildWarningText(warningKey, warningInfo);
+        warningTexts.add(textWidget);
+      }
     }
 
-    // 8, 固定添加測試用的新界北部水浸特別報告警告信號 (已註釋)
-    // final testWarningInfo1 = WeatherWarningInfo(
-    //   name: "新界北部水浸特別報告",
-    //   code: "WFNTSA",
-    //   actionCode: "ISSUE",
-    //   type: "", // 根據實際需要設置
-    //   issueTime: "2020-09-24T11:40:00+08:00",
-    //   updateTime: "2020-09-24T11:40:00+08:00",
-    // );
-
-    // warningWidgets.add(_buildWarningRow("WFNTSA", testWarningInfo1));
-
-    // 9, 固定添加測試用的熱帶氣旋警告信號
-    // 10, 固定添加測試用的黃色暴雨警告信號 (已註釋)
-    // final testWarningInfo3 = WeatherWarningInfo(
-    //   name: "暴雨警告信號",
-    //   code: "WRAINA",
-    //   actionCode: "ISSUE",
-    //   type: "黃色",
-    //   issueTime: "2020-09-24T09:30:00+08:00",
-    //   updateTime: "2020-09-24T09:30:00+08:00",
-    // );
-
-    // warningWidgets.add(_buildWarningRow("WRAIN", testWarningInfo3));
-
-    // 如果沒有任何警告（包括測試警告），返回空組件
-    if (warningWidgets.isEmpty) {
+    // 如果沒有任何警告，返回空組件
+    if (warningIcons.isEmpty) {
       return const SizedBox.shrink();
     }
 
     return Column(
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.center,
-      children: warningWidgets,
+      children: [
+        // 上方：警告图标横排显示
+        if (warningIcons.isNotEmpty)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 6.0),
+            child: Wrap(
+              alignment: WrapAlignment.center,
+              spacing: 4.0,
+              children: warningIcons,
+            ),
+          ),
+        // 中间：警告文字纵排显示
+        if (warningTexts.isNotEmpty)
+          Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: warningTexts,
+          ),
+      ],
     );
   }
 
-  ///8，构建單个警告行
-  Widget _buildWarningRow(String warningKey, WeatherWarningInfo warningInfo) {
-    // 🔧 使用新的映射系统获取警告描述和图标
-    final warningDescription = WeatherWarningMapping.getWarningDescription(
-        warningKey, warningInfo.code, warningInfo.type);
+  ///8，构建單个警告图标
+  Widget _buildWarningIcon(String warningKey, WeatherWarningInfo warningInfo) {
     final iconPath =
         WeatherIconUtil.getWeatherWarningIconPathByCode(warningInfo.code);
-    const double fontSize = 15.0;
-    const double iconSize = 45.0;
+    const double iconSize = 45.0; // 缩小图标尺寸以适应横排
 
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 1.0),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.center,
-        children: [
-          Image.asset(
-            iconPath,
-            width: iconSize,
-            height: iconSize,
-            errorBuilder: (context, error, stackTrace) {
-              return const Icon(
-                Icons.warning,
-                size: iconSize,
-                color: Colors.orange,
-              );
-            },
-          ),
-          const SizedBox(width: iconSize * 0.25),
-          Flexible(
-            child: Text(
-              warningDescription,
-              style: const TextStyle(
-                fontSize: fontSize,
-                fontWeight: FontWeight.bold,
-                color: Color.fromARGB(255, 8, 12, 133),
-              ),
-              textAlign: TextAlign.center,
-              overflow: TextOverflow.visible,
-              softWrap: true,
-            ),
-          ),
-        ],
+      padding: const EdgeInsets.symmetric(horizontal: 2.0),
+      child: Image.asset(
+        iconPath,
+        width: iconSize,
+        height: iconSize,
+        errorBuilder: (context, error, stackTrace) {
+          return Icon(
+            Icons.warning,
+            size: iconSize,
+            color: Colors.orange,
+          );
+        },
       ),
     );
   }
 
-  ///9，构建当前天气卡片第一頁
+  ///9，构建單个警告文字
+  Widget _buildWarningText(String warningKey, WeatherWarningInfo warningInfo) {
+    // 🔧 使用新的映射系统获取警告描述
+    final warningDescription = WeatherWarningMapping.getWarningDescription(
+        warningKey, warningInfo.code, warningInfo.type);
+    const double fontSize = 14.0; // 稍微缩小字体
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 1.0),
+      child: Text(
+        warningDescription,
+        style: const TextStyle(
+          fontSize: fontSize,
+          fontWeight: FontWeight.bold,
+          color: Color.fromARGB(255, 8, 12, 133),
+        ),
+        textAlign: TextAlign.center,
+        overflow: TextOverflow.visible,
+        softWrap: true,
+      ),
+    );
+  }
+
+  ///10，构建当前天气卡片第一頁
   Widget _buildCurrentWeatherPage1(CurrentWeatherDataModel currentWeatherData) {
     CurrentTemperatureDataModel? tempLocationData;
 
@@ -388,7 +406,7 @@ class WeatherWidgetState extends State<WeatherWidget> {
     );
   }
 
-  ///10，构建当前天气卡片第二頁
+  ///11，构建当前天气卡片第二頁 - 新布局：上方图标，中间警告文字，下方温度
   Widget _buildCurrentWeatherPage2(CurrentWeatherDataModel currentWeatherData) {
     CurrentTemperatureDataModel? tempLocationData;
 
@@ -435,7 +453,7 @@ class WeatherWidgetState extends State<WeatherWidget> {
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.center,
                 children: [
-                  // 天气警告区域
+                  // 天气警告区域 - 新布局
                   Consumer<WeatherProvider>(
                     builder: (context, weatherProvider, child) {
                       final warningData = weatherProvider.weatherWarningData;
@@ -444,19 +462,19 @@ class WeatherWidgetState extends State<WeatherWidget> {
                         return Column(
                           children: [
                             _buildWeatherWarningWidget(warningData),
+                            const SizedBox(height: 8),
                           ],
                         );
                       }
                       return const SizedBox.shrink();
                     },
                   ),
-                  const SizedBox(height: 8),
-                  // 温度信息
+                  // 温度信息 - 放在最下方，直接显示数值
                   if (tempLocationData != null) ...[
                     Text(
-                      ' ${tempLocationData.value}°${tempLocationData.unit}',
+                      '${tempLocationData.value}°${tempLocationData.unit}',
                       style: TextStyle(
-                        fontSize: 14,
+                        fontSize: 16,
                         fontWeight: FontWeight.bold,
                         color: Colors.blue[800],
                       ),
@@ -472,7 +490,7 @@ class WeatherWidgetState extends State<WeatherWidget> {
     );
   }
 
-  ///11，构建当前天气部分（支持自动轮播）
+  ///12，构建当前天气部分（支持自动轮播）
   Widget _buildCurrentWeatherSection(WeatherProvider weatherProvider) {
     if (weatherProvider.isLoadingCurrent) {
       return const Center(child: CircularProgressIndicator());
@@ -567,7 +585,7 @@ class WeatherWidgetState extends State<WeatherWidget> {
     );
   }
 
-  ///12，构建天气预报部分
+  ///13，构建天气预报部分
   Widget _buildForecastSection(WeatherProvider weatherProvider) {
     if (weatherProvider.isLoadingForecast) {
       return const Center(child: CircularProgressIndicator());

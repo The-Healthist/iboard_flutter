@@ -14,6 +14,7 @@ class AnnouncementReaderWidget extends StatefulWidget {
   final AnnouncementModel announcement;
   final FileManager fileManager;
   final VoidCallback? onHomeButtonPressed;
+  final bool isInCarouselMode; // 是否在轮播模式中
 
   // 新增：視頻播放進度回調
   final Function(Duration)? onVideoProgressChanged;
@@ -30,6 +31,7 @@ class AnnouncementReaderWidget extends StatefulWidget {
     required this.announcement,
     required this.fileManager,
     this.onHomeButtonPressed,
+    this.isInCarouselMode = false, // 默认不在轮播模式
     this.onVideoProgressChanged,
     this.initialPlaybackPosition,
     this.onPdfCompleted,
@@ -54,6 +56,7 @@ class AnnouncementReaderWidgetState extends State<AnnouncementReaderWidget> {
   int _currentPage = 0;
   Timer? _pdfPageTimer;
   bool _isPdfAutoPlaying = false;
+  bool _isPdfPaginationPaused = false; // PDF分頁暂停状态
 
   @override
   void initState() {
@@ -193,14 +196,19 @@ class AnnouncementReaderWidgetState extends State<AnnouncementReaderWidget> {
       }
     }
 
-    // PDF控制
-    if (_totalPages > 1) {
-      if (isMediaPaused && _isPdfAutoPlaying) {
-        _pausePdf();
-      } else if (!isMediaPaused &&
-          !_isPdfAutoPlaying &&
-          _currentPage < _totalPages - 1) {
-        _resumePdf();
+    // 监听媒體暂停状态 - 仅在轮播模式下且有多页时生效
+    if (widget.isInCarouselMode && _totalPages > 1) {
+      final carouselStateProvider = context.watch<CarouselStateProvider>();
+      final currentAppState = carouselStateProvider.currentAppState;
+
+      // 检查是否应该暂停PDF分頁（全屏广告或手动操作状态）
+      final shouldPausePdfPagination =
+          currentAppState == AppState.fullscreenAd ||
+              currentAppState == AppState.manualOperation;
+      if (shouldPausePdfPagination && !_isPdfPaginationPaused) {
+        _pausePdfPagination();
+      } else if (!shouldPausePdfPagination && _isPdfPaginationPaused) {
+        _resumePdfPagination();
       }
     }
 
@@ -344,7 +352,7 @@ class AnnouncementReaderWidgetState extends State<AnnouncementReaderWidget> {
             if (mounted && _videoController != null) {
               _pauseVideo();
             }
-            if (mounted && _totalPages > 1) {
+            if (mounted && widget.isInCarouselMode && _totalPages > 1) {
               _pausePdf();
             }
           });
@@ -354,7 +362,7 @@ class AnnouncementReaderWidgetState extends State<AnnouncementReaderWidget> {
             if (mounted && _videoController != null) {
               _resumeVideo();
             }
-            if (mounted && _totalPages > 1) {
+            if (mounted && widget.isInCarouselMode && _totalPages > 1) {
               _resumePdf();
             }
           });
@@ -559,20 +567,19 @@ class AnnouncementReaderWidgetState extends State<AnnouncementReaderWidget> {
         _currentPage = 0; // 從第0頁開始
       });
 
-      // 如果PDF有多頁，啟動自動翻頁並通知延長時間
+      // 如果PDF有多頁，啟動自動翻頁
       if (_totalPages > 1) {
-        // 通知外部延長停留時間
-        if (widget.onPdfPaginationStart != null) {
-          widget.onPdfPaginationStart!(_totalPages);
-        }
         _startPdfAutoPlay();
       }
     }
   }
 
-  ///19, 啟動PDF自動翻頁
+  ///19, 啟動PDF自動翻頁 - 仅在轮播模式下启动
   void _startPdfAutoPlay() {
     if (_isPdfAutoPlaying || _totalPages <= 1) return;
+
+    // 只在轮播模式下启动自动翻頁
+    if (!widget.isInCarouselMode) return;
 
     // 通知AnnouncementCarouselProvider開始PDF多頁翻頁，延長停留時間
     if (widget.onPdfPaginationStart != null) {
@@ -586,12 +593,19 @@ class AnnouncementReaderWidgetState extends State<AnnouncementReaderWidget> {
     _schedulePdfPageChange(pageStayDuration);
   }
 
-  ///20, 調度PDF頁面切換
+  ///20, 調度PDF頁面切換 - 使用periodic timer並支持暂停
   void _schedulePdfPageChange(int pageStayDuration) {
     _pdfPageTimer?.cancel();
 
-    _pdfPageTimer = Timer(Duration(seconds: pageStayDuration), () async {
-      if (!mounted || !_isPdfAutoPlaying) return;
+    _pdfPageTimer =
+        Timer.periodic(Duration(seconds: pageStayDuration), (timer) async {
+      if (!mounted || !_isPdfAutoPlaying) {
+        timer.cancel();
+        return;
+      }
+
+      // 如果PDF分頁被暂停，跳过这次执行
+      if (_isPdfPaginationPaused) return;
 
       if (_currentPage < _totalPages - 1) {
         // 切換到下一頁
@@ -602,11 +616,10 @@ class AnnouncementReaderWidgetState extends State<AnnouncementReaderWidget> {
           setState(() {
             _currentPage = nextPage;
           });
-          // 繼續調度下一頁
-          _schedulePdfPageChange(pageStayDuration);
         }
       } else {
         // 已到最後一頁，通知外部可以切換通告了
+        timer.cancel();
         _isPdfAutoPlaying = false;
         if (widget.onPdfCompleted != null) {
           widget.onPdfCompleted!();
@@ -618,32 +631,50 @@ class AnnouncementReaderWidgetState extends State<AnnouncementReaderWidget> {
   ///21, 停止PDF自動播放
   void _stopPdfAutoPlay() {
     _isPdfAutoPlaying = false;
+    _isPdfPaginationPaused = false;
     _pdfPageTimer?.cancel();
   }
 
-  ///22, 暫停PDF播放
+  ///22, 暫停PDF分頁 - 参考表格逻辑
+  void _pausePdfPagination() {
+    if (!_isPdfPaginationPaused) {
+      _isPdfPaginationPaused = true;
+    }
+  }
+
+  ///23, 恢復PDF分頁 - 参考表格逻辑
+  void _resumePdfPagination() {
+    if (_isPdfPaginationPaused) {
+      _isPdfPaginationPaused = false;
+
+      // 如果定时器不活跃且还有頁面需要翻頁，重新启动翻頁
+      if ((_pdfPageTimer == null || !_pdfPageTimer!.isActive) &&
+          _currentPage < _totalPages - 1 &&
+          _isPdfAutoPlaying) {
+        final carouselStateProvider = context.read<CarouselStateProvider>();
+        final pageStayDuration = carouselStateProvider.noticeStayDuration;
+        _schedulePdfPageChange(pageStayDuration);
+      }
+    }
+  }
+
+  ///24, 暫停PDF播放（舊方法保持兼容性）
   void _pausePdf() {
-    if (_isPdfAutoPlaying) {
-      _stopPdfAutoPlay();
-    }
+    _pausePdfPagination();
   }
 
-  ///23, 恢復PDF播放
+  ///25, 恢復PDF播放（舊方法保持兼容性）
   void _resumePdf() {
-    if (_totalPages > 1 &&
-        !_isPdfAutoPlaying &&
-        _currentPage < _totalPages - 1) {
-      _startPdfAutoPlay();
-    }
+    _resumePdfPagination();
   }
 
-  ///24, 獲取PDF總頁數
+  ///26, 獲取PDF總頁數
   int get totalPdfPages => _totalPages;
 
-  ///25, 獲取當前PDF頁數
+  ///27, 獲取當前PDF頁數
   int get currentPdfPage => _currentPage;
 
-  ///26, 檢查PDF是否已完成播放
+  ///28, 檢查PDF是否已完成播放
   bool get isPdfCompleted =>
       _totalPages <= 1 || _currentPage >= _totalPages - 1;
 }
