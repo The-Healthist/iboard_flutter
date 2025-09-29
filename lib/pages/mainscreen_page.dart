@@ -151,6 +151,8 @@ class AnnouncementPageState extends State<AnnouncementPage> {
     final stateProvider = context.read<CarouselStateProvider>();
     final topAdProvider = context.read<TopAdCarouselProvider>();
     final fullscreenAdProvider = context.read<FullscreenAdProvider>(); // 🔧 新增
+    final announcementCarouselProvider =
+        context.read<AnnouncementCarouselProvider>(); // 🔧 新增
     final rthkNewsProvider = context.read<RthkNewsProvider>();
 
     // 设置顶部广告轮播Provider引用（修复音视频不同步问题）
@@ -158,6 +160,9 @@ class AnnouncementPageState extends State<AnnouncementPage> {
 
     // 🔧 重要修复：设置全屏广告轮播Provider引用
     stateProvider.setFullscreenAdProvider(fullscreenAdProvider);
+
+    // 🔧 关键修复：设置通告轮播Provider引用
+    stateProvider.setAnnouncementCarouselProvider(announcementCarouselProvider);
 
     // 设置RTHK新闻Provider引用（用于直接控制跑马灯暂停恢复）
     stateProvider.setRthkNewsProvider(rthkNewsProvider);
