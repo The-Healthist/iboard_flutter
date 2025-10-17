@@ -109,6 +109,7 @@ class Settings {
   final int normalToAnnouncementCarouselDuration; // 正常到通告輪播轉換時間(秒)
   final int announcementCarouselToFullAdsCarouselDuration; // 通告輪播到全屏廣告輪播轉換時間(秒)
   final String printPassWord; // 打印密碼
+  final String orangePiIp; // 香橙派IP地址(打印服務)
 
   Settings({
     required this.arrearageUpdateDuration,
@@ -122,9 +123,17 @@ class Settings {
     required this.normalToAnnouncementCarouselDuration,
     required this.announcementCarouselToFullAdsCarouselDuration,
     required this.printPassWord,
+    this.orangePiIp = '', // 香橙派IP地址,需在設置中配置
   });
 
   factory Settings.fromJson(Map<String, dynamic> json) {
+    // 支持多種可能的字段名格式
+    final printPassword = json['printPassWord'] ?? 
+                         json['printPassword'] ?? 
+                         json['print_password'] ?? 
+                         json['print_pass_word'] ?? 
+                         '1090119';
+    
     return Settings(
       arrearageUpdateDuration: json['arrearageUpdateDuration'] ?? 30,
       noticeUpdateDuration: json['noticeUpdateDuration'] ?? 5,
@@ -138,7 +147,8 @@ class Settings {
           json['normalToAnnouncementCarouselDuration'] ?? 5,
       announcementCarouselToFullAdsCarouselDuration:
           json['announcementCarouselToFullAdsCarouselDuration'] ?? 5,
-      printPassWord: json['printPassWord'] ?? '1090119',
+      printPassWord: printPassword.toString(),
+      orangePiIp: json['orangePiIp'] ?? '',
     );
   }
 }

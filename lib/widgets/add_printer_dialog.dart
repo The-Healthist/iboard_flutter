@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:iboard_app/utils/wifi_printer_service.dart';
 import 'package:iboard_app/providers/printer_provider.dart';
 import 'package:provider/provider.dart';
 import 'package:logger/logger.dart';
@@ -45,13 +44,6 @@ class AddPrinterDialogState extends State<AddPrinterDialog> {
     final ip = _ipController.text.trim();
 
     // 驗證輸入
-    if (name.isEmpty) {
-      setState(() {
-        _connectionError = '請輸入打印機名稱';
-      });
-      return;
-    }
-
     if (ip.isEmpty || !_isValidIP(ip)) {
       setState(() {
         _connectionError = '請輸入有效的IP地址';
@@ -65,18 +57,12 @@ class AddPrinterDialogState extends State<AddPrinterDialog> {
     });
 
     try {
-      // 創建打印機設備
-      final printer = PrinterDevice(
-        id: 'manual_${ip.replaceAll('.', '_')}',
-        name: name,
-        ipAddress: ip,
-        isConnected: false,
-        model: '網絡打印機',
-      );
-
       // 獲取打印機提供者
       final printerProvider = context.read<PrinterProvider>();
-      final success = await printerProvider.addPrinter(printer);
+      final success = await printerProvider.addPrinter(
+        printerIp: ip,
+        name: name.isNotEmpty ? name : null,
+      );
 
       if (!mounted) return;
 
@@ -90,13 +76,13 @@ class AddPrinterDialogState extends State<AddPrinterDialog> {
 
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('打印機 "$name" 已成功添加'),
+            content: Text('打印機 "${name.isNotEmpty ? name : ip}" 已成功添加'),
             backgroundColor: Colors.green,
             duration: const Duration(seconds: 3),
           ),
         );
 
-        _logger.i('🖨️ 成功添加打印機: $name ($ip)');
+        _logger.i('🖨️ 成功添加打印機: ${name.isNotEmpty ? name : ip} ($ip)');
       } else {
         setState(() {
           _connectionError = '無法連接到打印機，請檢查IP地址和網絡連接';
@@ -143,7 +129,7 @@ class AddPrinterDialogState extends State<AddPrinterDialog> {
             TextField(
               controller: _nameController,
               decoration: const InputDecoration(
-                labelText: '打印機名稱 *',
+                labelText: '打印機名稱 (可選)',
                 hintText: '例如: HP ENVY Inspire 7200',
                 border: OutlineInputBorder(),
                 prefixIcon: Icon(Icons.print),

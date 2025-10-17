@@ -1,12 +1,11 @@
 import 'dart:io';
 import 'dart:async';
 import 'package:flutter/material.dart';
-import 'package:iboard_app/utils/wifi_printer_service.dart';
 import 'package:iboard_app/providers/printer_provider.dart';
 import 'package:iboard_app/models/announcement_model.dart';
+import 'package:iboard_app/models/printer_model.dart';
 import 'package:provider/provider.dart';
 import 'package:logger/logger.dart';
-import 'package:printing/printing.dart';
 import 'package:iboard_app/providers/app_data_provider.dart';
 
 /// 簡化版列印對話框
@@ -28,8 +27,8 @@ class SimplePrintDialogState extends State<SimplePrintDialog> {
   final Logger _logger = Logger();
   PrinterProvider? _printerProvider;
 
-  List<PrinterDevice> _printers = [];
-  PrinterDevice? _selectedPrinter;
+  List<PrinterInfo> _printers = [];
+  PrinterInfo? _selectedPrinter;
   bool _isLoading = true;
   final TextEditingController _codeController = TextEditingController();
   bool _hasCodeError = false;
@@ -58,41 +57,24 @@ class SimplePrintDialogState extends State<SimplePrintDialog> {
   Future<void> _initializeDialog() async {
     try {
       if (_printerProvider != null) {
-        // 初始化與刷新各自加入 3s 超時
+        // 刷新打印機列表 (3s 超時)
         try {
           await _printerProvider!
-              .initialize()
+              .refreshPrinters()
               .timeout(const Duration(seconds: 3));
         } on TimeoutException {
-          _logger.w('🕒 列印對話框: 初始化超時 (3s)');
+          _logger.w('🕒 列印對話框: 刷新列印機狀態超時 (3s)');
         }
         _printers = _printerProvider!.printers;
-        _selectedPrinter = _printerProvider!.defaultPrinter;
-
-        if (_printers.isEmpty) {
-          try {
-            await _printerProvider!
-                .refreshPrinterStatus()
-                .timeout(const Duration(seconds: 3));
-          } on TimeoutException {
-            _logger.w('🕒 列印對話框: 刷新列印機狀態超時 (3s)');
-          }
-          _printers = _printerProvider!.printers;
-          _selectedPrinter = _printerProvider!.defaultPrinter;
-        }
+        _selectedPrinter = _printers.isNotEmpty ? _printers.first : null;
       }
 
       setState(() {
         _isLoading = false;
-        // 掃描完成後，若當前選中不在列表中，糾正為默認或空
-        if (!_printers.any(
-            (p) => identical(p, _selectedPrinter) || p == _selectedPrinter)) {
-          _selectedPrinter = _printerProvider?.defaultPrinter;
-          if (_selectedPrinter != null &&
-              !_printers.any((p) =>
-                  identical(p, _selectedPrinter) || p == _selectedPrinter)) {
-            _selectedPrinter = null;
-          }
+        // 掃描完成後，若當前選中不在列表中，糾正為第一個或空
+        if (_selectedPrinter != null &&
+            !_printers.any((p) => p.id == _selectedPrinter!.id)) {
+          _selectedPrinter = _printers.isNotEmpty ? _printers.first : null;
         }
       });
 
@@ -105,10 +87,17 @@ class SimplePrintDialogState extends State<SimplePrintDialog> {
     }
   }
 
-  /// 2, 開始列印 - 校驗列印碼後調用系統列印服務
+  /// 2, 開始列印 - 校驗列印碼後調用打印服務
   Future<void> _startPrint() async {
     if (widget.localFilePath == null) {
       // 內聯錯誤顯示：維持當前對話框
+      setState(() {
+        _hasCodeError = true;
+      });
+      return;
+    }
+
+    if (_selectedPrinter == null) {
       setState(() {
         _hasCodeError = true;
       });
@@ -133,43 +122,33 @@ class SimplePrintDialogState extends State<SimplePrintDialog> {
 
       // 讀取PDF文件
       final file = File(widget.localFilePath!);
-      final pdfBytes = await file.readAsBytes();
 
-      // 直接調用系統列印服務，不顯示任何成功/失敗提示
-      await Printing.layoutPdf(
-        onLayout: (format) async => pdfBytes,
-        name: widget.announcement.title,
+      // 打印設置
+      const printSettings = PrintSettings(
+        copies: 1,
+        colorMode: 'color',
+        media: 'a4',
+        duplex: false,
+        quality: 'normal',
       );
 
-      _logger.i('🖨️ 已調用系統列印服務: ${widget.announcement.title}');
+      // 調用打印服務
+      final response = await _printerProvider?.printPdf(
+        printerIp: _selectedPrinter!.ipAddress,
+        pdfFile: file,
+        title: widget.announcement.title,
+        settings: printSettings,
+      );
 
-      // 20秒後自動關閉系統列印界面
-      Future.delayed(const Duration(seconds: 20), () {
-        if (mounted && Navigator.of(context).canPop()) {
-          Navigator.of(context).pop();
-        }
-      });
+      if (response?.success == true) {
+        _logger.i('🖨️ 已發送打印任務: ${widget.announcement.title}');
+      } else {
+        _logger.w('⚠️ 打印任務失敗: ${response?.message}');
+      }
     } catch (e) {
       // 即使出錯也不顯示錯誤對話框，只記錄日誌
-      _logger.e('調用系統列印服務失敗: $e');
+      _logger.e('調用打印服務失敗: $e');
     }
-  }
-
-  /// 3, 顯示錯誤對話框（僅在選擇列印機或文件問題時顯示）
-  void _showErrorDialog(String message) {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('列印提示'),
-        content: Text(message),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(),
-            child: const Text('確定'),
-          ),
-        ],
-      ),
-    );
   }
 
   @override
@@ -296,17 +275,16 @@ class SimplePrintDialogState extends State<SimplePrintDialog> {
                                 border: Border.all(color: Colors.grey.shade300),
                                 borderRadius: BorderRadius.circular(8),
                               ),
-                              child: DropdownButton<PrinterDevice>(
-                                value: _printers.any((p) =>
-                                        identical(p, _selectedPrinter) ||
-                                        p == _selectedPrinter)
+                              child: DropdownButton<PrinterInfo>(
+                                value: _printers.any(
+                                        (p) => p.id == _selectedPrinter?.id)
                                     ? _selectedPrinter
                                     : null,
                                 hint: const Text('請選擇列印機'),
                                 isExpanded: true,
                                 underline: const SizedBox(),
                                 items: _printers.map((printer) {
-                                  return DropdownMenuItem<PrinterDevice>(
+                                  return DropdownMenuItem<PrinterInfo>(
                                     value: printer,
                                     child: Row(
                                       children: [
@@ -314,7 +292,7 @@ class SimplePrintDialogState extends State<SimplePrintDialog> {
                                           width: 20,
                                           height: 20,
                                           decoration: BoxDecoration(
-                                            color: printer.isConnected
+                                            color: printer.isOnline
                                                 ? Colors.green
                                                 : Colors.grey,
                                             shape: BoxShape.circle,
@@ -330,12 +308,12 @@ class SimplePrintDialogState extends State<SimplePrintDialog> {
                                         const SizedBox(width: 8),
                                         Expanded(
                                           child: Text(
-                                            printer.name,
+                                            printer.displayName,
                                             style:
                                                 const TextStyle(fontSize: 14),
                                           ),
                                         ),
-                                        if (!printer.isConnected)
+                                        if (!printer.isOnline)
                                           Container(
                                             padding: const EdgeInsets.symmetric(
                                                 horizontal: 6, vertical: 2),
@@ -356,7 +334,7 @@ class SimplePrintDialogState extends State<SimplePrintDialog> {
                                     ),
                                   );
                                 }).toList(),
-                                onChanged: (value) {
+                                onChanged: (PrinterInfo? value) {
                                   setState(() {
                                     _selectedPrinter = value;
                                   });

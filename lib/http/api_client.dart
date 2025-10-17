@@ -877,4 +877,59 @@ class ApiClient {
         apiNameForLog: 'getOtherFeeStatus');
     return _handleResponse(response, 'getOtherFeeStatus');
   }
+
+  ///20. 打印機健康檢查接口
+  /// Endpoint: POST <<baseUrl>>/api/device/client/printers/health
+  /// Body: {"orange_pi": {...}, "printers": [...]}
+  Future<Map<String, dynamic>> printersHealthCheck({
+    required Map<String, dynamic> orangePi,
+    required List<Map<String, dynamic>> printers,
+  }) async {
+    const String endpointPath = '/api/device/client/printers/health';
+    final Uri url = _buildUri(endpointPath, null);
+    final String requestBody = json.encode({
+      'orange_pi': orangePi,
+      'printers': printers,
+    });
+    final Map<String, String> headers =
+        _getHeaders(requiresAuth: true, contentType: 'application/json');
+
+    _logger
+        .i('🏥 [健康檢查] 香橙派狀態: ${orangePi['status']}, 打印機: ${printers.length}個');
+
+    final http.Response response = await _sendRequest(
+        () => http.post(url, headers: headers, body: requestBody),
+        apiNameForLog: 'printersHealthCheck');
+
+    final Map<String, dynamic> responseData =
+        await _handleResponse(response, 'printersHealthCheck');
+
+    _logger.i('✅ [健康檢查] 同步完成: ${responseData['summary'] ?? 'Success'}');
+    return responseData;
+  }
+
+  ///21. 打印機回調接口
+  /// Endpoint: POST <<baseUrl>>/api/device/client/printers/callback
+  /// Body: {"printers": [{"ip_address": "string", "status": "online|offline", "reason": "string"}]}
+  Future<Map<String, dynamic>> printersCallback(
+    List<Map<String, dynamic>> printers,
+  ) async {
+    const String endpointPath = '/api/device/client/printers/callback';
+    final Uri url = _buildUri(endpointPath, null);
+    final String requestBody = json.encode({'printers': printers});
+    final Map<String, String> headers =
+        _getHeaders(requiresAuth: true, contentType: 'application/json');
+
+    _logger.i('📞 [打印回調] 上報打印結果: ${printers.length}個');
+
+    final http.Response response = await _sendRequest(
+        () => http.post(url, headers: headers, body: requestBody),
+        apiNameForLog: 'printersCallback');
+
+    final Map<String, dynamic> responseData =
+        await _handleResponse(response, 'printersCallback');
+
+    _logger.i('✅ [打印回調] 更新完成: ${responseData['summary'] ?? 'Success'}');
+    return responseData;
+  }
 }

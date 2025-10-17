@@ -126,10 +126,7 @@ void main() {
           ),
           ChangeNotifierProvider<PrinterProvider>(
             create: (context) {
-              final printerProvider = PrinterProvider();
-              // 初始化打印機提供者
-              printerProvider.initialize();
-              return printerProvider;
+              return PrinterProvider();
             },
           ),
           ChangeNotifierProvider<PaymentNotifier>(
@@ -259,6 +256,35 @@ class HomePageState extends State<HomePage> {
               appDataProvider.startPeriodicHealthCheck();
             } catch (e) {
               debugPrint('[初始化]健康檢查任務啟動失敗: $e');
+            }
+
+            // 8.1 初始化打印機提供者
+            try {
+              final printerProvider =
+                  Provider.of<PrinterProvider>(context, listen: false);
+
+              // 設置後端API客戶端
+              printerProvider.setApiClient(appDataProvider.apiClient);
+
+              // 從設備設置中獲取香橙派IP
+              final deviceSettings = appDataProvider.deviceSettings;
+              final orangePiIp = deviceSettings?.orangePiIp;
+
+              if (orangePiIp != null && orangePiIp.isNotEmpty) {
+                // 初始化打印機提供者
+                await printerProvider.initialize(orangePiIp: orangePiIp);
+
+                // 啟動定時健康檢查（30分鐘一次）
+                printerProvider.startPeriodicHealthCheck(
+                  interval: const Duration(minutes: 30),
+                );
+
+                debugPrint('[初始化]打印機提供者初始化完成，啟動定時健康檢查');
+              } else {
+                debugPrint('[初始化]香橙派IP未配置，跳過打印機初始化');
+              }
+            } catch (e) {
+              debugPrint('[初始化]打印機提供者初始化失敗: $e');
             }
 
             try {

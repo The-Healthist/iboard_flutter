@@ -8,7 +8,7 @@ import 'package:flutter_pdfview/flutter_pdfview.dart';
 import 'package:video_player/video_player.dart';
 import 'package:provider/provider.dart';
 import 'package:iboard_app/widgets/carousel_widget.dart'; // 添加輪播組件導入
-import 'package:iboard_app/widgets/simple_print_dialog.dart'; // 添加簡化版打印對話框導入
+import 'package:iboard_app/widgets/simple_print_dialog_enhanced.dart'; // 添加增強版打印對話框導入
 
 class AnnouncementReaderWidget extends StatefulWidget {
   final AnnouncementModel announcement;
@@ -518,7 +518,8 @@ class AnnouncementReaderWidgetState extends State<AnnouncementReaderWidget> {
   void _showPrintDialogWithAutoClose() {
     showDialog(
       context: context,
-      builder: (context) => SimplePrintDialog(
+      barrierDismissible: false, // 禁止點擊外部關閉
+      builder: (context) => SimplePrintDialogEnhanced(
         announcement: widget.announcement,
         localFilePath: _localFilePath,
       ),
