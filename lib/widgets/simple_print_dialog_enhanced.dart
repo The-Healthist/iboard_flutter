@@ -42,6 +42,11 @@ class SimplePrintDialogEnhancedState extends State<SimplePrintDialogEnhanced> {
   String _duplexType = 'long-edge';
   int _totalPages = 0;
 
+  Timer? _autoCloseTimer;
+  bool _isPrinting = false;
+  String? _printStatus; // 打印狀態消息
+  bool _printSuccess = false; // 打印是否成功
+
   @override
   void initState() {
     super.initState();
@@ -49,16 +54,22 @@ class SimplePrintDialogEnhancedState extends State<SimplePrintDialogEnhanced> {
     _initializeDialog();
     _getTotalPages();
 
-    // 30秒後自動關閉對話框
-    Future.delayed(const Duration(seconds: 30), () {
-      if (mounted && Navigator.of(context).canPop()) {
-        Navigator.of(context).pop();
+    // 30秒後自動關閉對話框（如果未開始打印）
+    _autoCloseTimer = Timer(const Duration(seconds: 30), () {
+      if (mounted && !_isPrinting && Navigator.of(context).canPop()) {
+        FocusScope.of(context).unfocus();
+        Future.delayed(const Duration(milliseconds: 100), () {
+          if (mounted && Navigator.of(context).canPop()) {
+            Navigator.of(context).pop();
+          }
+        });
       }
     });
   }
 
   @override
   void dispose() {
+    _autoCloseTimer?.cancel();
     _codeController.dispose();
     super.dispose();
   }
@@ -227,11 +238,14 @@ class SimplePrintDialogEnhancedState extends State<SimplePrintDialogEnhanced> {
       debugPrint('   總頁數: $totalPages');
       debugPrint('───────────────────────────────────────────────────────');
 
-      // 關閉當前對話框
-      if (mounted) {
-        debugPrint('🔄 [打印流程] 關閉打印設置對話框');
-        Navigator.of(context).pop();
-      }
+      // 標記為正在打印
+      setState(() {
+        _isPrinting = true;
+        _printStatus = null; // 清除之前的狀態
+      });
+
+      // 取消30秒自動關閉（將在打印完成後自動關閉）
+      _autoCloseTimer?.cancel();
 
       debugPrint('🚀 [打印流程] 啟動後台打印任務...');
       debugPrint('═══════════════════════════════════════════════════════');
@@ -252,7 +266,7 @@ class SimplePrintDialogEnhancedState extends State<SimplePrintDialogEnhanced> {
     }
   }
 
-  ///4, 在後台執行完整打印流程
+  ///4, 在後台執行完整打印流程（優化版）
   void _executePrintInBackground(
     PrinterInfo printer,
     int copies,
@@ -262,138 +276,63 @@ class SimplePrintDialogEnhancedState extends State<SimplePrintDialogEnhanced> {
     int totalPages,
   ) {
     Future.delayed(Duration.zero, () async {
+      int? jobId;
       try {
-        debugPrint('');
-        debugPrint('╔═══════════════════════════════════════════════════════╗');
-        debugPrint('║          開始後台打印流程                            ║');
-        debugPrint('╚═══════════════════════════════════════════════════════╝');
-        _logger.i('🖨️ 開始後台打印流程...');
+        _logger.i('🖨️ [打印流程] 開始');
 
-        // 步驟1: 測試打印機連接
-        debugPrint('');
-        debugPrint('┌─ 步驟1: 測試打印機連接 ─────────────────────────────┐');
-        debugPrint('│ 打印機IP: ${printer.ipAddress}');
-        debugPrint('│ 打印機名稱: ${printer.displayName}');
-        _logger.i('🔌 測試打印機連接: ${printer.ipAddress}');
-
-        final isConnected =
-            await _printerProvider?.testPrinterConnection(printer.ipAddress);
-
-        if (isConnected != true) {
-          debugPrint('│ ❌ 連接失敗！');
-          debugPrint(
-              '└──────────────────────────────────────────────────────┘');
-          debugPrint(
-              '╔═══════════════════════════════════════════════════════╗');
-          debugPrint('║          打印流程結束 (連接失敗)                     ║');
-          debugPrint(
-              '╚═══════════════════════════════════════════════════════╝');
-          _logger.e('❌ 打印機連接失敗: ${printer.displayName}');
+        // 步驟1: 健康檢查香橙派服務
+        if (mounted) setState(() => _printStatus = '正在檢查香橙派服務...');
+        final healthOk = await _checkOrangePiHealth();
+        if (!healthOk) {
+          if (mounted) {
+            setState(() {
+              _printStatus = '❌ 香橙派服務離線，無法打印';
+              _printSuccess = false;
+              _isPrinting = false;
+            });
+          }
+          _logger.e('❌ [打印流程] 香橙派服務離線');
+          await _sendPrintCallback(printer, false, '香橙派服務離線', null);
+          _scheduleAutoClose(10);
           return;
         }
 
-        debugPrint('│ ✅ 連接成功！');
-        debugPrint('└──────────────────────────────────────────────────────┘');
-        _logger.i('✅ 打印機連接成功');
+        // 步驟2: 獲取打印前的作業列表
+        if (mounted) setState(() => _printStatus = '正在準備打印任務...');
+        final jobsBefore = await _getAllJobs(printer.ipAddress);
+        final jobIdsBefore = jobsBefore.keys.toSet();
+        _logger.i('📋 [打印流程] 打印前作業數: ${jobIdsBefore.length}');
 
-        // 步驟2: 讀取PDF文件並轉換為Base64
-        debugPrint('');
-        debugPrint('┌─ 步驟2: 處理PDF文件 ─────────────────────────────────┐');
-        debugPrint('│ PDF路徑: ${widget.localFilePath}');
-        _logger.i('📄 讀取PDF文件...');
-
+        // 步驟3: 讀取並發送PDF
         final file = File(widget.localFilePath!);
         if (!await file.exists()) {
-          debugPrint('│ ❌ 文件不存在！');
-          debugPrint(
-              '└──────────────────────────────────────────────────────┘');
-          debugPrint(
-              '╔═══════════════════════════════════════════════════════╗');
-          debugPrint('║          打印流程結束 (文件不存在)                   ║');
-          debugPrint(
-              '╚═══════════════════════════════════════════════════════╝');
-          _logger.e('❌ PDF文件不存在');
+          if (mounted) {
+            setState(() {
+              _printStatus = '❌ PDF文件不存在';
+              _printSuccess = false;
+              _isPrinting = false;
+            });
+          }
+          _logger.e('❌ [打印流程] PDF文件不存在');
+          _scheduleAutoClose(10);
           return;
         }
 
-        debugPrint('│ ✅ 文件存在');
-        debugPrint('│ 🔄 開始轉換為Base64...');
-        _logger.i('🔄 轉換PDF為Base64...');
-
-        // 讀取PDF文件的原始字節數據（與PowerShell的ReadAllBytes相同）
         final bytes = await file.readAsBytes();
-        debugPrint('│ 📊 原始字節數: ${bytes.length}');
-
-        // 驗證PDF文件頭（應該以 %PDF- 開始）
-        if (bytes.length > 4) {
-          final header = String.fromCharCodes(bytes.sublist(0, 5));
-          debugPrint(
-              '│ 📄 文件頭: $header (${header == '%PDF-' ? '✅ 有效PDF' : '❌ 無效PDF'})');
-        }
-
-        // 轉換為Base64（與PowerShell的ToBase64String相同）
         final base64Data = base64Encode(bytes);
-        final fileSizeKB = (bytes.length / 1024).toStringAsFixed(2);
+        final filename = widget.localFilePath?.split('/').last ??
+            widget.announcement.file.url.split('/').last;
 
-        debugPrint('│ ✅ 轉換完成');
-        debugPrint('│ 📊 文件大小: $fileSizeKB KB');
-        debugPrint('│ 📊 Base64長度: ${base64Data.length} 字符');
-        debugPrint(
-            '│ 📝 Base64前100字符: ${base64Data.length > 100 ? base64Data.substring(0, 100) : base64Data}');
-        debugPrint('└──────────────────────────────────────────────────────┘');
-        _logger.i('📄 PDF文件大小: $fileSizeKB KB');
-
-        // 步驟3: 構建打印設置（符合API格式2）
-        debugPrint('');
-        debugPrint('┌─ 步驟3: 構建打印設置 ───────────────────────────────┐');
-
-        // 根據API文檔，可選參數只在有值時才發送
         final printSettings = PrintSettings(
           copies: copies,
           colorMode: colorMode,
           media: 'a4',
           duplex: duplex,
           duplexType: duplex ? duplexType : null,
-          quality: 'normal',
-          orientation: 'portrait',
-          pageRange: null, // 不發送頁碼範圍，讓打印機打印全部
         );
 
-        debugPrint('│ 打印機IP: ${printer.ipAddress}');
-        debugPrint('│ 份數: $copies');
-        debugPrint('│ 顏色模式: $colorMode');
-        debugPrint('│ 紙張: a4');
-        debugPrint('│ 雙面: ${duplex ? "是" : "否"}');
-        if (duplex) {
-          debugPrint('│ 雙面類型: $duplexType');
-        }
-        debugPrint('│ 品質: normal');
-        debugPrint('│ 方向: portrait');
-        debugPrint('│ 頁碼範圍: 不指定（打印全部）');
-        debugPrint('│');
-        debugPrint('│ 📝 API 格式2 請求參數:');
-        debugPrint('│    printer_ip: ${printer.ipAddress}');
-        debugPrint('│    copies: $copies');
-        debugPrint('│    color_mode: $colorMode');
-        debugPrint('│    media: a4');
-        debugPrint('│    duplex: $duplex');
-        if (duplex && duplexType.isNotEmpty) {
-          debugPrint('│    duplex_type: $duplexType');
-        }
-        debugPrint('│    quality: normal');
-        debugPrint('└──────────────────────────────────────────────────────┘');
-
-        // 步驟4: 調用Base64打印服務
-        debugPrint('');
-        debugPrint('┌─ 步驟4: 發送打印任務 ───────────────────────────────┐');
-        final filename = widget.localFilePath?.split('/').last ??
-            widget.announcement.file.url.split('/').last;
-
-        debugPrint('│ 文件名: $filename');
-        debugPrint('│ 標題: ${widget.announcement.title}');
-        debugPrint('│ 📤 正在發送到打印機...');
-        _logger.i('📤 發送打印任務到打印機...');
-
+        if (mounted) setState(() => _printStatus = '正在發送打印任務...');
+        _logger.i('📤 [打印流程] 發送打印任務到 ${printer.displayName}');
         final response = await _printerProvider?.printPdfBase64(
           printerIp: printer.ipAddress,
           base64Data: base64Data,
@@ -402,111 +341,344 @@ class SimplePrintDialogEnhancedState extends State<SimplePrintDialogEnhanced> {
           settings: printSettings,
         );
 
-        debugPrint('│ 📨 收到響應: ${response != null ? "有響應" : "null"}');
-        if (response == null) {
-          debugPrint('│ ❌ 響應為 null - 可能原因:');
-          debugPrint('│    1. PrintApiClient 未初始化');
-          debugPrint('│    2. 網絡請求異常');
-          debugPrint('│    3. API調用拋出異常');
-          debugPrint(
-              '└──────────────────────────────────────────────────────┘');
-          debugPrint(
-              '╔═══════════════════════════════════════════════════════╗');
-          debugPrint('║          打印流程結束 (響應為null)                   ║');
-          debugPrint(
-              '╚═══════════════════════════════════════════════════════╝');
-          _logger.e('❌ 打印任務提交失敗: 響應為null');
+        if (response == null || !response.success) {
+          final errorMsg = '打印任務提交失敗: ${response?.message ?? "未知錯誤"}';
+          if (mounted) {
+            setState(() {
+              _printStatus = '❌ $errorMsg';
+              _printSuccess = false;
+              _isPrinting = false;
+            });
+          }
+          _logger.e('❌ [打印流程] $errorMsg');
+          await _sendPrintCallback(printer, false, response?.message, null);
+          _scheduleAutoClose(10);
           return;
         }
 
-        debugPrint('│ 📝 響應詳情:');
-        debugPrint('│    success: ${response.success}');
-        debugPrint('│    message: ${response.message}');
-        debugPrint('│    jobId: ${response.jobId}');
-        debugPrint('│    cupsJobId: ${response.cupsJobId}');
+        jobId = response.cupsJobId!;
+        _logger.i('✅ [打印流程] 任務已提交 (Job ID: $jobId)');
 
-        if (response.success != true) {
-          debugPrint('│ ❌ 提交失敗: ${response.message}');
-          debugPrint(
-              '└──────────────────────────────────────────────────────┘');
-          debugPrint(
-              '╔═══════════════════════════════════════════════════════╗');
-          debugPrint('║          打印流程結束 (提交失敗)                     ║');
-          debugPrint(
-              '╚═══════════════════════════════════════════════════════╝');
-          _logger.e('❌ 打印任務提交失敗: ${response.message}');
-          return;
+        // 步驟4: 獲取新增的作業
+        await Future.delayed(const Duration(seconds: 1));
+        final jobsAfter = await _getAllJobs(printer.ipAddress);
+        final newJobId = _findNewJob(jobIdsBefore, jobsAfter);
+
+        if (newJobId == null) {
+          _logger.w('⚠️ [打印流程] 未找到新作業，使用返回的Job ID: $jobId');
+        } else {
+          _logger.i('🆔 [打印流程] 找到新作業 ID: $newJobId');
+          jobId = newJobId;
         }
 
-        final cupsJobId = response.cupsJobId!;
-        debugPrint('│ ✅ 任務已提交！');
-        debugPrint('│ 📝 Job ID: ${response.jobId}');
-        debugPrint('│ 📝 CUPS Job ID: $cupsJobId');
-        debugPrint('└──────────────────────────────────────────────────────┘');
-        _logger
-            .i('✅ 打印任務已提交: Job ID ${response.jobId}, CUPS Job ID $cupsJobId');
-        _logger.i('   打印機: ${printer.displayName}');
-        _logger.i('   份數: $copies');
-        _logger.i('   顏色: ${colorMode == "color" ? "彩色" : "黑白"}');
-        _logger.i('   雙面: ${duplex ? "是" : "否"}');
-        if (totalPages > 0) {
-          _logger.i('   頁碼: 1-$totalPages');
+        // 步驟5: 智能監控打印作業
+        if (mounted) {
+          setState(() => _printStatus = '正在打印作業 $jobId，請稍候...');
         }
-
-        // 步驟5: 後台監控打印作業
-        debugPrint('');
-        debugPrint('┌─ 步驟5: 監控打印作業 ───────────────────────────────┐');
-        debugPrint('│ 👀 開始監控作業狀態...');
-        debugPrint('│ ⏱️  等待時間: ${copies < 3 ? "3" : "5"} 分鐘');
-        _logger.i('👀 開始監控打印作業狀態...');
-
-        final success = await _printerProvider?.monitorPrintJob(
-          printer.ipAddress,
-          cupsJobId,
+        _logger.i('👀 [打印流程] 開始監控作業 $jobId');
+        final printSuccess = await _monitorPrintJobSmart(
+          printer,
+          jobId,
           copies,
+          jobsAfter,
         );
 
-        if (success == true) {
-          debugPrint('│ ✅ 打印作業完成！');
-          debugPrint(
-              '└──────────────────────────────────────────────────────┘');
-          debugPrint('');
-          debugPrint(
-              '╔═══════════════════════════════════════════════════════╗');
-          debugPrint('║          打印流程成功完成                            ║');
-          debugPrint(
-              '╚═══════════════════════════════════════════════════════╝');
-          debugPrint('');
-          _logger.i('✅ 打印作業完成！');
+        // 步驟6: 獲取打印機狀態信息
+        _logger.i('📊 [打印流程] 獲取打印機狀態信息...');
+        final statusInfo = await _getPrinterStatusInfo(printer.ipAddress);
+        String? markerLevels;
+        String? stateReasons;
+
+        if (statusInfo != null) {
+          markerLevels = statusInfo['marker_levels'];
+          stateReasons = statusInfo['state_reasons'];
+          _logger.i('✅ [打印流程] 墨盒信息: $markerLevels');
+          _logger.i('✅ [打印流程] 狀態原因: $stateReasons');
+        }
+
+        // 步驟7: 發送回調
+        if (printSuccess) {
+          _logger.i('✅ [打印流程] 打印任務 $jobId 成功完成');
+          if (mounted) {
+            setState(() {
+              _printStatus = '✅ 打印任務 $jobId 成功！';
+              _printSuccess = true;
+              _isPrinting = false;
+            });
+          }
+          await _sendPrintCallback(
+            printer,
+            true,
+            stateReasons,
+            markerLevels,
+          );
+          _scheduleAutoClose(10);
         } else {
-          debugPrint('│ ⚠️  打印作業異常');
-          debugPrint(
-              '└──────────────────────────────────────────────────────┘');
-          debugPrint('');
-          debugPrint(
-              '╔═══════════════════════════════════════════════════════╗');
-          debugPrint('║          打印流程結束 (作業異常)                     ║');
-          debugPrint(
-              '╚═══════════════════════════════════════════════════════╝');
-          debugPrint('');
-          _logger.w('⚠️ 打印作業異常');
+          _logger.w('⚠️ [打印流程] 打印任務 $jobId 失敗或超時');
+
+          // 步驟7a: 取消所有活動作業,避免半死不活的job
+          _logger.i('🚫 [打印流程] 取消所有活動作業...');
+          try {
+            final cancelSuccess =
+                await _printerProvider?.cancelAllJobs(printer.ipAddress);
+            if (cancelSuccess == true) {
+              _logger.i('✅ [打印流程] 成功取消所有活動作業');
+            }
+          } catch (e) {
+            _logger.e('❌ [打印流程] 取消作業失敗: $e');
+          }
+
+          final reason = await _getPrinterErrorReason(printer);
+          if (mounted) {
+            setState(() {
+              _printStatus = '❌ 任務 $jobId: $reason';
+              _printSuccess = false;
+              _isPrinting = false;
+            });
+          }
+          await _sendPrintCallback(
+            printer,
+            false,
+            stateReasons ?? reason,
+            markerLevels,
+          );
+          _scheduleAutoClose(10);
         }
       } catch (e) {
-        debugPrint('');
-        debugPrint('╔═══════════════════════════════════════════════════════╗');
-        debugPrint('║          打印流程異常終止                            ║');
-        debugPrint('╚═══════════════════════════════════════════════════════╝');
-        debugPrint('❌ 錯誤: $e');
-        debugPrint('');
-        _logger.e('❌ 後台打印流程失敗: $e');
+        _logger.e('❌ [打印流程] 異常: $e');
+
+        // 異常情況下也取消所有活動作業
+        _logger.i('🚫 [打印流程] 異常情況,取消所有活動作業...');
+        try {
+          final cancelSuccess =
+              await _printerProvider?.cancelAllJobs(printer.ipAddress);
+          if (cancelSuccess == true) {
+            _logger.i('✅ [打印流程] 成功取消所有活動作業');
+          }
+        } catch (cancelError) {
+          _logger.e('❌ [打印流程] 取消作業失敗: $cancelError');
+        }
+
+        if (mounted) {
+          setState(() {
+            _printStatus = '❌ 打印流程異常: $e';
+            _printSuccess = false;
+            _isPrinting = false;
+          });
+        }
+        await _sendPrintCallback(printer, false, e.toString(), null);
+        _scheduleAutoClose(10);
       }
     });
+  }
+
+  ///4a, 調度自動關閉
+  void _scheduleAutoClose(int seconds) {
+    _autoCloseTimer?.cancel();
+    _autoCloseTimer = Timer(Duration(seconds: seconds), () {
+      if (mounted && Navigator.of(context).canPop()) {
+        // 先讓輸入框失焦,避免鍵盤/焦點問題導致無法關閉
+        FocusScope.of(context).unfocus();
+        // 稍微延遲確保失焦完成
+        Future.delayed(const Duration(milliseconds: 100), () {
+          if (mounted && Navigator.of(context).canPop()) {
+            Navigator.of(context).pop();
+          }
+        });
+      }
+    });
+  }
+
+  ///5, 檢查香橙派健康狀態
+  Future<bool> _checkOrangePiHealth() async {
+    try {
+      return await _printerProvider?.checkServiceHealth() ?? false;
+    } catch (e) {
+      _logger.e('❌ [健康檢查] 失敗: $e');
+      return false;
+    }
+  }
+
+  ///6, 智能監控打印作業（優化版）
+  Future<bool> _monitorPrintJobSmart(
+    PrinterInfo printer,
+    int cupsJobId,
+    int copies,
+    Map<String, dynamic> initialJobs,
+  ) async {
+    try {
+      // 第一次等待: (份數+2)/2 分鐘
+      final firstWait = Duration(minutes: (copies + 2) ~/ 2);
+      _logger.i('⏱️ [監控] 第一次等待 ${firstWait.inMinutes} 分鐘...');
+      await Future.delayed(firstWait);
+
+      // 從完整作業列表檢查狀態
+      var jobState =
+          await _getJobStateFromAllJobs(printer.ipAddress, cupsJobId);
+      if (jobState == 'completed') {
+        return true;
+      }
+
+      if (jobState == 'processing' || jobState == 'pending') {
+        // 第二次等待: (份數+2)/3 分鐘
+        final secondWait = Duration(minutes: (copies + 2) ~/ 3);
+        _logger.i('⏱️ [監控] 作業處理中，第二次等待 ${secondWait.inMinutes} 分鐘...');
+        await Future.delayed(secondWait);
+
+        jobState = await _getJobStateFromAllJobs(printer.ipAddress, cupsJobId);
+        if (jobState == 'completed') {
+          return true;
+        }
+      }
+
+      return false;
+    } catch (e) {
+      _logger.e('❌ [監控] 失敗: $e');
+      return false;
+    }
+  }
+
+  ///7, 獲取所有作業
+  Future<Map<String, dynamic>> _getAllJobs(String printerIp) async {
+    try {
+      final allJobs = await _printerProvider?.getPrintJobs(printerIp);
+      return (allJobs?['jobs'] as Map<String, dynamic>?) ?? {};
+    } catch (e) {
+      return {};
+    }
+  }
+
+  ///7a, 從所有作業中獲取狀態
+  Future<String> _getJobStateFromAllJobs(
+      String printerIp, int cupsJobId) async {
+    try {
+      final jobs = await _getAllJobs(printerIp);
+
+      for (final entry in jobs.entries) {
+        final job = entry.value as Map<String, dynamic>;
+        if (job['cups_job_id'] == cupsJobId || job['job_id'] == cupsJobId) {
+          final completed = job['completed'] as bool?;
+          if (completed == true) {
+            return 'completed';
+          }
+          final stateCode = job['state_code'] as int?;
+          if (stateCode == 9) return 'completed';
+          if (stateCode == 5) return 'processing';
+          return job['status'] as String? ?? 'unknown';
+        }
+      }
+      return 'unknown';
+    } catch (e) {
+      return 'unknown';
+    }
+  }
+
+  ///7b, 找到新增的作業
+  int? _findNewJob(Set<String> oldJobIds, Map<String, dynamic> newJobs) {
+    for (final entry in newJobs.entries) {
+      if (!oldJobIds.contains(entry.key)) {
+        final job = entry.value as Map<String, dynamic>;
+        return job['cups_job_id'] as int? ?? job['job_id'] as int?;
+      }
+    }
+    return null;
+  }
+
+  ///8, 獲取打印機錯誤原因
+  Future<String> _getPrinterErrorReason(PrinterInfo printer) async {
+    try {
+      final options =
+          await _printerProvider?.getPrinterOptions(printer.ipAddress);
+      if (options == null) return '打印機狀態未知';
+
+      final stateReasons = options.options['printer-state-reasons'] ?? 'none';
+      final reasons = stateReasons.split(',').map((e) => e.trim()).toList();
+
+      // 檢查是否有error級別的原因
+      for (final reason in reasons) {
+        final info = _getReasonInfo(reason);
+        if (info['severity'] == 'error') {
+          return info['message']!;
+        }
+      }
+
+      // 沒有error級別，返回通用錯誤
+      return '打印機出現錯誤，請聯繫管理人員';
+    } catch (e) {
+      return '無法獲取打印機狀態';
+    }
+  }
+
+  ///9, 獲取狀態原因信息（簡化版）
+  Map<String, String> _getReasonInfo(String reason) {
+    const reasons = {
+      'media-empty': {'severity': 'error', 'message': '📭 紙張已用完'},
+      'media-jam': {'severity': 'error', 'message': '🔴 打印機卡紙'},
+      'marker-supply-empty': {'severity': 'error', 'message': '🔴 墨盒/碳粉已用完'},
+      'toner-empty': {'severity': 'error', 'message': '🔴 碳粉已用完'},
+      'door-open': {'severity': 'error', 'message': '🔴 打印機門未關閉'},
+      'cover-open': {'severity': 'error', 'message': '🔴 打印機蓋子打開'},
+      'offline': {'severity': 'error', 'message': '⚠️ 打印機離線'},
+    };
+
+    return reasons[reason] ??
+        {'severity': 'info', 'message': '❓ 未知狀態: $reason'};
+  }
+
+  ///10, 獲取打印機狀態信息(墨盒+狀態原因)
+  Future<Map<String, String?>?> _getPrinterStatusInfo(String printerIp) async {
+    try {
+      final options = await _printerProvider?.getPrinterOptions(printerIp);
+      if (options == null) return null;
+
+      return {
+        'marker_levels': options.options['marker-levels'],
+        'state_reasons': options.options['printer-state-reasons'],
+      };
+    } catch (e) {
+      _logger.w('⚠️ [狀態信息] 獲取失敗: $e');
+      return null;
+    }
+  }
+
+  ///10a, 發送打印回調（帶墨盒信息）
+  Future<void> _sendPrintCallback(
+    PrinterInfo printer,
+    bool success,
+    String? reason,
+    String? markerLevels,
+  ) async {
+    try {
+      _logger.i('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+      _logger.i('📞 [打印回調] 準備上報打印結果');
+      _logger.i('   打印機: ${printer.displayName} (${printer.ipAddress})');
+      _logger.i('   結果: ${success ? "✅ 成功" : "❌ 失敗"}');
+      if (reason != null && reason.isNotEmpty) {
+        _logger.i('   原因: $reason');
+      }
+      if (markerLevels != null && markerLevels.isNotEmpty) {
+        _logger.i('   墨盒信息: $markerLevels');
+      }
+
+      await _printerProvider?.printCallbackWithMarkerLevels(
+        printer.ipAddress,
+        success,
+        reason,
+        markerLevels,
+      );
+
+      _logger.i('✅ [打印回調] 上報成功');
+      _logger.i('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+    } catch (e) {
+      _logger.e('❌ [打印回調] 失敗: $e');
+      _logger.i('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     return WillPopScope(
-      onWillPop: () async => false, // 禁止通過返回鍵關閉
+      onWillPop: () async => true, // 允許返回鍵關閉
       child: Dialog(
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(8),
@@ -581,6 +753,51 @@ class SimplePrintDialogEnhancedState extends State<SimplePrintDialogEnhanced> {
 
                             // 列印密碼
                             _buildPasswordInput(),
+
+                            // 打印狀態顯示
+                            if (_printStatus != null) ...[
+                              const SizedBox(height: 16),
+                              Container(
+                                padding: const EdgeInsets.all(12),
+                                decoration: BoxDecoration(
+                                  color: _printSuccess
+                                      ? Colors.green.shade50
+                                      : Colors.orange.shade50,
+                                  borderRadius: BorderRadius.circular(8),
+                                  border: Border.all(
+                                    color: _printSuccess
+                                        ? Colors.green.shade200
+                                        : Colors.orange.shade200,
+                                  ),
+                                ),
+                                child: Row(
+                                  children: [
+                                    Icon(
+                                      _printSuccess
+                                          ? Icons.check_circle
+                                          : Icons.info_outline,
+                                      color: _printSuccess
+                                          ? Colors.green.shade700
+                                          : Colors.orange.shade700,
+                                      size: 20,
+                                    ),
+                                    const SizedBox(width: 8),
+                                    Expanded(
+                                      child: Text(
+                                        _printStatus!,
+                                        style: TextStyle(
+                                          color: _printSuccess
+                                              ? Colors.green.shade700
+                                              : Colors.orange.shade700,
+                                          fontSize: 13,
+                                          fontWeight: FontWeight.w500,
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
                           ],
                         ),
                       ),
@@ -672,7 +889,7 @@ class SimplePrintDialogEnhancedState extends State<SimplePrintDialogEnhanced> {
                       width: 20,
                       height: 20,
                       decoration: BoxDecoration(
-                        color: printer.isOnline ? Colors.green : Colors.grey,
+                        color: Colors.blue,
                         shape: BoxShape.circle,
                       ),
                       child: const Center(
@@ -690,22 +907,6 @@ class SimplePrintDialogEnhancedState extends State<SimplePrintDialogEnhanced> {
                         style: const TextStyle(fontSize: 14),
                       ),
                     ),
-                    if (!printer.isOnline)
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 6, vertical: 2),
-                        decoration: BoxDecoration(
-                          color: Colors.red.shade100,
-                          borderRadius: BorderRadius.circular(4),
-                        ),
-                        child: Text(
-                          '離線',
-                          style: TextStyle(
-                            color: Colors.red.shade700,
-                            fontSize: 10,
-                          ),
-                        ),
-                      ),
                   ],
                 ),
               );
@@ -933,7 +1134,7 @@ class SimplePrintDialogEnhancedState extends State<SimplePrintDialogEnhanced> {
           controller: _codeController,
           obscureText: true,
           textInputAction: TextInputAction.done,
-          keyboardType: TextInputType.visiblePassword,
+          keyboardType: TextInputType.number,
           decoration: InputDecoration(
             hintText: '請輸入列印碼',
             isDense: true,
@@ -992,7 +1193,7 @@ class SimplePrintDialogEnhancedState extends State<SimplePrintDialogEnhanced> {
           ),
           const SizedBox(width: 12),
           ElevatedButton(
-            onPressed: _startPrint,
+            onPressed: _isPrinting ? null : _startPrint,
             style: ElevatedButton.styleFrom(
               backgroundColor: Theme.of(context).primaryColor,
               foregroundColor: Colors.white,
@@ -1001,14 +1202,31 @@ class SimplePrintDialogEnhancedState extends State<SimplePrintDialogEnhanced> {
                 borderRadius: BorderRadius.circular(8),
               ),
             ),
-            child: const Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(Icons.print, size: 18),
-                SizedBox(width: 8),
-                Text('開始列印'),
-              ],
-            ),
+            child: _isPrinting
+                ? const Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      SizedBox(
+                        width: 16,
+                        height: 16,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          valueColor:
+                              AlwaysStoppedAnimation<Color>(Colors.white),
+                        ),
+                      ),
+                      SizedBox(width: 8),
+                      Text('打印中...'),
+                    ],
+                  )
+                : const Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.print, size: 18),
+                      SizedBox(width: 8),
+                      Text('開始列印'),
+                    ],
+                  ),
           ),
         ],
       ),

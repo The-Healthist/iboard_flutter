@@ -266,22 +266,29 @@ class HomePageState extends State<HomePage> {
               // 設置後端API客戶端
               printerProvider.setApiClient(appDataProvider.apiClient);
 
-              // 從設備設置中獲取香橙派IP
-              final deviceSettings = appDataProvider.deviceSettings;
-              final orangePiIp = deviceSettings?.orangePiIp;
+              // 優先從緩存載入IP，其次從設備設置獲取
+              await printerProvider.initialize();
 
-              if (orangePiIp != null && orangePiIp.isNotEmpty) {
-                // 初始化打印機提供者
-                await printerProvider.initialize(orangePiIp: orangePiIp);
+              // 如果緩存中沒有IP，嘗試從設備設置獲取
+              if (printerProvider.orangePiIp.isEmpty) {
+                final deviceSettings = appDataProvider.deviceSettings;
+                final orangePiIp = deviceSettings?.orangePiIp;
 
-                // 啟動定時健康檢查（30分鐘一次）
+                if (orangePiIp != null && orangePiIp.isNotEmpty) {
+                  await printerProvider.updateOrangePiIp(orangePiIp);
+                  debugPrint('[初始化]從設備設置同步香橙派IP: $orangePiIp');
+                }
+              }
+
+              // 如果有IP配置，啟動定時健康檢查
+              if (printerProvider.orangePiIp.isNotEmpty) {
                 printerProvider.startPeriodicHealthCheck(
                   interval: const Duration(minutes: 30),
                 );
-
-                debugPrint('[初始化]打印機提供者初始化完成，啟動定時健康檢查');
+                debugPrint(
+                    '[初始化]打印機提供者初始化完成，IP: ${printerProvider.orangePiIp}');
               } else {
-                debugPrint('[初始化]香橙派IP未配置，跳過打印機初始化');
+                debugPrint('[初始化]香橙派IP未配置，跳過定時健康檢查');
               }
             } catch (e) {
               debugPrint('[初始化]打印機提供者初始化失敗: $e');

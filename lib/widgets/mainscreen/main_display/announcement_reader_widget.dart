@@ -514,23 +514,16 @@ class AnnouncementReaderWidgetState extends State<AnnouncementReaderWidget> {
     _showPrintDialogWithAutoClose();
   }
 
-  /// 12, 顯示列印對話框並自動關閉
+  /// 12, 顯示列印對話框
   void _showPrintDialogWithAutoClose() {
     showDialog(
       context: context,
-      barrierDismissible: false, // 禁止點擊外部關閉
+      barrierDismissible: true, // 允許點擊外部關閉，不影響後台打印
       builder: (context) => SimplePrintDialogEnhanced(
         announcement: widget.announcement,
         localFilePath: _localFilePath,
       ),
     );
-
-    // 10秒後自動關閉對話框
-    Future.delayed(const Duration(seconds: 10), () {
-      if (mounted && Navigator.of(context).canPop()) {
-        Navigator.of(context).pop();
-      }
-    });
   }
 
   /// 16, 顯示不支持文件類型對話框

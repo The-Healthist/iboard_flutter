@@ -329,6 +329,7 @@ class PrinterOptions {
   String? get markerNames => options['marker-names'];
   String? get colorMode => options['print-color-mode'];
   String? get printerState => options['printer-state'];
+  String? get stateReasons => options['printer-state-reasons'];
   String? get deviceUri => options['device-uri'];
 }
 

@@ -9,7 +9,6 @@ import 'package:provider/provider.dart';
 import 'package:logger/logger.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
-import 'package:shared_preferences/shared_preferences.dart';
 
 class PrintDeviceListPage extends StatefulWidget {
   const PrintDeviceListPage({super.key});
@@ -27,8 +26,6 @@ class PrintDeviceListPageState extends State<PrintDeviceListPage> {
   String? _error;
   String _currentOrangePiIp = '';
 
-  static const String _orangePiIpKey = 'orange_pi_ip_address';
-
   @override
   void initState() {
     super.initState();
@@ -40,22 +37,22 @@ class PrintDeviceListPageState extends State<PrintDeviceListPage> {
   /// 1, 載入保存的IP地址
   Future<void> _loadSavedIp() async {
     try {
-      final prefs = await SharedPreferences.getInstance();
-      final savedIp = prefs.getString(_orangePiIpKey);
+      // 直接從 PrinterProvider 獲取IP
+      final savedIp = _printerProvider?.orangePiIp ?? '';
 
-      if (savedIp != null && savedIp.isNotEmpty) {
+      if (savedIp.isNotEmpty) {
         setState(() {
           _currentOrangePiIp = savedIp;
         });
         await _initializePrinters();
       } else {
-        // 嘗試從Settings獲取
+        // 嘗試從後台設置獲取
         final settingsIp = _appDataProvider?.deviceSettings?.orangePiIp ?? '';
         if (settingsIp.isNotEmpty) {
           setState(() {
             _currentOrangePiIp = settingsIp;
           });
-          await _saveIpAddress(settingsIp);
+          await _printerProvider?.updateOrangePiIp(settingsIp);
           await _initializePrinters();
         } else {
           setState(() {
@@ -110,17 +107,6 @@ class PrintDeviceListPageState extends State<PrintDeviceListPage> {
       });
 
       _logger.e('初始化打印機失敗: $e');
-    }
-  }
-
-  /// 3, 保存IP地址
-  Future<void> _saveIpAddress(String ip) async {
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.setString(_orangePiIpKey, ip);
-      _logger.i('💾 IP地址已保存: $ip');
-    } catch (e) {
-      _logger.e('保存IP地址失敗: $e');
     }
   }
 
@@ -239,21 +225,18 @@ class PrintDeviceListPageState extends State<PrintDeviceListPage> {
     );
   }
 
-  /// 5, 更新IP地址
+  /// 3, 更新IP地址
   Future<void> _updateIpAddress(String newIp) async {
     _showLoadingDialog('正在連接到 $newIp...');
 
     try {
-      // 保存IP地址
-      await _saveIpAddress(newIp);
+      // 更新PrinterProvider（自動持久化保存）
+      await _printerProvider?.updateOrangePiIp(newIp);
 
       // 更新狀態
       setState(() {
         _currentOrangePiIp = newIp;
       });
-
-      // 更新PrinterProvider
-      await _printerProvider?.updateOrangePiIp(newIp);
 
       if (!mounted) return;
       Navigator.of(context).pop();
@@ -291,7 +274,7 @@ class PrintDeviceListPageState extends State<PrintDeviceListPage> {
     }
   }
 
-  /// 6, 刷新打印機列表
+  /// 4, 刷新打印機列表
   Future<void> _refreshPrinters() async {
     setState(() => _isLoading = true);
 
@@ -307,6 +290,47 @@ class PrintDeviceListPageState extends State<PrintDeviceListPage> {
           _isLoading = false;
         });
       }
+    }
+  }
+
+  /// 4a, 手動健康檢測
+  Future<void> _manualHealthCheck() async {
+    _logger.i('🏥 [手動健康檢測] 用戶觸發');
+
+    // 顯示載入對話框
+    _showLoadingDialog('正在執行健康檢測...\n請稍候');
+
+    try {
+      // 調用批量健康檢查（與定時任務相同的邏輯）
+      await _printerProvider?.batchHealthCheck();
+
+      if (!mounted) return;
+      Navigator.of(context).pop(); // 關閉載入對話框
+
+      // 刷新打印機列表以顯示最新狀態
+      await _refreshPrinters();
+
+      if (!mounted) return;
+
+      // 顯示成功消息
+      _showMessageDialog(
+        title: '健康檢測完成',
+        message: '已完成香橙派服務和打印機連接檢測\n並已上報到後台管理系統',
+        isSuccess: true,
+      );
+
+      _logger.i('✅ [手動健康檢測] 完成');
+    } catch (e) {
+      if (!mounted) return;
+      Navigator.of(context).pop(); // 關閉載入對話框
+
+      _logger.e('❌ [手動健康檢測] 失敗: $e');
+
+      _showMessageDialog(
+        title: '健康檢測失敗',
+        message: '執行健康檢測時發生錯誤:\n$e',
+        isSuccess: false,
+      );
     }
   }
 
@@ -1727,6 +1751,16 @@ class PrintDeviceListPageState extends State<PrintDeviceListPage> {
                     onPressed: _isLoading ? null : _refreshPrinters,
                     icon: const Icon(Icons.refresh),
                     label: const Text('刷新列表'),
+                  ),
+                  const SizedBox(width: 12),
+                  ElevatedButton.icon(
+                    onPressed: _isLoading ? null : _manualHealthCheck,
+                    icon: const Icon(Icons.health_and_safety),
+                    label: const Text('手動健康檢測'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.green.shade600,
+                      foregroundColor: Colors.white,
+                    ),
                   ),
                   const SizedBox(width: 12),
                   ElevatedButton.icon(

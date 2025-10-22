@@ -910,17 +910,21 @@ class ApiClient {
 
   ///21. 打印機回調接口
   /// Endpoint: POST <<baseUrl>>/api/device/client/printers/callback
-  /// Body: {"printers": [{"ip_address": "string", "status": "online|offline", "reason": "string"}]}
-  Future<Map<String, dynamic>> printersCallback(
-    List<Map<String, dynamic>> printers,
-  ) async {
+  /// Body: {"orange_pi": {...}, "printers": [...]} (與健康檢查接口格式相同)
+  Future<Map<String, dynamic>> printersCallback({
+    required Map<String, dynamic> orangePi,
+    required List<Map<String, dynamic>> printers,
+  }) async {
     const String endpointPath = '/api/device/client/printers/callback';
     final Uri url = _buildUri(endpointPath, null);
-    final String requestBody = json.encode({'printers': printers});
+    final String requestBody = json.encode({
+      'orange_pi': orangePi,
+      'printers': printers,
+    });
     final Map<String, String> headers =
         _getHeaders(requiresAuth: true, contentType: 'application/json');
 
-    _logger.i('📞 [打印回調] 上報打印結果: ${printers.length}個');
+    _logger.i('📞 [打印回調] 香橙派: ${orangePi['status']}, 打印機: ${printers.length}個');
 
     final http.Response response = await _sendRequest(
         () => http.post(url, headers: headers, body: requestBody),
