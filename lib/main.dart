@@ -21,6 +21,7 @@ import 'pages/fullscreen_ads_page.dart';
 import 'pages/settings_page.dart';
 import 'pages/carousel_settings_page.dart'; // 添加轮播设置頁面导入
 import 'pages/error_page.dart'; // 添加错误頁面导入
+import 'pages/live_monitor_webview_page.dart'; // 添加WebView監控頁面導入
 import 'providers/arrear_provider.dart'; // 添加欠费provider导入
 import 'providers/weather_provider.dart'; // 添加天气provider导入
 import 'package:logger/logger.dart';
@@ -169,6 +170,7 @@ class MyApp extends StatelessWidget {
         '/fullscreen-ads': (context) => const FullscreenAdsPage(),
         '/settings': (context) => const SettingsPage(),
         '/carousel-settings': (context) => const CarouselSettingsPage(),
+        '/live-monitor-webview': (context) => const LiveMonitorWebViewPage(),
       },
     );
   }

@@ -563,8 +563,8 @@ class AnnouncementReaderWidgetState extends State<AnnouncementReaderWidget> {
 
   ///18, PDF渲染完成回調
   void _onPdfRender(int? pages) {
-    debugPrint(
-        '[AnnouncementReader] 📄 PDF渲染完成回调，页数: $pages，轮播模式: ${widget.isInCarouselMode}');
+    // debugPrint(
+    //     '[AnnouncementReader] 📄 PDF渲染完成回调，页数: $pages，轮播模式: ${widget.isInCarouselMode}');
 
     if (pages != null && pages > 0) {
       setState(() {
@@ -572,34 +572,34 @@ class AnnouncementReaderWidgetState extends State<AnnouncementReaderWidget> {
         _currentPage = 0; // 從第0頁開始
       });
 
-      debugPrint('[AnnouncementReader] 📄 PDF总页数设置为: $_totalPages');
+      // debugPrint('[AnnouncementReader] 📄 PDF总页数设置为: $_totalPages');
 
       // 如果PDF有多頁，啟動自動翻頁
       if (_totalPages > 1) {
-        debugPrint('[AnnouncementReader] 📄 PDF多页，准备启动自动翻页');
+        // debugPrint('[AnnouncementReader] 📄 PDF多页，准备启动自动翻页');
         _startPdfAutoPlay();
       } else {
-        debugPrint('[AnnouncementReader] 📄 PDF单页，不需要自动翻页');
+        // debugPrint('[AnnouncementReader] 📄 PDF单页，不需要自动翻页');
       }
     } else {
-      debugPrint('[AnnouncementReader] ⚠️ PDF渲染回调页数无效: $pages');
+      // debugPrint('[AnnouncementReader] ⚠️ PDF渲染回调页数无效: $pages');
     }
   }
 
   ///19, 啟動PDF自動翻頁 - 仅在轮播模式下启动
   void _startPdfAutoPlay() {
-    debugPrint(
-        '[AnnouncementReader] 📄 尝试启动PDF自动翻页，当前状态: 已播放=$_isPdfAutoPlaying, 总页数=$_totalPages, 轮播模式=${widget.isInCarouselMode}');
+    // debugPrint(
+    //     '[AnnouncementReader] 📄 尝试启动PDF自动翻页，当前状态: 已播放=$_isPdfAutoPlaying, 总页数=$_totalPages, 轮播模式=${widget.isInCarouselMode}');
 
     if (_isPdfAutoPlaying || _totalPages <= 1) {
-      debugPrint(
-          '[AnnouncementReader] 📄 PDF自动翻页跳过：已播放=$_isPdfAutoPlaying, 总页数=$_totalPages');
+      // debugPrint(
+      //     '[AnnouncementReader] 📄 PDF自动翻页跳过：已播放=$_isPdfAutoPlaying, 总页数=$_totalPages');
       return;
     }
 
     // 只在轮播模式下启动自动翻頁
     if (!widget.isInCarouselMode) {
-      debugPrint('[AnnouncementReader] 📄 PDF自动翻页跳过：不在轮播模式');
+      // debugPrint('[AnnouncementReader] 📄 PDF自动翻页跳过：不在轮播模式');
       return;
     }
 
@@ -609,18 +609,18 @@ class AnnouncementReaderWidgetState extends State<AnnouncementReaderWidget> {
     final shouldPausePdfPagination = currentAppState == AppState.fullscreenAd ||
         currentAppState == AppState.manualOperation;
 
-    debugPrint(
-        '[AnnouncementReader] 📄 当前应用状态: $currentAppState, 应该暂停翻页: $shouldPausePdfPagination');
+    // debugPrint(
+    //     '[AnnouncementReader] 📄 当前应用状态: $currentAppState, 应该暂停翻页: $shouldPausePdfPagination');
 
     if (shouldPausePdfPagination) {
       // 如果当前应该暂停，标记为暂停状态，但仍然设置为自动播放模式
       _isPdfPaginationPaused = true;
-      debugPrint('[AnnouncementReader] 📄 PDF启动时检测到应暂停状态: $currentAppState');
+      // debugPrint('[AnnouncementReader] 📄 PDF启动时检测到应暂停状态: $currentAppState');
     }
 
     // 通知AnnouncementCarouselProvider開始PDF多頁翻頁，延長停留時間
     if (widget.onPdfPaginationStart != null) {
-      debugPrint('[AnnouncementReader] 📄 通知轮播提供者PDF开始翻页，总页数: $_totalPages');
+      // debugPrint('[AnnouncementReader] 📄 通知轮播提供者PDF开始翻页，总页数: $_totalPages');
       widget.onPdfPaginationStart!(_totalPages);
     }
 
@@ -630,10 +630,10 @@ class AnnouncementReaderWidgetState extends State<AnnouncementReaderWidget> {
     // 只有在不应该暂停的情况下才启动翻页定时器
     if (!shouldPausePdfPagination) {
       _schedulePdfPageChange(pageStayDuration);
-      debugPrint(
-          '[AnnouncementReader] 📄 PDF自动翻页已启动，总页数: $_totalPages，翻页间隔: ${pageStayDuration}秒');
+      // debugPrint(
+      //     '[AnnouncementReader] 📄 PDF自动翻页已启动，总页数: $_totalPages，翻页间隔: ${pageStayDuration}秒');
     } else {
-      debugPrint('[AnnouncementReader] 📄 PDF自动翻页已准备，但当前暂停中，等待恢复');
+      // debugPrint('[AnnouncementReader] 📄 PDF自动翻页已准备，但当前暂停中，等待恢复');
     }
   }
 
@@ -699,8 +699,8 @@ class AnnouncementReaderWidgetState extends State<AnnouncementReaderWidget> {
         // 强制重新调度PDF翻页，无论定时器是否活跃
         _schedulePdfPageChange(pageStayDuration);
 
-        debugPrint(
-            '[AnnouncementReader] 📄 PDF翻页已恢复，当前页: $_currentPage/$_totalPages');
+        // debugPrint(
+        //     '[AnnouncementReader] 📄 PDF翻页已恢复，当前页: $_currentPage/$_totalPages');
       }
     }
   }
@@ -735,6 +735,6 @@ class AnnouncementReaderWidgetState extends State<AnnouncementReaderWidget> {
     // 重新調度PDF翻頁計時器
     _schedulePdfPageChange(pageStayDuration);
 
-    debugPrint('[AnnouncementReader] 📄 用戶手動滑動，重置PDF自動翻頁計時器');
+    // debugPrint('[AnnouncementReader] 📄 用戶手動滑動，重置PDF自動翻頁計時器');
   }
 }

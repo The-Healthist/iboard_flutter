@@ -1,5 +1,6 @@
 name: iboard_app
 description: "iBoard - Smart Building Information Display System"
+
 # The following line prevents the package from being accidentally published to
 # pub.dev using `flutter pub publish`. This is preferred for private packages.
 publish_to: "none" # Remove this line if you wish to publish to pub.dev
@@ -84,6 +85,9 @@ dependencies:
   # 打印功能
   printing: ^5.12.0
   pdf: ^3.10.7
+
+  # WebView 實時監控
+  webview_flutter: ^4.4.2
 
 dev_dependencies:
   flutter_test:

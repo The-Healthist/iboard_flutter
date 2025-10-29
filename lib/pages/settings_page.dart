@@ -281,6 +281,14 @@ class SettingsPageState extends State<SettingsPage> {
                               _navigateToSubPage(const PrintDeviceListPage()),
                         ),
                         const SizedBox(height: 16),
+                        _buildSettingsItem(
+                          icon: Icons.videocam_outlined,
+                          title: '實時監控頁面',
+                          subtitle: '全屏查看實時視頻流',
+                          onTap: () => Navigator.pushNamed(
+                              context, '/live-monitor-webview'),
+                        ),
+                        const SizedBox(height: 16),
                         _buildVersionUpdateItem(),
                       ],
                     ),

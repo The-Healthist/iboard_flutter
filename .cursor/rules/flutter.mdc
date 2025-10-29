@@ -103,5 +103,26 @@ This symbol does not apply on my command line because "&" is not supported.
 减少注释的内容,只在关键的方法会生成注释.
 你可以在agent模式下直接修改我的代码文件.
 尽量让我的代码比较简洁,不添加无用的代码和多余的注释.
-我的项目上有后端的http://test.iboard.skylinedances.com 的api,能访问就是C:\Users\20216\Documents\GitHub\test\iboard_flutter\lib\http\api_client.dart 中的api,也是后端的后台管理系统的api
-会链接同一个局域网下的一个香橙派ip地址192.168.50.173(这是目前我的已有的设备,未来链接其他的设备的化就或许是另一个地址了),用来控制打印机的一些行为
+
+Backend and Device Integration
+
+- 后端API: http://test.iboard.skylinedances.com
+  - API客户端位置: C:\Users\20216\Documents\GitHub\test\iboard_flutter\lib\http\api_client.dart
+  - 后端管理系统的API接口
+  
+- 局域网设备控制:
+  - 香橙派IP: 192.168.50.173 (当前设备)
+  - 用途: 控制打印机等硬件设备
+  - 注意: 未来可能连接其他局域网设备,IP地址会变化,需要支持动态配置
+  
+- 实时监控视频流:
+  - 协议: RTSP (Real Time Streaming Protocol)
+  - 视频流来源: 局域网内的监控设备或MediaMTX服务器
+  - 使用场景: 在Flutter应用中播放实时监控视频
+  - 实现方式: 使用flutter_vlc_player、media_kit或webview加载网页播放器
+  - 视频流地址格式示例: rtsp://192.168.50.173:8554/stream
+  - 注意事项:
+    * 处理视频流连接超时和断线重连
+    * 优化视频缓冲和延迟
+    * 支持多路视频流同时播放
+    * 实现全屏播放和手势控制(缩放、拖动等)
