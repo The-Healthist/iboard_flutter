@@ -80,11 +80,221 @@ class LiveMonitorWidgetState extends State<LiveMonitorWidget>
                 setState(() => _loadingStates[index] = true);
               }
             },
-            onPageFinished: (String url) {
+            onPageFinished: (String url) async {
               if (mounted && !_isDisposed) {
                 setState(() => _loadingStates[index] = false);
               }
               debugPrint('[LiveMonitor] ✅ WebView[$index] 加載完成');
+
+              // 專業方式禁用全屏功能
+              await _controllers![index].runJavaScript('''
+                (function() {
+                  'use strict';
+                  
+                  let fullscreenCheckInterval = null;
+                  
+                  // 1. 強制退出全屏的函數
+                  const forceExitFullscreen = function() {
+                    if (document.fullscreenElement || 
+                        document.webkitFullscreenElement || 
+                        document.mozFullScreenElement || 
+                        document.msFullscreenElement) {
+                      
+                      console.warn('[Fullscreen Blocked] Force exiting fullscreen');
+                      
+                      try {
+                        if (document.exitFullscreen) {
+                          document.exitFullscreen();
+                        } else if (document.webkitExitFullscreen) {
+                          document.webkitExitFullscreen();
+                        } else if (document.mozCancelFullScreen) {
+                          document.mozCancelFullScreen();
+                        } else if (document.msExitFullscreen) {
+                          document.msExitFullscreen();
+                        }
+                      } catch(e) {
+                        console.error('[Fullscreen Blocked] Error exiting:', e);
+                      }
+                    }
+                  };
+                  
+                  // 2. 攔截所有點擊事件（最高優先級）
+                  document.addEventListener('click', function(e) {
+                    const target = e.target;
+                    // 檢查是否點擊了全屏按鈕
+                    if (target.tagName === 'BUTTON' || target.closest('button')) {
+                      const button = target.tagName === 'BUTTON' ? target : target.closest('button');
+                      const classList = button.className.toLowerCase();
+                      const ariaLabel = (button.getAttribute('aria-label') || '').toLowerCase();
+                      const title = (button.getAttribute('title') || '').toLowerCase();
+                      
+                      if (classList.includes('fullscreen') || 
+                          ariaLabel.includes('fullscreen') || 
+                          title.includes('fullscreen')) {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        e.stopImmediatePropagation();
+                        console.warn('[Fullscreen Blocked] Fullscreen button click prevented');
+                        return false;
+                      }
+                    }
+                  }, true);
+                  
+                  // 3. 監聽fullscreenchange事件並立即退出
+                  const fullscreenEvents = [
+                    'fullscreenchange',
+                    'webkitfullscreenchange', 
+                    'mozfullscreenchange',
+                    'MSFullscreenChange'
+                  ];
+                  
+                  fullscreenEvents.forEach(function(eventName) {
+                    document.addEventListener(eventName, function(e) {
+                      forceExitFullscreen();
+                    }, true);
+                  });
+                  
+                  // 4. 攔截beforefullscreenchange事件
+                  document.addEventListener('fullscreenchange', function(e) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    forceExitFullscreen();
+                  }, true);
+                  
+                  // 5. 使用setInterval持續檢查全屏狀態（最強防線）
+                  fullscreenCheckInterval = setInterval(function() {
+                    forceExitFullscreen();
+                  }, 100); // 每100ms檢查一次
+                  
+                  // 6. CSS隱藏全屏按鈕和音量控制
+                  const style = document.createElement('style');
+                  style.textContent = \`
+                    /* 隱藏全屏按鈕 */
+                    button[class*="fullscreen" i],
+                    button[aria-label*="fullscreen" i],
+                    button[title*="fullscreen" i],
+                    video::-webkit-media-controls-fullscreen-button {
+                      display: none !important;
+                      visibility: hidden !important;
+                      pointer-events: none !important;
+                    }
+                    
+                    /* 隱藏音量/靜音按鈕 - 全面覆蓋所有可能的選擇器 */
+                    button[class*="mute" i],
+                    button[class*="volume" i],
+                    button[class*="sound" i],
+                    button[class*="audio" i],
+                    button[aria-label*="mute" i],
+                    button[aria-label*="volume" i],
+                    button[aria-label*="sound" i],
+                    button[aria-label*="audio" i],
+                    button[title*="mute" i],
+                    button[title*="volume" i],
+                    button[title*="sound" i],
+                    button[title*="audio" i],
+                    [class*="mute" i],
+                    [class*="volume" i],
+                    [class*="sound" i],
+                    div[class*="volume" i],
+                    div[class*="mute" i],
+                    input[type="range"],
+                    video::-webkit-media-controls-mute-button,
+                    video::-webkit-media-controls-volume-slider,
+                    video::-webkit-media-controls-volume-control-container,
+                    video::-moz-media-controls-mute-button,
+                    video::-moz-media-controls-volume-slider {
+                      display: none !important;
+                      visibility: hidden !important;
+                      pointer-events: none !important;
+                      opacity: 0 !important;
+                      width: 0 !important;
+                      height: 0 !important;
+                    }
+                  \`;
+                  document.head.appendChild(style);
+                  
+                  // 7. 直接禁用video的原生controls（關鍵！）
+                  setTimeout(function() {
+                    const disableVideoControls = function() {
+                      const videos = document.querySelectorAll('video');
+                      console.log('[Video Controls] 找到video元素:', videos.length);
+                      
+                      videos.forEach(function(video, index) {
+                        // 移除controls屬性
+                        video.removeAttribute('controls');
+                        video.controls = false;
+                        
+                        // 鎖定controls屬性（防止被重新啟用）
+                        Object.defineProperty(video, 'controls', {
+                          get: function() { return false; },
+                          set: function(value) { 
+                            console.warn('[Video Controls Blocked] Attempt to enable controls blocked'); 
+                          },
+                          configurable: false
+                        });
+                        
+                        console.log('[Video Controls] Video #' + index + ' controls已禁用');
+                      });
+                    };
+                    
+                    // 立即執行
+                    disableVideoControls();
+                    
+                    // 延遲後再次執行（確保動態加載的video也被處理）
+                    setTimeout(disableVideoControls, 500);
+                    setTimeout(disableVideoControls, 1000);
+                    setTimeout(disableVideoControls, 2000);
+                    
+                    // 使用MutationObserver監聽新添加的video元素
+                    const observer = new MutationObserver(function(mutations) {
+                      let hasNewVideo = false;
+                      mutations.forEach(function(mutation) {
+                        mutation.addedNodes.forEach(function(node) {
+                          if (node.nodeType === 1 && node.tagName === 'VIDEO') {
+                            hasNewVideo = true;
+                          }
+                        });
+                      });
+                      if (hasNewVideo) {
+                        console.log('[Video Controls] 檢測到新video元素，禁用controls');
+                        disableVideoControls();
+                      }
+                    });
+                    
+                    observer.observe(document.documentElement, {
+                      childList: true,
+                      subtree: true
+                    });
+                  }, 100);
+                  
+                  // 7. 攔截雙擊事件
+                  document.addEventListener('dblclick', function(e) {
+                    if (e.target.tagName === 'VIDEO' || e.target.closest('video')) {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      e.stopImmediatePropagation();
+                      console.warn('[Fullscreen Blocked] Video double-click prevented');
+                      return false;
+                    }
+                  }, true);
+                  
+                  // 8. 攔截鍵盤快捷鍵
+                  document.addEventListener('keydown', function(e) {
+                    if ((e.key === 'f' || e.key === 'F') && !e.shiftKey && !e.altKey) {
+                      const activeElement = document.activeElement;
+                      if (activeElement && activeElement.tagName === 'VIDEO') {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        e.stopImmediatePropagation();
+                        console.warn('[Fullscreen Blocked] Keyboard shortcut prevented');
+                        return false;
+                      }
+                    }
+                  }, true);
+                  
+                  console.log('[Fullscreen Disabled] Aggressive fullscreen blocking initialized');
+                })();
+              ''');
             },
             onWebResourceError: (WebResourceError error) {
               debugPrint(
