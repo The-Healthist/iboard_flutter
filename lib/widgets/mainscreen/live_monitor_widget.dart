@@ -335,7 +335,7 @@ class LiveMonitorWidgetState extends State<LiveMonitorWidget>
   Future<void> releaseResources() async {
     if (_isDisposed || _controllers == null) return;
 
-    debugPrint('[LiveMonitor] 🗑️ 開始釋放WebView資源...');
+    debugPrint('[LiveMonitor]  開始釋放WebView資源...');
 
     _isDisposed = true;
 
@@ -345,7 +345,7 @@ class LiveMonitorWidgetState extends State<LiveMonitorWidget>
         _controllers!.clear();
         _controllers = null;
       } catch (e) {
-        debugPrint('[LiveMonitor] ⚠️ 釋放WebView時出錯: $e');
+        debugPrint('[LiveMonitor]  釋放WebView時出錯: $e');
       }
     }
 
@@ -356,7 +356,7 @@ class LiveMonitorWidgetState extends State<LiveMonitorWidget>
       updateKeepAlive();
     }
 
-    debugPrint('[LiveMonitor] ✅ WebView資源釋放完成');
+    debugPrint('[LiveMonitor]  WebView資源釋放完成');
   }
 
   ///2, 刷新所有視頻流
@@ -372,7 +372,7 @@ class LiveMonitorWidgetState extends State<LiveMonitorWidget>
     _isDisposed = true;
     _controllers?.clear();
     _controllers = null;
-    debugPrint('[LiveMonitor] 🔴 Widget已dispose');
+    debugPrint('[LiveMonitor]  Widget已dispose');
     super.dispose();
   }
 
@@ -420,7 +420,7 @@ class LiveMonitorWidgetState extends State<LiveMonitorWidget>
                 crossAxisCount: 2,
                 crossAxisSpacing: 2,
                 mainAxisSpacing: 2,
-                childAspectRatio: aspectRatio, // 🔧 使用动态计算的比例
+                childAspectRatio: aspectRatio,
               ),
               itemCount: 4,
               itemBuilder: (context, index) {
