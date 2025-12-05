@@ -1,0 +1,665 @@
+import 'dart:convert';
+import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
+import 'package:iboard_app/models/monitor_models.dart';
+import 'package:iboard_app/providers/app_data_provider.dart';
+import 'package:provider/provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+
+class MonitorSettingsPage extends StatefulWidget {
+  const MonitorSettingsPage({super.key});
+
+  @override
+  MonitorSettingsPageState createState() => MonitorSettingsPageState();
+}
+
+class MonitorSettingsPageState extends State<MonitorSettingsPage> {
+  final TextEditingController _apiUrlController = TextEditingController();
+  bool _isLoading = false;
+  List<Orangepi> _orangepis = [];
+  Set<String> _selectedChannels = {}; // 存储选中的通道
+  String? _currentIsmartId; // 当前ismartId
+  String _currentApiUrl = 'http://ajlive.sunofw.cn:32001/api/auth/public'; // 默认API地址
+
+  @override
+  void initState() {
+    super.initState();
+    _loadSavedSettings();
+  }
+
+  @override
+  void dispose() {
+    _apiUrlController.dispose();
+    super.dispose();
+  }
+
+  ///1, 加载已保存的设置
+  Future<void> _loadSavedSettings() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final savedApiUrl = prefs.getString('monitor_api_url');
+      final savedChannels = prefs.getStringList('monitor_selected_channels');
+      
+      setState(() {
+        _currentApiUrl = savedApiUrl ?? _currentApiUrl;
+        _apiUrlController.text = _currentApiUrl;
+        _selectedChannels = Set.from(savedChannels ?? []);
+      });
+      
+      // 获取大厦的ismartid
+      await _loadBuildingIsmartId();
+    } catch (e) {
+      // 静默失败
+    }
+  }
+
+  ///2, 从AppDataProvider获取大厦ismartid
+  Future<void> _loadBuildingIsmartId() async {
+    try {
+      final appDataProvider = Provider.of<AppDataProvider>(context, listen: false);
+      final ismartId = appDataProvider.settingsModel?.building.ismartId;
+      
+      if (ismartId != null && ismartId.isNotEmpty) {
+        setState(() {
+          _currentIsmartId = ismartId;
+        });
+        
+        // 自动发起监控数据请求
+        await _onGetMonitorData();
+      } else {
+        _showError('未找到大厦ismartid，请先确保设备已正确登录');
+      }
+    } catch (e) {
+      _showError('获取大厦ismartid失败: ${e.toString()}');
+    }
+  }
+
+  ///3, 保存设置
+  Future<void> _saveSettings() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString('monitor_api_url', _currentApiUrl);
+      await prefs.setStringList('monitor_selected_channels', _selectedChannels.toList());
+    } catch (e) {
+      _showError('保存失败: ${e.toString()}');
+    }
+  }
+
+  ///4, 获取监控数据
+  Future<void> _onGetMonitorData() async {
+    if (_currentIsmartId == null || _currentIsmartId!.isEmpty) {
+      _showError('大厦ismartid为空');
+      return;
+    }
+
+    setState(() {
+      _isLoading = true;
+    });
+
+    try {
+      final apiUrl = _apiUrlController.text.trim().isEmpty 
+          ? _currentApiUrl 
+          : _apiUrlController.text.trim();
+      
+      final response = await http.post(
+        Uri.parse(apiUrl),
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: jsonEncode(MonitorRequest(
+          ismartId: _currentIsmartId!,
+          isStaff: true,
+        ).toJson()),
+      );
+
+      if (response.statusCode == 200) {
+        final monitorResponse = MonitorResponse.fromJson(
+          jsonDecode(response.body),
+        );
+        
+        if (monitorResponse.success) {
+          setState(() {
+            _orangepis = monitorResponse.data.orangepis;
+            _currentApiUrl = apiUrl;
+          });
+          _showSuccess('监控数据获取成功');
+        } else {
+          _showError('获取监控数据失败');
+        }
+      } else {
+        _showError('网络请求失败: ${response.statusCode}');
+      }
+    } catch (e) {
+      _showError('请求失败: ${e.toString()}');
+    } finally {
+      setState(() {
+        _isLoading = false;
+      });
+    }
+  }
+
+  ///5, 手动刷新监控数据
+  Future<void> _onRefreshButtonPressed() async {
+    // 更新API地址
+    final inputUrl = _apiUrlController.text.trim();
+    if (inputUrl.isNotEmpty) {
+      _currentApiUrl = inputUrl;
+    }
+    
+    // 重新获取监控数据
+    await _onGetMonitorData();
+  }
+
+  ///2, 切换通道选择
+  void _toggleChannelSelection(String channelKey) {
+    setState(() {
+      if (_selectedChannels.contains(channelKey)) {
+        _selectedChannels.remove(channelKey);
+      } else {
+        // 检查是否超过4个通道限制
+        if (_selectedChannels.length < 4) {
+          _selectedChannels.add(channelKey);
+        } else {
+          _showError('每个大厦最多只能选择4个监控通道');
+        }
+      }
+    });
+  }
+
+  ///3, 显示成功消息
+  void _showSuccess(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        backgroundColor: Colors.green.shade600,
+        duration: const Duration(seconds: 2),
+      ),
+    );
+  }
+
+  ///6, 确认选择
+  Future<void> _confirmSelection() async {
+    if (_selectedChannels.isEmpty) {
+      _showError('请至少选择一个监控通道');
+      return;
+    }
+
+    await _saveSettings();
+    _showSuccess('监控通道设置已保存');
+    
+    // 通知实时监控页面更新
+    _notifyLiveMonitorUpdate();
+  }
+
+  ///5, 通知实时监控页面更新
+  void _notifyLiveMonitorUpdate() {
+    // 延迟返回，让用户看到保存成功的提示
+    Future.delayed(const Duration(seconds: 1), () {
+      if (mounted) {
+        Navigator.pop(context, true); // 返回true表示需要更新监控页面
+      }
+    });
+  }
+
+  ///5, 显示错误消息
+  void _showError(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        backgroundColor: Colors.red.shade600,
+        duration: const Duration(seconds: 3),
+      ),
+    );
+  }
+
+  ///6, 构建香橙派卡片
+  Widget _buildOrangepiCard(Orangepi orangepi) {
+    return Container(
+      width: double.infinity,
+      margin: const EdgeInsets.only(bottom: 16),
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.grey.withOpacity(0.1),
+            spreadRadius: 1,
+            blurRadius: 6,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // 香橙派标题
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: orangepi.is_active ? Colors.green.shade50 : Colors.grey.shade50,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Icon(
+                  Icons.device_hub,
+                  color: orangepi.is_active ? Colors.green.shade600 : Colors.grey.shade600,
+                  size: 20,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  orangepi.orangepi_name,
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.grey.shade800,
+                  ),
+                ),
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  color: orangepi.is_active ? Colors.green.shade100 : Colors.grey.shade100,
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Text(
+                  orangepi.is_active ? '在线' : '离线',
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w500,
+                    color: orangepi.is_active ? Colors.green.shade700 : Colors.grey.shade700,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          
+          // 视频通道网格
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: orangepi.urls.asMap().entries.map((entry) {
+              final index = entry.key;
+              final url = entry.value;
+              final channelName = 'channel${index + 1}';
+              final channelKey = '${orangepi.orangepi_id}_$channelName';
+              final isSelected = _selectedChannels.contains(channelKey);
+              
+              return GestureDetector(
+                onTap: () => _toggleChannelSelection(channelKey),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  decoration: BoxDecoration(
+                    color: isSelected ? Colors.blue.shade600 : Colors.grey.shade100,
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(
+                      color: isSelected ? Colors.blue.shade600 : Colors.grey.shade300,
+                    ),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        isSelected ? Icons.check_circle : Icons.videocam_outlined,
+                        size: 16,
+                        color: isSelected ? Colors.white : Colors.grey.shade600,
+                      ),
+                      const SizedBox(width: 6),
+                      Text(
+                        channelName,
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w500,
+                          color: isSelected ? Colors.white : Colors.grey.shade700,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              );
+            }).toList(),
+          ),
+        ],
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: Colors.grey.shade50,
+      body: SizedBox(
+        width: double.infinity,
+        height: double.infinity,
+        child: SafeArea(
+          child: Column(
+            children: [
+              // 顶部标题区域
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(20),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.grey.withOpacity(0.05),
+                      spreadRadius: 1,
+                      blurRadius: 3,
+                      offset: const Offset(0, 2),
+                    ),
+                  ],
+                ),
+                child: Row(
+                  children: [
+                    IconButton(
+                      onPressed: () {
+                        Navigator.pop(context);
+                      },
+                      icon: const Icon(Icons.arrow_back, size: 28),
+                    ),
+                    const SizedBox(width: 16),
+                    Icon(
+                      Icons.settings_remote,
+                      size: 32,
+                      color: Colors.blue.shade600,
+                    ),
+                    const SizedBox(width: 16),
+                    Text(
+                      '设置监控画面',
+                      style: TextStyle(
+                        fontSize: 28,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.grey.shade800,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+
+              // 主要内容区域
+              Expanded(
+                child: SingleChildScrollView(
+                  padding: const EdgeInsets.all(20),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const SizedBox(height: 40),
+                      
+                      // 设置卡片
+                      Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.all(24),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(12),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.grey.withOpacity(0.1),
+                              spreadRadius: 1,
+                              blurRadius: 6,
+                              offset: const Offset(0, 2),
+                            ),
+                          ],
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: [
+                                Container(
+                                  padding: const EdgeInsets.all(10),
+                                  decoration: BoxDecoration(
+                                    color: Colors.blue.shade50,
+                                    borderRadius: BorderRadius.circular(8),
+                                  ),
+                                  child: Icon(
+                                    Icons.api,
+                                    color: Colors.blue.shade600,
+                                    size: 24,
+                                  ),
+                                ),
+                                const SizedBox(width: 16),
+                                Text(
+                                  'API接口配置',
+                                  style: TextStyle(
+                                    fontSize: 18,
+                                    fontWeight: FontWeight.bold,
+                                    color: Colors.grey.shade800,
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 24),
+                            
+                            // API地址输入框和按钮区域
+                            Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  '接口地址 (可选)',
+                                  style: TextStyle(
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.w500,
+                                    color: Colors.grey.shade600,
+                                  ),
+                                ),
+                                const SizedBox(height: 8),
+                                Row(
+                                  children: [
+                                    Expanded(
+                                      child: TextField(
+                                        controller: _apiUrlController,
+                                        enabled: !_isLoading,
+                                        decoration: InputDecoration(
+                                          hintText: '默认: http://ajlive.sunofw.cn:32001/api/auth/public',
+                                          border: OutlineInputBorder(
+                                            borderRadius: BorderRadius.circular(8),
+                                            borderSide: BorderSide(color: Colors.grey.shade300),
+                                          ),
+                                          enabledBorder: OutlineInputBorder(
+                                            borderRadius: BorderRadius.circular(8),
+                                            borderSide: BorderSide(color: Colors.grey.shade300),
+                                          ),
+                                          focusedBorder: OutlineInputBorder(
+                                            borderRadius: BorderRadius.circular(8),
+                                            borderSide: BorderSide(color: Colors.blue.shade600),
+                                          ),
+                                          contentPadding: const EdgeInsets.symmetric(
+                                            horizontal: 16,
+                                            vertical: 12,
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                    const SizedBox(width: 16),
+                                    ElevatedButton(
+                                      onPressed: _isLoading ? null : _onRefreshButtonPressed,
+                                      child: _isLoading
+                                          ? SizedBox(
+                                              width: 16,
+                                              height: 16,
+                                              child: CircularProgressIndicator(
+                                                strokeWidth: 2,
+                                                color: Colors.white,
+                                              ),
+                                            )
+                                          : const Text('刷新'),
+                                      style: ElevatedButton.styleFrom(
+                                        backgroundColor: Colors.blue.shade600,
+                                        foregroundColor: Colors.white,
+                                        padding: const EdgeInsets.symmetric(
+                                          horizontal: 24,
+                                          vertical: 12,
+                                        ),
+                                        shape: RoundedRectangleBorder(
+                                          borderRadius: BorderRadius.circular(8),
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 24),
+                            
+                            // 大厦信息显示
+                            if (_currentIsmartId != null) ...[
+                              Container(
+                                width: double.infinity,
+                                padding: const EdgeInsets.all(12),
+                                decoration: BoxDecoration(
+                                  color: Colors.green.shade50,
+                                  borderRadius: BorderRadius.circular(8),
+                                  border: Border.all(color: Colors.green.shade200),
+                                ),
+                                child: Row(
+                                  children: [
+                                    Icon(
+                                      Icons.business,
+                                      color: Colors.green.shade600,
+                                      size: 20,
+                                    ),
+                                    const SizedBox(width: 8),
+                                    Expanded(
+                                      child: Text(
+                                        '当前大厦 iSmart ID: $_currentIsmartId',
+                                        style: TextStyle(
+                                          fontSize: 14,
+                                          color: Colors.green.shade700,
+                                          fontWeight: FontWeight.w500,
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              const SizedBox(height: 16),
+                            ],
+                            
+                            // 选中通道数量提示
+                            if (_selectedChannels.isNotEmpty) ...[
+                              Container(
+                                width: double.infinity,
+                                padding: const EdgeInsets.all(12),
+                                decoration: BoxDecoration(
+                                  color: Colors.blue.shade50,
+                                  borderRadius: BorderRadius.circular(8),
+                                  border: Border.all(color: Colors.blue.shade200),
+                                ),
+                                child: Row(
+                                  children: [
+                                    Icon(
+                                      Icons.info_outline,
+                                      color: Colors.blue.shade600,
+                                      size: 20,
+                                    ),
+                                    const SizedBox(width: 8),
+                                    Text(
+                                      '已选择 ${_selectedChannels.length}/4 个监控通道',
+                                      style: TextStyle(
+                                        fontSize: 14,
+                                        color: Colors.blue.shade700,
+                                        fontWeight: FontWeight.w500,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              const SizedBox(height: 16),
+                            ],
+                          ],
+                        ),
+                      ),
+                      
+                      // 香橙派信息显示区域
+                      if (_orangepis.isNotEmpty) ...[
+                        const SizedBox(height: 24),
+                        ..._orangepis.map((orangepi) => _buildOrangepiCard(orangepi)),
+                        
+                        const SizedBox(height: 32),
+                        
+                        // 确认按钮
+                        Container(
+                          width: double.infinity,
+                          padding: const EdgeInsets.all(20),
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(12),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.grey.withOpacity(0.1),
+                                spreadRadius: 1,
+                                blurRadius: 6,
+                                offset: const Offset(0, 2),
+                              ),
+                            ],
+                          ),
+                          child: Column(
+                            children: [
+                              Row(
+                                children: [
+                                  Icon(
+                                    Icons.check_circle_outline,
+                                    color: Colors.blue.shade600,
+                                    size: 24,
+                                  ),
+                                  const SizedBox(width: 12),
+                                  Text(
+                                    '确认选择',
+                                    style: TextStyle(
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.bold,
+                                      color: Colors.grey.shade800,
+                                    ),
+                                  ),
+                                  const Spacer(),
+                                  Text(
+                                    '已选择 ${_selectedChannels.length}/4 个通道',
+                                    style: TextStyle(
+                                      fontSize: 14,
+                                      color: Colors.grey.shade600,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 16),
+                              SizedBox(
+                                width: double.infinity,
+                                child: ElevatedButton(
+                                  onPressed: _confirmSelection,
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: Colors.blue.shade600,
+                                    foregroundColor: Colors.white,
+                                    padding: const EdgeInsets.symmetric(vertical: 16),
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(8),
+                                    ),
+                                  ),
+                                  child: const Text(
+                                    '确认保存',
+                                    style: TextStyle(
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}

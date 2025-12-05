@@ -1,5 +1,11 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:webview_flutter/webview_flutter.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:iboard_app/models/monitor_models.dart';
+import 'package:iboard_app/providers/app_data_provider.dart';
+import 'package:provider/provider.dart';
+import 'package:http/http.dart' as http;
 
 ///實時監控Widget - 四宮格方案
 ///可作為頂部廣告輪播的一部分
@@ -31,19 +37,10 @@ class LiveMonitorWidgetState extends State<LiveMonitorWidget>
   bool get isInitialized => _isInitialized;
   bool get isDisposed => _isDisposed;
 
-  final List<String> _streamUrls = [
-    'http://117.72.193.54:28889/frontyard/',
-    'http://117.72.193.54:28889/sub1/',
-    'http://117.72.193.54:28889/sub2/',
-    'http://117.72.193.54:28889/sub3/',
-  ];
-
-  final List<String> _streamNames = [
-    '主碼流',
-    '子碼流1',
-    '子碼流2',
-    '子碼流3',
-  ];
+  // 用户选择的监控URL和名称
+  List<String> _streamUrls = [];
+  List<String> _streamNames = [];
+  bool _hasUserSelection = false;
 
   @override
   bool get wantKeepAlive => !_isDisposed && _isInitialized;
@@ -51,22 +48,119 @@ class LiveMonitorWidgetState extends State<LiveMonitorWidget>
   @override
   void initState() {
     super.initState();
-    // 🔧 修复：立即初始化，不等待PostFrameCallback，加快显示速度
-    if (!widget.disableAutoInit) {
-      // 延迟50ms，让Widget先完成基础渲染
-      Future.delayed(const Duration(milliseconds: 50), () {
-        if (mounted && !_isDisposed) {
-          initializeWebViews();
+    // 先加载用户选择的监控通道
+    _loadSelectedChannels().then((_) {
+      // 🔧 修复：立即初始化，不等待PostFrameCallback，加快显示速度
+      if (!widget.disableAutoInit) {
+        // 延迟50ms，让Widget先完成基础渲染
+        Future.delayed(const Duration(milliseconds: 50), () {
+          if (mounted && !_isDisposed) {
+            initializeWebViews();
+          }
+        });
+      }
+    });
+  }
+
+  ///1, 加载用户选择的监控通道
+  Future<void> _loadSelectedChannels() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final savedChannels = prefs.getStringList('monitor_selected_channels');
+      final savedApiUrl = prefs.getString('monitor_api_url');
+      
+      // 从AppDataProvider获取大厦ismartid
+      String? ismartId;
+      try {
+        // 尝试从AppDataProvider获取ismartid
+        final appDataProvider = Provider.of<AppDataProvider>(context, listen: false);
+        ismartId = appDataProvider.settingsModel?.building.ismartId;
+      } catch (e) {
+        debugPrint('[LiveMonitor] 获取AppDataProvider失败: $e');
+      }
+      
+      if (savedChannels != null && savedChannels.isNotEmpty && ismartId != null) {
+        // 从保存的channelKey解析出URL信息
+        // channelKey格式: "orangepiId_channelName"
+        final List<String> selectedUrls = [];
+        final List<String> selectedNames = [];
+        
+        // 使用用户保存的API地址或默认地址
+        final apiUrl = savedApiUrl ?? 'http://ajlive.sunofw.cn:32001/api/auth/public';
+        
+        // 重新获取监控数据以得到最新的URL
+        try {
+          final response = await http.post(
+            Uri.parse(apiUrl),
+            headers: {'Content-Type': 'application/json'},
+            body: jsonEncode(MonitorRequest(
+              ismartId: ismartId,
+              isStaff: true,
+            ).toJson()),
+          );
+          
+          if (response.statusCode == 200) {
+            final monitorResponse = MonitorResponse.fromJson(jsonDecode(response.body));
+            if (monitorResponse.success) {
+              // 根据保存的通道选择获取对应的URL
+              for (final orangepi in monitorResponse.data.orangepis) {
+                for (int i = 0; i < orangepi.urls.length; i++) {
+                  final channelKey = '${orangepi.orangepi_id}_channel${i + 1}';
+                  if (savedChannels.contains(channelKey)) {
+                    selectedUrls.add(orangepi.urls[i]);
+                    selectedNames.add('${orangepi.orangepi_name}-channel${i + 1}');
+                  }
+                }
+              }
+              debugPrint('[LiveMonitor] ✅ 成功加载用户选择的监控通道: ${selectedNames.length}个');
+            }
+          }
+        } catch (e) {
+          debugPrint('[LiveMonitor] 加载监控数据失败: $e');
         }
+        
+        if (selectedUrls.isNotEmpty) {
+          setState(() {
+            _streamUrls = selectedUrls.take(4).toList(); // 最多取4个
+            _streamNames = selectedNames.take(4).toList();
+            _hasUserSelection = true;
+          });
+          debugPrint('[LiveMonitor] ✅ 成功加载用户选择的监控通道: ${selectedNames.length}个');
+        } else {
+          // 如果没有找到用户选择的URL，设置为无选择状态
+          setState(() {
+            _streamUrls = [];
+            _streamNames = [];
+            _hasUserSelection = false;
+          });
+          debugPrint('[LiveMonitor] ⚠️ 未找到用户选择的监控通道');
+        }
+      } else {
+        // 没有保存的选择，设置为无选择状态
+        setState(() {
+          _streamUrls = [];
+          _streamNames = [];
+          _hasUserSelection = false;
+        });
+        debugPrint('[LiveMonitor] ℹ️ 没有用户选择的监控通道');
+      }
+    } catch (e) {
+      debugPrint('[LiveMonitor] 加载用户选择失败: $e');
+      // 出错时设置为无选择状态
+      setState(() {
+        _streamUrls = [];
+        _streamNames = [];
+        _hasUserSelection = false;
       });
     }
   }
 
-  ///1, 初始化所有WebView控制器(公開方法供Provider調用)
+  ///2, 初始化所有WebView控制器(公開方法供Provider調用)
   Future<void> initializeWebViews() async {
-    if (_isInitialized || _isDisposed || !mounted) return;
+    if (_isInitialized || _isDisposed || !mounted || !_hasUserSelection) return;
 
     debugPrint('[LiveMonitor] 🚀 開始初始化4個WebView控制器...');
+    debugPrint('[LiveMonitor] 📹 使用监控URL: $_streamUrls');
 
     _controllers = List.generate(
       4,
@@ -367,6 +461,38 @@ class LiveMonitorWidgetState extends State<LiveMonitorWidget>
     }
   }
 
+  ///3, 刷新监控通道（重新加载用户选择的通道）
+  Future<void> refreshMonitorChannels() async {
+    debugPrint('[LiveMonitor] 🔄 刷新监控通道...');
+    
+    // 先释放当前的WebView
+    _isDisposed = true;
+    _isInitialized = false;
+    _controllers?.clear();
+    _controllers = null;
+
+    // 重置加载状态
+    for (int i = 0; i < _loadingStates.length; i++) {
+      _loadingStates[i] = true;
+    }
+    
+    // 重新加载用户选择的通道
+    await _loadSelectedChannels();
+    
+    // 重置状态
+    if (mounted) {
+      setState(() {
+        _isDisposed = false;
+        _isInitialized = false;
+      });
+      
+      // 重新初始化WebView（如果有用户选择）
+      if (_hasUserSelection) {
+        await initializeWebViews();
+      }
+    }
+  }
+
   @override
   void dispose() {
     _isDisposed = true;
@@ -382,6 +508,10 @@ class LiveMonitorWidgetState extends State<LiveMonitorWidget>
 
     if (_isDisposed) {
       return _buildPlaceholder();
+    }
+
+    if (!_hasUserSelection) {
+      return _buildNoSelectionPrompt();
     }
 
     if (!_isInitialized) {
@@ -439,7 +569,54 @@ class LiveMonitorWidgetState extends State<LiveMonitorWidget>
     );
   }
 
-  ///4, 構建占位符
+  ///4, 構建無選擇提示界面
+  Widget _buildNoSelectionPrompt() {
+    return Container(
+      width: double.infinity,
+      height: double.infinity,
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            Colors.grey.shade800,
+            Colors.grey.shade900,
+          ],
+        ),
+      ),
+      child: Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              Icons.videocam_off_outlined,
+              size: 64,
+              color: Colors.white.withOpacity(0.6),
+            ),
+            const SizedBox(height: 16),
+            Text(
+              '尚未選擇監控通道',
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.w500,
+                color: Colors.white.withOpacity(0.9),
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              '請前往設置頁面選擇您要監控的通道',
+              style: TextStyle(
+                fontSize: 14,
+                color: Colors.white.withOpacity(0.7),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  ///5, 構建占位符
   Widget _buildPlaceholder() {
     return Container(
       width: double.infinity,
