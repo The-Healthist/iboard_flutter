@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:iboard_app/pages/time_settings_page.dart';
 import 'package:iboard_app/pages/print_device_list_page.dart'; // 添加打印機頁面導入
+import 'package:iboard_app/pages/monitor_settings_page.dart'; // 添加監控設置頁面導入
 import 'package:iboard_app/providers/announcement_carousel_provider.dart';
 import 'package:iboard_app/providers/ad_full_carousel_provider.dart';
 import 'package:iboard_app/providers/state_provider.dart';
@@ -287,6 +288,14 @@ class SettingsPageState extends State<SettingsPage> {
                           subtitle: '全屏查看實時視頻流',
                           onTap: () => Navigator.pushNamed(
                               context, '/live-monitor-webview'),
+                        ),
+                        const SizedBox(height: 16),
+                        _buildSettingsItem(
+                          icon: Icons.settings_remote,
+                          title: '設置監控畫面',
+                          subtitle: '配置監控畫面地址和參數',
+                          onTap: () =>
+                              _navigateToSubPage(const MonitorSettingsPage()),
                         ),
                         const SizedBox(height: 16),
                         _buildVersionUpdateItem(),
