@@ -17,9 +17,9 @@ class MonitorSettingsPageState extends State<MonitorSettingsPage> {
   final TextEditingController _apiUrlController = TextEditingController();
   bool _isLoading = false;
   List<Orangepi> _orangepis = [];
-  Set<String> _selectedChannels = {}; // 存储选中的通道
-  String? _currentIsmartId; // 当前ismartId
-  String _currentApiUrl = 'http://ajlive.sunofw.cn:32001/api/auth/public'; // 默认API地址
+  Set<String> _selectedChannels = {};
+  String? _currentIsmartId;
+  String _currentApiUrl = 'http://ajlive.sunofw.cn:32001/api/auth/public';
 
   @override
   void initState() {
@@ -33,62 +33,62 @@ class MonitorSettingsPageState extends State<MonitorSettingsPage> {
     super.dispose();
   }
 
-  ///1, 加载已保存的设置
+  ///1, 載入已保存的設定
   Future<void> _loadSavedSettings() async {
     try {
       final prefs = await SharedPreferences.getInstance();
       final savedApiUrl = prefs.getString('monitor_api_url');
       final savedChannels = prefs.getStringList('monitor_selected_channels');
-      
+
       setState(() {
         _currentApiUrl = savedApiUrl ?? _currentApiUrl;
         _apiUrlController.text = _currentApiUrl;
         _selectedChannels = Set.from(savedChannels ?? []);
       });
-      
-      // 获取大厦的ismartid
+
       await _loadBuildingIsmartId();
     } catch (e) {
-      // 静默失败
+      // 靜默失敗
     }
   }
 
-  ///2, 从AppDataProvider获取大厦ismartid
+  ///2, 從AppDataProvider獲取大廈ismartid
   Future<void> _loadBuildingIsmartId() async {
     try {
-      final appDataProvider = Provider.of<AppDataProvider>(context, listen: false);
+      final appDataProvider =
+          Provider.of<AppDataProvider>(context, listen: false);
       final ismartId = appDataProvider.settingsModel?.building.ismartId;
-      
+
       if (ismartId != null && ismartId.isNotEmpty) {
         setState(() {
           _currentIsmartId = ismartId;
         });
-        
-        // 自动发起监控数据请求
+
         await _onGetMonitorData();
       } else {
-        _showError('未找到大厦ismartid，请先确保设备已正确登录');
+        _showError('未找到大廈ismartid，請先確保設備已正確登入');
       }
     } catch (e) {
-      _showError('获取大厦ismartid失败: ${e.toString()}');
+      _showError('獲取大廈ismartid失敗: ${e.toString()}');
     }
   }
 
-  ///3, 保存设置
+  ///3, 保存設定
   Future<void> _saveSettings() async {
     try {
       final prefs = await SharedPreferences.getInstance();
       await prefs.setString('monitor_api_url', _currentApiUrl);
-      await prefs.setStringList('monitor_selected_channels', _selectedChannels.toList());
+      await prefs.setStringList(
+          'monitor_selected_channels', _selectedChannels.toList());
     } catch (e) {
-      _showError('保存失败: ${e.toString()}');
+      _showError('保存失敗: ${e.toString()}');
     }
   }
 
-  ///4, 获取监控数据
+  ///4, 獲取監控數據
   Future<void> _onGetMonitorData() async {
     if (_currentIsmartId == null || _currentIsmartId!.isEmpty) {
-      _showError('大厦ismartid为空');
+      _showError('大廈ismartid為空');
       return;
     }
 
@@ -97,10 +97,10 @@ class MonitorSettingsPageState extends State<MonitorSettingsPage> {
     });
 
     try {
-      final apiUrl = _apiUrlController.text.trim().isEmpty 
-          ? _currentApiUrl 
+      final apiUrl = _apiUrlController.text.trim().isEmpty
+          ? _currentApiUrl
           : _apiUrlController.text.trim();
-      
+
       final response = await http.post(
         Uri.parse(apiUrl),
         headers: {
@@ -116,21 +116,21 @@ class MonitorSettingsPageState extends State<MonitorSettingsPage> {
         final monitorResponse = MonitorResponse.fromJson(
           jsonDecode(response.body),
         );
-        
+
         if (monitorResponse.success) {
           setState(() {
             _orangepis = monitorResponse.data.orangepis;
             _currentApiUrl = apiUrl;
           });
-          _showSuccess('监控数据获取成功');
+          _showSuccess('監控數據獲取成功');
         } else {
-          _showError('获取监控数据失败');
+          _showError('獲取監控數據失敗');
         }
       } else {
-        _showError('网络请求失败: ${response.statusCode}');
+        _showError('網路請求失敗: ${response.statusCode}');
       }
     } catch (e) {
-      _showError('请求失败: ${e.toString()}');
+      _showError('請求失敗: ${e.toString()}');
     } finally {
       setState(() {
         _isLoading = false;
@@ -138,35 +138,59 @@ class MonitorSettingsPageState extends State<MonitorSettingsPage> {
     }
   }
 
-  ///5, 手动刷新监控数据
+  ///5, 手動刷新監控數據
   Future<void> _onRefreshButtonPressed() async {
-    // 更新API地址
     final inputUrl = _apiUrlController.text.trim();
     if (inputUrl.isNotEmpty) {
       _currentApiUrl = inputUrl;
     }
-    
-    // 重新获取监控数据
+
     await _onGetMonitorData();
   }
 
-  ///2, 切换通道选择
+  ///2, 切換通道選擇
   void _toggleChannelSelection(String channelKey) {
     setState(() {
       if (_selectedChannels.contains(channelKey)) {
         _selectedChannels.remove(channelKey);
       } else {
-        // 检查是否超过4个通道限制
         if (_selectedChannels.length < 4) {
           _selectedChannels.add(channelKey);
         } else {
-          _showError('每个大厦最多只能选择4个监控通道');
+          _showError('每個大廈最多只能選擇4個監控通道');
         }
       }
     });
   }
 
-  ///3, 显示成功消息
+  ///7, 取消選中的通道
+  void _removeChannel(String channelKey) {
+    setState(() {
+      _selectedChannels.remove(channelKey);
+    });
+  }
+
+  ///8, 獲取已選中通道的顯示名稱
+  String _getChannelDisplayName(String channelKey) {
+    final parts = channelKey.split('_');
+    if (parts.length >= 2) {
+      final channelName = parts[1];
+      if (_orangepis.isNotEmpty) {
+        final orangepiId = int.tryParse(parts[0]);
+        if (orangepiId != null) {
+          final orangepi = _orangepis.firstWhere(
+            (o) => o.orangepi_id == orangepiId,
+            orElse: () => _orangepis.first,
+          );
+          return '${orangepi.orangepi_name}-$channelName';
+        }
+      }
+      return channelName;
+    }
+    return channelKey;
+  }
+
+  ///3, 顯示成功消息
   void _showSuccess(String message) {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
@@ -177,31 +201,29 @@ class MonitorSettingsPageState extends State<MonitorSettingsPage> {
     );
   }
 
-  ///6, 确认选择
+  ///6, 確認選擇
   Future<void> _confirmSelection() async {
     if (_selectedChannels.isEmpty) {
-      _showError('请至少选择一个监控通道');
+      _showError('請至少選擇一個監控通道');
       return;
     }
 
     await _saveSettings();
-    _showSuccess('监控通道设置已保存');
-    
-    // 通知实时监控页面更新
+    _showSuccess('監控通道設定已保存');
+
     _notifyLiveMonitorUpdate();
   }
 
-  ///5, 通知实时监控页面更新
+  ///5, 通知實時監控頁面更新
   void _notifyLiveMonitorUpdate() {
-    // 延迟返回，让用户看到保存成功的提示
     Future.delayed(const Duration(seconds: 1), () {
       if (mounted) {
-        Navigator.pop(context, true); // 返回true表示需要更新监控页面
+        Navigator.pop(context, true);
       }
     });
   }
 
-  ///5, 显示错误消息
+  ///5, 顯示錯誤消息
   void _showError(String message) {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
@@ -233,18 +255,21 @@ class MonitorSettingsPageState extends State<MonitorSettingsPage> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // 香橙派标题
           Row(
             children: [
               Container(
                 padding: const EdgeInsets.all(8),
                 decoration: BoxDecoration(
-                  color: orangepi.is_active ? Colors.green.shade50 : Colors.grey.shade50,
+                  color: orangepi.is_active
+                      ? Colors.green.shade50
+                      : Colors.grey.shade50,
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: Icon(
                   Icons.device_hub,
-                  color: orangepi.is_active ? Colors.green.shade600 : Colors.grey.shade600,
+                  color: orangepi.is_active
+                      ? Colors.green.shade600
+                      : Colors.grey.shade600,
                   size: 20,
                 ),
               ),
@@ -262,49 +287,57 @@ class MonitorSettingsPageState extends State<MonitorSettingsPage> {
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                 decoration: BoxDecoration(
-                  color: orangepi.is_active ? Colors.green.shade100 : Colors.grey.shade100,
+                  color: orangepi.is_active
+                      ? Colors.green.shade100
+                      : Colors.grey.shade100,
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: Text(
-                  orangepi.is_active ? '在线' : '离线',
+                  orangepi.is_active ? '在線' : '離線',
                   style: TextStyle(
                     fontSize: 12,
                     fontWeight: FontWeight.w500,
-                    color: orangepi.is_active ? Colors.green.shade700 : Colors.grey.shade700,
+                    color: orangepi.is_active
+                        ? Colors.green.shade700
+                        : Colors.grey.shade700,
                   ),
                 ),
               ),
             ],
           ),
           const SizedBox(height: 16),
-          
-          // 视频通道网格
           Wrap(
             spacing: 8,
             runSpacing: 8,
             children: orangepi.urls.asMap().entries.map((entry) {
               final index = entry.key;
-              final url = entry.value;
               final channelName = 'channel${index + 1}';
               final channelKey = '${orangepi.orangepi_id}_$channelName';
               final isSelected = _selectedChannels.contains(channelKey);
-              
+
               return GestureDetector(
                 onTap: () => _toggleChannelSelection(channelKey),
                 child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                   decoration: BoxDecoration(
-                    color: isSelected ? Colors.blue.shade600 : Colors.grey.shade100,
+                    color: isSelected
+                        ? Colors.blue.shade600
+                        : Colors.grey.shade100,
                     borderRadius: BorderRadius.circular(20),
                     border: Border.all(
-                      color: isSelected ? Colors.blue.shade600 : Colors.grey.shade300,
+                      color: isSelected
+                          ? Colors.blue.shade600
+                          : Colors.grey.shade300,
                     ),
                   ),
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       Icon(
-                        isSelected ? Icons.check_circle : Icons.videocam_outlined,
+                        isSelected
+                            ? Icons.check_circle
+                            : Icons.videocam_outlined,
                         size: 16,
                         color: isSelected ? Colors.white : Colors.grey.shade600,
                       ),
@@ -314,7 +347,8 @@ class MonitorSettingsPageState extends State<MonitorSettingsPage> {
                         style: TextStyle(
                           fontSize: 14,
                           fontWeight: FontWeight.w500,
-                          color: isSelected ? Colors.white : Colors.grey.shade700,
+                          color:
+                              isSelected ? Colors.white : Colors.grey.shade700,
                         ),
                       ),
                     ],
@@ -369,7 +403,7 @@ class MonitorSettingsPageState extends State<MonitorSettingsPage> {
                     ),
                     const SizedBox(width: 16),
                     Text(
-                      '设置监控画面',
+                      '設定監控畫面',
                       style: TextStyle(
                         fontSize: 28,
                         fontWeight: FontWeight.bold,
@@ -388,7 +422,7 @@ class MonitorSettingsPageState extends State<MonitorSettingsPage> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       const SizedBox(height: 40),
-                      
+
                       // 设置卡片
                       Container(
                         width: double.infinity,
@@ -424,7 +458,7 @@ class MonitorSettingsPageState extends State<MonitorSettingsPage> {
                                 ),
                                 const SizedBox(width: 16),
                                 Text(
-                                  'API接口配置',
+                                  'API介面配置',
                                   style: TextStyle(
                                     fontSize: 18,
                                     fontWeight: FontWeight.bold,
@@ -434,13 +468,13 @@ class MonitorSettingsPageState extends State<MonitorSettingsPage> {
                               ],
                             ),
                             const SizedBox(height: 24),
-                            
+
                             // API地址输入框和按钮区域
                             Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 Text(
-                                  '接口地址 (可选)',
+                                  '介面地址 (可選)',
                                   style: TextStyle(
                                     fontSize: 14,
                                     fontWeight: FontWeight.w500,
@@ -455,20 +489,28 @@ class MonitorSettingsPageState extends State<MonitorSettingsPage> {
                                         controller: _apiUrlController,
                                         enabled: !_isLoading,
                                         decoration: InputDecoration(
-                                          hintText: '默认: http://ajlive.sunofw.cn:32001/api/auth/public',
+                                          hintText:
+                                              '預設: http://ajlive.sunofw.cn:32001/api/auth/public',
                                           border: OutlineInputBorder(
-                                            borderRadius: BorderRadius.circular(8),
-                                            borderSide: BorderSide(color: Colors.grey.shade300),
+                                            borderRadius:
+                                                BorderRadius.circular(8),
+                                            borderSide: BorderSide(
+                                                color: Colors.grey.shade300),
                                           ),
                                           enabledBorder: OutlineInputBorder(
-                                            borderRadius: BorderRadius.circular(8),
-                                            borderSide: BorderSide(color: Colors.grey.shade300),
+                                            borderRadius:
+                                                BorderRadius.circular(8),
+                                            borderSide: BorderSide(
+                                                color: Colors.grey.shade300),
                                           ),
                                           focusedBorder: OutlineInputBorder(
-                                            borderRadius: BorderRadius.circular(8),
-                                            borderSide: BorderSide(color: Colors.blue.shade600),
+                                            borderRadius:
+                                                BorderRadius.circular(8),
+                                            borderSide: BorderSide(
+                                                color: Colors.blue.shade600),
                                           ),
-                                          contentPadding: const EdgeInsets.symmetric(
+                                          contentPadding:
+                                              const EdgeInsets.symmetric(
                                             horizontal: 16,
                                             vertical: 12,
                                           ),
@@ -477,7 +519,9 @@ class MonitorSettingsPageState extends State<MonitorSettingsPage> {
                                     ),
                                     const SizedBox(width: 16),
                                     ElevatedButton(
-                                      onPressed: _isLoading ? null : _onRefreshButtonPressed,
+                                      onPressed: _isLoading
+                                          ? null
+                                          : _onRefreshButtonPressed,
                                       child: _isLoading
                                           ? SizedBox(
                                               width: 16,
@@ -496,7 +540,8 @@ class MonitorSettingsPageState extends State<MonitorSettingsPage> {
                                           vertical: 12,
                                         ),
                                         shape: RoundedRectangleBorder(
-                                          borderRadius: BorderRadius.circular(8),
+                                          borderRadius:
+                                              BorderRadius.circular(8),
                                         ),
                                       ),
                                     ),
@@ -505,7 +550,7 @@ class MonitorSettingsPageState extends State<MonitorSettingsPage> {
                               ],
                             ),
                             const SizedBox(height: 24),
-                            
+
                             // 大厦信息显示
                             if (_currentIsmartId != null) ...[
                               Container(
@@ -514,7 +559,8 @@ class MonitorSettingsPageState extends State<MonitorSettingsPage> {
                                 decoration: BoxDecoration(
                                   color: Colors.green.shade50,
                                   borderRadius: BorderRadius.circular(8),
-                                  border: Border.all(color: Colors.green.shade200),
+                                  border:
+                                      Border.all(color: Colors.green.shade200),
                                 ),
                                 child: Row(
                                   children: [
@@ -526,7 +572,7 @@ class MonitorSettingsPageState extends State<MonitorSettingsPage> {
                                     const SizedBox(width: 8),
                                     Expanded(
                                       child: Text(
-                                        '当前大厦 iSmart ID: $_currentIsmartId',
+                                        '當前大廈 iSmart ID: $_currentIsmartId',
                                         style: TextStyle(
                                           fontSize: 14,
                                           color: Colors.green.shade700,
@@ -539,8 +585,7 @@ class MonitorSettingsPageState extends State<MonitorSettingsPage> {
                               ),
                               const SizedBox(height: 16),
                             ],
-                            
-                            // 选中通道数量提示
+
                             if (_selectedChannels.isNotEmpty) ...[
                               Container(
                                 width: double.infinity,
@@ -548,24 +593,77 @@ class MonitorSettingsPageState extends State<MonitorSettingsPage> {
                                 decoration: BoxDecoration(
                                   color: Colors.blue.shade50,
                                   borderRadius: BorderRadius.circular(8),
-                                  border: Border.all(color: Colors.blue.shade200),
+                                  border:
+                                      Border.all(color: Colors.blue.shade200),
                                 ),
-                                child: Row(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
-                                    Icon(
-                                      Icons.info_outline,
-                                      color: Colors.blue.shade600,
-                                      size: 20,
+                                    Row(
+                                      children: [
+                                        Icon(
+                                          Icons.info_outline,
+                                          color: Colors.blue.shade600,
+                                          size: 20,
+                                        ),
+                                        const SizedBox(width: 8),
+                                        Text(
+                                          '已選擇 ${_selectedChannels.length}/4 個監控通道',
+                                          style: TextStyle(
+                                            fontSize: 14,
+                                            color: Colors.blue.shade700,
+                                            fontWeight: FontWeight.w500,
+                                          ),
+                                        ),
+                                      ],
                                     ),
-                                    const SizedBox(width: 8),
-                                    Text(
-                                      '已选择 ${_selectedChannels.length}/4 个监控通道',
-                                      style: TextStyle(
-                                        fontSize: 14,
-                                        color: Colors.blue.shade700,
-                                        fontWeight: FontWeight.w500,
+                                    if (_selectedChannels.isNotEmpty) ...[
+                                      const SizedBox(height: 12),
+                                      Wrap(
+                                        spacing: 8,
+                                        runSpacing: 8,
+                                        children:
+                                            _selectedChannels.map((channelKey) {
+                                          return GestureDetector(
+                                            onTap: () =>
+                                                _removeChannel(channelKey),
+                                            child: Container(
+                                              padding:
+                                                  const EdgeInsets.symmetric(
+                                                horizontal: 12,
+                                                vertical: 6,
+                                              ),
+                                              decoration: BoxDecoration(
+                                                color: Colors.blue.shade600,
+                                                borderRadius:
+                                                    BorderRadius.circular(16),
+                                              ),
+                                              child: Row(
+                                                mainAxisSize: MainAxisSize.min,
+                                                children: [
+                                                  Text(
+                                                    _getChannelDisplayName(
+                                                        channelKey),
+                                                    style: const TextStyle(
+                                                      fontSize: 12,
+                                                      fontWeight:
+                                                          FontWeight.w500,
+                                                      color: Colors.white,
+                                                    ),
+                                                  ),
+                                                  const SizedBox(width: 4),
+                                                  const Icon(
+                                                    Icons.close,
+                                                    size: 14,
+                                                    color: Colors.white,
+                                                  ),
+                                                ],
+                                              ),
+                                            ),
+                                          );
+                                        }).toList(),
                                       ),
-                                    ),
+                                    ],
                                   ],
                                 ),
                               ),
@@ -574,15 +672,12 @@ class MonitorSettingsPageState extends State<MonitorSettingsPage> {
                           ],
                         ),
                       ),
-                      
-                      // 香橙派信息显示区域
+
                       if (_orangepis.isNotEmpty) ...[
                         const SizedBox(height: 24),
-                        ..._orangepis.map((orangepi) => _buildOrangepiCard(orangepi)),
-                        
+                        ..._orangepis
+                            .map((orangepi) => _buildOrangepiCard(orangepi)),
                         const SizedBox(height: 32),
-                        
-                        // 确认按钮
                         Container(
                           width: double.infinity,
                           padding: const EdgeInsets.all(20),
@@ -609,7 +704,7 @@ class MonitorSettingsPageState extends State<MonitorSettingsPage> {
                                   ),
                                   const SizedBox(width: 12),
                                   Text(
-                                    '确认选择',
+                                    '確認選擇',
                                     style: TextStyle(
                                       fontSize: 16,
                                       fontWeight: FontWeight.bold,
@@ -618,7 +713,7 @@ class MonitorSettingsPageState extends State<MonitorSettingsPage> {
                                   ),
                                   const Spacer(),
                                   Text(
-                                    '已选择 ${_selectedChannels.length}/4 个通道',
+                                    '已選擇 ${_selectedChannels.length}/4 個通道',
                                     style: TextStyle(
                                       fontSize: 14,
                                       color: Colors.grey.shade600,
@@ -634,13 +729,14 @@ class MonitorSettingsPageState extends State<MonitorSettingsPage> {
                                   style: ElevatedButton.styleFrom(
                                     backgroundColor: Colors.blue.shade600,
                                     foregroundColor: Colors.white,
-                                    padding: const EdgeInsets.symmetric(vertical: 16),
+                                    padding: const EdgeInsets.symmetric(
+                                        vertical: 16),
                                     shape: RoundedRectangleBorder(
                                       borderRadius: BorderRadius.circular(8),
                                     ),
                                   ),
                                   child: const Text(
-                                    '确认保存',
+                                    '確認保存',
                                     style: TextStyle(
                                       fontSize: 16,
                                       fontWeight: FontWeight.w600,

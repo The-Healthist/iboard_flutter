@@ -1,6 +1,8 @@
 import 'dart:convert';
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:webview_flutter/webview_flutter.dart';
+import 'package:webview_flutter_android/webview_flutter_android.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:iboard_app/models/monitor_models.dart';
 import 'package:iboard_app/providers/app_data_provider.dart';
@@ -68,26 +70,30 @@ class LiveMonitorWidgetState extends State<LiveMonitorWidget>
       final prefs = await SharedPreferences.getInstance();
       final savedChannels = prefs.getStringList('monitor_selected_channels');
       final savedApiUrl = prefs.getString('monitor_api_url');
-      
+
       // 从AppDataProvider获取大厦ismartid
       String? ismartId;
       try {
         // 尝试从AppDataProvider获取ismartid
-        final appDataProvider = Provider.of<AppDataProvider>(context, listen: false);
+        final appDataProvider =
+            Provider.of<AppDataProvider>(context, listen: false);
         ismartId = appDataProvider.settingsModel?.building.ismartId;
       } catch (e) {
         debugPrint('[LiveMonitor] 获取AppDataProvider失败: $e');
       }
-      
-      if (savedChannels != null && savedChannels.isNotEmpty && ismartId != null) {
+
+      if (savedChannels != null &&
+          savedChannels.isNotEmpty &&
+          ismartId != null) {
         // 从保存的channelKey解析出URL信息
         // channelKey格式: "orangepiId_channelName"
         final List<String> selectedUrls = [];
         final List<String> selectedNames = [];
-        
+
         // 使用用户保存的API地址或默认地址
-        final apiUrl = savedApiUrl ?? 'http://ajlive.sunofw.cn:32001/api/auth/public';
-        
+        final apiUrl =
+            savedApiUrl ?? 'http://ajlive.sunofw.cn:32001/api/auth/public';
+
         // 重新获取监控数据以得到最新的URL
         try {
           final response = await http.post(
@@ -98,9 +104,10 @@ class LiveMonitorWidgetState extends State<LiveMonitorWidget>
               isStaff: true,
             ).toJson()),
           );
-          
+
           if (response.statusCode == 200) {
-            final monitorResponse = MonitorResponse.fromJson(jsonDecode(response.body));
+            final monitorResponse =
+                MonitorResponse.fromJson(jsonDecode(response.body));
             if (monitorResponse.success) {
               // 根据保存的通道选择获取对应的URL
               for (final orangepi in monitorResponse.data.orangepis) {
@@ -108,17 +115,19 @@ class LiveMonitorWidgetState extends State<LiveMonitorWidget>
                   final channelKey = '${orangepi.orangepi_id}_channel${i + 1}';
                   if (savedChannels.contains(channelKey)) {
                     selectedUrls.add(orangepi.urls[i]);
-                    selectedNames.add('${orangepi.orangepi_name}-channel${i + 1}');
+                    selectedNames
+                        .add('${orangepi.orangepi_name}-channel${i + 1}');
                   }
                 }
               }
-              debugPrint('[LiveMonitor] ✅ 成功加载用户选择的监控通道: ${selectedNames.length}个');
+              debugPrint(
+                  '[LiveMonitor] ✅ 成功加载用户选择的监控通道: ${selectedNames.length}个');
             }
           }
         } catch (e) {
           debugPrint('[LiveMonitor] 加载监控数据失败: $e');
         }
-        
+
         if (selectedUrls.isNotEmpty) {
           setState(() {
             _streamUrls = selectedUrls.take(4).toList(); // 最多取4个
@@ -164,10 +173,22 @@ class LiveMonitorWidgetState extends State<LiveMonitorWidget>
 
     _controllers = List.generate(
       4,
-      (index) => WebViewController()
-        ..setJavaScriptMode(JavaScriptMode.unrestricted)
-        ..setBackgroundColor(Colors.black)
-        ..setNavigationDelegate(
+      (index) {
+        final controller = WebViewController()
+          ..setJavaScriptMode(JavaScriptMode.unrestricted)
+          ..setBackgroundColor(Colors.black);
+
+        // 🔧 关键：为 Android 平台启用 WebRTC 和媒体播放支持
+        if (Platform.isAndroid) {
+          final androidController =
+              controller.platform as AndroidWebViewController;
+          // 启用媒体自动播放（不需要用户交互）
+          androidController.setMediaPlaybackRequiresUserGesture(false);
+          // 注意：WebRTC 权限请求会在 onPermissionRequest 回调中处理
+          debugPrint('[LiveMonitor] ✅ Android WebView[$index] 已启用媒体自动播放');
+        }
+
+        controller.setNavigationDelegate(
           NavigationDelegate(
             onPageStarted: (String url) {
               if (mounted && !_isDisposed) {
@@ -395,7 +416,10 @@ class LiveMonitorWidgetState extends State<LiveMonitorWidget>
                   '[LiveMonitor] ⚠️ WebView[$index] 錯誤: ${error.description}');
             },
           ),
-        ),
+        );
+
+        return controller;
+      },
     );
 
     // 🔧 优化：并行加载所有WebView，不使用延迟，最快速度初始化
@@ -464,7 +488,7 @@ class LiveMonitorWidgetState extends State<LiveMonitorWidget>
   ///3, 刷新监控通道（重新加载用户选择的通道）
   Future<void> refreshMonitorChannels() async {
     debugPrint('[LiveMonitor] 🔄 刷新监控通道...');
-    
+
     // 先释放当前的WebView
     _isDisposed = true;
     _isInitialized = false;
@@ -475,17 +499,17 @@ class LiveMonitorWidgetState extends State<LiveMonitorWidget>
     for (int i = 0; i < _loadingStates.length; i++) {
       _loadingStates[i] = true;
     }
-    
+
     // 重新加载用户选择的通道
     await _loadSelectedChannels();
-    
+
     // 重置状态
     if (mounted) {
       setState(() {
         _isDisposed = false;
         _isInitialized = false;
       });
-      
+
       // 重新初始化WebView（如果有用户选择）
       if (_hasUserSelection) {
         await initializeWebViews();
