@@ -423,9 +423,9 @@ class _CarouselWidgetState extends State<CarouselWidget>
           _isAnimating = false;
         });
 
-        if (widget.onPageChanged != null) {
-          widget.onPageChanged!(_currentIndex);
-        }
+        // 🔧 修复：移除重复的 onPageChanged 调用
+        // PageView.builder 的 onPageChanged 回调已经会在页面变化时自动触发
+        // 这里再次调用会导致 onPageChanged 被调用两次
       }
     }).catchError((error) {
       // Handle animation errors gracefully
@@ -457,9 +457,8 @@ class _CarouselWidgetState extends State<CarouselWidget>
           _isAnimating = false;
         });
 
-        if (widget.onPageChanged != null) {
-          widget.onPageChanged!(_currentIndex);
-        }
+        // 🔧 修复：移除重复的 onPageChanged 调用
+        // PageView.builder 的 onPageChanged 回调已经会在页面变化时自动触发
       }
     }).catchError((error) {
       // Handle animation errors gracefully
@@ -568,6 +567,11 @@ class _CarouselWidgetState extends State<CarouselWidget>
                     ? const PageScrollPhysics()
                     : const NeverScrollableScrollPhysics(),
                 onPageChanged: (index) {
+                  // 🔧 修复：防止重复触发 - 只在索引真正变化时才处理
+                  if (_currentIndex == index) {
+                    return;
+                  }
+
                   setState(() {
                     _currentIndex = index;
                   });

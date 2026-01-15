@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/material.dart';
@@ -29,9 +30,9 @@ class LiveMonitorWidget extends StatefulWidget {
 }
 
 class LiveMonitorWidgetState extends State<LiveMonitorWidget>
-    with AutomaticKeepAliveClientMixin {
+    with AutomaticKeepAliveClientMixin, WidgetsBindingObserver {
   List<WebViewController>? _controllers;
-  final List<bool> _loadingStates = [true, true, true, true];
+  late List<bool> _loadingStates;
   bool _isInitialized = false;
   bool _isDisposed = false;
 
@@ -43,6 +44,30 @@ class LiveMonitorWidgetState extends State<LiveMonitorWidget>
   List<String> _streamUrls = [];
   List<String> _streamNames = [];
   bool _hasUserSelection = false;
+  MonitorLayoutType _layoutType = MonitorLayoutType.grid4;
+
+  // 保存上次的配置，用于检测变化
+  List<String>? _lastSavedChannels;
+  String? _lastSavedLayout;
+
+  ///布局类型
+
+  // ===== 🏥 健康检查相关字段 =====
+  late List<DateTime?> _lastFrameTime; // 每个流最后一帧时间
+  late List<int> _frameErrorCount; // 每个流的错误计数
+  late List<String> _lastErrorReason; // 每个流的最后错误原因
+  late List<bool> _isRetrying; // 🔧 新增：每个流是否正在重试
+  late List<DateTime?> _lastRetryTime; // 🔧 新增：每个流上次重试时间
+  Timer? _healthCheckTimer; // 健康检查定时器
+  Timer? _forceRefreshTimer; // 定期强制刷新定时器
+  static const Duration _healthCheckInterval = Duration(seconds: 30); // 健康检查间隔
+  static const Duration _forceRefreshInterval =
+      Duration(minutes: 5); // 定期强制刷新间隔（延长到5分钟，减少干扰）
+  static const Duration _frameTimeout = Duration(seconds: 60); // 无帧超时时间（给足缓冲时间）
+  static const int _maxErrorCount = 3; // 最大错误次数阈值（提高到3次，避免误判）
+  static const Duration _retryDelay = Duration(seconds: 5); // 🔧 新增：重试延迟时间
+  static const Duration _retryMinInterval =
+      Duration(seconds: 15); // 🔧 新增：最小重试间隔，避免频繁重试
 
   @override
   bool get wantKeepAlive => !_isDisposed && _isInitialized;
@@ -50,6 +75,19 @@ class LiveMonitorWidgetState extends State<LiveMonitorWidget>
   @override
   void initState() {
     super.initState();
+    // 添加应用生命周期观察者
+    WidgetsBinding.instance.addObserver(this);
+
+    // 初始化加载状态列表（默认4格）
+    _loadingStates = List.filled(4, true);
+
+    // 初始化健康检查相关字段
+    _lastFrameTime = List.filled(4, null);
+    _frameErrorCount = List.filled(4, 0);
+    _lastErrorReason = List.filled(4, '');
+    _isRetrying = List.filled(4, false);
+    _lastRetryTime = List.filled(4, null);
+
     // 先加载用户选择的监控通道
     _loadSelectedChannels().then((_) {
       // 🔧 修复：立即初始化，不等待PostFrameCallback，加快显示速度
@@ -70,6 +108,10 @@ class LiveMonitorWidgetState extends State<LiveMonitorWidget>
       final prefs = await SharedPreferences.getInstance();
       final savedChannels = prefs.getStringList('monitor_selected_channels');
       final savedApiUrl = prefs.getString('monitor_api_url');
+      final savedLayout = prefs.getString('monitor_layout_type');
+
+      // 加载布局类型
+      _layoutType = MonitorLayoutType.fromString(savedLayout ?? 'grid4');
 
       // 从AppDataProvider获取大厦ismartid
       String? ismartId;
@@ -109,7 +151,7 @@ class LiveMonitorWidgetState extends State<LiveMonitorWidget>
             final monitorResponse =
                 MonitorResponse.fromJson(jsonDecode(response.body));
             if (monitorResponse.success) {
-              // 根据保存的通道选择获取对应的URL
+              // 根据保存的通道选择获取对应的URL（直接使用原始认证URL）
               for (final orangepi in monitorResponse.data.orangepis) {
                 for (int i = 0; i < orangepi.urls.length; i++) {
                   final channelKey = '${orangepi.orangepi_id}_channel${i + 1}';
@@ -117,6 +159,8 @@ class LiveMonitorWidgetState extends State<LiveMonitorWidget>
                     selectedUrls.add(orangepi.urls[i]);
                     selectedNames
                         .add('${orangepi.orangepi_name}-channel${i + 1}');
+                    debugPrint(
+                        '[LiveMonitor] ✅ 使用原始认证URL: ${orangepi.urls[i]}');
                   }
                 }
               }
@@ -129,20 +173,31 @@ class LiveMonitorWidgetState extends State<LiveMonitorWidget>
         }
 
         if (selectedUrls.isNotEmpty) {
+          final actualCount = _layoutType.count;
           setState(() {
-            _streamUrls = selectedUrls.take(4).toList(); // 最多取4个
-            _streamNames = selectedNames.take(4).toList();
+            _streamUrls = selectedUrls.take(actualCount).toList();
+            _streamNames = selectedNames.take(actualCount).toList();
             _hasUserSelection = true;
+            _lastSavedChannels = savedChannels;
+            _lastSavedLayout = savedLayout;
+            // 根据实际布局重新初始化健康检查相关字段
+            _loadingStates = List.filled(actualCount, true);
+            _lastFrameTime = List.filled(actualCount, null);
+            _frameErrorCount = List.filled(actualCount, 0);
+            _lastErrorReason = List.filled(actualCount, '');
+            _isRetrying = List.filled(actualCount, false);
+            _lastRetryTime = List.filled(actualCount, null);
           });
-          debugPrint('[LiveMonitor] ✅ 成功加载用户选择的监控通道: ${selectedNames.length}个');
+          debugPrint(
+              '[LiveMonitor] ✅ 加载监控通道: ${_streamUrls.length}个, 布局: $_layoutType');
         } else {
-          // 如果没有找到用户选择的URL，设置为无选择状态
+          // 没有保存的选择，设置为无选择状态
           setState(() {
             _streamUrls = [];
             _streamNames = [];
             _hasUserSelection = false;
           });
-          debugPrint('[LiveMonitor] ⚠️ 未找到用户选择的监控通道');
+          debugPrint('[LiveMonitor] ℹ️ 没有用户选择的监控通道');
         }
       } else {
         // 没有保存的选择，设置为无选择状态
@@ -166,13 +221,30 @@ class LiveMonitorWidgetState extends State<LiveMonitorWidget>
 
   ///2, 初始化所有WebView控制器(公開方法供Provider調用)
   Future<void> initializeWebViews() async {
-    if (_isInitialized || _isDisposed || !mounted || !_hasUserSelection) return;
+    if (_isInitialized || _isDisposed || !mounted) return;
 
-    debugPrint('[LiveMonitor] 🚀 開始初始化4個WebView控制器...');
+    // 如果没有用户选择，显示黑屏或错误信息
+    if (!_hasUserSelection) {
+      debugPrint('[LiveMonitor] ℹ️ 没有用户选择的监控通道，显示黑屏');
+      _isInitialized = true;
+      if (mounted) {
+        setState(() {});
+      }
+      return;
+    }
+
+    debugPrint('[LiveMonitor] 🚀 開始初始化WebView控制器...');
+    debugPrint('[LiveMonitor] 📹 布局类型: ${_layoutType.label}');
     debugPrint('[LiveMonitor] 📹 使用监控URL: $_streamUrls');
 
+    // 初始化加载状态列表和健康检查字段（防止布局切换时数组长度不一致）
+    _loadingStates = List.filled(_layoutType.count, true);
+    _lastFrameTime = List.filled(_layoutType.count, null);
+    _frameErrorCount = List.filled(_layoutType.count, 0);
+    _lastErrorReason = List.filled(_layoutType.count, '');
+
     _controllers = List.generate(
-      4,
+      _layoutType.count,
       (index) {
         final controller = WebViewController()
           ..setJavaScriptMode(JavaScriptMode.unrestricted)
@@ -184,6 +256,8 @@ class LiveMonitorWidgetState extends State<LiveMonitorWidget>
               controller.platform as AndroidWebViewController;
           // 启用媒体自动播放（不需要用户交互）
           androidController.setMediaPlaybackRequiresUserGesture(false);
+
+          // 注意：混合内容已通过 AndroidManifest.xml 中的 usesCleartextTraffic="true" 启用
           // 注意：WebRTC 权限请求会在 onPermissionRequest 回调中处理
           debugPrint('[LiveMonitor] ✅ Android WebView[$index] 已启用媒体自动播放');
         }
@@ -191,15 +265,16 @@ class LiveMonitorWidgetState extends State<LiveMonitorWidget>
         controller.setNavigationDelegate(
           NavigationDelegate(
             onPageStarted: (String url) {
-              if (mounted && !_isDisposed) {
+              if (mounted && !_isDisposed && index < _loadingStates.length) {
                 setState(() => _loadingStates[index] = true);
               }
+              debugPrint('[LiveMonitor] 🌐 WebView[$index] 开始加载: $url');
             },
             onPageFinished: (String url) async {
               if (mounted && !_isDisposed) {
                 setState(() => _loadingStates[index] = false);
               }
-              debugPrint('[LiveMonitor] ✅ WebView[$index] 加載完成');
+              debugPrint('[LiveMonitor] ✅ WebView[$index] 加載完成: $url');
 
               // 專業方式禁用全屏功能
               await _controllers![index].runJavaScript('''
@@ -283,7 +358,7 @@ class LiveMonitorWidgetState extends State<LiveMonitorWidget>
                   
                   // 6. CSS隱藏全屏按鈕和音量控制
                   const style = document.createElement('style');
-                  style.textContent = \`
+                  style.textContent = `
                     /* 隱藏全屏按鈕 */
                     button[class*="fullscreen" i],
                     button[aria-label*="fullscreen" i],
@@ -412,8 +487,41 @@ class LiveMonitorWidgetState extends State<LiveMonitorWidget>
               ''');
             },
             onWebResourceError: (WebResourceError error) {
-              debugPrint(
-                  '[LiveMonitor] ⚠️ WebView[$index] 錯誤: ${error.description}');
+              debugPrint('[LiveMonitor] ❌ WebView[$index] 资源错误:');
+              debugPrint('  - 错误类型: ${error.errorType}');
+              debugPrint('  - 错误码: ${error.errorCode}');
+              debugPrint('  - 描述: ${error.description}');
+              debugPrint('  - URL: ${error.url}');
+
+              // 记录到健康检查
+              if (index < _frameErrorCount.length) {
+                _frameErrorCount[index]++;
+                _lastErrorReason[index] = 'Network error: ${error.description}';
+              }
+
+              // 🔧 检测严重错误并自动重试
+              // 只对主页面加载错误触发重试（URL包含channel且不包含whep/api）
+              final errorUrl = error.url ?? '';
+              final isMainPageError = errorUrl.contains('channel') &&
+                  !errorUrl.contains('/whep/') &&
+                  !errorUrl.contains('/api/');
+
+              final isSevereError =
+                  error.description.contains('ERR_EMPTY_RESPONSE') ||
+                      error.description.contains('ERR_CONNECTION_RESET') ||
+                      error.description.contains('ERR_CONNECTION_REFUSED') ||
+                      error.description.contains('ERR_NAME_NOT_RESOLVED') ||
+                      error.description.contains('ERR_INTERNET_DISCONNECTED') ||
+                      error.description.contains('ERR_TIMED_OUT');
+
+              if (isMainPageError && isSevereError) {
+                _scheduleAutoRetry(index);
+              }
+            },
+            onHttpError: (HttpResponseError error) {
+              debugPrint('[LiveMonitor] 🌐 WebView[$index] HTTP错误:');
+              debugPrint('  - 状态码: ${error.response?.statusCode}');
+              debugPrint('  - URL: ${error.response?.uri}');
             },
           ),
         );
@@ -427,10 +535,21 @@ class LiveMonitorWidgetState extends State<LiveMonitorWidget>
     for (int i = 0; i < _controllers!.length; i++) {
       if (!mounted || _isDisposed) break;
 
-      if (mounted && !_isDisposed) {
+      if (mounted && !_isDisposed && i < _streamUrls.length) {
+        debugPrint('[LiveMonitor] 🔗 准备加载流[$i]: ${_streamUrls[i]}');
         // 并行发起所有加载请求
-        loadFutures
-            .add(_controllers![i].loadRequest(Uri.parse(_streamUrls[i])));
+        try {
+          loadFutures.add(
+              _controllers![i].loadRequest(Uri.parse(_streamUrls[i])).timeout(
+            const Duration(seconds: 15),
+            onTimeout: () {
+              debugPrint('[LiveMonitor] ⏱️ 流[$i] 加载超时 (15秒)');
+              throw TimeoutException('WebView load timeout');
+            },
+          ));
+        } catch (e) {
+          debugPrint('[LiveMonitor] ❌ 流[$i] 加载请求失败: $e');
+        }
       }
     }
 
@@ -446,6 +565,13 @@ class LiveMonitorWidgetState extends State<LiveMonitorWidget>
       debugPrint('[LiveMonitor] ✅ 所有WebView初始化完成');
       widget.onInitialized?.call();
       updateKeepAlive();
+
+      // 🔧 禁用Flutter健康检查 - WebRTC播放器HTML已内置完整重连逻辑
+      // 后端每30秒检查，90秒无数据自动重连，无需Flutter层干预
+      // _startVideoHealthCheck();
+
+      // 只保留定期刷新作为保底机制（10分钟）
+      _startPeriodicRefresh();
     }
   }
 
@@ -477,11 +603,86 @@ class LiveMonitorWidgetState extends State<LiveMonitorWidget>
     debugPrint('[LiveMonitor]  WebView資源釋放完成');
   }
 
-  ///2, 刷新所有視頻流
-  void _refreshAll() {
-    if (_controllers == null) return;
-    for (var controller in _controllers!) {
-      controller.reload();
+  ///2b, 🔄 调度自动重试（延迟重新加载单个WebView）
+  void _scheduleAutoRetry(int index) {
+    if (!mounted || _isDisposed || _controllers == null) return;
+    if (index < 0 || index >= _controllers!.length) return;
+    if (index >= _isRetrying.length) return;
+
+    // 检查是否正在重试
+    if (_isRetrying[index]) {
+      debugPrint('[LiveMonitor] ⏳ 流[$index] 已在重试队列中，跳过');
+      return;
+    }
+
+    // 检查最小重试间隔
+    final lastRetry = _lastRetryTime[index];
+    if (lastRetry != null) {
+      final elapsed = DateTime.now().difference(lastRetry);
+      if (elapsed < _retryMinInterval) {
+        debugPrint(
+            '[LiveMonitor] ⏳ 流[$index] 距离上次重试不足${_retryMinInterval.inSeconds}秒，跳过');
+        return;
+      }
+    }
+
+    _isRetrying[index] = true;
+    debugPrint(
+        '[LiveMonitor] 🔄 流[$index] 将在${_retryDelay.inSeconds}秒后自动重试...');
+
+    Future.delayed(_retryDelay, () async {
+      if (!mounted || _isDisposed || _controllers == null) {
+        if (index < _isRetrying.length) _isRetrying[index] = false;
+        return;
+      }
+      if (index >= _controllers!.length || index >= _streamUrls.length) {
+        if (index < _isRetrying.length) _isRetrying[index] = false;
+        return;
+      }
+
+      try {
+        debugPrint('[LiveMonitor] 🔄 流[$index] 开始自动重试加载...');
+        _lastRetryTime[index] = DateTime.now();
+
+        // 重新加载WebView
+        await _controllers![index].loadRequest(Uri.parse(_streamUrls[index]));
+
+        // 重置错误计数
+        _frameErrorCount[index] = 0;
+        _lastErrorReason[index] = '';
+        _lastFrameTime[index] = DateTime.now();
+
+        debugPrint('[LiveMonitor] ✅ 流[$index] 自动重试完成');
+      } catch (e) {
+        debugPrint('[LiveMonitor] ❌ 流[$index] 自动重试失败: $e');
+      } finally {
+        if (index < _isRetrying.length) {
+          _isRetrying[index] = false;
+        }
+      }
+    });
+  }
+
+  ///2c, 🔍 检查是否有错误并刷新（供外部调用）
+  Future<void> checkAndRefreshIfHasErrors() async {
+    if (!mounted || _isDisposed || _controllers == null) return;
+
+    bool hasErrors = false;
+    for (int i = 0;
+        i < _frameErrorCount.length && i < _controllers!.length;
+        i++) {
+      if (_frameErrorCount[i] >= _maxErrorCount) {
+        hasErrors = true;
+        debugPrint('[LiveMonitor] 🔍 流[$i] 错误计数达到阈值: ${_frameErrorCount[i]}');
+        break;
+      }
+    }
+
+    if (hasErrors) {
+      debugPrint('[LiveMonitor] 🔄 检测到错误，触发刷新...');
+      await refreshMonitorChannels();
+    } else {
+      debugPrint('[LiveMonitor] ✅ 无严重错误，无需刷新');
     }
   }
 
@@ -489,19 +690,27 @@ class LiveMonitorWidgetState extends State<LiveMonitorWidget>
   Future<void> refreshMonitorChannels() async {
     debugPrint('[LiveMonitor] 🔄 刷新监控通道...');
 
+    // 停止现有的健康检查
+    _stopVideoHealthCheck();
+
     // 先释放当前的WebView
     _isDisposed = true;
     _isInitialized = false;
     _controllers?.clear();
     _controllers = null;
 
-    // 重置加载状态
-    for (int i = 0; i < _loadingStates.length; i++) {
-      _loadingStates[i] = true;
-    }
-
     // 重新加载用户选择的通道
     await _loadSelectedChannels();
+
+    // 根据新的布局类型初始化加载状态和健康检查字段
+    if (_hasUserSelection) {
+      _loadingStates = List.filled(_layoutType.count, true);
+      _lastFrameTime = List.filled(_layoutType.count, null);
+      _frameErrorCount = List.filled(_layoutType.count, 0);
+      _lastErrorReason = List.filled(_layoutType.count, '');
+      _isRetrying = List.filled(_layoutType.count, false);
+      _lastRetryTime = List.filled(_layoutType.count, null);
+    }
 
     // 重置状态
     if (mounted) {
@@ -517,9 +726,316 @@ class LiveMonitorWidgetState extends State<LiveMonitorWidget>
     }
   }
 
+  ///4, 🔄 启动定期刷新（仅保底机制，信任后端重连）
+  void _startPeriodicRefresh() {
+    if (_forceRefreshTimer != null) return;
+
+    debugPrint('[LiveMonitor] 🔄 启动定期刷新 (间隔: 10分钟)，信任WebRTC内置重连逻辑...');
+
+    // 只启动定期刷新，不做健康检查（后端HTML已有完整重连机制）
+    _forceRefreshTimer = Timer.periodic(const Duration(minutes: 10), (_) async {
+      if (!mounted || _isDisposed || _controllers == null) {
+        _forceRefreshTimer?.cancel();
+        _forceRefreshTimer = null;
+        return;
+      }
+
+      debugPrint('[LiveMonitor] 🔄 定期刷新所有流（保底机制）...');
+      await _performForceRefreshAll();
+    });
+  }
+
+  ///4a, 🏥 启动视频流健康检查（已禁用 - 使用后端重连）
+  @Deprecated('WebRTC播放器HTML已内置重连逻辑，无需Flutter层检查')
+  void _startVideoHealthCheck() {
+    // 已禁用：后端webrtc_player.py提供了完整的重连机制
+    // - 每30秒健康检查
+    // - 90秒无数据自动重连
+    // - ICE连接失败自动重连
+    // Flutter层只需要定期刷新作为保底即可
+  }
+
+  ///5, 🏥 停止健康检查和定期刷新
+  void _stopVideoHealthCheck() {
+    _healthCheckTimer?.cancel();
+    _healthCheckTimer = null;
+    _forceRefreshTimer?.cancel();
+    _forceRefreshTimer = null;
+    debugPrint('[LiveMonitor] ⏹️ 停止健康检查和定期刷新');
+  }
+
+  ///6, 🏥 执行健康检查（保留但默认不启用）
+  @Deprecated('WebRTC播放器HTML已内置重连逻辑，此方法默认不再调用')
+  Future<void> _performHealthCheck() async {
+    if (!mounted ||
+        _isDisposed ||
+        _controllers == null ||
+        _controllers!.isEmpty) {
+      return;
+    }
+
+    debugPrint(
+        '[LiveMonitor] 🔍 执行健康检查周期 (${DateTime.now().toIso8601String()})...');
+
+    for (int i = 0; i < _controllers!.length; i++) {
+      if (!mounted || _isDisposed) break;
+
+      try {
+        await _checkStreamHealth(i);
+      } catch (e) {
+        debugPrint('[LiveMonitor] ⚠️ 检查流[$i]时出错: $e');
+      }
+    }
+
+    // 检查是否有需要自动恢复的流
+    _performAutoRecovery();
+
+    debugPrint('[LiveMonitor] ✅ 健康检查周期完成');
+  }
+
+  ///7, 🏥 检查单个流的健康状态
+  Future<void> _checkStreamHealth(int index) async {
+    if (index >= _controllers!.length || index >= _streamUrls.length) {
+      return;
+    }
+
+    try {
+      // 1. 检查WebView是否能响应
+      final canReload = await _controllers![index]
+          .runJavaScriptReturningResult('document.readyState')
+          .timeout(const Duration(seconds: 5))
+          .then((_) => true)
+          .catchError((_) => false);
+
+      if (!canReload) {
+        _frameErrorCount[index]++;
+        _lastErrorReason[index] = 'WebView no response';
+        debugPrint(
+            '[LiveMonitor] ⚠️ 流[$index] WebView无响应 (错误计数: ${_frameErrorCount[index]})');
+        return;
+      }
+
+      // 2. 检查视频是否在播放
+      final hasVideo = await _controllers![index]
+          .runJavaScriptReturningResult(
+              'document.querySelector("video") == null ? "NO_VIDEO" : document.querySelector("video").paused ? "PAUSED" : "PLAYING"')
+          .timeout(const Duration(seconds: 5))
+          .then((result) => result?.toString() ?? 'UNKNOWN')
+          .catchError((_) => 'ERROR');
+
+      debugPrint('[LiveMonitor] 📹 流[$index] 视频状态: $hasVideo');
+
+      // 3. 根据状态更新统计信息
+      if (hasVideo == 'PLAYING') {
+        // ✅ 视频正常播放，重置所有错误标记
+        _lastFrameTime[index] = DateTime.now();
+        _frameErrorCount[index] = 0;
+        _lastErrorReason[index] = '';
+        debugPrint('[LiveMonitor] ✅ 流[$index] 正常播放');
+      } else if (hasVideo == 'PAUSED' || hasVideo == 'NO_VIDEO') {
+        // ⚠️ 视频暂停或无视频，检查是否是短暂的加载状态
+        final lastTime = _lastFrameTime[index];
+        if (lastTime != null) {
+          final timeSinceLastFrame = DateTime.now().difference(lastTime);
+          // 只有超过阈值才计为错误（避免误判短暂的缓冲状态）
+          if (timeSinceLastFrame > _frameTimeout) {
+            _frameErrorCount[index]++;
+            _lastErrorReason[index] =
+                '$hasVideo (${timeSinceLastFrame.inSeconds}s)';
+            debugPrint(
+                '[LiveMonitor] ⚠️ 流[$index] 长时间$hasVideo (${timeSinceLastFrame.inSeconds}s, 错误计数: ${_frameErrorCount[index]})');
+          } else {
+            // 短暂暂停，不计错误
+            debugPrint('[LiveMonitor] ℹ️ 流[$index] 短暂$hasVideo，等待恢复...');
+          }
+        } else {
+          // 首次检测到问题，记录时间但不计错误
+          _lastFrameTime[index] = DateTime.now();
+          debugPrint('[LiveMonitor] ℹ️ 流[$index] 初次检测到$hasVideo状态');
+        }
+      }
+    } catch (e) {
+      _frameErrorCount[index]++;
+      _lastErrorReason[index] = 'Health check error: $e';
+      debugPrint('[LiveMonitor] ❌ 流[$index] 健康检查失败: $e');
+    }
+  }
+
+  ///8, 🏥 自动恢复异常流（增强版：更激进的恢复策略）
+  Future<void> _performAutoRecovery() async {
+    for (int i = 0; i < _controllers!.length; i++) {
+      if (!mounted || _isDisposed) break;
+
+      final errorCount = _frameErrorCount[i];
+      final hasError = errorCount > 0;
+
+      // 如果错误计数超过阈值，尝试自动恢复
+      if (errorCount >= _maxErrorCount) {
+        debugPrint(
+            '[LiveMonitor] 🔧 自动恢复流[$i] (错误计数: $errorCount, 原因: ${_lastErrorReason[i]})...');
+
+        try {
+          // 先尝试轻量级恢复 - 重新加载
+          await _controllers![i].reload();
+
+          // 等待加载完成
+          await Future.delayed(const Duration(seconds: 2));
+
+          // 验证恢复是否成功
+          final recoveryCheck = await _controllers![i]
+              .runJavaScriptReturningResult(
+                  'document.querySelector("video") && !document.querySelector("video").paused ? "OK" : "FAIL"')
+              .timeout(const Duration(seconds: 3))
+              .then((result) => result?.toString() ?? 'UNKNOWN')
+              .catchError((_) => 'ERROR');
+
+          if (recoveryCheck == 'OK') {
+            debugPrint('[LiveMonitor] ✅ 流[$i] 轻量级恢复成功');
+            _frameErrorCount[i] = 0;
+            _lastErrorReason[i] = '';
+            _lastFrameTime[i] = DateTime.now();
+          } else {
+            debugPrint('[LiveMonitor] ⚠️ 流[$i] 轻量级恢复失败，尝试重新加载URL...');
+            // 重新加载URL（重建WebRTC连接）
+            await _controllers![i].loadRequest(Uri.parse(_streamUrls[i]));
+            _frameErrorCount[i] = 0;
+            _lastErrorReason[i] = 'Deep recovery in progress';
+          }
+        } catch (e) {
+          debugPrint('[LiveMonitor] ❌ 流[$i] 恢复失败: $e');
+          _frameErrorCount[i] = 0; // 重置计数避免无限重试
+          _lastErrorReason[i] = 'Recovery failed: $e';
+        }
+
+        debugPrint('[LiveMonitor] ↻ 流[$i] 已触发恢复动作');
+      } else if (hasError && errorCount <= _maxErrorCount) {
+        // 错误但还未达到阈值，输出警告
+        debugPrint(
+            '[LiveMonitor] ⚠️ 流[$i] 有$errorCount个错误，继续监测 (${_lastErrorReason[i]})');
+      }
+    }
+  }
+
+  ///9, 🏥 获取健康检查统计信息
+  Map<String, dynamic> getHealthStats() {
+    return {
+      'timestamp': DateTime.now().toIso8601String(),
+      'total_streams': _streamUrls.length,
+      'healthy_streams': _frameErrorCount.where((e) => e == 0).length,
+      'streams': List.generate(
+        _streamUrls.length,
+        (i) => {
+          'index': i,
+          'url': _streamUrls[i],
+          'name': _streamNames[i],
+          'error_count': _frameErrorCount[i],
+          'last_error': _lastErrorReason[i],
+          'last_frame_time': _lastFrameTime[i]?.toIso8601String() ?? 'never',
+          'status': _frameErrorCount[i] == 0
+              ? 'healthy'
+              : _frameErrorCount[i] < _maxErrorCount
+                  ? 'degraded'
+                  : 'unhealthy',
+        },
+      ),
+    };
+  }
+
+  ///10, 公开方法：检查配置变化并刷新（供外部调用）
+  Future<void> checkConfigAndRefresh() async {
+    await _checkAndRefreshIfConfigChanged();
+  }
+
+  ///10a, 监听应用生命周期变化
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    super.didChangeAppLifecycleState(state);
+    if (state == AppLifecycleState.resumed) {
+      debugPrint('[LiveMonitor] 📱 应用恢复前台');
+      _checkAndRefreshIfConfigChanged();
+    }
+  }
+
+  ///11, 检查配置是否变化，如果变化则自动刷新
+  Future<void> _checkAndRefreshIfConfigChanged() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final currentChannels = prefs.getStringList('monitor_selected_channels');
+      final currentLayout = prefs.getString('monitor_layout_type');
+
+      // 比较配置是否变化
+      final channelsChanged = !_listEquals(_lastSavedChannels, currentChannels);
+      final layoutChanged = _lastSavedLayout != currentLayout;
+
+      if (channelsChanged || layoutChanged) {
+        debugPrint('[LiveMonitor] 🔄 检测到配置变化，自动刷新...');
+        debugPrint('[LiveMonitor]   - 频道变化: $channelsChanged');
+        debugPrint('[LiveMonitor]   - 布局变化: $layoutChanged');
+        await refreshMonitorChannels();
+      } else {
+        debugPrint('[LiveMonitor] ✅ 配置未变化，无需刷新');
+      }
+    } catch (e) {
+      debugPrint('[LiveMonitor] ⚠️ 检查配置变化时出错: $e');
+    }
+  }
+
+  ///12, 🔧 比较两个列表是否相等（辅助方法）
+  bool _listEquals(List<String>? a, List<String>? b) {
+    if (a == null && b == null) return true;
+    if (a == null || b == null) return false;
+    if (a.length != b.length) return false;
+    for (int i = 0; i < a.length; i++) {
+      if (a[i] != b[i]) return false;
+    }
+    return true;
+  }
+
+  ///13, 🔄 定期强制刷新所有流（保底机制，防止WebRTC连接长时间后失效）
+  Future<void> _performForceRefreshAll() async {
+    if (!mounted ||
+        _isDisposed ||
+        _controllers == null ||
+        _controllers!.isEmpty) {
+      return;
+    }
+
+    debugPrint('[LiveMonitor] 🔄 执行定期强制刷新（${_controllers!.length}个流）...');
+
+    for (int i = 0; i < _controllers!.length; i++) {
+      if (!mounted || _isDisposed) break;
+
+      try {
+        // 重新加载WebView
+        await _controllers![i].reload();
+
+        // 重置错误计数和状态（重要：避免刷新后立即误判）
+        _frameErrorCount[i] = 0;
+        _lastErrorReason[i] = '';
+        _lastFrameTime[i] = DateTime.now(); // 设置当前时间作为基准
+
+        debugPrint('[LiveMonitor] ✅ 流[$i] 强制刷新完成');
+
+        // 延迟1秒，给WebView足够的加载时间
+        await Future.delayed(const Duration(seconds: 1));
+      } catch (e) {
+        debugPrint('[LiveMonitor] ⚠️ 流[$i] 强制刷新失败: $e');
+      }
+    }
+
+    debugPrint('[LiveMonitor] ✅ 所有流强制刷新完成，等待10秒后恢复健康检查');
+
+    // 刷新完成后等待10秒，让所有流稳定后再进行健康检查
+    await Future.delayed(const Duration(seconds: 10));
+  }
+
   @override
   void dispose() {
+    // 移除生命周期观察者
+    WidgetsBinding.instance.removeObserver(this);
+
     _isDisposed = true;
+    _stopVideoHealthCheck(); // 停止健康检查
     _controllers?.clear();
     _controllers = null;
     debugPrint('[LiveMonitor]  Widget已dispose');
@@ -558,26 +1074,52 @@ class LiveMonitorWidgetState extends State<LiveMonitorWidget>
       child: RepaintBoundary(
         child: LayoutBuilder(
           builder: (context, constraints) {
-            // 🔧 修复：根据顶部广告区域的实际高度动态计算childAspectRatio
-            // 顶部广告高度通常是固定的，我们需要让2x2的格子能完整显示
-            // 每个格子的宽度 = (总宽度 - padding - spacing) / 2
-            // 每个格子的高度 = (总高度 - padding - spacing) / 2
-            final gridWidth =
-                (constraints.maxWidth - 4 - 2) / 2; // padding(2*2) + spacing(2)
-            final gridHeight = (constraints.maxHeight - 4 - 2) / 2;
+            final columns = _layoutType.columns;
+            if (columns == 0) {
+              return const SizedBox.shrink();
+            }
+            const gridSpacing = 2.0;
+            const gridPadding = 2.0;
+
+            final gridWidth = (constraints.maxWidth -
+                    (gridPadding * 2) -
+                    (gridSpacing * (columns - 1))) /
+                columns;
+            final gridHeight = (constraints.maxHeight -
+                    (gridPadding * 2) -
+                    (gridSpacing * (_layoutType.rows - 1))) /
+                _layoutType.rows;
             final aspectRatio = gridWidth / gridHeight;
 
             return GridView.builder(
-              padding: const EdgeInsets.all(2),
+              padding: EdgeInsets.all(gridPadding),
               physics: const NeverScrollableScrollPhysics(),
               gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                crossAxisCount: 2,
-                crossAxisSpacing: 2,
-                mainAxisSpacing: 2,
+                crossAxisCount: columns,
+                crossAxisSpacing: gridSpacing,
+                mainAxisSpacing: gridSpacing,
                 childAspectRatio: aspectRatio,
               ),
-              itemCount: 4,
+              itemCount: _layoutType.count,
               itemBuilder: (context, index) {
+                // 如果索引超过实际的URL数量，显示黑屏
+                if (index >= _streamUrls.length) {
+                  return RepaintBoundary(
+                    child: Container(
+                      color: Colors.black,
+                      child: Center(
+                        child: Text(
+                          '未使用',
+                          style: TextStyle(
+                            color: Colors.white.withOpacity(0.3),
+                            fontSize: 14,
+                          ),
+                        ),
+                      ),
+                    ),
+                  );
+                }
+
                 return RepaintBoundary(
                   child: _CameraViewWidget(
                     controller: _controllers![index],

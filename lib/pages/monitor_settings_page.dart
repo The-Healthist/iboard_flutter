@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:iboard_app/models/monitor_models.dart';
 import 'package:iboard_app/providers/app_data_provider.dart';
+import 'package:iboard_app/providers/advertisement_provider.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -20,6 +21,9 @@ class MonitorSettingsPageState extends State<MonitorSettingsPage> {
   Set<String> _selectedChannels = {};
   String? _currentIsmartId;
   String _currentApiUrl = 'http://ajlive.sunofw.cn:32001/api/auth/public';
+  MonitorLayoutType _selectedLayout = MonitorLayoutType.grid4;
+
+  ///布局类型
 
   @override
   void initState() {
@@ -39,11 +43,13 @@ class MonitorSettingsPageState extends State<MonitorSettingsPage> {
       final prefs = await SharedPreferences.getInstance();
       final savedApiUrl = prefs.getString('monitor_api_url');
       final savedChannels = prefs.getStringList('monitor_selected_channels');
+      final savedLayout = prefs.getString('monitor_layout_type');
 
       setState(() {
         _currentApiUrl = savedApiUrl ?? _currentApiUrl;
         _apiUrlController.text = _currentApiUrl;
         _selectedChannels = Set.from(savedChannels ?? []);
+        _selectedLayout = MonitorLayoutType.fromString(savedLayout ?? 'grid4');
       });
 
       await _loadBuildingIsmartId();
@@ -80,6 +86,7 @@ class MonitorSettingsPageState extends State<MonitorSettingsPage> {
       await prefs.setString('monitor_api_url', _currentApiUrl);
       await prefs.setStringList(
           'monitor_selected_channels', _selectedChannels.toList());
+      await prefs.setString('monitor_layout_type', _selectedLayout.name);
     } catch (e) {
       _showError('保存失敗: ${e.toString()}');
     }
@@ -150,14 +157,20 @@ class MonitorSettingsPageState extends State<MonitorSettingsPage> {
 
   ///2, 切換通道選擇
   void _toggleChannelSelection(String channelKey) {
+    // 如果布局是 hidden，不允许选择
+    if (_selectedLayout == MonitorLayoutType.hidden) {
+      _showError('「不顯示」佈局無需選擇監控通道');
+      return;
+    }
+
     setState(() {
       if (_selectedChannels.contains(channelKey)) {
         _selectedChannels.remove(channelKey);
       } else {
-        if (_selectedChannels.length < 4) {
+        if (_selectedChannels.length < _selectedLayout.count) {
           _selectedChannels.add(channelKey);
         } else {
-          _showError('每個大廈最多只能選擇4個監控通道');
+          _showError('此佈局最多只能選擇${_selectedLayout.count}個監控通道');
         }
       }
     });
@@ -203,12 +216,29 @@ class MonitorSettingsPageState extends State<MonitorSettingsPage> {
 
   ///6, 確認選擇
   Future<void> _confirmSelection() async {
-    if (_selectedChannels.isEmpty) {
+    // 如果布局不是 hidden，要求至少选择一个通道
+    if (_selectedLayout != MonitorLayoutType.hidden &&
+        _selectedChannels.isEmpty) {
       _showError('請至少選擇一個監控通道');
       return;
     }
 
+    // 如果布局是 hidden，清空已选通道
+    if (_selectedLayout == MonitorLayoutType.hidden) {
+      _selectedChannels.clear();
+    }
+
     await _saveSettings();
+
+    // 触发广告轮播更新，以便重新读取监控配置
+    try {
+      final advertisementProvider =
+          Provider.of<AdvertisementProvider>(context, listen: false);
+      await advertisementProvider.fetchAdvertisements(forceInit: true);
+    } catch (e) {
+      debugPrint('[MonitorSettings] 触发广告更新失败: $e');
+    }
+
     _showSuccess('監控通道設定已保存');
 
     _notifyLiveMonitorUpdate();
@@ -314,44 +344,52 @@ class MonitorSettingsPageState extends State<MonitorSettingsPage> {
               final channelName = 'channel${index + 1}';
               final channelKey = '${orangepi.orangepi_id}_$channelName';
               final isSelected = _selectedChannels.contains(channelKey);
+              final isDisabled = _selectedLayout == MonitorLayoutType.hidden;
 
               return GestureDetector(
-                onTap: () => _toggleChannelSelection(channelKey),
-                child: Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                  decoration: BoxDecoration(
-                    color: isSelected
-                        ? Colors.blue.shade600
-                        : Colors.grey.shade100,
-                    borderRadius: BorderRadius.circular(20),
-                    border: Border.all(
+                onTap: isDisabled
+                    ? null
+                    : () => _toggleChannelSelection(channelKey),
+                child: Opacity(
+                  opacity: isDisabled ? 0.5 : 1.0,
+                  child: Container(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    decoration: BoxDecoration(
                       color: isSelected
                           ? Colors.blue.shade600
-                          : Colors.grey.shade300,
+                          : Colors.grey.shade100,
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(
+                        color: isSelected
+                            ? Colors.blue.shade600
+                            : Colors.grey.shade300,
+                      ),
                     ),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(
-                        isSelected
-                            ? Icons.check_circle
-                            : Icons.videocam_outlined,
-                        size: 16,
-                        color: isSelected ? Colors.white : Colors.grey.shade600,
-                      ),
-                      const SizedBox(width: 6),
-                      Text(
-                        channelName,
-                        style: TextStyle(
-                          fontSize: 14,
-                          fontWeight: FontWeight.w500,
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          isSelected
+                              ? Icons.check_circle
+                              : Icons.videocam_outlined,
+                          size: 16,
                           color:
-                              isSelected ? Colors.white : Colors.grey.shade700,
+                              isSelected ? Colors.white : Colors.grey.shade600,
                         ),
-                      ),
-                    ],
+                        const SizedBox(width: 6),
+                        Text(
+                          channelName,
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w500,
+                            color: isSelected
+                                ? Colors.white
+                                : Colors.grey.shade700,
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                 ),
               );
@@ -551,6 +589,89 @@ class MonitorSettingsPageState extends State<MonitorSettingsPage> {
                             ),
                             const SizedBox(height: 24),
 
+                            /// 🎯 布局选择部分
+                            Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  '監控佈局選擇',
+                                  style: TextStyle(
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.w500,
+                                    color: Colors.grey.shade600,
+                                  ),
+                                ),
+                                const SizedBox(height: 12),
+                                Row(
+                                  children:
+                                      MonitorLayoutType.values.map((layout) {
+                                    final isSelected =
+                                        _selectedLayout == layout;
+                                    return Expanded(
+                                      child: Padding(
+                                        padding: const EdgeInsets.symmetric(
+                                            horizontal: 4),
+                                        child: GestureDetector(
+                                          onTap: () {
+                                            setState(() {
+                                              _selectedLayout = layout;
+                                              // 如果选择"不显示"，清空已选通道
+                                              if (layout ==
+                                                  MonitorLayoutType.hidden) {
+                                                _selectedChannels.clear();
+                                              } else if (_selectedChannels
+                                                      .length >
+                                                  layout.count) {
+                                                // 如果选中的通道数超过新布局的最大数，移除多余的
+                                                final channelList =
+                                                    _selectedChannels.toList();
+                                                _selectedChannels = Set.from(
+                                                    channelList
+                                                        .take(layout.count));
+                                              }
+                                            });
+                                          },
+                                          child: Container(
+                                            padding: const EdgeInsets.symmetric(
+                                                vertical: 12),
+                                            decoration: BoxDecoration(
+                                              color: isSelected
+                                                  ? Colors.blue.shade600
+                                                  : Colors.grey.shade100,
+                                              borderRadius:
+                                                  BorderRadius.circular(8),
+                                              border: Border.all(
+                                                color: isSelected
+                                                    ? Colors.blue.shade600
+                                                    : Colors.grey.shade300,
+                                              ),
+                                            ),
+                                            child: Column(
+                                              mainAxisAlignment:
+                                                  MainAxisAlignment.center,
+                                              children: [
+                                                Text(
+                                                  layout.label,
+                                                  style: TextStyle(
+                                                    fontSize: 14,
+                                                    fontWeight: FontWeight.bold,
+                                                    color: isSelected
+                                                        ? Colors.white
+                                                        : Colors.grey.shade700,
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
+                                          ),
+                                        ),
+                                      ),
+                                    );
+                                  }).toList(),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 24),
+
                             // 大厦信息显示
                             if (_currentIsmartId != null) ...[
                               Container(
@@ -608,7 +729,7 @@ class MonitorSettingsPageState extends State<MonitorSettingsPage> {
                                         ),
                                         const SizedBox(width: 8),
                                         Text(
-                                          '已選擇 ${_selectedChannels.length}/4 個監控通道',
+                                          '已選擇 ${_selectedChannels.length}/${_selectedLayout.count} 個監控通道',
                                           style: TextStyle(
                                             fontSize: 14,
                                             color: Colors.blue.shade700,
@@ -713,7 +834,7 @@ class MonitorSettingsPageState extends State<MonitorSettingsPage> {
                                   ),
                                   const Spacer(),
                                   Text(
-                                    '已選擇 ${_selectedChannels.length}/4 個通道',
+                                    '已選擇 ${_selectedChannels.length}/${_selectedLayout.count} 個通道',
                                     style: TextStyle(
                                       fontSize: 14,
                                       color: Colors.grey.shade600,

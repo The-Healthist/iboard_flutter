@@ -38,8 +38,9 @@ void main() {
         providers: [
           ChangeNotifierProvider(
             create: (context) => AppDataProvider(
-                baseUrl: 'http://test.iboard.skylinedances.com'),
-            // baseUrl: 'http://117.72.193.54:10031'),
+                // baseUrl: 'http://test.iboard.skylinedances.com'),
+                // baseUrl: 'http://117.72.193.54:10031'),
+                baseUrl: 'http://39.108.49.167:10031'),
           ),
           Provider<FileManager>(
             create: (context) => FileManager(),

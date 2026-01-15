@@ -200,12 +200,14 @@ class SettingsPageState extends State<SettingsPage> {
                 ),
                 // 主要設置內容區域
                 Expanded(
-                  child: Container(
-                    width: double.infinity,
-                    padding: const EdgeInsets.all(20),
-                    child: Column(
-                      children: [
-                        const SizedBox(height: 40),
+                  child: SingleChildScrollView(
+                    physics: const BouncingScrollPhysics(),
+                    child: Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(20),
+                      child: Column(
+                        children: [
+                          const SizedBox(height: 40),
                         // 設置項目占位符
                         Container(
                           width: double.infinity,
@@ -299,8 +301,10 @@ class SettingsPageState extends State<SettingsPage> {
                         ),
                         const SizedBox(height: 16),
                         _buildVersionUpdateItem(),
+                        const SizedBox(height: 40), // 底部留白，方便滚动
                       ],
                     ),
+                  ),
                   ),
                 ),
               ],

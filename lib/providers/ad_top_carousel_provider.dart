@@ -1,9 +1,9 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
-import 'package:flutter/foundation.dart';
 import 'package:iboard_app/managers/file_manager.dart';
 import 'package:iboard_app/models/ad_model.dart';
 import 'package:iboard_app/models/live_monitor_ad_model.dart';
+import 'package:iboard_app/models/monitor_models.dart';
 import 'package:iboard_app/widgets/carousel_widget.dart' as custom_carousel;
 import 'package:iboard_app/widgets/mainscreen/ad_top_widget.dart';
 import 'package:iboard_app/widgets/mainscreen/live_monitor_widget.dart';
@@ -66,32 +66,32 @@ class TopAdCarouselProvider extends ChangeNotifier {
   }
 
   ///1，更新輪播廣告列表（由AdvertisementProvider調用）
-  void updateCarouselList(List<AdModel> newTopAds) {
-    // 🔧 简化：始终添加實時監控到列表中
+  Future<void> updateCarouselList(List<AdModel> newTopAds) async {
     final List<AdModel> completeAdList = List<AdModel>.from(newTopAds);
-    completeAdList.add(LiveMonitorAdModel());
 
-    debugPrint('[TopAdCarousel] 📋 更新輪播: ${newTopAds.length}個廣告 + 實時監控');
+    // 讀取監控配置，決定是否添加實時監控
+    final prefs = await SharedPreferences.getInstance();
+    final savedLayout = prefs.getString('monitor_layout_type');
+    final savedChannels = prefs.getStringList('monitor_selected_channels');
+    final layoutType = MonitorLayoutType.fromString(savedLayout ?? 'grid4');
+    final hasChannels = savedChannels != null && savedChannels.isNotEmpty;
+
+    if (layoutType != MonitorLayoutType.hidden && hasChannels) {
+      completeAdList.add(LiveMonitorAdModel());
+      debugPrint('[TopAdCarousel] 📋 更新輪播: ${newTopAds.length}個廣告 + 實時監控');
+    } else {
+      debugPrint('[TopAdCarousel] 📋 更新輪播: ${newTopAds.length}個廣告 (無實時監控)');
+    }
 
     if (_areAdsListsEqual(_topAds, completeAdList)) {
-      debugPrint('[TopAdCarousel] ℹ️ 列表無變化');
       return;
     }
 
     _topAds = completeAdList;
-    debugPrint('[TopAdCarousel] 📊 最終: ${_topAds.length}個項目');
 
-    // 智能更新：如果正在播放，延遲更新Widget；如果是恢復操作，不更新Widget
-    if (!_isTopCarouselPaused && _topTimer != null && _topTimer!.isActive) {
-      _pendingWidgetUpdate = true;
-    } else if (_widgetCache.isNotEmpty) {
-      // 如果已有Widget緩存且處於暫停狀態，不重建Widget以保持播放狀態
-      // 保持現有Widget緩存，避免重建
-    } else {
-      _smartUpdateWidgets();
-    }
+    // 强制更新 Widget，确保轮播列表变化时立即生效
+    _smartUpdateWidgets();
 
-    // 使用 WidgetsBinding.instance.addPostFrameCallback 延迟通知
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (hasListeners) {
         notifyListeners();
@@ -131,16 +131,13 @@ class TopAdCarouselProvider extends ChangeNotifier {
   }
 
   ///3，初始化頂部輪播
-  void initializeTopWidgets(List<AdModel> topAds) {
+  Future<void> initializeTopWidgets(List<AdModel> topAds) async {
     if (topAds.isEmpty) {
-      // No top advertisements available
       return;
     }
 
-    // 🔧 简化：始终包含實時監控
-    updateCarouselList(topAds);
+    await updateCarouselList(topAds);
 
-    // 使用智能更新方法創建Widget - 只在首次初始化時創建
     if (_widgetCache.isEmpty) {
       _smartUpdateWidgets();
     }
@@ -507,6 +504,14 @@ class TopAdCarouselProvider extends ChangeNotifier {
 
   ///10，處理頁面變化事件
   void onPageChanged(int index) {
+    // 🔧 防重複：只在索引真正變化時才處理
+    if (index == _currentTopAdIndex &&
+        _topTimer != null &&
+        _topTimer!.isActive) {
+      debugPrint('[TopAdCarousel] ℹ️ 頁面索引未變化 ($index)，跳過重複處理');
+      return;
+    }
+
     // 處理頁面切換時的資源管理
     _handlePageChangeResourceManagement(index);
 
@@ -535,9 +540,10 @@ class TopAdCarouselProvider extends ChangeNotifier {
 
           if (state.isInitialized) {
             debugPrint('[TopAdCarousel] ✅ 實時監控已就緒 (索引: $i)');
+            // 切換到實時監控時，檢查配置是否變化並刷新
+            state.checkConfigAndRefresh();
           } else if (!state.isDisposed) {
             debugPrint('[TopAdCarousel] 📺 切換到實時監控，快速初始化 (索引: $i)');
-            // 不需要手動調用，Widget會自動初始化
           }
         }
       }

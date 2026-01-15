@@ -87,8 +87,10 @@ class AppUpdateProvider with ChangeNotifier {
   // 节流控制
   DateTime? _lastCheckTime;
   DateTime? _lastInstallTime;
-  static const Duration _checkThrottleDuration = Duration(seconds: 3); // 检查更新节流3秒
-  static const Duration _installThrottleDuration = Duration(seconds: 5); // 安装节流5秒
+  static const Duration _checkThrottleDuration =
+      Duration(seconds: 3); // 检查更新节流3秒
+  static const Duration _installThrottleDuration =
+      Duration(seconds: 5); // 安装节流5秒
 
   ///2.1. 检查是否可以进行更新检查 (节流控制)
   bool get canCheckUpdate {
@@ -97,11 +99,12 @@ class AppUpdateProvider with ChangeNotifier {
     return DateTime.now().difference(_lastCheckTime!) > _checkThrottleDuration;
   }
 
-  ///2.2. 检查是否可以进行安装 (节流控制)  
+  ///2.2. 检查是否可以进行安装 (节流控制)
   bool get canInstall {
     if (_isInstalling) return false;
     if (_lastInstallTime == null) return true;
-    return DateTime.now().difference(_lastInstallTime!) > _installThrottleDuration;
+    return DateTime.now().difference(_lastInstallTime!) >
+        _installThrottleDuration;
   }
 
   ///2. 初始化权限状态检查
@@ -298,7 +301,8 @@ class AppUpdateProvider with ChangeNotifier {
 
     // 如果版本号相同，检查description是否不同
     if (currentVersion == remoteVersion && currentBuild == remoteBuild) {
-      final descriptionChanged = (currentDescription ?? '') != remoteDescription;
+      final descriptionChanged =
+          (currentDescription ?? '') != remoteDescription;
       if (descriptionChanged) {
         _logger.i('📝 描述检查: 发现描述变化，需要更新');
         _logger.d('   当前描述: ${currentDescription ?? '(空)'}');
@@ -340,7 +344,9 @@ class AppUpdateProvider with ChangeNotifier {
 
       // 获取远程版本信息
       final apiClient =
-          ApiClient(baseUrl: 'http://test.iboard.skylinedances.com');
+          // ApiClient(baseUrl: 'http://test.iboard.skylinedances.com');
+          // ApiClient(baseUrl: 'http://117.72.193.54:10031');
+          ApiClient(baseUrl: 'http://39.108.49.167:10031');
       final response = await apiClient.getAppVersion();
 
       if (response['data'] == null) {
@@ -384,7 +390,7 @@ class AppUpdateProvider with ChangeNotifier {
       // 使用增强的更新检查逻辑（同时考虑版本和描述）
       final needsUpdate = _needsUpdateWithDescription(
         currentVersion,
-        currentBuild, 
+        currentBuild,
         _currentVersionDescription,
         remoteVersion,
         remoteBuild,
@@ -449,7 +455,7 @@ class AppUpdateProvider with ChangeNotifier {
 
       // 获取下载目录
       final downloadDir = await _getDownloadDirectory();
-      
+
       // 生成包含description哈希的文件名
       final descriptionHash = _updateDescription?.hashCode.toString() ?? '0';
       final fileName =
@@ -575,7 +581,7 @@ class AppUpdateProvider with ChangeNotifier {
 
       if (result.type == ResultType.done) {
         _logger.i('✅ APK安裝程序已啟動');
-        
+
         // 安装程序启动成功后，保存当前的description以备下次比较
         if (_updateDescription != null) {
           await _saveCurrentVersionDescription(_updateDescription!);
@@ -603,7 +609,7 @@ class AppUpdateProvider with ChangeNotifier {
 
     try {
       final downloadDir = await _getDownloadDirectory();
-      
+
       // 生成包含description哈希的文件名，确保description变化时重新下载
       final descriptionHash = _updateDescription?.hashCode.toString() ?? '0';
       final fileName =
@@ -632,13 +638,14 @@ class AppUpdateProvider with ChangeNotifier {
     try {
       final downloadDir = await _getDownloadDirectory();
       final files = downloadDir.listSync();
-      
+
       // 查找当前版本的旧APK文件（不同description哈希）
-      final currentVersionPrefix = 'iboard_v${_remoteVersionNumber}_$_remoteBuildNumber';
-      
+      final currentVersionPrefix =
+          'iboard_v${_remoteVersionNumber}_$_remoteBuildNumber';
+
       for (final file in files) {
-        if (file is File && 
-            file.path.contains(currentVersionPrefix) && 
+        if (file is File &&
+            file.path.contains(currentVersionPrefix) &&
             file.path.endsWith('.apk')) {
           try {
             await file.delete();

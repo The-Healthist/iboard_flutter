@@ -2,6 +2,44 @@ import 'package:json_annotation/json_annotation.dart';
 
 part 'monitor_models.g.dart';
 
+/// 監控布局類型
+enum MonitorLayoutType {
+  hidden(0, '不顯示'),
+  grid1(1, '1宮格'),
+  grid4(4, '4宮格'),
+  grid6(6, '6宮格'),
+  grid8(8, '8宮格');
+
+  final int count;
+  final String label;
+
+  const MonitorLayoutType(this.count, this.label);
+
+  int get rows => this == hidden ? 0 : (this == grid1 ? 1 : 2);
+
+  int get columns {
+    switch (this) {
+      case hidden:
+        return 0;
+      case grid1:
+        return 1;
+      case grid4:
+        return 2;
+      case grid6:
+        return 3;
+      case grid8:
+        return 4;
+    }
+  }
+
+  static MonitorLayoutType fromString(String value) {
+    return MonitorLayoutType.values.firstWhere(
+      (e) => e.name == value,
+      orElse: () => MonitorLayoutType.grid4,
+    );
+  }
+}
+
 @JsonSerializable()
 class MonitorResponse {
   final bool success;
