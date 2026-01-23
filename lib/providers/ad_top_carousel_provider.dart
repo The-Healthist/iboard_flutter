@@ -65,6 +65,47 @@ class TopAdCarouselProvider extends ChangeNotifier {
     _topCarouselController = custom_carousel.CarouselController();
   }
 
+  ///1a，刷新所有监控画面配置（设置页修改后立即生效）
+  Future<void> refreshAllMonitorWidgets() async {
+    if (!_mounted) return;
+
+    debugPrint('[TopAdCarousel] 🔄 刷新所有监控画面配置...');
+    debugPrint('[TopAdCarousel] 📊 当前有 ${_liveMonitorKeys.length} 个监控Widget缓存');
+    debugPrint('[TopAdCarousel] 📍 当前广告索引: $_currentTopAdIndex / ${topAds.length}');
+
+    int refreshCount = 0;
+    for (final entry in _liveMonitorKeys.entries) {
+      final key = entry.value;
+      debugPrint('[TopAdCarousel] 🔍 检查监控Widget: ${entry.key}');
+      
+      if (key.currentState != null) {
+        try {
+          final state = key.currentState!;
+          debugPrint('[TopAdCarousel]   - State存在，mounted: ${state.mounted}, isDisposed: ${state.isDisposed}, isInitialized: ${state.isInitialized}');
+          
+          // 检查配置是否有变化
+          final hasChanged = await state.hasConfigChanged();
+          debugPrint('[TopAdCarousel]   - 配置是否变化: $hasChanged');
+          
+          if (hasChanged) {
+            debugPrint('[TopAdCarousel] ✅ 监控配置有变化，重新加载: ${entry.key}');
+            await state.reloadMonitorConfig();
+            refreshCount++;
+            debugPrint('[TopAdCarousel]   - 刷新完成');
+          } else {
+            debugPrint('[TopAdCarousel] ℹ️ 监控配置无变化，跳过: ${entry.key}');
+          }
+        } catch (e) {
+          debugPrint('[TopAdCarousel] ⚠️ 刷新监控失败 ${entry.key}: $e');
+        }
+      } else {
+        debugPrint('[TopAdCarousel]   - State为空，跳过');
+      }
+    }
+
+    debugPrint('[TopAdCarousel] ✅ 监控刷新完成，共刷新 $refreshCount 个监控画面');
+  }
+
   ///1，更新輪播廣告列表（由AdvertisementProvider調用）
   Future<void> updateCarouselList(List<AdModel> newTopAds) async {
     final List<AdModel> completeAdList = List<AdModel>.from(newTopAds);

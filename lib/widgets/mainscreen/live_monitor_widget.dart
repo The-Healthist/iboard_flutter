@@ -726,6 +726,42 @@ class LiveMonitorWidgetState extends State<LiveMonitorWidget>
     }
   }
 
+  ///3a, 🔄 重载监控配置并重新初始化（由外部调用，例如用户更新监控设置后）
+  Future<void> reloadMonitorConfig() async {
+    debugPrint('[LiveMonitor] 🔄 重载监控配置...');
+    debugPrint('[LiveMonitor]   - mounted: $mounted, _isDisposed: $_isDisposed, _isInitialized: $_isInitialized');
+    debugPrint('[LiveMonitor]   - 当前布局: ${_layoutType.label}, 通道数: ${_streamUrls.length}');
+    
+    if (!mounted) {
+      debugPrint('[LiveMonitor] ⚠️ Widget未mounted，取消刷新');
+      return;
+    }
+    
+    // 直接调用刷新监控通道方法
+    debugPrint('[LiveMonitor] 🚀 开始刷新监控通道...');
+    await refreshMonitorChannels();
+    debugPrint('[LiveMonitor] ✅ 监控配置重载完成');
+  }
+
+  ///3b, 🔄 检查配置是否有变化（用于判断是否需要刷新）
+  Future<bool> hasConfigChanged() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final savedChannels = prefs.getStringList('monitor_selected_channels');
+      final savedLayout = prefs.getString('monitor_layout_type');
+
+      // 比较通道和布局是否有变化
+      final channelsChanged = 
+          (savedChannels?.join(',') ?? '') != (_lastSavedChannels?.join(',') ?? '');
+      final layoutChanged = savedLayout != _lastSavedLayout;
+
+      return channelsChanged || layoutChanged;
+    } catch (e) {
+      debugPrint('[LiveMonitor] 检查配置变化失败: $e');
+      return false;
+    }
+  }
+
   ///4, 🔄 启动定期刷新（仅保底机制，信任后端重连）
   void _startPeriodicRefresh() {
     if (_forceRefreshTimer != null) return;

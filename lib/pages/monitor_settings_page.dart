@@ -4,6 +4,7 @@ import 'package:http/http.dart' as http;
 import 'package:iboard_app/models/monitor_models.dart';
 import 'package:iboard_app/providers/app_data_provider.dart';
 import 'package:iboard_app/providers/advertisement_provider.dart';
+import 'package:iboard_app/providers/ad_top_carousel_provider.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -230,7 +231,22 @@ class MonitorSettingsPageState extends State<MonitorSettingsPage> {
 
     await _saveSettings();
 
-    // 触发广告轮播更新，以便重新读取监控配置
+    debugPrint('[MonitorSettings] 💾 配置已保存到SharedPreferences');
+    debugPrint('[MonitorSettings]   - 布局: ${_selectedLayout.label}');
+    debugPrint('[MonitorSettings]   - 通道数: ${_selectedChannels.length}');
+
+    // 🎯 立即刷新监控画面配置（不等待广告轮播）
+    try {
+      debugPrint('[MonitorSettings] 🔄 开始刷新监控画面...');
+      final topAdCarouselProvider =
+          Provider.of<TopAdCarouselProvider>(context, listen: false);
+      await topAdCarouselProvider.refreshAllMonitorWidgets();
+      debugPrint('[MonitorSettings] ✅ 监控画面配置已立即刷新');
+    } catch (e) {
+      debugPrint('[MonitorSettings] ⚠️ 刷新监控画面失败: $e');
+    }
+
+    // 触发广告轮播更新，以便重新读取监控配置（用于下次轮播）
     try {
       final advertisementProvider =
           Provider.of<AdvertisementProvider>(context, listen: false);
@@ -239,7 +255,7 @@ class MonitorSettingsPageState extends State<MonitorSettingsPage> {
       debugPrint('[MonitorSettings] 触发广告更新失败: $e');
     }
 
-    _showSuccess('監控通道設定已保存');
+    _showSuccess('監控通道設定已保存並立即生效');
 
     _notifyLiveMonitorUpdate();
   }
