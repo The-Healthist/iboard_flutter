@@ -43,11 +43,22 @@ class RthkNewsProvider extends ChangeNotifier {
 
   RthkNewsProvider(this._apiClient) {
     _logger.i('🔍 RthkNewsProvider 初始化完成');
-    _loadFromLocalStorage();
+    _initializeData();
     _startUpdateTimer();
   }
 
-  ///1, 从本地存储加载新闻数据
+  ///1, 初始化数据
+  Future<void> _initializeData() async {
+    await _loadFromLocalStorage();
+    // 注释掉模拟数据加载逻辑
+    // if (_newsList.isEmpty) {
+    //   _logger.i('📱 本地存储为空，加载模拟数据用于测试');
+    //   _isTestMode = true; // 标记为测试模式
+    //   _loadMockData();
+    // }
+  }
+
+  ///2, 从本地存储加载新闻数据
   Future<void> _loadFromLocalStorage() async {
     try {
       final prefs = await SharedPreferences.getInstance();
@@ -58,15 +69,19 @@ class RthkNewsProvider extends ChangeNotifier {
         final List<dynamic> newsData = json.decode(newsJson);
         _newsList =
             newsData.map((item) => RthkNewsModel.fromJson(item)).toList();
-        _logger.i('📱 从本地存储加载了 ${_newsList.length} 条新闻');
 
-        // 检查是否包含网络错误提示数据
-        final networkErrorCount = _newsList
-            .where((news) => news.guid.startsWith('network_error_'))
-            .length;
-        if (networkErrorCount > 0) {
-          _logger.w('⚠️ 本地存储中包含 $networkErrorCount 条网络错误提示数据');
+        // 过滤掉网络错误提示数据和模拟数据
+        final originalCount = _newsList.length;
+        _newsList = _newsList
+            .where((news) => !news.guid.startsWith('network_error_') && 
+                           !news.guid.startsWith('mock_news_'))
+            .toList();
+        
+        if (_newsList.length < originalCount) {
+          _logger.w('⚠️ 已过滤掉 ${originalCount - _newsList.length} 条测试/错误数据');
         }
+
+        _logger.i('📱 从本地存储加载了 ${_newsList.length} 条新闻');
       } else {
         _logger.i('📱 本地存储中没有新闻数据');
       }
@@ -89,7 +104,7 @@ class RthkNewsProvider extends ChangeNotifier {
     }
   }
 
-  ///2, 保存到本地存储
+  ///3, 保存到本地存储
   Future<void> _saveToLocalStorage() async {
     try {
       final prefs = await SharedPreferences.getInstance();
@@ -111,7 +126,7 @@ class RthkNewsProvider extends ChangeNotifier {
     }
   }
 
-  ///3, 启动定时更新定时器
+  ///4, 启动定时更新定时器
   void _startUpdateTimer() {
     _updateTimer?.cancel();
 
@@ -123,8 +138,9 @@ class RthkNewsProvider extends ChangeNotifier {
     _logger.i('⏰ RTHK新闻更新定时器已启动，更新间隔: 30分鈡');
   }
 
-  ///4, 检查并执行更新
+  ///5, 检查并执行更新
   Future<void> _checkAndUpdate() async {
+    // 移除测试模式检查，恢复正常更新逻辑
     if (_lastUpdateTime != null) {
       final timeSinceLastUpdate = DateTime.now().difference(_lastUpdateTime!);
       if (timeSinceLastUpdate < _updateInterval) {

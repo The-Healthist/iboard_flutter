@@ -28,6 +28,11 @@ class RthkNewsTickerWidgetState extends State<RthkNewsTickerWidget>
   bool _isPaused = false;
   double _totalContentWidth = 0;
   final Logger logger = Logger();
+  
+  // 监听器变量，确保正确移除
+  VoidCallback? _animationListener;
+  void Function(AnimationStatus)? _animationStatusListener;
+  bool _isAnimating = false;
 
   @override
   void initState() {
@@ -41,6 +46,7 @@ class RthkNewsTickerWidgetState extends State<RthkNewsTickerWidget>
 
   @override
   void dispose() {
+    _stopScrolling();
     _controller.dispose();
     _scrollController.dispose();
     super.dispose();
@@ -72,47 +78,66 @@ class RthkNewsTickerWidgetState extends State<RthkNewsTickerWidget>
 
   ///2, 啟動滾動動畫
   void _startScrolling() {
-    if (!_scrollController.hasClients) return;
+    if (!_scrollController.hasClients || _isAnimating) return;
 
     final maxScrollExtent = _scrollController.position.maxScrollExtent;
-    const scrollSpeed = 40.0; // 降低滾動速度，讓使用者更易讀
-    final durationSeconds = (maxScrollExtent / scrollSpeed).ceil();
+    if (maxScrollExtent <= 0) return;
 
-    if (durationSeconds <= 0) return;
+    // 固定动画时长，确保速度一致
+    const baseDuration = 30; // 基础时长30秒
+    final adjustedDuration = (maxScrollExtent / widget.width * baseDuration).clamp(20, 60);
+    _controller.duration = Duration(seconds: adjustedDuration.round());
 
-    _controller.duration = Duration(seconds: durationSeconds);
+    // 先移除已有監聽器
+    _removeListeners();
 
-// 定义监听器变量
-    void animationListener() {
-      if (!_isPaused) {
+    // 定义新的监听器
+    _animationListener = () {
+      if (!_isPaused && _scrollController.hasClients) {
         final offset = _controller.value * maxScrollExtent;
-        _scrollController.jumpTo(offset);
+        if (offset <= maxScrollExtent) {
+          _scrollController.jumpTo(offset);
+        }
       }
-    }
+    };
 
-    void animationStatusListener(AnimationStatus status) {
-      if (status == AnimationStatus.completed) {
+    _animationStatusListener = (AnimationStatus status) {
+      if (status == AnimationStatus.completed && mounted) {
         _controller.reset();
-        _controller.forward();
+        if (!_isPaused) {
+          _controller.forward();
+        }
       }
-    }
+    };
 
-// 先移除已有監聽器
-    _controller.removeListener(animationListener);
-    _controller.removeStatusListener(animationStatusListener);
-
-// 添加監聽器
-    _controller.addListener(animationListener);
-    _controller.addStatusListener(animationStatusListener);
+    // 添加新監聽器
+    _controller.addListener(_animationListener!);
+    _controller.addStatusListener(_animationStatusListener!);
+    
+    _isAnimating = true;
     _controller.forward();
   }
 
-  ///3, 停止滚动动画
-  void _stopScrolling() {
-    _controller.stop();
+  ///3, 移除动画监听器
+  void _removeListeners() {
+    if (_animationListener != null) {
+      _controller.removeListener(_animationListener!);
+      _animationListener = null;
+    }
+    if (_animationStatusListener != null) {
+      _controller.removeStatusListener(_animationStatusListener!);
+      _animationStatusListener = null;
+    }
   }
 
-  ///4, 更新新聞數據並重新啟動滾動
+  ///4, 停止滚动动画
+  void _stopScrolling() {
+    _isAnimating = false;
+    _controller.stop();
+    _removeListeners();
+  }
+
+  ///5, 更新新聞數據並重新啟動滾動
   void _updateNews(List<String> newTexts) {
     if (newTexts.isEmpty) {
       _newsTexts = ['暫無新聞數據'];
@@ -120,6 +145,7 @@ class RthkNewsTickerWidgetState extends State<RthkNewsTickerWidget>
       _newsTexts = newTexts;
     }
 
+    // 检查内容是否真的发生了变化
     if (_newsTexts.length == _previousNewsTexts.length &&
         !_newsTexts
             .asMap()
@@ -130,23 +156,28 @@ class RthkNewsTickerWidgetState extends State<RthkNewsTickerWidget>
 
     _previousNewsTexts = List.from(_newsTexts);
 
-    WidgetsBinding.instance.addPostFrameCallback((_) {
+    // 防抖：避免频繁更新
+    Future.delayed(const Duration(milliseconds: 100), () {
       if (!mounted) return;
 
       _totalContentWidth = _calculateTotalWidth(_newsTexts);
-      // 調試：總寬度
-      logger.i('總寬度: $_totalContentWidth');
-      _scrollController.jumpTo(0);
-
+      
       setState(() {});
 
-      _stopScrolling();
-      _controller.reset();
-      _startScrolling();
+      // 延迟一帧再重新开始动画，确保UI已更新
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        _stopScrolling();
+        _controller.reset();
+        if (_scrollController.hasClients) {
+          _scrollController.jumpTo(0);
+        }
+        _startScrolling();
+      });
     });
   }
 
-  ///5, 根据Provider状态处理滚动控制
+  ///6, 根据Provider状态处理滚动控制
   void _handleProviderPauseState(bool isProviderPaused) {
     if (isProviderPaused && !_isPaused) {
       _pauseScrolling();
@@ -155,23 +186,25 @@ class RthkNewsTickerWidgetState extends State<RthkNewsTickerWidget>
     }
   }
 
-  ///6, 暂停滚动
+  ///7, 暂停滚动
   void _pauseScrolling() {
     _isPaused = true;
-    _stopScrolling();
+    _controller.stop();
   }
 
-  ///7, 恢復滾動
+  ///8, 恢復滾動
   void _resumeScrolling() {
-    if (_isPaused) {
+    if (_isPaused && mounted) {
       _isPaused = false;
-      // 確保存在有效時長
-      _controller.duration ??= const Duration(seconds: 30);
-      _controller.forward();
+      if (_isAnimating) {
+        _controller.forward();
+      } else {
+        _startScrolling();
+      }
     }
   }
 
-  ///8, 智能确定显示项目数量
+  ///9, 智能确定显示项目数量
   int _getItemCount() {
     // 如果只有一条新闻（通常是网络错误提示），检查是否需要滚动
     if (_newsTexts.length == 1) {
@@ -199,7 +232,7 @@ class RthkNewsTickerWidgetState extends State<RthkNewsTickerWidget>
     return _newsTexts.length * 2;
   }
 
-  ///9, 构建渐变遮罩，避免文字在边缘处突然出现或消失
+  ///10, 构建渐变遮罩，避免文字在边缘处突然出现或消失
   Widget _buildFadeMask(Widget child) => ShaderMask(
         blendMode: BlendMode.dstIn,
         shaderCallback: (bounds) => const LinearGradient(
