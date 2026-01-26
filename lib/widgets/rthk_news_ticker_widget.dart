@@ -83,10 +83,13 @@ class RthkNewsTickerWidgetState extends State<RthkNewsTickerWidget>
     final maxScrollExtent = _scrollController.position.maxScrollExtent;
     if (maxScrollExtent <= 0) return;
 
-    // 固定动画时长，确保速度一致
-    const baseDuration = 30; // 基础时长30秒
-    final adjustedDuration = (maxScrollExtent / widget.width * baseDuration).clamp(20, 60);
-    _controller.duration = Duration(seconds: adjustedDuration.round());
+    // 固定滚动速度，确保所有设备速度一致 (像素/秒)
+    const scrollSpeed = 40.0; // 调整这个值来改变全局速度：30=慢，50=中等，70=快
+    final duration = (maxScrollExtent / scrollSpeed).clamp(10, 120); // 最少10秒，最多2分钟
+    _controller.duration = Duration(milliseconds: (duration * 1000).round());
+
+    // 添加调试信息
+    logger.d('新闻跑马灯 - 内容宽度: $maxScrollExtent, 动画时长: ${duration.toStringAsFixed(1)}s, 滚动速度: ${(maxScrollExtent / duration).toStringAsFixed(1)}px/s');
 
     // 先移除已有監聽器
     _removeListeners();
