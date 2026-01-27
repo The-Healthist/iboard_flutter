@@ -1,0 +1,526 @@
+/// 1, 支付方式枚舉
+enum PaymentMethod {
+  wechat,
+  alipay,
+  card,
+  cash,
+  bankTransfer,
+  cheque,
+}
+
+/// 2, 支付狀態枚舉
+enum PaymentStatus {
+  pending,
+  processing,
+  success,
+  failed,
+  cancelled,
+}
+
+/// 3, 賬單模型
+class PaymentBill {
+  final String flatCode;
+  final String itemId;
+  final String trsTo;
+  final String billDt;
+  final double netAmount;
+  final String invoiceNo;
+  final String? remark;
+  final String? unitName;
+  final double paidAmount;
+
+  const PaymentBill({
+    required this.flatCode,
+    required this.itemId,
+    required this.trsTo,
+    required this.billDt,
+    required this.netAmount,
+    required this.invoiceNo,
+    this.remark,
+    this.unitName,
+    this.paidAmount = 0.0,
+  });
+
+  factory PaymentBill.fromJson(Map<String, dynamic> json) {
+    return PaymentBill(
+      flatCode: json['flat_code']?.toString() ?? '',
+      itemId: json['item_id']?.toString() ?? '',
+      trsTo: json['trs_to']?.toString() ?? '',
+      billDt: json['bill_dt']?.toString() ?? '',
+      netAmount: (json['net_amount'] as num?)?.toDouble() ?? 0.0,
+      invoiceNo: json['invoice_no']?.toString() ?? '',
+      remark: json['remark']?.toString(),
+      unitName: json['unit_name']?.toString(),
+      paidAmount: (json['paid_amount'] as num?)?.toDouble() ??
+          ((json['net_amount'] as num?)?.toDouble() ?? 0.0),
+    );
+  }
+
+  ///3.1, 複製並覆蓋字段
+  PaymentBill copyWith({
+    String? flatCode,
+    String? itemId,
+    String? trsTo,
+    String? billDt,
+    double? netAmount,
+    String? invoiceNo,
+    String? remark,
+    String? unitName,
+    double? paidAmount,
+  }) {
+    return PaymentBill(
+      flatCode: flatCode ?? this.flatCode,
+      itemId: itemId ?? this.itemId,
+      trsTo: trsTo ?? this.trsTo,
+      billDt: billDt ?? this.billDt,
+      netAmount: netAmount ?? this.netAmount,
+      invoiceNo: invoiceNo ?? this.invoiceNo,
+      remark: remark ?? this.remark,
+      unitName: unitName ?? this.unitName,
+      paidAmount: paidAmount ?? this.paidAmount,
+    );
+  }
+
+  ///3.2, 從列表構建賬單清單（可覆蓋unitName）
+  static List<PaymentBill> listFrom(
+    List<dynamic> jsonList, {
+    String? unitName,
+  }) {
+    return jsonList
+        .map((e) => PaymentBill.fromJson(e as Map<String, dynamic>))
+        .map((bill) => (unitName != null && unitName.isNotEmpty)
+            ? bill.copyWith(
+                unitName: (bill.unitName == null || bill.unitName!.isEmpty)
+                    ? unitName
+                    : bill.unitName,
+              )
+            : bill)
+        .toList();
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'flat_code': flatCode,
+      'item_id': itemId,
+      'trs_to': trsTo,
+      'bill_dt': billDt,
+      'net_amount': netAmount,
+      'invoice_no': invoiceNo,
+      if (remark != null) 'remark': remark,
+      if (unitName != null) 'unit_name': unitName,
+      'paid_amount': paidAmount,
+    };
+  }
+
+  /// 3.3, 計算單個賬單的手續費（參考POS系統的getFee方法）
+  double getFee(double feeRate) {
+    var totalFeeAfter001 =
+        netAmount * feeRate * 100 - (netAmount * feeRate * 100).toInt();
+    if (totalFeeAfter001 > 0) {
+      return ((netAmount * feeRate * 100).toInt() + 1) / 100.0;
+    } else {
+      return netAmount * feeRate;
+    }
+  }
+}
+
+/// 4, 支付響應模型
+class PaymentResponse {
+  final String paymentId;
+  final PaymentStatus status;
+  final String transactionId;
+  final String? qrCode;
+  final String? paymentUrl;
+  final String? receiptId;
+  final double? handlingFee;
+  final DateTime? createdAt;
+  final DateTime? completedAt;
+  final String? errorMessage;
+  final Map<String, dynamic>? rawData;
+
+  const PaymentResponse({
+    required this.paymentId,
+    required this.status,
+    required this.transactionId,
+    this.qrCode,
+    this.paymentUrl,
+    this.receiptId,
+    this.handlingFee,
+    this.createdAt,
+    this.completedAt,
+    this.errorMessage,
+    this.rawData,
+  });
+
+  factory PaymentResponse.fromJson(Map<String, dynamic> json) {
+    return PaymentResponse(
+      paymentId: json['payment_id']?.toString() ?? '',
+      status: _parsePaymentStatus(json['status']),
+      transactionId: json['transaction_id']?.toString() ?? '',
+      qrCode: json['qr_code']?.toString(),
+      paymentUrl: json['payment_url']?.toString(),
+      receiptId: json['receipt_id']?.toString(),
+      handlingFee: (json['handling_fee'] as num?)?.toDouble(),
+      createdAt: json['created_at'] != null
+          ? DateTime.tryParse(json['created_at'].toString())
+          : null,
+      completedAt: json['completed_at'] != null
+          ? DateTime.tryParse(json['completed_at'].toString())
+          : null,
+      errorMessage: json['error_message']?.toString(),
+      rawData: json['raw_data'] as Map<String, dynamic>?,
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'payment_id': paymentId,
+      'status': _paymentStatusToString(status),
+      'transaction_id': transactionId,
+      if (qrCode != null) 'qr_code': qrCode,
+      if (paymentUrl != null) 'payment_url': paymentUrl,
+      if (receiptId != null) 'receipt_id': receiptId,
+      if (handlingFee != null) 'handling_fee': handlingFee,
+      if (createdAt != null) 'created_at': createdAt!.toIso8601String(),
+      if (completedAt != null) 'completed_at': completedAt!.toIso8601String(),
+      if (errorMessage != null) 'error_message': errorMessage,
+      if (rawData != null) 'raw_data': rawData,
+    };
+  }
+
+  PaymentResponse copyWith({
+    String? paymentId,
+    PaymentStatus? status,
+    String? transactionId,
+    String? qrCode,
+    String? paymentUrl,
+    String? receiptId,
+    double? handlingFee,
+    DateTime? createdAt,
+    DateTime? completedAt,
+    String? errorMessage,
+    Map<String, dynamic>? rawData,
+  }) {
+    return PaymentResponse(
+      paymentId: paymentId ?? this.paymentId,
+      status: status ?? this.status,
+      transactionId: transactionId ?? this.transactionId,
+      qrCode: qrCode ?? this.qrCode,
+      paymentUrl: paymentUrl ?? this.paymentUrl,
+      receiptId: receiptId ?? this.receiptId,
+      handlingFee: handlingFee ?? this.handlingFee,
+      createdAt: createdAt ?? this.createdAt,
+      completedAt: completedAt ?? this.completedAt,
+      errorMessage: errorMessage ?? this.errorMessage,
+      rawData: rawData ?? this.rawData,
+    );
+  }
+
+  static PaymentStatus _parsePaymentStatus(dynamic status) {
+    if (status == null) return PaymentStatus.pending;
+
+    switch (status.toString().toLowerCase()) {
+      case 'pending':
+        return PaymentStatus.pending;
+      case 'processing':
+        return PaymentStatus.processing;
+      case 'success':
+        return PaymentStatus.success;
+      case 'failed':
+        return PaymentStatus.failed;
+      case 'cancelled':
+        return PaymentStatus.cancelled;
+      default:
+        return PaymentStatus.pending;
+    }
+  }
+
+  static String _paymentStatusToString(PaymentStatus status) {
+    switch (status) {
+      case PaymentStatus.pending:
+        return 'pending';
+      case PaymentStatus.processing:
+        return 'processing';
+      case PaymentStatus.success:
+        return 'success';
+      case PaymentStatus.failed:
+        return 'failed';
+      case PaymentStatus.cancelled:
+        return 'cancelled';
+    }
+  }
+}
+
+/// 5, 單位信息模型
+class UnitInfo {
+  final String unitId;
+  final String flatCode;
+  final String blockName;
+  final String floorName;
+  final String unitName;
+  final String? buildingId;
+  final String? displayName;
+
+  const UnitInfo({
+    required this.unitId,
+    required this.flatCode,
+    required this.blockName,
+    required this.floorName,
+    required this.unitName,
+    this.buildingId,
+    this.displayName,
+  });
+
+  factory UnitInfo.fromJson(Map<String, dynamic> json) {
+    final unitInfo = UnitInfo(
+      unitId: json['unit_id']?.toString() ?? '',
+      flatCode: json['simpleadd']?.toString() ?? '',
+      blockName: json['block']?.toString() ?? '',
+      floorName: json['floor']?.toString() ?? '',
+      unitName: json['unit']?.toString() ?? '',
+      buildingId: json['building_id']?.toString(),
+      displayName: json['simpleadd']?.toString(),
+    );
+
+    return unitInfo;
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'unit_id': unitId,
+      'simpleadd': flatCode,
+      'block': blockName,
+      'floor': floorName,
+      'unit': unitName,
+      if (buildingId != null) 'building_id': buildingId,
+      if (displayName != null) 'simpleadd': displayName,
+    };
+  }
+}
+
+/// 6, 銀行賬戶信息模型
+class BankAccountInfo {
+  final String accountName;
+  final String accountNumber;
+  final String bankName;
+  final String? bankCode;
+  final String? branchName;
+  final String? swiftCode;
+
+  const BankAccountInfo({
+    required this.accountName,
+    required this.accountNumber,
+    required this.bankName,
+    this.bankCode,
+    this.branchName,
+    this.swiftCode,
+  });
+
+  factory BankAccountInfo.fromJson(Map<String, dynamic> json) {
+    return BankAccountInfo(
+      accountName: json['account_name']?.toString() ?? '',
+      accountNumber: json['account_number']?.toString() ?? '',
+      bankName: json['bank_name']?.toString() ?? '',
+      bankCode: json['bank_code']?.toString(),
+      branchName: json['branch_name']?.toString(),
+      swiftCode: json['swift_code']?.toString(),
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'account_name': accountName,
+      'account_number': accountNumber,
+      'bank_name': bankName,
+      if (bankCode != null) 'bank_code': bankCode,
+      if (branchName != null) 'branch_name': branchName,
+      if (swiftCode != null) 'swift_code': swiftCode,
+    };
+  }
+}
+
+/// 7, 支付配置模型
+class PaymentConfig {
+  final String buildingId;
+  final List<PaymentMethod> enabledMethods;
+  final Map<String, double> feeRates;
+  final BankAccountInfo? bankAccount;
+  final Map<String, dynamic>? settings;
+
+  const PaymentConfig({
+    required this.buildingId,
+    required this.enabledMethods,
+    required this.feeRates,
+    this.bankAccount,
+    this.settings,
+  });
+
+  /// 默認支付配置構造函數
+  factory PaymentConfig.defaultConfig(String buildingId) {
+    return PaymentConfig(
+      buildingId: buildingId,
+      enabledMethods: [PaymentMethod.wechat, PaymentMethod.alipay],
+      feeRates: {},
+    );
+  }
+
+  factory PaymentConfig.fromJson(Map<String, dynamic> json) {
+    // 處理手續費數據，從 transaction_types 數組中提取
+    Map<String, double> feeRates = {};
+    List<PaymentMethod> enabledMethods = [];
+    // print('[PaymentConfig] 🔍 解析 JSON 數據: $json');
+
+    if (json['transaction_types'] is List) {
+      final List<dynamic> transactionTypes = json['transaction_types'];
+      // print('[PaymentConfig] 🔍 找到 ${transactionTypes.length} 個交易類型');
+
+      for (final type in transactionTypes) {
+        if (type is Map<String, dynamic>) {
+          final payType = type['pay_type']?.toString();
+          final markup = (type['markup'] as num?)?.toDouble() ?? 0.0;
+          // print('[PaymentConfig] 🔍 處理類型: $payType, 費率: $markup');
+
+          // 映射支付類型到我們的枚舉
+          if (payType == 'POS_ALIWE') {
+            feeRates['wechat'] = markup;
+            feeRates['alipay'] = markup;
+            enabledMethods.addAll([PaymentMethod.wechat, PaymentMethod.alipay]);
+            // print('[PaymentConfig] ✅ 設置微信/支付寶費率: $markup');
+          } else if (payType == 'POS_CARD') {
+            feeRates['card'] = markup;
+            enabledMethods.add(PaymentMethod.card);
+          } else if (payType == 'POS_BANK') {
+            feeRates['bank_transfer'] = markup;
+            enabledMethods.add(PaymentMethod.bankTransfer);
+          } else if (payType == 'POS_CASH') {
+            feeRates['cash'] = markup;
+            enabledMethods.add(PaymentMethod.cash);
+          } else if (payType == 'POS_CHEQUE') {
+            feeRates['cheque'] = markup;
+            enabledMethods.add(PaymentMethod.cheque);
+          }
+        }
+      }
+    } else {
+      // print('[PaymentConfig] ⚠️ transaction_types 不是數組或不存在');
+    }
+
+    // 檢查是否有微信/支付寶支付方式
+    final hasWechatAlipay = enabledMethods.contains(PaymentMethod.wechat) ||
+        enabledMethods.contains(PaymentMethod.alipay);
+    // print('[PaymentConfig] 🔍 是否有微信/支付寶支付: $hasWechatAlipay');
+    // print('[PaymentConfig] 🔍 啟用的支付方式: $enabledMethods');
+    // print('[PaymentConfig] 🔍 最終費率配置: $feeRates');
+
+    return PaymentConfig(
+      buildingId: json['building_id']?.toString() ?? '',
+      enabledMethods: enabledMethods.isNotEmpty
+          ? enabledMethods
+          : _parsePaymentMethods(json['enabled_methods']),
+      feeRates: feeRates,
+      bankAccount: json['bank_account'] != null
+          ? BankAccountInfo.fromJson(
+              json['bank_account'] as Map<String, dynamic>)
+          : null,
+      settings: json['settings'] as Map<String, dynamic>?,
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'building_id': buildingId,
+      'enabled_methods': enabledMethods.map(_paymentMethodToString).toList(),
+      'fee_rates': feeRates,
+      if (bankAccount != null) 'bank_account': bankAccount!.toJson(),
+      if (settings != null) 'settings': settings,
+    };
+  }
+
+  static List<PaymentMethod> _parsePaymentMethods(dynamic methods) {
+    if (methods == null || methods is! List) return [];
+
+    return (methods as List).map((method) {
+      switch (method.toString().toLowerCase()) {
+        case 'wechat':
+          return PaymentMethod.wechat;
+        case 'alipay':
+          return PaymentMethod.alipay;
+        case 'card':
+          return PaymentMethod.card;
+        case 'cash':
+          return PaymentMethod.cash;
+        case 'bank_transfer':
+          return PaymentMethod.bankTransfer;
+        default:
+          return PaymentMethod.wechat;
+      }
+    }).toList();
+  }
+
+  static Map<String, double> _parseFeeRates(dynamic rates) {
+    if (rates == null || rates is! Map) return {};
+
+    final Map<String, double> result = {};
+    (rates as Map).forEach((key, value) {
+      if (value is num) {
+        result[key.toString()] = value.toDouble();
+      }
+    });
+    return result;
+  }
+
+  static String _paymentMethodToString(PaymentMethod method) {
+    switch (method) {
+      case PaymentMethod.wechat:
+        return 'wechat';
+      case PaymentMethod.alipay:
+        return 'alipay';
+      case PaymentMethod.card:
+        return 'card';
+      case PaymentMethod.cash:
+        return 'cash';
+      case PaymentMethod.bankTransfer:
+        return 'bank_transfer';
+      case PaymentMethod.cheque:
+        return 'cheque';
+    }
+  }
+
+  /// 7.1, 計算總手續費（參考POS系統的getTotalFee方法）
+  double getTotalFee(List<PaymentBill> bills, PaymentMethod method) {
+    if (bills.isEmpty) {
+      return 0;
+    }
+
+    final feeRate = feeRates[_getMethodKey(method)] ?? 0.0;
+    var totalFee = bills.map((bill) {
+      return bill.getFee(feeRate);
+    }).reduce((value, element) => value + element);
+
+    return totalFee;
+  }
+
+  /// 7.2, 獲取支付方式對應的key
+  String _getMethodKey(PaymentMethod method) {
+    switch (method) {
+      case PaymentMethod.wechat:
+        return 'wechat';
+      case PaymentMethod.alipay:
+        return 'alipay';
+      case PaymentMethod.card:
+        return 'card';
+      case PaymentMethod.cash:
+        return 'cash';
+      case PaymentMethod.bankTransfer:
+        return 'bank_transfer';
+      case PaymentMethod.cheque:
+        return 'cheque';
+    }
+  }
+
+  /// 7.3, 獲取支付方式的手續費率（百分比顯示）
+  double getFeeRatePercentage(PaymentMethod method) {
+    final feeRate = feeRates[_getMethodKey(method)] ?? 0.0;
+    return feeRate * 100; // 轉換為百分比
+  }
+}

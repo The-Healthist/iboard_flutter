@@ -26,6 +26,8 @@ class WeatherForecastModel {
   final String forecastWeather;
   final Temperature forecastMaxtemp;
   final Temperature forecastMintemp;
+  final Temperature? forecastMaxrh;
+  final Temperature? forecastMinrh;
   final int forecastIcon;
   final String psr;
 
@@ -36,6 +38,8 @@ class WeatherForecastModel {
     required this.forecastWeather,
     required this.forecastMaxtemp,
     required this.forecastMintemp,
+    this.forecastMaxrh,
+    this.forecastMinrh,
     required this.forecastIcon,
     required this.psr,
   });
@@ -50,6 +54,12 @@ class WeatherForecastModel {
           Temperature.fromJson(json['forecastMaxtemp'] as Map<String, dynamic>),
       forecastMintemp:
           Temperature.fromJson(json['forecastMintemp'] as Map<String, dynamic>),
+      forecastMaxrh: json['forecastMaxrh'] != null
+          ? Temperature.fromJson(json['forecastMaxrh'] as Map<String, dynamic>)
+          : null,
+      forecastMinrh: json['forecastMinrh'] != null
+          ? Temperature.fromJson(json['forecastMinrh'] as Map<String, dynamic>)
+          : null,
       forecastIcon: json['ForecastIcon'] as int,
       psr: json['PSR'] as String,
     );
@@ -63,6 +73,8 @@ class WeatherForecastModel {
       'forecastWeather': forecastWeather,
       'forecastMaxtemp': forecastMaxtemp.toJson(),
       'forecastMintemp': forecastMintemp.toJson(),
+      'forecastMaxrh': forecastMaxrh?.toJson(),
+      'forecastMinrh': forecastMinrh?.toJson(),
       'ForecastIcon': forecastIcon,
       'PSR': psr,
     };
@@ -90,6 +102,15 @@ class SeaTemp {
       recordTime: json['recordTime'] as String,
     );
   }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'place': place,
+      'value': value,
+      'unit': unit,
+      'recordTime': recordTime,
+    };
+  }
 }
 
 class SoilTempDepth {
@@ -103,6 +124,13 @@ class SoilTempDepth {
       unit: json['unit'] as String,
       value: (json['value'] as num).toDouble(),
     );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'unit': unit,
+      'value': value,
+    };
   }
 }
 
@@ -129,6 +157,16 @@ class SoilTemp {
       recordTime: json['recordTime'] as String,
       depth: SoilTempDepth.fromJson(json['depth'] as Map<String, dynamic>),
     );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'place': place,
+      'value': value,
+      'unit': unit,
+      'recordTime': recordTime,
+      'depth': depth.toJson(),
+    };
   }
 }
 
@@ -171,5 +209,15 @@ class WeatherData {
           : null,
       soilTemp: soilTemps,
     );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'generalSituation': generalSituation,
+      'weatherForecast': weatherForecast.map((f) => f.toJson()).toList(),
+      'updateTime': updateTime,
+      'seaTemp': seaTemp?.toJson(),
+      'soilTemp': soilTemp?.map((s) => s.toJson()).toList(),
+    };
   }
 }

@@ -18,7 +18,7 @@ class FileManager {
     final Directory cacheDir = Directory(cachePath);
     if (!await cacheDir.exists()) {
       await cacheDir.create(recursive: true);
-      _logger.i('Created cache directory: $cachePath');
+      // _logger.i('Created cache directory: $cachePath');
     }
     return cachePath;
   }
@@ -35,15 +35,15 @@ class FileManager {
       final File localFile = File(localFilePath);
 
       if (await localFile.exists()) {
-        _logger.i('File found in cache: $localFilePath');
+        // _logger.i('File found in cache: $localFilePath');
         // Optionally, add a check here to verify file integrity using MD5 if required.
         fileModel.localFilePath = localFilePath;
         return localFile;
       }
 
-      _logger.i('Downloading file from ${fileModel.url} to $localFilePath');
+      // _logger.i('Downloading file from ${fileModel.url} to $localFilePath');
       await _dio.download(fileModel.url, localFilePath);
-      _logger.i('File downloaded successfully: $localFilePath');
+      // _logger.i('File downloaded successfully: $localFilePath');
       fileModel.localFilePath = localFilePath;
       return localFile;
     } catch (e, stackTrace) {
@@ -59,7 +59,7 @@ class FileManager {
       final Directory cacheDir = Directory(cacheDirPath);
       if (await cacheDir.exists()) {
         await cacheDir.delete(recursive: true);
-        _logger.i('Cache cleared: $cacheDirPath');
+        // _logger.i('Cache cleared: $cacheDirPath');
         await cacheDir.create(recursive: true); // Recreate after deleting
       }
     } catch (e, stackTrace) {
