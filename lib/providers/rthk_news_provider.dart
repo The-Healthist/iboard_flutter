@@ -50,11 +50,6 @@ class RthkNewsProvider extends ChangeNotifier {
   ///1, 初始化数据
   Future<void> _initializeData() async {
     await _loadFromLocalStorage();
-    // 暂时使用模拟数据进行测试
-    if (_newsList.isEmpty) {
-      _logger.i('📱 本地存储为空，加载模拟数据用于测试');
-      _loadMockData();
-    }
   }
 
   ///2, 从本地存储加载新闻数据
@@ -139,12 +134,6 @@ class RthkNewsProvider extends ChangeNotifier {
 
   ///5, 检查并执行更新
   Future<void> _checkAndUpdate() async {
-    // 使用模拟数据时跳过自动更新
-    _logger.i('⏭️ 当前使用模拟数据，跳过自动更新');
-    return;
-    
-    /* 暂时注释掉原有的自动更新逻辑
-    // 移除测试模式检查，恢复正常更新逻辑
     if (_lastUpdateTime != null) {
       final timeSinceLastUpdate = DateTime.now().difference(_lastUpdateTime!);
       if (timeSinceLastUpdate < _updateInterval) {
@@ -171,46 +160,10 @@ class RthkNewsProvider extends ChangeNotifier {
       _logger.e('❌ 定时更新失败: $e');
       // 定时更新失败不影响现有数据，继续使用缓存
     }
-    */
   }
 
-  ///5, 获取RTHK新闻数据
+  ///6, 获取RTHK新闻数据
   Future<void> fetchRthkNews({bool forceUpdate = false}) async {
-    _logger.i('🔄 暂时跳过API调用，使用模拟数据进行测试');
-    
-    // 暂时跳过API调用，直接返回
-    if (!forceUpdate && _newsList.isNotEmpty) {
-      _logger.i('⏭️ 模拟数据已存在，跳过重复加载');
-      return;
-    }
-
-    if (_isLoading) {
-      _logger.i('⏳ 新闻更新已在进行中，跳过重复请求');
-      return;
-    }
-
-    _isLoading = true;
-    _hasError = false;
-    _errorMessage = '';
-    notifyListeners();
-
-    try {
-      // 模拟API调用延迟
-      await Future.delayed(const Duration(milliseconds: 500));
-      
-      _logger.i('📱 使用模拟数据替代API调用');
-      _loadMockData();
-      
-    } catch (e) {
-      _hasError = true;
-      _errorMessage = e.toString();
-      _logger.e('❌ 模拟数据加载失败: $e');
-    } finally {
-      _isLoading = false;
-      notifyListeners();
-    }
-
-    /* 暂时注释掉原有的API调用逻辑
     // 如果不是强制更新，检查是否需要更新
     if (!forceUpdate && _lastUpdateTime != null) {
       final timeSinceLastUpdate = DateTime.now().difference(_lastUpdateTime!);
@@ -295,7 +248,6 @@ class RthkNewsProvider extends ChangeNotifier {
       _isLoading = false;
       // 注意：这里不再调用notifyListeners()，因为成功时已经在上面调用了
     }
-    */
   }
 
   ///5.1, 使用网络連接失败提示
@@ -317,13 +269,13 @@ class RthkNewsProvider extends ChangeNotifier {
     _logger.w('⚠️ 注意：显示网络連接失败提示，而不是模拟数据');
   }
 
-  ///6, 手动刷新新闻
+  ///7, 手动刷新新闻
   Future<void> refreshNews() async {
     _logger.i('🔄 手动刷新新闻数据');
     await fetchRthkNews(forceUpdate: true);
   }
 
-  ///7, 清空新闻数据
+  ///8, 清空新闻数据
   void clearNews() {
     _newsList.clear();
     _lastUpdateTime = null;
@@ -334,7 +286,7 @@ class RthkNewsProvider extends ChangeNotifier {
     _logger.i('🗑️ 新闻数据已清空');
   }
 
-  ///7.1, 获取当前数据状态信息
+  ///8.1, 获取当前数据状态信息
   Map<String, dynamic> getDataStatus() {
     return {
       'newsCount': _newsList.length,
@@ -347,7 +299,7 @@ class RthkNewsProvider extends ChangeNotifier {
     };
   }
 
-  ///8, 获取所有新闻的显示文本
+  ///9, 获取所有新闻的显示文本
   List<String> getAllNewsDisplayTexts() {
     return _newsList.map((news) {
       // 格式化显示文本：时间 + 标题
@@ -359,7 +311,7 @@ class RthkNewsProvider extends ChangeNotifier {
     }).toList();
   }
 
-  ///9, 暂停跑马灯滚动
+  ///10, 暂停跑马灯滚动
   void pauseScrolling() {
     if (!_isScrollingPaused) {
       _isScrollingPaused = true;
@@ -368,102 +320,13 @@ class RthkNewsProvider extends ChangeNotifier {
     }
   }
 
-  ///10, 恢复跑马灯滚动
+  ///11, 恢复跑马灯滚动
   void resumeScrolling() {
     if (_isScrollingPaused) {
       _isScrollingPaused = false;
       _logger.i('▶️ RTHK新闻跑马灯已恢复');
       notifyListeners();
     }
-  }
-
-  ///11, 加载模拟数据用于测试
-  void _loadMockData() {
-    final now = DateTime.now();
-    
-    _newsList = [
-      RthkNewsModel(
-        title: '政府宣布新一輪消費券計劃將於下月推出，每人可獲\$5000電子消費券',
-        guid: 'mock_news_001',
-        link: 'https://news.rthk.hk/rthk/tc/component/k2/1689234-20241227.htm',
-        pubDate: now.subtract(const Duration(minutes: 5)),
-        formattedTime: '${(now.hour - 0).toString().padLeft(2, '0')}:${(now.minute - 5).toString().padLeft(2, '0')}',
-      ),
-      RthkNewsModel(
-        title: '天文台預測本週氣溫將逐步回升，週末最高可達25度',
-        guid: 'mock_news_002', 
-        link: 'https://news.rthk.hk/rthk/tc/component/k2/1689235-20241227.htm',
-        pubDate: now.subtract(const Duration(minutes: 15)),
-        formattedTime: '${(now.hour - 0).toString().padLeft(2, '0')}:${(now.minute - 15).toString().padLeft(2, '0')}',
-      ),
-      RthkNewsModel(
-        title: '港鐵宣布新增車廂監察系統，提升乘客安全保障',
-        guid: 'mock_news_003',
-        link: 'https://news.rthk.hk/rthk/tc/component/k2/1689236-20241227.htm', 
-        pubDate: now.subtract(const Duration(minutes: 25)),
-        formattedTime: '${(now.hour - 0).toString().padLeft(2, '0')}:${(now.minute - 25).toString().padLeft(2, '0')}',
-      ),
-      RthkNewsModel(
-        title: '教育局推出新措施支援基層學童學習，提供免費上網設備',
-        guid: 'mock_news_004',
-        link: 'https://news.rthk.hk/rthk/tc/component/k2/1689237-20241227.htm',
-        pubDate: now.subtract(const Duration(minutes: 35)),
-        formattedTime: '${(now.hour - 0).toString().padLeft(2, '0')}:${(now.minute - 35).toString().padLeft(2, '0')}',
-      ),
-      RthkNewsModel(
-        title: '醫管局引進新醫療技術，縮短病人輪候時間',
-        guid: 'mock_news_005',
-        link: 'https://news.rthk.hk/rthk/tc/component/k2/1689238-20241227.htm',
-        pubDate: now.subtract(const Duration(minutes: 45)),
-        formattedTime: '${(now.hour - 0).toString().padLeft(2, '0')}:${(now.minute - 45).toString().padLeft(2, '0')}',
-      ),
-      RthkNewsModel(
-        title: '環保署推行新回收計劃，鼓勵市民參與減廢行動',
-        guid: 'mock_news_006',
-        link: 'https://news.rthk.hk/rthk/tc/component/k2/1689239-20241227.htm',
-        pubDate: now.subtract(const Duration(hours: 1, minutes: 5)),
-        formattedTime: '${(now.hour - 1).toString().padLeft(2, '0')}:${(now.minute - 5).toString().padLeft(2, '0')}',
-      ),
-      RthkNewsModel(
-        title: '運輸署宣布巴士路線重組計劃，優化公共交通服務',
-        guid: 'mock_news_007',
-        link: 'https://news.rthk.hk/rthk/tc/component/k2/1689240-20241227.htm',
-        pubDate: now.subtract(const Duration(hours: 1, minutes: 15)),
-        formattedTime: '${(now.hour - 1).toString().padLeft(2, '0')}:${(now.minute - 15).toString().padLeft(2, '0')}',
-      ),
-      RthkNewsModel(
-        title: '房屋署公布居屋新申請安排，預計下半年推售新項目',
-        guid: 'mock_news_008',
-        link: 'https://news.rthk.hk/rthk/tc/component/k2/1689241-20241227.htm',
-        pubDate: now.subtract(const Duration(hours: 1, minutes: 25)),
-        formattedTime: '${(now.hour - 1).toString().padLeft(2, '0')}:${(now.minute - 25).toString().padLeft(2, '0')}',
-      ),
-      RthkNewsModel(
-        title: '創新科技署推出科技券升級版，加強對中小企支援',
-        guid: 'mock_news_009',
-        link: 'https://news.rthk.hk/rthk/tc/component/k2/1689242-20241227.htm',
-        pubDate: now.subtract(const Duration(hours: 1, minutes: 35)),
-        formattedTime: '${(now.hour - 1).toString().padLeft(2, '0')}:${(now.minute - 35).toString().padLeft(2, '0')}',
-      ),
-      RthkNewsModel(
-        title: '衞生署提醒市民注意流感高峰期，籲及時接種疫苗',
-        guid: 'mock_news_010',
-        link: 'https://news.rthk.hk/rthk/tc/component/k2/1689243-20241227.htm',
-        pubDate: now.subtract(const Duration(hours: 2, minutes: 10)),
-        formattedTime: '${(now.hour - 2).toString().padLeft(2, '0')}:${(now.minute - 10).toString().padLeft(2, '0')}',
-      ),
-    ];
-    
-    _lastUpdateTime = now;
-    _hasError = false;
-    _errorMessage = '';
-    
-    _logger.i('📱 已加載 ${_newsList.length} 條模擬新聞數據');
-    
-    // 保存到本地存储
-    _saveToLocalStorage();
-    
-    notifyListeners();
   }
 
   @override
