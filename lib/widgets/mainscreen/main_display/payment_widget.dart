@@ -1,4 +1,4 @@
-// import 'dart:async'; // 22, 暫時注釋掉因為功能被注釋
+import 'dart:async'; // 22, 用於Timer無操作計時器
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:logger/logger.dart';
@@ -8,7 +8,9 @@ import 'package:iboard_app/providers/app_data_provider.dart';
 import 'package:iboard_app/models/payment_model.dart';
 
 class PaymentWidget extends StatefulWidget {
-  const PaymentWidget({super.key});
+  final VoidCallback? onIdleTimeout; // 20, 無操作超時回調
+  
+  const PaymentWidget({super.key, this.onIdleTimeout});
 
   @override
   State<PaymentWidget> createState() => _PaymentWidgetState();
@@ -20,17 +22,26 @@ class _PaymentWidgetState extends State<PaymentWidget> {
   String? _selectedFloor;
   String? _selectedUnit;
   PaymentMethod? _selectedPaymentMethod;
+  
+  // 21, 無操作計時器相關
+  Timer? _idleTimer;
+  static const _idleTimeout = Duration(seconds: 100); // 100秒無操作超時
   // 14, 暫時注釋掉開發中訊息變數
   // bool _showDevelopmentMessage = false; // 是否顯示開發中訊息
 
   @override
   void initState() {
     super.initState();
+    // 22, 啟動無操作計時器
+    _startIdleTimer();
+    
     WidgetsBinding.instance.addPostFrameCallback((_) {
       // 進入時清空殘留的購物車與支付方式
       try {
         final notifier = context.read<PaymentNotifier>();
         notifier.clearCart();
+        // 18, 重置支付狀態，清除之前的二維碼和成功信息
+        notifier.resetPayment();
       } catch (_) {}
       setState(() {
         _selectedPaymentMethod = null;
@@ -63,6 +74,10 @@ class _PaymentWidgetState extends State<PaymentWidget> {
 
   @override
   void dispose() {
+    // 23, 清理無操作計時器
+    _idleTimer?.cancel();
+    _idleTimer = null;
+    
     //1, 退出電子繳費時清空賬單與支付方式，避免下方UI殘留
     try {
       final notifier = context.read<PaymentNotifier>();
@@ -73,6 +88,21 @@ class _PaymentWidgetState extends State<PaymentWidget> {
     _selectedFloor = null;
     _selectedUnit = null;
     super.dispose();
+  }
+  
+  /// 24, 啟動無操作計時器
+  void _startIdleTimer() {
+    _idleTimer?.cancel();
+    _idleTimer = Timer(_idleTimeout, () {
+      debugPrint('⏰ [PaymentWidget] 100秒無操作，自動返回輪播');
+      // 調用回調返回輪播
+      widget.onIdleTimeout?.call();
+    });
+  }
+  
+  /// 25, 重置無操作計時器（用戶有交互時調用）
+  void _resetIdleTimer() {
+    _startIdleTimer();
   }
 
   /// 1, 使用登录后的 ismartId 初始化支付流程
@@ -106,109 +136,283 @@ class _PaymentWidgetState extends State<PaymentWidget> {
 
   @override
   Widget build(BuildContext context) {
-    // 19, 暫時注釋掉所有電子繳費功能，只顯示背景圖
-    return _buildPaymentNotAvailablePage();
+    // 23, 啟用樓層和單位選擇功能
+    // 26, 包裹Listener檢測任何用戶交互
+    return Listener(
+      onPointerDown: (_) => _resetIdleTimer(),
+      onPointerMove: (_) => _resetIdleTimer(),
+      child: Consumer<PaymentNotifier>(
+      builder: (context, paymentNotifier, child) {
+        final paymentState = paymentNotifier.state;
 
-    // 20, 註釋掉的完整電子繳費功能邏輯
-    // return Consumer<PaymentNotifier>(
-    //   builder: (context, paymentNotifier, child) {
-    //     final paymentState = paymentNotifier.state;
+        // 根據載入狀態決定顯示內容
+        if (paymentState.isLoading && paymentState.paymentConfig == null) {
+          return Container(
+            padding: const EdgeInsets.fromLTRB(16.0, 20.0, 16.0, 20.0),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const CircularProgressIndicator(),
+                const SizedBox(height: 16),
+                const Text('正在初始化電子繳費...'),
+                const SizedBox(height: 32),
+                ElevatedButton(
+                  onPressed: _initializePaymentWithBuildingId,
+                  child: const Text('開始使用電子繳費'),
+                ),
+              ],
+            ),
+          );
+        }
 
-    //     // 根據載入狀態決定顯示內容
-    //     if (paymentState.isLoading && paymentState.paymentConfig == null) {
-    //       return Container(
-    //         padding: const EdgeInsets.fromLTRB(16.0, 20.0, 16.0, 20.0),
-    //         child: Column(
-    //           mainAxisAlignment: MainAxisAlignment.center,
-    //           children: [
-    //             const CircularProgressIndicator(),
-    //             const SizedBox(height: 16),
-    //             const Text('正在初始化電子繳費...'),
-    //             const SizedBox(height: 32),
-    //             ElevatedButton(
-    //               onPressed: _initializePaymentWithBuildingId,
-    //               child: const Text('開始使用電子繳費'),
-    //             ),
-    //           ],
-    //         ),
-    //       );
-    //     }
+        // 24, 如果支付配置為空或支付方式為空，但有單位數據，仍顯示選擇器
+        if (paymentState.paymentConfig == null || 
+            (paymentState.paymentConfig?.enabledMethods.isEmpty ?? true)) {
+          // 如果沒有單位數據，顯示背景圖
+          if (paymentState.units.isEmpty) {
+            return _buildPaymentNotAvailablePage();
+          }
+          
+          // 有單位數據，顯示選擇器但不顯示支付功能
+          return Container(
+            padding: const EdgeInsets.fromLTRB(16.0, 20.0, 16.0, 20.0),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(
+                  child: SingleChildScrollView(
+                    child: Column(
+                      children: [
+                        // 選擇器容器
+                        _buildPaymentSelectorContainer(paymentNotifier, paymentState),
+                        const SizedBox(height: 16),
+                        
+                        // 如果選擇了單位且有賬單，顯示賬單信息但不允許選擇
+                        if (_selectedUnit != null && paymentState.bills.isNotEmpty) ...[
+                          _buildBillInfoContainer(paymentNotifier, paymentState),
+                          const SizedBox(height: 16),
+                        ],
+                        
+                        // 顯示支付功能不可用提示
+                        _buildPaymentUnavailableNotice(),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          );
+        }
 
-    //     // 如果有錯誤或沒有支付配置，顯示背景圖頁面
-    //     if (paymentState.errorMessage != null ||
-    //         paymentState.paymentConfig == null) {
-    //       return _buildPaymentNotAvailablePage();
-    //     }
+        // 正常的支付流程UI
+        return Container(
+          padding: const EdgeInsets.fromLTRB(16.0, 20.0, 16.0, 20.0),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                child: SingleChildScrollView(
+                  child: Column(
+                    children: [
+                      // 選擇器容器
+                      _buildPaymentSelectorContainer(paymentNotifier, paymentState),
 
-    //     // 正常的支付流程UI
-    //     return Container(
-    //       padding: const EdgeInsets.fromLTRB(16.0, 20.0, 16.0, 20.0),
-    //       child: Column(
-    //         crossAxisAlignment: CrossAxisAlignment.start,
-    //         children: [
-    //           Expanded(
-    //             child: SingleChildScrollView(
-    //               child: Column(
-    //                 children: [
-    //                   // 選擇器容器
-    //                   _buildPaymentSelectorContainer(
-    //                       paymentNotifier, paymentState),
+                      const SizedBox(height: 16),
 
-    //                   const SizedBox(height: 16),
+                      // 如果選擇了單位且有賬單，顯示賬單選擇
+                      if (_selectedUnit != null && paymentState.bills.isNotEmpty) ...[
+                        _buildBillSelectionContainer(paymentNotifier, paymentState),
+                        const SizedBox(height: 16),
+                      ],
 
-    //                   // 如果選擇了單位且有賬單，顯示賬單選擇
-    //                   if (_selectedUnit != null &&
-    //                       paymentState.bills.isNotEmpty) ...[
-    //                     _buildBillSelectionContainer(
-    //                         paymentNotifier, paymentState),
-    //                     const SizedBox(height: 16),
-    //                   ],
+                      // 如果有選中的賬單，顯示支付方式選擇
+                      if (paymentState.selectedBills.isNotEmpty) ...[
+                        _buildPaymentMethodContainer(paymentNotifier, paymentState),
+                        const SizedBox(height: 16),
+                      ],
 
-    //                   // 如果有選中的賬單，顯示支付方式選擇
-    //                   if (paymentState.selectedBills.isNotEmpty) ...[
-    //                     _buildPaymentMethodContainer(
-    //                         paymentNotifier, paymentState),
-    //                     const SizedBox(height: 16),
-    //                   ],
+                      // 如果選擇了支付方式，顯示費用計算
+                      if (_selectedPaymentMethod != null && 
+                          paymentState.selectedBills.isNotEmpty) ...[
+                        _buildAmountCalculationContainer(paymentNotifier, paymentState),
+                        const SizedBox(height: 16),
+                      ],
 
-    //                   // 如果選擇了支付方式，顯示費用計算
-    //                   if (_selectedPaymentMethod != null &&
-    //                       paymentState.selectedBills.isNotEmpty) ...[
-    //                     _buildAmountCalculationContainer(
-    //                         paymentNotifier, paymentState),
-    //                     const SizedBox(height: 16),
-    //                   ],
+                      // 結賬按鈕
+                      if (paymentState.selectedBills.isNotEmpty)
+                        _buildCheckoutButton(paymentNotifier, paymentState),
 
-    //                   // 結賬按鈕
-    //                   if (paymentState.selectedBills.isNotEmpty)
-    //                     _buildCheckoutButton(paymentNotifier, paymentState),
+                      const SizedBox(height: 16),
 
-    //                   const SizedBox(height: 16),
+                      // 支付處理狀態
+                      if (paymentState.status == PaymentStatus.processing)
+                        _buildPaymentProcessingContainer(paymentNotifier, paymentState),
 
-    //                   // 18, 開發中訊息狀態
-    //                   if (_showDevelopmentMessage) ...[
-    //                     _buildDevelopmentMessageContainer(),
-    //                     const SizedBox(height: 16),
-    //                   ],
+                      // 支付成功狀態
+                      if (paymentState.status == PaymentStatus.success)
+                        _buildPaymentSuccessContainer(paymentNotifier, paymentState),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+      ), // 27, 關閉Listener
+    );
+  }
 
-    //                   // 支付處理狀態
-    //                   if (paymentState.status == PaymentStatus.processing)
-    //                     _buildPaymentProcessingContainer(
-    //                         paymentNotifier, paymentState),
+  /// 25, 構建賬單信息容器（只顯示，不允許選擇）
+  Widget _buildBillInfoContainer(
+      PaymentNotifier paymentNotifier, PaymentState paymentState) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            '該單位的待繳費賬單',
+            style: TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.w600,
+              color: Colors.black87,
+            ),
+          ),
+          const SizedBox(height: 12),
+          if (paymentState.bills.isEmpty) ...[
+            const Center(
+              child: Text(
+                '暫無待繳費賬單',
+                style: TextStyle(
+                  fontSize: 14,
+                  color: Colors.grey,
+                ),
+              ),
+            ),
+          ] else ...[
+            ...paymentState.bills
+                .map((bill) => _buildBillInfoItem(bill)),
+          ],
+        ],
+      ),
+    );
+  }
 
-    //                   // 支付成功狀態
-    //                   if (paymentState.status == PaymentStatus.success)
-    //                     _buildPaymentSuccessContainer(
-    //                         paymentNotifier, paymentState),
-    //                 ],
-    //               ),
-    //             ),
-    //           ),
-    //         ],
-    //       ),
-    //     );
-    //   },
-    // );
+  /// 26, 構建賬單信息項目（只顯示）
+  Widget _buildBillInfoItem(PaymentBill bill) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 8),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Colors.grey.shade50,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: Colors.grey.shade200),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Expanded(
+                child: Text(
+                  bill.itemId,
+                  style: const TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w500,
+                    color: Colors.black87,
+                  ),
+                ),
+              ),
+              Text(
+                'HK\$${bill.netAmount.toStringAsFixed(2)}',
+                style: const TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.red,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 4),
+          Text(
+            '期間：${bill.trsTo}',
+            style: TextStyle(
+              fontSize: 12,
+              color: Colors.grey.shade600,
+            ),
+          ),
+          Text(
+            '發票號：${bill.invoiceNo}',
+            style: TextStyle(
+              fontSize: 12,
+              color: Colors.grey.shade600,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// 27, 構建支付功能不可用提示
+  Widget _buildPaymentUnavailableNotice() {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.orange.shade50,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.orange.shade200),
+      ),
+      child: Column(
+        children: [
+          Icon(
+            Icons.info_outline,
+            color: Colors.orange.shade600,
+            size: 48,
+          ),
+          const SizedBox(height: 16),
+          Text(
+            '支付功能暫未開通',
+            style: TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.bold,
+              color: Colors.orange.shade800,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'Payment Feature Not Available',
+            style: TextStyle(
+              fontSize: 14,
+              color: Colors.orange.shade700,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            '該大廈尚未開通微信/支付寶支付功能',
+            style: TextStyle(
+              fontSize: 12,
+              color: Colors.orange.shade600,
+            ),
+            textAlign: TextAlign.center,
+          ),
+        ],
+      ),
+    );
   }
 
   /// 2, 構建支付選擇器容器
@@ -703,6 +907,8 @@ class _PaymentWidgetState extends State<PaymentWidget> {
                   PaymentMethod.wechat, '微信支付', paymentState.paymentConfig),
               _buildPaymentMethodOption(
                   PaymentMethod.alipay, '支付寶', paymentState.paymentConfig),
+              _buildPaymentMethodOption(
+                  PaymentMethod.unionpay, '雲閃付', paymentState.paymentConfig),
             ],
           ),
         ],
@@ -745,7 +951,11 @@ class _PaymentWidgetState extends State<PaymentWidget> {
               mainAxisSize: MainAxisSize.min,
               children: [
                 Icon(
-                  method == PaymentMethod.wechat ? Icons.wechat : Icons.payment,
+                  method == PaymentMethod.wechat 
+                      ? Icons.wechat 
+                      : method == PaymentMethod.unionpay 
+                          ? Icons.credit_card 
+                          : Icons.payment,
                   color: isSelected ? Colors.white : Colors.black87,
                   size: 20,
                 ),
@@ -766,7 +976,7 @@ class _PaymentWidgetState extends State<PaymentWidget> {
     );
   }
 
-  /// 12, 構建金額計算容器
+  /// 11, 構建金額計算容器
   Widget _buildAmountCalculationContainer(
       PaymentNotifier paymentNotifier, PaymentState paymentState) {
     final billAmount = paymentNotifier.cartTotalAmount;
@@ -845,7 +1055,7 @@ class _PaymentWidgetState extends State<PaymentWidget> {
     );
   }
 
-  /// 13, 構建結賬按鈕
+  /// 12, 構建結賬按鈕
   Widget _buildCheckoutButton(
       PaymentNotifier paymentNotifier, PaymentState paymentState) {
     final canCheckout =
@@ -877,10 +1087,27 @@ class _PaymentWidgetState extends State<PaymentWidget> {
     );
   }
 
-  /// 14, 處理結賬 (暫時注釋掉，因為只顯示背景圖)
+  /// 13, 處理結賬
   void _handleCheckout(PaymentNotifier paymentNotifier) {
-    // 21, 由於功能被注釋，這個方法暫時不執行任何操作
-    return;
+    // 28, 啟用實際支付功能
+    if (_selectedPaymentMethod == null) return;
+    
+    switch (_selectedPaymentMethod!) {
+      case PaymentMethod.wechat:
+        paymentNotifier.createWechatPayment(
+            selectedBills: paymentNotifier.state.selectedBills);
+        break;
+      case PaymentMethod.alipay:
+        paymentNotifier.createAlipayPayment(
+            selectedBills: paymentNotifier.state.selectedBills);
+        break;
+      case PaymentMethod.unionpay:
+        paymentNotifier.createUnionpayPayment(
+            selectedBills: paymentNotifier.state.selectedBills);
+        break;
+      default:
+        break;
+    }
 
     // 15, 顯示開發中訊息而不執行實際支付 (已注釋)
     // if (_selectedPaymentMethod == null) return;
@@ -912,7 +1139,7 @@ class _PaymentWidgetState extends State<PaymentWidget> {
     // }
   }
 
-  /// 15, 構建開發中訊息容器
+  /// 14, 構建開發中訊息容器
   Widget _buildDevelopmentMessageContainer() {
     return Container(
       width: double.infinity,
@@ -959,9 +1186,12 @@ class _PaymentWidgetState extends State<PaymentWidget> {
     );
   }
 
-  /// 16, 構建支付處理容器
+  /// 15, 構建支付處理容器
   Widget _buildPaymentProcessingContainer(
       PaymentNotifier paymentNotifier, PaymentState paymentState) {
+    // 17, 如果已經有二維碼，只顯示二維碼，不顯示處理中狀態
+    final hasQrCode = paymentState.paymentResponse?.qrCode != null;
+    
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(16),
@@ -978,23 +1208,46 @@ class _PaymentWidgetState extends State<PaymentWidget> {
       ),
       child: Column(
         children: [
-          const CircularProgressIndicator(),
-          const SizedBox(height: 16),
-          const Text(
-            '正在處理支付...',
-            style: TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.w500,
+          if (hasQrCode) ...[
+            // 只顯示二維碼，不顯示處理中的加載動畫
+            const Text(
+              '請掃描二維碼完成支付',
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.w500,
+              ),
             ),
-          ),
-          if (paymentState.paymentResponse?.qrCode != null) ...[
-            const SizedBox(height: 16),
-            const Text('請掃描二維碼完成支付'),
             const SizedBox(height: 16),
             QrImageView(
               data: paymentState.paymentResponse!.qrCode!,
               version: QrVersions.auto,
               size: 200.0,
+            ),
+            const SizedBox(height: 16),
+            ElevatedButton(
+              onPressed: () {
+                // 19, 取消支付並重置所有選擇
+                paymentNotifier.cancelPayment();
+                setState(() {
+                  _selectedPaymentMethod = null;
+                });
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.grey,
+                foregroundColor: Colors.white,
+              ),
+              child: const Text('取消支付'),
+            ),
+          ] else ...[
+            // 沒有二維碼時顯示處理中狀態
+            const CircularProgressIndicator(),
+            const SizedBox(height: 16),
+            const Text(
+              '正在創建訂單...',
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.w500,
+              ),
             ),
           ],
         ],
@@ -1038,16 +1291,40 @@ class _PaymentWidgetState extends State<PaymentWidget> {
             ),
           ),
           const SizedBox(height: 16),
-          ElevatedButton.icon(
-            onPressed: () {
-              // 這裡可以添加打印小票的邏輯
-            },
-            icon: const Icon(Icons.print),
-            label: const Text('打印小票'),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Theme.of(context).colorScheme.primary,
-              foregroundColor: Colors.white,
-            ),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              ElevatedButton.icon(
+                onPressed: () {
+                  // 這裡可以添加打印小票的邏輯
+                },
+                icon: const Icon(Icons.print),
+                label: const Text('打印小票'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Theme.of(context).colorScheme.primary,
+                  foregroundColor: Colors.white,
+                ),
+              ),
+              const SizedBox(width: 16),
+              ElevatedButton.icon(
+                onPressed: () {
+                  // 18, 重置支付狀態，返回初始頁面
+                  paymentNotifier.resetPayment();
+                  setState(() {
+                    _selectedPaymentMethod = null;
+                    _selectedBlock = null;
+                    _selectedFloor = null;
+                    _selectedUnit = null;
+                  });
+                },
+                icon: const Icon(Icons.check),
+                label: const Text('完成'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.green,
+                  foregroundColor: Colors.white,
+                ),
+              ),
+            ],
           ),
         ],
       ),

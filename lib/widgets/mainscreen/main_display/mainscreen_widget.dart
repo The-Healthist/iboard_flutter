@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:iboard_app/models/announcement_model.dart';
 import 'package:iboard_app/providers/announcement_provider.dart';
+import 'package:iboard_app/providers/announcement_carousel_provider.dart';
 import 'package:iboard_app/providers/arrear_provider.dart';
+import 'package:iboard_app/providers/state_provider.dart';
 import 'package:iboard_app/widgets/mainscreen/main_display/payment_widget.dart';
 import 'package:provider/provider.dart';
 import 'package:logger/logger.dart';
@@ -57,6 +59,18 @@ class MainScreenWidgetState extends State<MainScreenWidget> {
       }
     });
   }
+  
+  @override
+  void dispose() {
+    // 33, 清理時確保恢復輪播狀態
+    try {
+      final carouselStateProvider = context.read<CarouselStateProvider>();
+      if (carouselStateProvider.currentAppState == AppState.manualOperation) {
+        carouselStateProvider.enterDefaultState();
+      }
+    } catch (_) {}
+    super.dispose();
+  }
 
   ///1, 構建功能按鈕
   Widget _buildFunctionButton(
@@ -74,8 +88,19 @@ class MainScreenWidgetState extends State<MainScreenWidget> {
                 _selectedFunction = chineseTitle;
               });
 
+              // 29, 處理功能按鈕點擊，電子繳費需要暫停輪播
+              if (chineseTitle == '電子繳費') {
+                _logger.i('🔵 [MainScreenWidget] 用戶點擊電子繳費按鈕 - 進入手動操作狀態（禁用超時）');
+                final carouselStateProvider = context.read<CarouselStateProvider>();
+                carouselStateProvider.enterManualOperation(disableTimeout: true);
+              } else if (chineseTitle == '通告列表') {
+                // 30, 返回通告列表時恢復輪播
+                _logger.i('🔵 [MainScreenWidget] 用戶點擊通告列表 - 恢復默認狀態');
+                final carouselStateProvider = context.read<CarouselStateProvider>();
+                carouselStateProvider.enterDefaultState();
+              }
               // 处理功能按钮点击
-              if (chineseTitle == '欠費查詢') {
+              else if (chineseTitle == '欠費查詢') {
                 _logger.i('🔵 [MainScreenWidget] 用戶點擊欠費查詢按鈕 - 在右側顯示');
                 // 不再调用回调函数，直接在右侧显示欠费查询内容
                 // widget.onAnnouncementTap?.call(null); // 注释掉原有逻辑
@@ -188,7 +213,60 @@ class MainScreenWidgetState extends State<MainScreenWidget> {
 
   ///3, 構建電子繳費頁面
   Widget _buildElectronicPaymentPage() {
-    return const PaymentWidget();
+    return PaymentWidget(
+      onIdleTimeout: () {
+        // 28, 無操作超時，恢復輪播（自動切換到通告和繳費列表）
+        debugPrint('⏰ [MainScreenWidget] 電子繳費頁面無操作超時，恢復通告輪播');
+        if (mounted) {
+          final carouselStateProvider = context.read<CarouselStateProvider>();
+          final announcementCarouselProvider = context.read<AnnouncementCarouselProvider>();
+          
+          // 39, 模仿 _enterAnnouncementCarouselMode 的邏輯恢復輪播
+          try {
+            final noticeStayDuration = carouselStateProvider.noticeStayDuration;
+            
+            debugPrint('📊 [MainScreenWidget] 開始恢復輪播，noticeStayDuration=$noticeStayDuration');
+            
+            // 1. 檢查是否在獨立通告模式
+            final isInIndependentMode = announcementCarouselProvider.isInIndependentAnnouncementMode;
+            debugPrint('📊 [MainScreenWidget] 獨立通告模式: $isInIndependentMode');
+            
+            if (isInIndependentMode) {
+              // 退出獨立通告模式
+              announcementCarouselProvider.exitIndependentAnnouncementMode();
+            }
+            
+            // 2. 確保輪播不是暫停狀態
+            announcementCarouselProvider.updateCarouselPauseState(false);
+            
+            // 3. 恢復輪播
+            final hasContent = announcementCarouselProvider.hasCarouselContent;
+            debugPrint('📊 [MainScreenWidget] hasCarouselContent=$hasContent');
+            
+            if (hasContent) {
+              announcementCarouselProvider.resumeMidCarousel(
+                noticeStayDuration,
+                forceJumpToIndex: false,
+                isFromManualOperation: true,
+              );
+              debugPrint('✅ [MainScreenWidget] 已調用 resumeMidCarousel');
+            }
+            
+            // 4. 恢復到默認狀態（這會啟動默認狀態計時器）
+            carouselStateProvider.enterDefaultState();
+            debugPrint('✅ [MainScreenWidget] 已恢復到默認狀態');
+            
+          } catch (e) {
+            debugPrint('⚠️ [MainScreenWidget] 恢復通告輪播失敗: $e');
+          }
+          
+          // 32, 重置本地選擇狀態
+          setState(() {
+            _selectedFunction = '通告列表';
+          });
+        }
+      },
+    );
   }
 
   ///4, 構建欠費查詢內容

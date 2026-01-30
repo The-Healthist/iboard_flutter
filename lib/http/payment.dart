@@ -2332,6 +2332,44 @@ class PaymentClient {
     }
   }
 
+  /// 20.1, 創建雲閃付支付請求
+  /// 用於生成雲閃付支付二維碼或支付鏈接
+  Future<Map<String, dynamic>> createUnionpayPayment({
+    required String buildingId,
+    required String unitId,
+    required double amount,
+    required List<Map<String, dynamic>> bills,
+    String? remark,
+  }) async {
+    const String endpoint = '$_baseUrl/pos/create-unionpay-payment';
+    final Uri url = Uri.parse(endpoint);
+    final Map<String, dynamic> requestBody = {
+      'building_id': buildingId,
+      'unit_id': unitId,
+      'amount': amount.toStringAsFixed(2),
+      'payment_method': 'UNIONPAY',
+      'bills': bills,
+      if (remark != null) 'remark': remark,
+    };
+
+    _logger.i('💳 創建雲閃付支付請求，單位ID: $unitId, 金額: $amount');
+
+    try {
+      final response = await http
+          .post(
+            url,
+            headers: {'Content-Type': 'application/json'},
+            body: json.encode(requestBody),
+          )
+          .timeout(_requestTimeout);
+
+      return _handleResponse(response, '創建雲閃付支付請求');
+    } catch (e) {
+      _logger.e('❌ 創建雲閃付支付請求失敗: $e');
+      rethrow;
+    }
+  }
+
   /// 21, 查詢支付狀態
   /// 用於輪詢檢查支付是否完成
   Future<Map<String, dynamic>> queryPaymentStatus({

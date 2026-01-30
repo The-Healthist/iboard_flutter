@@ -204,6 +204,9 @@ class CarouselStateProvider extends ChangeNotifier {
   bool _isTopMediaPaused = false; // 頂部廣告媒體暫停狀態
   bool _isMiddleMediaPaused = false; // 中部通告媒體暫停狀態
   bool _isBottomMediaPaused = false; // 底部區域媒體暫停狀態（包括天气和二维码轮播）
+  
+  // 35, 禁用手動操作超時標誌（用於電子繳費等需要長時間停留的頁面）
+  bool _disableManualOperationTimeout = false;
 
   // 時間配置（從服務器獲取，帶默認值）
   Settings? _settings;
@@ -393,7 +396,11 @@ class CarouselStateProvider extends ChangeNotifier {
   }
 
   ///5， 切換到手動操作狀態
-  void enterManualOperation() {
+  void enterManualOperation({bool disableTimeout = false}) {
+    // 36, 設置是否禁用超時
+    _disableManualOperationTimeout = disableTimeout;
+    debugPrint('[StateProvider] 🔒 手動操作超時禁用: $_disableManualOperationTimeout');
+    
     if (_currentState.canTransitionTo(AppState.manualOperation)) {
       // 🔧 修复：设置状态切换标志，防止竞争条件
       _isStateTransitioning = true;
@@ -453,6 +460,10 @@ class CarouselStateProvider extends ChangeNotifier {
 
   ///6， 切換到默認狀態
   Future<void> enterDefaultState() async {
+    // 37, 恢复默認狀態時重置超時禁用標誌
+    _disableManualOperationTimeout = false;
+    debugPrint('[StateProvider] 🔓 重置手動操作超時禁用');
+    
     if (_currentState.canTransitionTo(AppState.defaultState)) {
       // 🔧 修复：设置状态切换标志，防止竞争条件
       _isStateTransitioning = true;
@@ -610,6 +621,13 @@ class CarouselStateProvider extends ChangeNotifier {
   ///9， 啟動手動操作計時器（使用配置的手動操作超時時間）
   void _startManualOperationTimer() {
     _manualOperationTimer?.cancel();
+    
+    // 38, 如果禁用了超時，則不啟動計時器
+    if (_disableManualOperationTimeout) {
+      debugPrint('[StateProvider] ⏸️ 手動操作超時已禁用，不啟動計時器');
+      return;
+    }
+    
     final duration = Duration(seconds: normalToAnnouncementCarouselDuration);
     _manualOperationTimer = Timer(duration, () {
       if (_currentState.currentAppState == AppState.manualOperation) {
