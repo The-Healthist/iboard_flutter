@@ -576,6 +576,20 @@ class CarouselStateProvider extends ChangeNotifier {
     debugPrint('[StateProvider] 🏁 _enterAnnouncementCarouselMode方法执行完成');
   }
 
+  ///6b， 從手動操作狀態恢復到默認狀態（公開方法，用於電子繳費等頁面的無操作超時恢復）
+  void exitManualOperationToDefault() {
+    debugPrint('[StateProvider] 🔄 從手動操作狀態恢復到默認狀態');
+    
+    // 39, 恢复默認狀態時重置超時禁用標誌
+    _disableManualOperationTimeout = false;
+    
+    if (_currentState.currentAppState == AppState.manualOperation) {
+      _enterAnnouncementCarouselMode();
+    } else {
+      debugPrint('[StateProvider] ⚠️ 當前不在手動操作狀態，無需恢復');
+    }
+  }
+
   ///7， 用戶交互更新（重置手動操作計時器）
   void onUserInteraction() {
     final now = DateTime.now();

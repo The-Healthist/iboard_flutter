@@ -9,13 +9,14 @@ import 'package:flutter/foundation.dart';
 // 支付API配置類
 class PaymentApiConfig {
   static const String baseUrl = 'https://ts-api-pay.gnete.com.hk';
-  static const String mchNo = 'M1717387055';
+  static const String mchNo = 'M1717387055';  // 微信、支付寶商戶號
   
   // 微信/支付宝支付配置 - 公众号 | 二维码（C2B）
   static const String wechatAlipayAppId = '66612abb2dd17b1e0797a37d';
   static const String wechatAlipayAppSecret = '5YuFyUGJxcr7CvO1FOTfRGBzWhtWhBcI0tTV2RpibqnIS3piA1Wqm1bsvO5RImRGoxU8h49hV47yCdwSDINYi2S88kr1JerBODTomglWMC5nTlawLiJXas6KKQhvnaSa';
   
   // 银联支付配置 - 云闪付二维码（C2B）
+  static const String unionPayMchNo = 'M1720165806';  // 雲閃付專用商戶號
   static const String unionPayQrAppId = '6698cb04bf8623b8bc814381';
   static const String unionPayQrAppSecret = 'ezYUR5kGA38MtkxJaPLPG4qsComzxxmiFG2tS9MJ2awhndOzIXqCAxjMtmfxfl0N8QzuKeRuS3tZr58pThHmjje62Glu2KbuPfqPn3qNIO6GiX4Rhju5AcdHRc6YUoOu';
   
@@ -1189,10 +1190,10 @@ class ApiClient {
       final reqTime = DateTime.now().millisecondsSinceEpoch;  // 13位毫秒時間戳
       
       final params = <String, dynamic>{
-        'mchNo': PaymentApiConfig.mchNo,
+        'mchNo': PaymentApiConfig.unionPayMchNo,  // 使用雲閃付專用商戶號
         'appId': PaymentApiConfig.unionPayQrAppId,
         'mchOrderNo': orderNo,
-        'wayCode': 'UP_QR',  // 銀聯二維碼支付
+        'wayCode': 'YSF_QR',  // 云闪付二维码支付
         'amount': (amount * 100).toInt(),  // 轉為分，使用int類型
         'currency': 'HKD',
         'subject': subject,
@@ -1241,6 +1242,7 @@ class ApiClient {
   /// 25, 查詢支付狀態
   Future<Map<String, dynamic>> queryPaymentStatus({
     required String orderNo,
+    String? paymentMethod,  // 添加支付方式參數
   }) async {
     try {
       final String endpoint = '/api/pay/query';
@@ -1248,9 +1250,24 @@ class ApiClient {
       
       final reqTime = DateTime.now().millisecondsSinceEpoch;
       
+      // 44, 根據支付方式選擇對應的商戶號和appId
+      String mchNo;
+      String appId;
+      String appSecret;
+      
+      if (paymentMethod == 'unionpay') {
+        mchNo = PaymentApiConfig.unionPayMchNo;
+        appId = PaymentApiConfig.unionPayQrAppId;
+        appSecret = PaymentApiConfig.unionPayQrAppSecret;
+      } else {
+        mchNo = PaymentApiConfig.mchNo;
+        appId = PaymentApiConfig.wechatAlipayAppId;
+        appSecret = PaymentApiConfig.wechatAlipayAppSecret;
+      }
+      
       final params = <String, dynamic>{
-        'mchNo': PaymentApiConfig.mchNo,
-        'appId': PaymentApiConfig.wechatAlipayAppId,
+        'mchNo': mchNo,
+        'appId': appId,
         'mchOrderNo': orderNo,
         'reqTime': reqTime,
         'version': '1.0',
@@ -1258,7 +1275,7 @@ class ApiClient {
       };
 
       // 生成簽名
-      final signature = _generatePaymentSign(params, PaymentApiConfig.wechatAlipayAppSecret);
+      final signature = _generatePaymentSign(params, appSecret);
       params['sign'] = signature;
 
       _logger.i('🔍 [支付查詢] 訂單號: $orderNo');

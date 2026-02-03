@@ -219,43 +219,12 @@ class MainScreenWidgetState extends State<MainScreenWidget> {
         debugPrint('⏰ [MainScreenWidget] 電子繳費頁面無操作超時，恢復通告輪播');
         if (mounted) {
           final carouselStateProvider = context.read<CarouselStateProvider>();
-          final announcementCarouselProvider = context.read<AnnouncementCarouselProvider>();
           
-          // 39, 模仿 _enterAnnouncementCarouselMode 的邏輯恢復輪播
+          // 40, 使用專門的方法從手動操作狀態恢復到默認狀態
+          // 這個方法會正確處理輪播恢復、全屏廣告計時器啟動等邏輯
           try {
-            final noticeStayDuration = carouselStateProvider.noticeStayDuration;
-            
-            debugPrint('📊 [MainScreenWidget] 開始恢復輪播，noticeStayDuration=$noticeStayDuration');
-            
-            // 1. 檢查是否在獨立通告模式
-            final isInIndependentMode = announcementCarouselProvider.isInIndependentAnnouncementMode;
-            debugPrint('📊 [MainScreenWidget] 獨立通告模式: $isInIndependentMode');
-            
-            if (isInIndependentMode) {
-              // 退出獨立通告模式
-              announcementCarouselProvider.exitIndependentAnnouncementMode();
-            }
-            
-            // 2. 確保輪播不是暫停狀態
-            announcementCarouselProvider.updateCarouselPauseState(false);
-            
-            // 3. 恢復輪播
-            final hasContent = announcementCarouselProvider.hasCarouselContent;
-            debugPrint('📊 [MainScreenWidget] hasCarouselContent=$hasContent');
-            
-            if (hasContent) {
-              announcementCarouselProvider.resumeMidCarousel(
-                noticeStayDuration,
-                forceJumpToIndex: false,
-                isFromManualOperation: true,
-              );
-              debugPrint('✅ [MainScreenWidget] 已調用 resumeMidCarousel');
-            }
-            
-            // 4. 恢復到默認狀態（這會啟動默認狀態計時器）
-            carouselStateProvider.enterDefaultState();
-            debugPrint('✅ [MainScreenWidget] 已恢復到默認狀態');
-            
+            carouselStateProvider.exitManualOperationToDefault();
+            debugPrint('✅ [MainScreenWidget] 已調用 exitManualOperationToDefault');
           } catch (e) {
             debugPrint('⚠️ [MainScreenWidget] 恢復通告輪播失敗: $e');
           }
