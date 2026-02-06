@@ -8,23 +8,37 @@ import 'package:flutter/foundation.dart';
 
 // 支付API配置類
 class PaymentApiConfig {
-  static const String baseUrl = 'https://ts-api-pay.gnete.com.hk';
-  static const String mchNo = 'M1717387055';  // 微信、支付寶商戶號
+  // ============ 生產環境配置 ============
+  static const String baseUrl = 'https://api-pay.gnete.com.hk';
+  static const String mchNo = 'M1767163761';  // 生產環境商戶號
   
-  // 微信/支付宝支付配置 - 公众号 | 二维码（C2B）
-  static const String wechatAlipayAppId = '66612abb2dd17b1e0797a37d';
-  static const String wechatAlipayAppSecret = '5YuFyUGJxcr7CvO1FOTfRGBzWhtWhBcI0tTV2RpibqnIS3piA1Wqm1bsvO5RImRGoxU8h49hV47yCdwSDINYi2S88kr1JerBODTomglWMC5nTlawLiJXas6KKQhvnaSa';
+  // 微信/支付宝/云闪付支付配置 - 二维码（C2B）- 生產環境統一配置
+  static const String wechatAlipayAppId = '6954c771e4b012d6d79a6a08';
+  static const String wechatAlipayAppSecret = '2fSsOWIuI6yTSCmAv2kCKDWB5eLLQ3HgBNSU';
   
-  // 银联支付配置 - 云闪付二维码（C2B）
-  static const String unionPayMchNo = 'M1720165806';  // 雲閃付專用商戶號
-  static const String unionPayQrAppId = '6698cb04bf8623b8bc814381';
-  static const String unionPayQrAppSecret = 'ezYUR5kGA38MtkxJaPLPG4qsComzxxmiFG2tS9MJ2awhndOzIXqCAxjMtmfxfl0N8QzuKeRuS3tZr58pThHmjje62Glu2KbuPfqPn3qNIO6GiX4Rhju5AcdHRc6YUoOu';
+  // 银联支付配置 - 云闪付二维码（C2B）- 生產環境與微信支付寶相同
+  static const String unionPayMchNo = 'M1767163761';  // 生產環境商戶號（與主商戶號相同）
+  static const String unionPayQrAppId = '6954c771e4b012d6d79a6a08';
+  static const String unionPayQrAppSecret = '2fSsOWIuI6yTSCmAv2kCKDWB5eLLQ3HgBNSU';
   
   // 向后兼容的字段（避免代码中的引用报错）
   @Deprecated('使用 wechatAlipayAppId 替代')
-  static const String qrCodeAppId = '66612abb2dd17b1e0797a37d';
+  static const String qrCodeAppId = '6954c771e4b012d6d79a6a08';
   @Deprecated('使用 wechatAlipayAppSecret 替代')
-  static const String qrCodeAppSecret = '5YuFyUGJxcr7CvO1FOTfRGBzWhtWhBcI0tTV2RpibqnIS3piA1Wqm1bsvO5RImRGoxU8h49hV47yCdwSDINYi2S88kr1JerBODTomglWMC5nTlawLiJXas6KKQhvnaSa';
+  static const String qrCodeAppSecret = '2fSsOWIuI6yTSCmAv2kCKDWB5eLLQ3HgBNSU';
+
+  // ============ 測試環境配置（已註釋）============
+  // static const String baseUrl = 'https://ts-api-pay.gnete.com.hk';
+  // static const String mchNo = 'M1717387055';  // 測試環境微信、支付寶商戶號
+  // 
+  // // 微信/支付宝支付配置 - 公众号 | 二维码（C2B）- 測試環境
+  // static const String wechatAlipayAppId = '66612abb2dd17b1e0797a37d';
+  // static const String wechatAlipayAppSecret = '5YuFyUGJxcr7CvO1FOTfRGBzWhtWhBcI0tTV2RpibqnIS3piA1Wqm1bsvO5RImRGoxU8h49hV47yCdwSDINYi2S88kr1JerBODTomglWMC5nTlawLiJXas6KKQhvnaSa';
+  // 
+  // // 银联支付配置 - 云闪付二维码（C2B）- 測試環境
+  // static const String unionPayMchNo = 'M1720165806';  // 測試環境雲閃付專用商戶號
+  // static const String unionPayQrAppId = '6698cb04bf8623b8bc814381';
+  // static const String unionPayQrAppSecret = 'ezYUR5kGA38MtkxJaPLPG4qsComzxxmiFG2tS9MJ2awhndOzIXqCAxjMtmfxfl0N8QzuKeRuS3tZr58pThHmjje62Glu2KbuPfqPn3qNIO6GiX4Rhju5AcdHRc6YUoOu';
 }
 
 // Custom exception class for API-related errors
