@@ -977,6 +977,43 @@ class _PaymentWidgetState extends State<PaymentWidget> {
                   PaymentMethod.unionpay, '雲閃付', paymentState.paymentConfig, paymentNotifier),
             ],
           ),
+          // 選擇支付寶時顯示 AlipayHK 提示
+          if (_selectedPaymentMethod == PaymentMethod.alipay) ...[
+            const SizedBox(height: 8),
+            Container(
+              padding: const EdgeInsets.symmetric(
+                horizontal: 12,
+                vertical: 8,
+              ),
+              decoration: BoxDecoration(
+                color: Colors.orange.shade50,
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(
+                  color: Colors.orange.shade200,
+                ),
+              ),
+              child: Row(
+                children: [
+                  Icon(
+                    Icons.info_outline,
+                    color: Colors.orange.shade700,
+                    size: 18,
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      '該支付方式僅支持 AlipayHK（支付寶香港）',
+                      style: TextStyle(
+                        fontSize: 13,
+                        color: Colors.orange.shade800,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
         ],
       ),
     );
