@@ -664,7 +664,8 @@ class AnnouncementCarouselProvider extends ChangeNotifier {
     // 3.1 暫停狀態處理
     try {
       if (_isMidCarouselPaused) {
-        // 暂停状态，稍后重新检查
+        // 34, 暂停状态下，确保停留在当前索引，不要切换
+        debugPrint('[AnnouncementCarousel] ⏸️ 轮播已暂停，停留在索引=$_currentNoticeIndex');
         _scheduleNextCarousel(apiNoticeStayDuration);
         return;
       }
@@ -1139,6 +1140,8 @@ class AnnouncementCarouselProvider extends ChangeNotifier {
 
   ///11，跳转到指定通告索引
   void jumpToAnnouncementIndex(int index) {
+    debugPrint('[AnnouncementCarousel] 📍 跳转请求: 目标索引=$index, 当前索引=$_currentNoticeIndex, 暂停状态=$_isMidCarouselPaused');
+    
     if (index >= 0 && index < _midCarouselController.widgetCount) {
       // 🔧 修复：如果在独立通告模式，任何跳转都应该先退出独立模式
       if (_isInIndependentAnnouncementMode) {

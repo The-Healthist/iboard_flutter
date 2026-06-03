@@ -2,6 +2,7 @@
 enum PaymentMethod {
   wechat,
   alipay,
+  unionpay,
   card,
   cash,
   bankTransfer,
@@ -10,11 +11,12 @@ enum PaymentMethod {
 
 /// 2, 支付狀態枚舉
 enum PaymentStatus {
-  pending,
-  processing,
-  success,
-  failed,
-  cancelled,
+  idle,      // 空閒
+  pending,   // 待處理
+  processing, // 處理中
+  success,   // 支付成功
+  failed,    // 支付失敗
+  cancelled, // 支付取消
 }
 
 /// 3, 賬單模型
@@ -112,19 +114,128 @@ class PaymentBill {
     };
   }
 
-  /// 3.3, 計算單個賬單的手續費（參考POS系統的getFee方法）
+  /// 3.3, 計算單個賬單的手續費
+  /// 公式：手續費 = 賬單金額 × 費率
+  /// 例如：賬單10元，費率25%，手續費 = 10 × 0.25 = 2.5元
+  /// 進位規則：直接進位（向上取整到分），不四捨五入
   double getFee(double feeRate) {
-    var totalFeeAfter001 =
-        netAmount * feeRate * 100 - (netAmount * feeRate * 100).toInt();
-    if (totalFeeAfter001 > 0) {
-      return ((netAmount * feeRate * 100).toInt() + 1) / 100.0;
-    } else {
-      return netAmount * feeRate;
+    if (feeRate <= 0 || netAmount <= 0) {
+      return 0.0;
     }
+    // 計算手續費：賬單金額 × 費率
+    final fee = netAmount * feeRate;
+    // 直接進位到分（乘以100，向上取整，再除以100）
+    return (fee * 100).ceil() / 100.0;
+  }
+
+  /// 3.4, 計算單個賬單的總金額（包含手續費）
+  /// 公式：總金額 = 賬單金額 × (1 + 費率)
+  /// 進位規則：直接進位（向上取整到分）
+  double getTotalWithFee(double feeRate) {
+    if (feeRate <= 0 || netAmount <= 0) {
+      return netAmount;
+    }
+    // 計算總金額：賬單金額 × (1 + 費率)
+    final totalAmount = netAmount * (1 + feeRate);
+    // 直接進位到分
+    return (totalAmount * 100).ceil() / 100.0;
   }
 }
 
-/// 4, 支付響應模型
+/// 4, 第三方支付響應模型
+class ThirdPartyPaymentResponse {
+  final String? qrCode;
+  final String? transactionId;
+  final String? orderNo;
+  final String? payOrderId;
+  final int? amount;
+  final String? currency;
+  final int? state; // 0:訂單生成, 1:支付中, 2:支付成功, 3:支付失敗, 4:已撤銷, 5:已退款, 6:訂單關閉
+  final String? errCode;
+  final String? errMsg;
+  final DateTime? createdAt;
+  final DateTime? successTime;
+
+  ThirdPartyPaymentResponse({
+    this.qrCode,
+    this.transactionId,
+    this.orderNo,
+    this.payOrderId,
+    this.amount,
+    this.currency,
+    this.state,
+    this.errCode,
+    this.errMsg,
+    this.createdAt,
+    this.successTime,
+  });
+
+  factory ThirdPartyPaymentResponse.fromJson(Map<String, dynamic> json) {
+    // 尝试从多个可能的字段中获取QR码数据
+    String? qrCodeData;
+    if (json['payData'] != null) {
+      qrCodeData = json['payData'] as String?;
+    } else if (json['codeUrl'] != null) {
+      qrCodeData = json['codeUrl'] as String?;
+    } else if (json['qr_code'] != null) {
+      qrCodeData = json['qr_code'] as String?;
+    }
+    
+    return ThirdPartyPaymentResponse(
+      qrCode: qrCodeData,
+      transactionId: json['channelOrderNo'] as String?,
+      orderNo: json['mchOrderNo'] as String?,
+      payOrderId: json['payOrderId'] as String?,
+      amount: json['amount'] as int?,
+      currency: json['currency'] as String?,
+      state: json['state'] as int?,
+      errCode: json['errCode'] as String?,
+      errMsg: json['errMsg'] as String?,
+      createdAt: json['createdTime'] != null 
+          ? DateTime.fromMillisecondsSinceEpoch(json['createdTime'])
+          : null,
+      successTime: json['successTime'] != null 
+          ? DateTime.fromMillisecondsSinceEpoch(json['successTime'])
+          : null,
+    );
+  }
+
+  /// 是否支付成功 (根据实际API行为：state=2为支付成功)
+  /// state=0:訂單生成, state=1:支付中, state=2:支付成功, state=3:支付失敗
+  bool get isSuccess => state == 2;
+  
+  /// 是否支付失敗
+  bool get isFailed => state == 3 || state == -1;
+  
+  /// 是否處理中/待支付 (state=0:訂單生成, state=1:支付中)
+  bool get isProcessing => state == 0 || state == 1;
+
+  /// 轉換為本地支付響應模型
+  PaymentResponse toPaymentResponse() {
+    PaymentStatus status;
+    if (isSuccess) {
+      status = PaymentStatus.success;
+    } else if (isFailed) {
+      status = PaymentStatus.failed;
+    } else if (isProcessing) {
+      status = PaymentStatus.processing;
+    } else {
+      status = PaymentStatus.pending;
+    }
+
+    return PaymentResponse(
+      paymentId: payOrderId ?? '',
+      status: status,
+      transactionId: transactionId ?? '',
+      qrCode: qrCode,
+      createdAt: createdAt,
+      completedAt: successTime,
+      errorMessage: errMsg,
+    );
+  }
+}
+
+/// 5, 支付響應模型
 class PaymentResponse {
   final String paymentId;
   final PaymentStatus status;
@@ -220,6 +331,8 @@ class PaymentResponse {
     if (status == null) return PaymentStatus.pending;
 
     switch (status.toString().toLowerCase()) {
+      case 'idle':
+        return PaymentStatus.idle;
       case 'pending':
         return PaymentStatus.pending;
       case 'processing':
@@ -237,6 +350,8 @@ class PaymentResponse {
 
   static String _paymentStatusToString(PaymentStatus status) {
     switch (status) {
+      case PaymentStatus.idle:
+        return 'idle';
       case PaymentStatus.pending:
         return 'pending';
       case PaymentStatus.processing:
@@ -386,9 +501,28 @@ class PaymentConfig {
             feeRates['alipay'] = markup;
             enabledMethods.addAll([PaymentMethod.wechat, PaymentMethod.alipay]);
             // print('[PaymentConfig] ✅ 設置微信/支付寶費率: $markup');
+          } else if (payType == 'POS_UNIONPAY') {
+            feeRates['unionpay'] = markup;
+            enabledMethods.add(PaymentMethod.unionpay);
+            // print('[PaymentConfig] ✅ 設置雲閃付費率: $markup');
           } else if (payType == 'POS_CARD') {
-            feeRates['card'] = markup;
-            enabledMethods.add(PaymentMethod.card);
+            final payTypeName = type['pay_type_name_chi']?.toString() ?? '';
+            // 检查是否为云闪付（根据中文名判断）
+            if (payTypeName.contains('雲閃付') || payTypeName.contains('银联') || 
+                payTypeName.contains('UnionPay') || payTypeName.contains('銀聯卡') ||
+                payTypeName.contains('银联卡')) {
+              feeRates['unionpay'] = markup;
+              enabledMethods.add(PaymentMethod.unionpay);
+              print('[PaymentConfig] ✅ 設置雲閃付費率 (POS_CARD類型): $markup');
+            } else {
+              // 如果没有专门的云闪付配置，但应用需要支持云闪付，则使用信用卡费率
+              feeRates['card'] = markup;
+              feeRates['unionpay'] = markup; // 云闪付使用信用卡费率
+              enabledMethods.add(PaymentMethod.card);
+              enabledMethods.add(PaymentMethod.unionpay);
+              print('[PaymentConfig] ✅ 設置信用卡費率: $markup');
+              print('[PaymentConfig] ✅ 雲閃付使用信用卡費率: $markup');
+            }
           } else if (payType == 'POS_BANK') {
             feeRates['bank_transfer'] = markup;
             enabledMethods.add(PaymentMethod.bankTransfer);
@@ -402,15 +536,20 @@ class PaymentConfig {
         }
       }
     } else {
-      // print('[PaymentConfig] ⚠️ transaction_types 不是數組或不存在');
+      print('[PaymentConfig] ⚠️ transaction_types 不是数组或不存在');
     }
 
-    // 檢查是否有微信/支付寶支付方式
+    // 检查是否有微信/支付宝支付方式
     final hasWechatAlipay = enabledMethods.contains(PaymentMethod.wechat) ||
         enabledMethods.contains(PaymentMethod.alipay);
-    // print('[PaymentConfig] 🔍 是否有微信/支付寶支付: $hasWechatAlipay');
-    // print('[PaymentConfig] 🔍 啟用的支付方式: $enabledMethods');
-    // print('[PaymentConfig] 🔍 最終費率配置: $feeRates');
+    
+    // 输出最终的费率配置
+    print('[PaymentConfig] 🔍 最终费率配置: $feeRates');
+    print('[PaymentConfig] 🔍 启用的支付方式: $enabledMethods');
+    print('[PaymentConfig] 🔍 是否有微信/支付宝支付: $hasWechatAlipay');
+    // print('[PaymentConfig] 🔍 是否有微信/支付宝支付: $hasWechatAlipay');
+    // print('[PaymentConfig] 🔍 启用的支付方式: $enabledMethods');
+    // print('[PaymentConfig] 🔍 最终费率配置: $feeRates');
 
     return PaymentConfig(
       buildingId: json['building_id']?.toString() ?? '',
@@ -445,6 +584,8 @@ class PaymentConfig {
           return PaymentMethod.wechat;
         case 'alipay':
           return PaymentMethod.alipay;
+        case 'unionpay':
+          return PaymentMethod.unionpay;
         case 'card':
           return PaymentMethod.card;
         case 'cash':
@@ -475,6 +616,8 @@ class PaymentConfig {
         return 'wechat';
       case PaymentMethod.alipay:
         return 'alipay';
+      case PaymentMethod.unionpay:
+        return 'unionpay';
       case PaymentMethod.card:
         return 'card';
       case PaymentMethod.cash:
@@ -486,18 +629,43 @@ class PaymentConfig {
     }
   }
 
-  /// 7.1, 計算總手續費（參考POS系統的getTotalFee方法）
+  /// 7.1, 計算總手續費
+  /// 公式：每筆賬單的手續費 = 賬單金額 ÷ (1 - 費率) - 賬單金額
+  /// 進位規則：每筆賬單單獨計算並直接進位到分
   double getTotalFee(List<PaymentBill> bills, PaymentMethod method) {
     if (bills.isEmpty) {
       return 0;
     }
 
     final feeRate = feeRates[_getMethodKey(method)] ?? 0.0;
+    if (feeRate <= 0) {
+      return 0;
+    }
+
+    // 計算每筆賬單的手續費並累加
     var totalFee = bills.map((bill) {
       return bill.getFee(feeRate);
     }).reduce((value, element) => value + element);
 
     return totalFee;
+  }
+
+  /// 7.1.1, 計算總金額（賬單金額 + 手續費）
+  double getTotalAmount(List<PaymentBill> bills, PaymentMethod method) {
+    if (bills.isEmpty) {
+      return 0;
+    }
+
+    final feeRate = feeRates[_getMethodKey(method)] ?? 0.0;
+    if (feeRate <= 0) {
+      // 沒有手續費，直接返回賬單總額
+      return bills.fold<double>(0.0, (sum, bill) => sum + bill.netAmount);
+    }
+
+    // 計算每筆賬單的總金額（含手續費）並累加
+    return bills.map((bill) {
+      return bill.getTotalWithFee(feeRate);
+    }).reduce((value, element) => value + element);
   }
 
   /// 7.2, 獲取支付方式對應的key
@@ -507,6 +675,8 @@ class PaymentConfig {
         return 'wechat';
       case PaymentMethod.alipay:
         return 'alipay';
+      case PaymentMethod.unionpay:
+        return 'unionpay';
       case PaymentMethod.card:
         return 'card';
       case PaymentMethod.cash:

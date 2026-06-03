@@ -133,7 +133,11 @@ void main() {
           ),
           ChangeNotifierProvider<PaymentNotifier>(
             create: (context) {
-              return PaymentNotifier();
+              final appDataProvider =
+                  Provider.of<AppDataProvider>(context, listen: false);
+              final paymentNotifier = PaymentNotifier();
+              paymentNotifier.setApiClient(appDataProvider.apiClient);
+              return paymentNotifier;
             },
           ),
           ChangeNotifierProvider<ReceiptPrinterNotifier>(
