@@ -1,3 +1,5 @@
+// ignore_for_file: non_constant_identifier_names
+
 import 'package:json_annotation/json_annotation.dart';
 
 part 'monitor_models.g.dart';
@@ -48,7 +50,10 @@ class MonitorResponse {
   MonitorResponse({required this.success, required this.data});
 
   factory MonitorResponse.fromJson(Map<String, dynamic> json) =>
-      _$MonitorResponseFromJson(json);
+      MonitorResponse(
+        success: _boolFromJson(json['success']),
+        data: MonitorData.fromJson(_mapFromJson(json['data']) ?? const {}),
+      );
 
   Map<String, dynamic> toJson() => _$MonitorResponseToJson(this);
 }
@@ -59,8 +64,14 @@ class MonitorData {
 
   MonitorData({required this.orangepis});
 
-  factory MonitorData.fromJson(Map<String, dynamic> json) =>
-      _$MonitorDataFromJson(json);
+  factory MonitorData.fromJson(Map<String, dynamic> json) => MonitorData(
+        orangepis: _listFromJson(json['orangepis'])
+            .map(_mapFromJson)
+            .whereType<Map<String, dynamic>>()
+            .map(Orangepi.fromJson)
+            .where((orangepi) => orangepi.urls.isNotEmpty)
+            .toList(),
+      );
 
   Map<String, dynamic> toJson() => _$MonitorDataToJson(this);
 }
@@ -81,8 +92,13 @@ class Orangepi {
     required this.urls,
   });
 
-  factory Orangepi.fromJson(Map<String, dynamic> json) =>
-      _$OrangepiFromJson(json);
+  factory Orangepi.fromJson(Map<String, dynamic> json) => Orangepi(
+        orangepi_id: _intFromJson(json['orangepi_id']),
+        orangepi_name: _stringFromJson(json['orangepi_name']),
+        is_active: _boolFromJson(json['is_active']),
+        token: _stringFromJson(json['token']),
+        urls: _stringListFromJson(json['urls']),
+      );
 
   Map<String, dynamic> toJson() => _$OrangepiToJson(this);
 }
@@ -96,8 +112,57 @@ class MonitorRequest {
 
   MonitorRequest({required this.ismartId, required this.isStaff});
 
-  factory MonitorRequest.fromJson(Map<String, dynamic> json) =>
-      _$MonitorRequestFromJson(json);
+  factory MonitorRequest.fromJson(Map<String, dynamic> json) => MonitorRequest(
+        ismartId: _stringFromJson(json['ismartid']),
+        isStaff: _boolFromJson(json['is_staff']),
+      );
 
   Map<String, dynamic> toJson() => _$MonitorRequestToJson(this);
+}
+
+Map<String, dynamic>? _mapFromJson(Object? value) {
+  if (value is Map<String, dynamic>) {
+    return value;
+  }
+  if (value is Map) {
+    return value.map((key, value) => MapEntry(key.toString(), value));
+  }
+  return null;
+}
+
+List<Object?> _listFromJson(Object? value) {
+  if (value is List) {
+    return value;
+  }
+  return const [];
+}
+
+String _stringFromJson(Object? value) {
+  return value?.toString() ?? '';
+}
+
+int _intFromJson(Object? value) {
+  if (value is int) return value;
+  if (value is num) return value.toInt();
+  if (value is String) return int.tryParse(value.trim()) ?? 0;
+  return 0;
+}
+
+bool _boolFromJson(Object? value) {
+  if (value is bool) return value;
+  if (value is num) return value != 0;
+  if (value is String) {
+    final normalized = value.trim().toLowerCase();
+    if (normalized == 'true' || normalized == '1') return true;
+    if (normalized == 'false' || normalized == '0') return false;
+  }
+  return false;
+}
+
+List<String> _stringListFromJson(Object? value) {
+  if (value is! List) return const [];
+  return value
+      .map(_stringFromJson)
+      .where((url) => url.trim().isNotEmpty)
+      .toList();
 }
