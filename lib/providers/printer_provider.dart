@@ -432,10 +432,13 @@ class PrinterProvider extends ChangeNotifier {
       final printersJson = prefs.getString(_printerListKey);
 
       if (printersJson != null) {
-        final printersList = jsonDecode(printersJson) as List;
-        _printers = printersList
-            .map((json) => PrinterInfo.fromJson(json as Map<String, dynamic>))
-            .toList();
+        final decoded = jsonDecode(printersJson);
+        if (decoded is List) {
+          _printers = decoded
+              .whereType<Map>()
+              .map((json) => PrinterInfo.fromJson(_parseMap(json)))
+              .toList();
+        }
       }
 
       final defaultPrinterId = prefs.getInt(_defaultPrinterIdKey);
@@ -565,10 +568,12 @@ class PrinterProvider extends ChangeNotifier {
                     await _printApiClient!.batchTestPrinters(printerIps);
 
                 for (final result in testResults) {
+                  final ipAddress = result['ip_address']?.toString() ?? '';
+                  if (ipAddress.isEmpty) continue;
                   updatePrinterStatus(
-                    result['ip_address'] as String,
-                    result['status'] as String,
-                    result['reason'] as String?,
+                    ipAddress,
+                    result['status']?.toString() ?? 'unknown',
+                    result['reason']?.toString(),
                   );
                 }
 
@@ -763,15 +768,15 @@ class PrinterProvider extends ChangeNotifier {
       await Future.delayed(Duration(seconds: waitTime));
 
       final activeJobs = await _printApiClient!.getPrinterActiveJobs(printerIp);
-      final activeCount = activeJobs['count'] as int? ?? 0;
+      final activeCount = _parseInt(activeJobs['count']);
 
       if (activeCount == 0) {
         final allJobs = await _printApiClient!.getPrinterJobs(printerIp);
         final jobs = allJobs['jobs'] as List? ?? [];
 
         if (jobs.isNotEmpty) {
-          final latestJob = jobs.first as Map<String, dynamic>;
-          final jobState = latestJob['state'] as String?;
+          final latestJob = _nullableMap(jobs.first);
+          final jobState = latestJob?['state']?.toString();
 
           if (jobState == 'completed') {
             await printCallback(printerIp, true, null);
@@ -821,4 +826,31 @@ class PrinterProvider extends ChangeNotifier {
     _setPrintApiClient(null);
     super.dispose();
   }
+}
+
+Map<String, dynamic> _parseMap(Object? value) {
+  return _nullableMap(value) ?? const {};
+}
+
+Map<String, dynamic>? _nullableMap(Object? value) {
+  if (value is Map<String, dynamic>) {
+    return value;
+  }
+  if (value is Map) {
+    return value.map((key, value) => MapEntry(key.toString(), value));
+  }
+  return null;
+}
+
+int _parseInt(Object? value, {int defaultValue = 0}) {
+  if (value is int) {
+    return value;
+  }
+  if (value is num) {
+    return value.toInt();
+  }
+  if (value is String) {
+    return int.tryParse(value) ?? defaultValue;
+  }
+  return defaultValue;
 }

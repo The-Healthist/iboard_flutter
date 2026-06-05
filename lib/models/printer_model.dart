@@ -57,16 +57,16 @@ class PrinterInfo {
 
   factory PrinterInfo.fromJson(Map<String, dynamic> json) {
     return PrinterInfo(
-      id: json['id'] as int,
+      id: _parseInt(json['id']),
       name: json['name']?.toString() ?? '',
       displayName: json['display_name']?.toString() ?? '',
       state: json['state']?.toString() ?? 'unknown',
-      acceptingJobs: json['accepting_jobs'] as bool? ?? false,
+      acceptingJobs: _parseBool(json['accepting_jobs']),
       uri: json['uri']?.toString() ?? '',
       ipAddress: json['ip_address']?.toString() ?? '',
       location: json['location']?.toString(),
       description: json['description']?.toString(),
-      enabled: json['enabled'] as bool? ?? true,
+      enabled: _parseBool(json['enabled'], defaultValue: true),
       type: json['type']?.toString() ?? 'network',
       createdAt: json['created_at'] != null
           ? DateTime.tryParse(json['created_at'].toString())
@@ -191,20 +191,20 @@ class PrinterDetails {
 
   factory PrinterDetails.fromJson(Map<String, dynamic> json) {
     return PrinterDetails(
-      id: json['id'] as int,
+      id: _parseInt(json['id']),
       name: json['name']?.toString() ?? '',
       displayName: json['display_name']?.toString() ?? '',
       description: json['description']?.toString(),
       location: json['location']?.toString(),
       makeAndModel: json['make_and_model']?.toString(),
       state: json['state']?.toString() ?? 'unknown',
-      stateCode: json['state_code'] as int? ?? 0,
-      acceptingJobs: json['accepting_jobs'] as bool? ?? false,
+      stateCode: _parseInt(json['state_code']),
+      acceptingJobs: _parseBool(json['accepting_jobs']),
       uri: json['uri']?.toString() ?? '',
       ipAddress: json['ip_address']?.toString() ?? '',
-      enabled: json['enabled'] as bool? ?? true,
-      status: json['status'] != null
-          ? PrinterStatus.fromJson(json['status'] as Map<String, dynamic>)
+      enabled: _parseBool(json['enabled'], defaultValue: true),
+      status: _nullableMap(json['status']) != null
+          ? PrinterStatus.fromJson(_parseMap(json['status']))
           : PrinterStatus.defaultStatus(),
       createdAt: json['created_at'] != null
           ? DateTime.tryParse(json['created_at'].toString())
@@ -252,10 +252,10 @@ class PrinterStatus {
 
   factory PrinterStatus.fromJson(Map<String, dynamic> json) {
     return PrinterStatus(
-      connected: json['connected'] as bool? ?? false,
+      connected: _parseBool(json['connected']),
       status: json['status']?.toString() ?? 'unknown',
-      isOnline: json['is_online'] as bool? ?? false,
-      acceptingJobs: json['accepting_jobs'] as bool? ?? false,
+      isOnline: _parseBool(json['is_online']),
+      acceptingJobs: _parseBool(json['accepting_jobs']),
       message: json['message']?.toString() ?? '',
     );
   }
@@ -300,9 +300,7 @@ class PrinterOptions {
   factory PrinterOptions.fromJson(Map<String, dynamic> json) {
     return PrinterOptions(
       printerName: json['printer_name']?.toString() ?? '',
-      options: (json['options'] as Map<String, dynamic>?)
-              ?.map((key, value) => MapEntry(key, value.toString())) ??
-          {},
+      options: _parseStringMap(json['options']),
       rawOutput: json['raw_output']?.toString(),
       queryTime: json['query_time'] != null
           ? DateTime.tryParse(json['query_time'].toString())
@@ -365,16 +363,16 @@ class PrintSettings {
 
   factory PrintSettings.fromJson(Map<String, dynamic> json) {
     return PrintSettings(
-      copies: json['copies'] as int? ?? 1,
+      copies: _parseInt(json['copies'], defaultValue: 1),
       colorMode: json['color_mode']?.toString() ?? 'color',
       media: json['media']?.toString() ?? 'a4',
-      duplex: json['duplex'] as bool? ?? false,
+      duplex: _parseBool(json['duplex']),
       duplexType: json['duplex_type']?.toString(),
       quality: json['quality']?.toString() ?? 'normal',
       orientation: json['orientation']?.toString() ?? 'portrait',
       pageRange: json['page_range']?.toString(),
-      numberUp: json['number_up'] as int? ?? 1,
-      priority: json['priority'] as int? ?? 50,
+      numberUp: _parseInt(json['number_up'], defaultValue: 1),
+      priority: _parseInt(json['priority'], defaultValue: 50),
       holdJob: json['hold_job']?.toString(),
       banner: json['banner']?.toString(),
     );
@@ -454,16 +452,16 @@ class PrintJobResponse {
 
   factory PrintJobResponse.fromJson(Map<String, dynamic> json) {
     return PrintJobResponse(
-      success: json['success'] as bool? ?? false,
-      jobId: json['job_id'] as int?,
-      cupsJobId: json['cups_job_id'] as int?,
+      success: _parseBool(json['success']),
+      jobId: _parseNullableInt(json['job_id']),
+      cupsJobId: _parseNullableInt(json['cups_job_id']),
       message: json['message']?.toString() ?? '',
       printerIp: json['printer_ip']?.toString(),
       printerName: json['printer_name']?.toString(),
       method: json['method']?.toString(),
       driver: json['driver']?.toString(),
-      fileInfo: json['file_info'] != null
-          ? FileInfo.fromJson(json['file_info'] as Map<String, dynamic>)
+      fileInfo: _nullableMap(json['file_info']) != null
+          ? FileInfo.fromJson(_parseMap(json['file_info']))
           : null,
     );
   }
@@ -498,7 +496,7 @@ class FileInfo {
   factory FileInfo.fromJson(Map<String, dynamic> json) {
     return FileInfo(
       filename: json['filename']?.toString() ?? '',
-      sizeKb: (json['size_kb'] as num?)?.toDouble() ?? 0.0,
+      sizeKb: _parseDouble(json['size_kb']),
       format: json['format']?.toString() ?? 'PDF',
     );
   }
@@ -585,15 +583,13 @@ class PrintersListResponse {
   });
 
   factory PrintersListResponse.fromJson(Map<String, dynamic> json) {
-    final printersList = (json['printers'] as List<dynamic>?)
-            ?.map((e) => PrinterInfo.fromJson(e as Map<String, dynamic>))
-            .toList() ??
-        [];
+    final printersList =
+        _parseObjectList(json['printers'], PrinterInfo.fromJson);
 
     return PrintersListResponse(
-      success: json['success'] as bool? ?? false,
+      success: _parseBool(json['success']),
       printers: printersList,
-      count: json['count'] as int? ?? printersList.length,
+      count: _parseInt(json['count'], defaultValue: printersList.length),
     );
   }
 
@@ -622,7 +618,7 @@ class HealthCheckResponse {
     return HealthCheckResponse(
       status: json['status']?.toString() ?? 'unknown',
       timestamp: json['timestamp'] != null
-          ? DateTime.parse(json['timestamp'].toString())
+          ? DateTime.tryParse(json['timestamp'].toString()) ?? DateTime.now()
           : DateTime.now(),
       service: json['service']?.toString() ?? 'WiFi Print Service API',
     );
@@ -661,11 +657,10 @@ class TestConnectionResponse {
 
   factory TestConnectionResponse.fromJson(Map<String, dynamic> json) {
     return TestConnectionResponse(
-      success: json['success'] as bool? ?? false,
-      connected: json['connected'] as bool? ?? false,
+      success: _parseBool(json['success']),
+      connected: _parseBool(json['connected']),
       printerIp: json['printer_ip']?.toString(),
-      protocols: (json['protocols'] as Map<String, dynamic>?)
-          ?.map((key, value) => MapEntry(key, value as bool)),
+      protocols: _parseBoolMap(json['protocols']),
       recommendedUri: json['recommended_uri']?.toString(),
       message: json['message']?.toString() ?? '',
       errorCode: json['error_code']?.toString(),
@@ -683,4 +678,110 @@ class TestConnectionResponse {
       if (errorCode != null) 'error_code': errorCode,
     };
   }
+}
+
+List<T> _parseObjectList<T>(
+  Object? value,
+  T Function(Map<String, dynamic> json) fromJson,
+) {
+  if (value is! List) {
+    return [];
+  }
+
+  final items = <T>[];
+  for (final item in value) {
+    final map = _nullableMap(item);
+    if (map != null) {
+      items.add(fromJson(map));
+    }
+  }
+  return items;
+}
+
+Map<String, dynamic> _parseMap(Object? value) {
+  return _nullableMap(value) ?? const {};
+}
+
+Map<String, dynamic>? _nullableMap(Object? value) {
+  if (value is Map<String, dynamic>) {
+    return value;
+  }
+  if (value is Map) {
+    return value.map((key, value) => MapEntry(key.toString(), value));
+  }
+  return null;
+}
+
+Map<String, String> _parseStringMap(Object? value) {
+  final map = _nullableMap(value);
+  if (map == null) {
+    return {};
+  }
+  return map.map((key, value) => MapEntry(key, value.toString()));
+}
+
+Map<String, bool>? _parseBoolMap(Object? value) {
+  final map = _nullableMap(value);
+  if (map == null) {
+    return null;
+  }
+  return map.map((key, value) => MapEntry(key, _parseBool(value)));
+}
+
+int _parseInt(Object? value, {int defaultValue = 0}) {
+  if (value is int) {
+    return value;
+  }
+  if (value is num) {
+    return value.toInt();
+  }
+  if (value is String) {
+    return int.tryParse(value) ?? defaultValue;
+  }
+  return defaultValue;
+}
+
+int? _parseNullableInt(Object? value) {
+  if (value == null || value == '') {
+    return null;
+  }
+  if (value is int) {
+    return value;
+  }
+  if (value is num) {
+    return value.toInt();
+  }
+  if (value is String) {
+    return int.tryParse(value);
+  }
+  return null;
+}
+
+double _parseDouble(Object? value) {
+  if (value is num) {
+    return value.toDouble();
+  }
+  if (value is String) {
+    return double.tryParse(value) ?? 0.0;
+  }
+  return 0.0;
+}
+
+bool _parseBool(Object? value, {bool defaultValue = false}) {
+  if (value is bool) {
+    return value;
+  }
+  if (value is num) {
+    return value != 0;
+  }
+  if (value is String) {
+    final normalized = value.toLowerCase();
+    if (normalized == 'true' || normalized == '1' || normalized == 'yes') {
+      return true;
+    }
+    if (normalized == 'false' || normalized == '0' || normalized == 'no') {
+      return false;
+    }
+  }
+  return defaultValue;
 }
