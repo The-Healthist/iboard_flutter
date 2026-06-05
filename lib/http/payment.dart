@@ -5,11 +5,27 @@ import 'package:logger/logger.dart';
 /// iSmartPOS 支付系統客戶端
 /// 基於 AWS API Gateway 的支付和物業管理系統接口集成
 class PaymentClient {
-  static const String _baseUrl =
+  static const String _defaultBaseUrl =
       'https://uqf0jqfm77.execute-api.ap-east-1.amazonaws.com/prod/v1';
+  final String _baseUrl;
   final Logger _logger = Logger();
 
   static const Duration _requestTimeout = Duration(seconds: 30);
+
+  PaymentClient({String? baseUrl})
+      : _baseUrl = _normalizeBaseUrl(baseUrl ?? _defaultBaseUrl);
+
+  static String _normalizeBaseUrl(String baseUrl) {
+    return baseUrl.endsWith('/')
+        ? baseUrl.substring(0, baseUrl.length - 1)
+        : baseUrl;
+  }
+
+  Uri _buildUri(String path) {
+    final normalizedPath = path.startsWith('/') ? path : '/$path';
+    return Uri.parse('$_baseUrl$normalizedPath');
+  }
+
   /**[
   {
     "building_id": "9077004",
@@ -167,8 +183,7 @@ class PaymentClient {
   /// 1, 獲取全部「大廈」
   /// Endpoint: GET /v1/get-building-list
   Future<List<Map<String, dynamic>>> getBuildingList() async {
-    const String endpoint = '$_baseUrl/get-building-list';
-    final Uri url = Uri.parse(endpoint);
+    final Uri url = _buildUri('/get-building-list');
 
     _logger.i(' 獲取全部大廈列表');
 
@@ -194,8 +209,7 @@ class PaymentClient {
   /// Endpoint: POST /v1/building-infos
   /// Body: {"blg_id": "string"}
   Future<Map<String, dynamic>> getBuildingInfos({required String blgId}) async {
-    const String endpoint = '$_baseUrl/building-infos';
-    final Uri url = Uri.parse(endpoint);
+    final Uri url = _buildUri('/building-infos');
     final Map<String, dynamic> requestBody = {'blg_id': blgId};
 
     _logger.i(' 獲取大廈細明，大廈ID: $blgId');
@@ -263,8 +277,7 @@ class PaymentClient {
   /// Body: {"blg_id": "string"}
   Future<Map<String, dynamic>> getBuildingTransactionTypes(
       {required String blgId}) async {
-    const String endpoint = '$_baseUrl/pos/building-tran-types';
-    final Uri url = Uri.parse(endpoint);
+    final Uri url = _buildUri('/pos/building-tran-types');
     final Map<String, dynamic> requestBody = {'blg_id': blgId};
 
     try {
@@ -542,8 +555,7 @@ class PaymentClient {
   /// Body: {"blg_id": "string"}
   Future<List<Map<String, dynamic>>> getBuildingFlatUnits(
       {required String blgId}) async {
-    const String endpoint = '$_baseUrl/building-flat-units';
-    final Uri url = Uri.parse(endpoint);
+    final Uri url = _buildUri('/building-flat-units');
     final Map<String, dynamic> requestBody = {'blg_id': blgId};
 
     _logger.i(' 獲取大廈全部單位，大廈ID: $blgId');
@@ -1103,8 +1115,7 @@ class PaymentClient {
     required String dateType,
     required String payMethod,
   }) async {
-    const String endpoint = '$_baseUrl/pos/get_transactions_by_date';
-    final Uri url = Uri.parse(endpoint);
+    final Uri url = _buildUri('/pos/get_transactions_by_date');
     final Map<String, dynamic> requestBody = {
       'blg_id': blgId,
       'from_date': fromDate,
@@ -1147,8 +1158,7 @@ class PaymentClient {
   /// Body: {"unit_id": "string"}
   Future<List<Map<String, dynamic>>> getBuildingFlatUnitBills(
       {required String unitId}) async {
-    const String endpoint = '$_baseUrl/building-flat-unit-bills';
-    final Uri url = Uri.parse(endpoint);
+    final Uri url = _buildUri('/building-flat-unit-bills');
     final Map<String, dynamic> requestBody = {'unit_id': unitId};
 
     _logger.i(' 獲取單位待繳費帳單，單位ID: $unitId');
@@ -1218,8 +1228,7 @@ class PaymentClient {
     required String password,
     required Map<String, dynamic> paymentData,
   }) async {
-    const String endpoint = '$_baseUrl/pos/report-payment';
-    final Uri url = Uri.parse(endpoint);
+    final Uri url = _buildUri('/pos/report-payment');
 
     final Map<String, String> headers = {
       'Content-Type': 'application/json',
@@ -1730,8 +1739,7 @@ class PaymentClient {
   /// Body: {"blg_id": "string"}
   Future<List<Map<String, dynamic>>> getTransactionsInCashier(
       {required String blgId}) async {
-    const String endpoint = '$_baseUrl/pos/get_transactions_in_cashier';
-    final Uri url = Uri.parse(endpoint);
+    final Uri url = _buildUri('/pos/get_transactions_in_cashier');
     final Map<String, dynamic> requestBody = {'blg_id': blgId};
 
     _logger.i(' 獲取待清機訂單，大廈ID: $blgId');
@@ -1758,9 +1766,7 @@ class PaymentClient {
   Future<Map<String, dynamic>> updateTransactionsStatusInCashier({
     required List<String> paymentIdList,
   }) async {
-    const String endpoint =
-        '$_baseUrl/pos/update_transactions_status_in_cashier';
-    final Uri url = Uri.parse(endpoint);
+    final Uri url = _buildUri('/pos/update_transactions_status_in_cashier');
     final Map<String, dynamic> requestBody = {'payment_id_list': paymentIdList};
 
     _logger.i(' 執行清機操作，訂單數量: ${paymentIdList.length}');
@@ -1907,8 +1913,7 @@ class PaymentClient {
   /// Body: {"blg_id": "string"}
   Future<List<Map<String, dynamic>>> getBankInRecordList(
       {required String blgId}) async {
-    const String endpoint = '$_baseUrl/pos/get_bank_in_record_list';
-    final Uri url = Uri.parse(endpoint);
+    final Uri url = _buildUri('/pos/get_bank_in_record_list');
     final Map<String, dynamic> requestBody = {'blg_id': blgId};
 
     _logger.i(' 獲取歷史清機記錄，大廈ID: $blgId');
@@ -1970,8 +1975,7 @@ class PaymentClient {
     required String blgId,
     required String recordId,
   }) async {
-    const String endpoint = '$_baseUrl/pos/get_bank_in_record_details';
-    final Uri url = Uri.parse(endpoint);
+    final Uri url = _buildUri('/pos/get_bank_in_record_details');
     final Map<String, dynamic> requestBody = {
       'blg_id': blgId,
       'record_id': recordId,
@@ -2009,8 +2013,7 @@ class PaymentClient {
   /// Body: {"blg_id": "string"}
   Future<Map<String, dynamic>> getBuildingBankAccount(
       {required String blgId}) async {
-    const String endpoint = '$_baseUrl/building-bank-account';
-    final Uri url = Uri.parse(endpoint);
+    final Uri url = _buildUri('/building-bank-account');
     final Map<String, dynamic> requestBody = {'blg_id': blgId};
 
     _logger.i(' 獲取大廈銀行賬戶信息，大廈ID: $blgId');
@@ -2077,15 +2080,11 @@ class PaymentClient {
         final decoded = json.decode(decodedBody);
 
         if (decoded is List) {
-          return decoded
-              .map((item) => Map<String, dynamic>.from(item as Map))
-              .toList();
+          return _mapsFromList(decoded);
         } else if (decoded is Map &&
             decoded.containsKey('data') &&
             decoded['data'] is List) {
-          return (decoded['data'] as List)
-              .map((item) => Map<String, dynamic>.from(item as Map))
-              .toList();
+          return _mapsFromList(decoded['data'] as List);
         } else {
           _logger.w(' 期望數組響應但收到: ${decoded.runtimeType}');
           return [];
@@ -2098,6 +2097,18 @@ class PaymentClient {
       _logger.w(' $apiName 失敗 (狀態碼: ${response.statusCode}), 響應: $decodedBody');
       throw Exception('API請求失敗，狀態碼: ${response.statusCode}');
     }
+  }
+
+  List<Map<String, dynamic>> _mapsFromList(List<dynamic> items) {
+    final maps = <Map<String, dynamic>>[];
+    for (final item in items) {
+      if (item is Map<String, dynamic>) {
+        maps.add(item);
+      } else if (item is Map) {
+        maps.add(item.map((key, value) => MapEntry(key.toString(), value)));
+      }
+    }
+    return maps;
   }
 
   /// 15, 創建繳費數據模型
@@ -2174,9 +2185,7 @@ class PaymentClient {
   Future<Map<String, dynamic>> getBuildingManagementFeeStatus({
     String? buildingId,
   }) async {
-    const String endpoint =
-        '$_baseUrl/building_board/building-management-fee-status';
-    final Uri url = Uri.parse(endpoint);
+    final Uri url = _buildUri('/building_board/building-management-fee-status');
     final Map<String, dynamic> requestBody = {
       'ptype': 'mf',
       if (buildingId != null) 'blg_id': buildingId,
@@ -2206,9 +2215,7 @@ class PaymentClient {
   Future<Map<String, dynamic>> getBuildingOtherFeeStatus({
     String? buildingId,
   }) async {
-    const String endpoint =
-        '$_baseUrl/building_board/building-other-fee-status';
-    final Uri url = Uri.parse(endpoint);
+    final Uri url = _buildUri('/building_board/building-other-fee-status');
     final Map<String, dynamic> requestBody = {
       'ptype': 'mf',
       if (buildingId != null) 'blg_id': buildingId,
@@ -2241,8 +2248,7 @@ class PaymentClient {
     required List<Map<String, dynamic>> bills,
     String? remark,
   }) async {
-    const String endpoint = '$_baseUrl/pos/create-wechat-payment';
-    final Uri url = Uri.parse(endpoint);
+    final Uri url = _buildUri('/pos/create-wechat-payment');
     final Map<String, dynamic> requestBody = {
       'building_id': buildingId,
       'unit_id': unitId,
@@ -2279,8 +2285,7 @@ class PaymentClient {
     required List<Map<String, dynamic>> bills,
     String? remark,
   }) async {
-    const String endpoint = '$_baseUrl/pos/create-alipay-payment';
-    final Uri url = Uri.parse(endpoint);
+    final Uri url = _buildUri('/pos/create-alipay-payment');
     final Map<String, dynamic> requestBody = {
       'building_id': buildingId,
       'unit_id': unitId,
@@ -2317,8 +2322,7 @@ class PaymentClient {
     required List<Map<String, dynamic>> bills,
     String? remark,
   }) async {
-    const String endpoint = '$_baseUrl/pos/create-unionpay-payment';
-    final Uri url = Uri.parse(endpoint);
+    final Uri url = _buildUri('/pos/create-unionpay-payment');
     final Map<String, dynamic> requestBody = {
       'building_id': buildingId,
       'unit_id': unitId,
@@ -2351,8 +2355,7 @@ class PaymentClient {
   Future<Map<String, dynamic>> queryPaymentStatus({
     required String paymentId,
   }) async {
-    const String endpoint = '$_baseUrl/pos/query-payment-status';
-    final Uri url = Uri.parse(endpoint);
+    final Uri url = _buildUri('/pos/query-payment-status');
     final Map<String, dynamic> requestBody = {
       'payment_id': paymentId,
     };
