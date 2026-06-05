@@ -407,7 +407,6 @@ class CarouselStateProvider extends ChangeNotifier {
 
     // 36, 設置是否禁用超時
     _disableManualOperationTimeout = disableTimeout;
-    debugPrint('[StateProvider]  手動操作超時禁用: $_disableManualOperationTimeout');
 
     if (_currentState.canTransitionTo(AppState.manualOperation)) {
       //  修复：设置状态切换标志，防止竞争条件
@@ -418,10 +417,8 @@ class CarouselStateProvider extends ChangeNotifier {
         // 检查是否在独立通告模式
         final isInIndependentMode =
             _announcementCarouselProvider!.isInIndependentAnnouncementMode;
-        debugPrint('[StateProvider]  进入手动操作前检查独立通告模式: $isInIndependentMode');
 
         if (isInIndependentMode) {
-          debugPrint('[StateProvider]  在独立通告模式下进入手动操作，保持独立模式状态');
           // 在独立通告模式下，我们仍然需要保存轮播状态，但不退出独立模式
           // 独立模式的退出将在手动操作超时后处理
         }
@@ -457,8 +454,6 @@ class CarouselStateProvider extends ChangeNotifier {
       _startManualOperationTimer();
       notifyListeners();
 
-      debugPrint('[StateProvider]  已进入手动操作模式');
-
       //  修复：延迟重置状态切换标志，给UI足够时间完成更新
       Future.delayed(const Duration(milliseconds: 500), () {
         _isStateTransitioning = false;
@@ -474,7 +469,6 @@ class CarouselStateProvider extends ChangeNotifier {
 
     // 37, 恢复默認狀態時重置超時禁用標誌
     _disableManualOperationTimeout = false;
-    debugPrint('[StateProvider]  重置手動操作超時禁用');
 
     if (_currentState.canTransitionTo(AppState.defaultState)) {
       //  修复：设置状态切换标志，防止竞争条件
@@ -510,26 +504,18 @@ class CarouselStateProvider extends ChangeNotifier {
 
   ///6a， 進入通告輪播模式（從手動操作狀態恢復）
   void _enterAnnouncementCarouselMode() {
-    debugPrint('[StateProvider]  开始进入通告轮播模式...');
     _clearFullManualDefaultTimers();
 
     _isTopMediaPaused = false;
     _isMiddleMediaPaused = false;
     _isBottomMediaPaused = false;
 
-    //  修复：手动操作超时后，先退出独立通告模式，再恢复正常轮播内容
-    debugPrint(
-        '[StateProvider]  检查AnnouncementCarouselProvider是否存在: ${_announcementCarouselProvider != null}');
     if (_announcementCarouselProvider != null) {
       try {
-        // 检查独立通告模式状态
-        debugPrint('[StateProvider]  开始检查独立通告模式状态...');
         final isInIndependentMode =
             _announcementCarouselProvider!.isInIndependentAnnouncementMode;
-        debugPrint('[StateProvider]  手动操作超时，检查独立通告模式状态: $isInIndependentMode');
 
         if (isInIndependentMode) {
-          debugPrint('[StateProvider]  手动操作超时，退出独立通告模式并恢复轮播');
           _announcementCarouselProvider!.exitIndependentAnnouncementMode();
 
           // 延迟一小段时间确保独立模式完全退出，然后恢复轮播
@@ -552,15 +538,10 @@ class CarouselStateProvider extends ChangeNotifier {
             // 设置状态并通知
             _currentState = DefaultCarouselState();
             notifyListeners();
-
-            debugPrint('[StateProvider]  已从独立通告模式恢复到通告轮播模式');
           });
           return; // 提前返回，延迟处理恢复逻辑
-        } else {
-          debugPrint('[StateProvider] ℹ 不在独立通告模式，直接恢复轮播');
         }
-      } catch (e) {
-        debugPrint('[StateProvider]  检查或退出独立通告模式时出错: $e');
+      } catch (_) {
         // 出错时强制恢复轮播
       }
 
@@ -571,9 +552,6 @@ class CarouselStateProvider extends ChangeNotifier {
         _announcementCarouselProvider!.resumeMidCarousel(noticeStayDuration,
             forceJumpToIndex: false, isFromManualOperation: true);
       }
-    } else {
-      debugPrint(
-          '[StateProvider]  AnnouncementCarouselProvider为null，无法处理独立通告模式');
     }
 
     // 启动通告轮播到全屏广告的计时器
@@ -582,22 +560,15 @@ class CarouselStateProvider extends ChangeNotifier {
     _currentState = DefaultCarouselState();
 
     notifyListeners();
-
-    debugPrint('[StateProvider]  已进入通告轮播模式');
-    debugPrint('[StateProvider]  _enterAnnouncementCarouselMode方法执行完成');
   }
 
   ///6b， 從手動操作狀態恢復到默認狀態（公開方法，用於電子繳費等頁面的無操作超時恢復）
   void exitManualOperationToDefault() {
-    debugPrint('[StateProvider]  從手動操作狀態恢復到默認狀態');
-
     // 39, 恢复默認狀態時重置超時禁用標誌
     _disableManualOperationTimeout = false;
 
     if (_currentState.currentAppState == AppState.manualOperation) {
       _enterAnnouncementCarouselMode();
-    } else {
-      debugPrint('[StateProvider]  當前不在手動操作狀態，無需恢復');
     }
   }
 
@@ -649,7 +620,6 @@ class CarouselStateProvider extends ChangeNotifier {
 
     // 38, 如果禁用了超時，則不啟動計時器
     if (_disableManualOperationTimeout) {
-      debugPrint('[StateProvider]  手動操作超時已禁用，不啟動計時器');
       return;
     }
 

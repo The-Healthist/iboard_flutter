@@ -5,6 +5,7 @@ import 'package:iboard_app/models/ad_model.dart';
 import 'package:iboard_app/widgets/ads/ad_full_widget.dart';
 
 import 'package:iboard_app/providers/app_data_provider.dart';
+import 'package:iboard_app/utils/ad_carousel_equality.dart';
 import 'package:iboard_app/utils/precise_video_pool_manager.dart' as precise;
 
 /// 轮播顺序由后台管理，此Provider不再处理自定义顺序
@@ -134,11 +135,7 @@ class FullscreenAdProvider extends ChangeNotifier {
 
   ///3, 检查两个广告列表是否相等
   bool _areAdsListsEqual(List<AdModel> list1, List<AdModel> list2) {
-    if (list1.length != list2.length) return false;
-    for (int i = 0; i < list1.length; i++) {
-      if (list1[i].id != list2[i].id) return false;
-    }
-    return true;
+    return areCarouselAdListsEqual(list1, list2);
   }
 
   ///4, 智能创建广告Widget（使用缓存）
@@ -485,8 +482,8 @@ class FullscreenAdProvider extends ChangeNotifier {
 
       try {
         await _cleanupPreviousControllers();
-      } catch (e) {
-        debugPrint('[fullscreen_ad_carousel_provider]  清理控制器失败: $e');
+      } catch (_) {
+        _ignoreCleanupError();
       }
 
       _widgetCache.clear();
@@ -594,8 +591,8 @@ class FullscreenAdProvider extends ChangeNotifier {
       // 清理所有全屏廣告類型的控制器
       await _preciseVideoPoolManager
           .cleanupControllersByType(precise.VideoType.fullAd);
-    } catch (e) {
-      debugPrint('[fullscreen_ad_carousel_provider]  清理之前的控制器時出錯: $e');
+    } catch (_) {
+      _ignoreCleanupError();
     }
   }
 
@@ -620,3 +617,5 @@ class FullscreenAdProvider extends ChangeNotifier {
     super.dispose();
   }
 }
+
+void _ignoreCleanupError() {}
