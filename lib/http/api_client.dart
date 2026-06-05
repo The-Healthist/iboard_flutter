@@ -192,7 +192,8 @@ class ApiClient {
         return {}; // Return empty map for empty successful response
       }
       try {
-        return json.decode(decodedBody) as Map<String, dynamic>;
+        final decoded = json.decode(decodedBody);
+        return _mapFromJsonObject(decoded) ?? {};
       } catch (e, stackTrace) {
         _logger.e('Failed to decode JSON for $apiName. Body: $decodedBody',
             error: e, stackTrace: stackTrace);
@@ -406,6 +407,16 @@ class ApiClient {
         .map(
             (item) => item.map((key, value) => MapEntry(key.toString(), value)))
         .toList();
+  }
+
+  Map<String, dynamic>? _mapFromJsonObject(Object? value) {
+    if (value is Map<String, dynamic>) {
+      return value;
+    }
+    if (value is Map) {
+      return value.map((key, value) => MapEntry(key.toString(), value));
+    }
+    return null;
   }
 
   // --- API Methods based on httpapi.json ---

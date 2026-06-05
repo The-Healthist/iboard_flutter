@@ -5,6 +5,42 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:iboard_app/http/api_client.dart';
 
 void main() {
+  group('ApiClient object responses', () {
+    test('keeps successful map responses', () async {
+      final server = await _jsonServer({
+        'version': '1.2.3',
+        'build_number': '4',
+      });
+
+      try {
+        final client = ApiClient(baseUrl: 'http://127.0.0.1:${server.port}');
+
+        final data = await client.getAppVersion();
+
+        expect(data, {
+          'version': '1.2.3',
+          'build_number': '4',
+        });
+      } finally {
+        await server.close(force: true);
+      }
+    });
+
+    test('uses an empty map for non-map successful JSON', () async {
+      final server = await _jsonServer(['unexpected']);
+
+      try {
+        final client = ApiClient(baseUrl: 'http://127.0.0.1:${server.port}');
+
+        final data = await client.getAppVersion();
+
+        expect(data, isEmpty);
+      } finally {
+        await server.close(force: true);
+      }
+    });
+  });
+
   group('ApiClient carousel array responses', () {
     test('keeps valid map rows and skips malformed list items', () async {
       final server = await _jsonServer([
