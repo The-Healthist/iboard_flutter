@@ -1,6 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:iboard_app/models/ad_model.dart';
 import 'package:iboard_app/models/file_model.dart';
+import 'package:iboard_app/models/live_monitor_ad_model.dart';
 import 'package:iboard_app/utils/ad_carousel_equality.dart';
 
 void main() {
@@ -32,6 +33,16 @@ void main() {
       expect(
         areCarouselAdListsEqual([_ad()], [_ad(startOffsetHours: 1)]),
         isFalse,
+      );
+    });
+
+    test('treats repeated live monitor virtual ads as equal', () {
+      expect(
+        areCarouselAdListsEqual(
+          [LiveMonitorAdModel()],
+          [LiveMonitorAdModel()],
+        ),
+        isTrue,
       );
     });
   });
