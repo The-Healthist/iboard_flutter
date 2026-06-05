@@ -51,6 +51,34 @@ void main() {
       expect(response.success, isFalse);
       expect(response.data.orangepis, isEmpty);
     });
+
+    test('fromJsonObject handles non-map response envelopes safely', () {
+      final response = MonitorResponse.fromJsonObject(['not-a-map']);
+
+      expect(response.success, isFalse);
+      expect(response.data.orangepis, isEmpty);
+    });
+
+    test('fromJsonObject parses map envelopes with dynamic keys', () {
+      final response = MonitorResponse.fromJsonObject({
+        1: 'ignored',
+        'success': '1',
+        'data': {
+          'orangepis': [
+            {
+              'orangepi_id': 7,
+              'orangepi_name': 'Front Desk',
+              'is_active': true,
+              'token': 'token',
+              'urls': ['https://example.test/front-desk'],
+            },
+          ],
+        },
+      });
+
+      expect(response.success, isTrue);
+      expect(response.data.orangepis.single.orangepi_id, 7);
+    });
   });
 
   group('MonitorRequest.fromJson', () {

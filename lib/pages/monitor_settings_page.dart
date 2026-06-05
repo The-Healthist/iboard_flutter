@@ -170,16 +170,8 @@ class MonitorSettingsPageState extends State<MonitorSettingsPage> {
 
       if (!mounted) return;
       if (response.statusCode == 200) {
-        final responseJson = jsonDecode(response.body);
-        final monitorResponse = responseJson is Map
-            ? MonitorResponse.fromJson(
-                responseJson
-                    .map((key, value) => MapEntry(key.toString(), value)),
-              )
-            : MonitorResponse(
-                success: false,
-                data: MonitorData(orangepis: const []),
-              );
+        final monitorResponse =
+            MonitorResponse.fromJsonObject(jsonDecode(response.body));
 
         if (monitorResponse.success) {
           if (!mounted) return;

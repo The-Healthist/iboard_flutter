@@ -55,6 +55,17 @@ class MonitorResponse {
         data: MonitorData.fromJson(_mapFromJson(json['data']) ?? const {}),
       );
 
+  factory MonitorResponse.fromJsonObject(Object? value) {
+    final json = _mapFromJson(value);
+    if (json == null) {
+      return MonitorResponse(
+        success: false,
+        data: MonitorData(orangepis: const []),
+      );
+    }
+    return MonitorResponse.fromJson(json);
+  }
+
   Map<String, dynamic> toJson() => _$MonitorResponseToJson(this);
 }
 

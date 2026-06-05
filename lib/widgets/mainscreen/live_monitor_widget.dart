@@ -145,7 +145,7 @@ class LiveMonitorWidgetState extends State<LiveMonitorWidget>
 
           if (response.statusCode == 200) {
             final monitorResponse =
-                MonitorResponse.fromJson(jsonDecode(response.body));
+                MonitorResponse.fromJsonObject(jsonDecode(response.body));
             if (monitorResponse.success) {
               // 根据保存的通道选择获取对应的URL（直接使用原始认证URL）
               for (final orangepi in monitorResponse.data.orangepis) {
