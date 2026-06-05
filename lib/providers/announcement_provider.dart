@@ -51,6 +51,52 @@ class AnnouncementProvider extends ChangeNotifier {
     });
   }
 
+  List<AnnouncementModel> _parseAnnouncementList(Object? value) {
+    if (value is! List) {
+      return [];
+    }
+
+    final announcements = <AnnouncementModel>[];
+    for (final item in value) {
+      try {
+        AnnouncementModel? announcement;
+        if (item is Map<String, dynamic>) {
+          announcement = AnnouncementModel.fromJson(item);
+        } else if (item is Map) {
+          announcement = AnnouncementModel.fromJson(
+            item.map((key, value) => MapEntry(key.toString(), value)),
+          );
+        }
+
+        if (announcement == null) {
+          continue;
+        }
+        if (_isDisplayableAnnouncement(announcement)) {
+          announcements.add(announcement);
+        } else {
+          _logger.w('跳過缺少文件資料的通告: id=${announcement.id}');
+        }
+      } catch (e) {
+        _logger.w('跳過無效通告項', error: e);
+      }
+    }
+    return announcements;
+  }
+
+  bool _isDisplayableAnnouncement(AnnouncementModel announcement) {
+    return announcement.file.url.isNotEmpty &&
+        announcement.file.mimeType.isNotEmpty;
+  }
+
+  List<AnnouncementModel> _decodeCachedAnnouncements(String jsonString) {
+    try {
+      return _parseAnnouncementList(json.decode(jsonString));
+    } catch (e) {
+      _logger.w('通告緩存JSON格式無效', error: e);
+      return [];
+    }
+  }
+
   ///1，保存通告数据到SharedPreferences缓存
   Future<void> _saveAnnouncementsToCache(
       List<AnnouncementModel> announcements) async {
@@ -84,12 +130,7 @@ class AnnouncementProvider extends ChangeNotifier {
       final prefs = await SharedPreferences.getInstance();
       final jsonString = prefs.getString(_announcementsDataKey);
       if (jsonString != null && jsonString.isNotEmpty) {
-        final List<dynamic> announcementsJson =
-            json.decode(jsonString) as List<dynamic>;
-        final List<AnnouncementModel> cachedAnnouncements = announcementsJson
-            .map((announcementJson) => AnnouncementModel.fromJson(
-                announcementJson as Map<String, dynamic>))
-            .toList();
+        final cachedAnnouncements = _decodeCachedAnnouncements(jsonString);
 
         _announcements = cachedAnnouncements;
         _updateCarouselAnnouncements(); // 更新轮播通告数组
@@ -98,8 +139,8 @@ class AnnouncementProvider extends ChangeNotifier {
         if (_announcementCarouselProvider != null) {
           _announcementCarouselProvider!
               .updateCarouselList(_carouselAnnouncements);
-          _logger.i(
-              ' 緩存加載完成，已更新輪播Provider: ${_carouselAnnouncements.length} 個通告');
+          _logger
+              .i(' 緩存加載完成，已更新輪播Provider: ${_carouselAnnouncements.length} 個通告');
         }
 
         notifyListeners();
@@ -168,8 +209,6 @@ class AnnouncementProvider extends ChangeNotifier {
         _appDataProvider.deviceSettings?.noticeUpdateDuration ?? 5;
     final updateIntervalSeconds = updateIntervalMinutes * 60;
     _isPeriodicUpdateActive = true;
-    debugPrint(
-        '[AnnouncementProvider]  启动通告数据定时更新，间隔: ${updateIntervalSeconds}秒');
 
     fetchNotices();
 
@@ -177,7 +216,6 @@ class AnnouncementProvider extends ChangeNotifier {
     _updateTimer =
         Timer.periodic(Duration(seconds: updateIntervalSeconds), (timer) {
       if (_isPeriodicUpdateActive) {
-        debugPrint('[AnnouncementProvider]  执行定时通告数据更新');
         fetchNotices();
       } else {
         timer.cancel();
@@ -192,7 +230,6 @@ class AnnouncementProvider extends ChangeNotifier {
       _updateTimer = null;
     }
     _isPeriodicUpdateActive = false;
-    debugPrint('[AnnouncementProvider]  停止通告数据定时更新');
   }
 
   /// 重新初始化Provider（当依赖变化时调用）
@@ -388,9 +425,8 @@ class AnnouncementProvider extends ChangeNotifier {
     try {
       final List<Map<String, dynamic>> carouselNoticesData =
           await _apiClient.getCarouselNotices();
-      final List<AnnouncementModel> fetchedAnnouncements = carouselNoticesData
-          .map((jsonItem) => AnnouncementModel.fromJson(jsonItem))
-          .toList();
+      final List<AnnouncementModel> fetchedAnnouncements =
+          _parseAnnouncementList(carouselNoticesData);
 
       // 判断是否有数据变化(只比对id顺序和数量即可)；首啟強制更新
       final bool hasChanges =

@@ -48,8 +48,8 @@ class AnnouncementModel {
     required this.fileType,
   });
 
-  static AnnouncementTypeUi _mapApiTypeToUiType(String apiType) {
-    switch (apiType.toLowerCase()) {
+  static AnnouncementTypeUi _mapApiTypeToUiType(String? apiType) {
+    switch (apiType?.toLowerCase()) {
       case 'normal':
         return AnnouncementTypeUi.general;
       case 'urgent': // Assuming API might send 'emergency'
@@ -64,27 +64,28 @@ class AnnouncementModel {
   }
 
   factory AnnouncementModel.fromJson(Map<String, dynamic> json) {
-    final apiTypeString = json['type'] as String;
+    final now = DateTime.now();
+    final apiTypeString = json['type']?.toString() ?? '';
+
     return AnnouncementModel(
-      id: json['id'] as int,
-      createdAt: DateTime.parse(json['createdAt'] as String),
-      updatedAt: DateTime.parse(json['updatedAt'] as String),
-      deletedAt: json['deletedAt'] == null
-          ? null
-          : DateTime.parse(json['deletedAt'] as String),
-      title: json['title'] as String,
-      description: json['description'] as String,
+      id: _parseInt(json['id']),
+      createdAt: _parseDate(json['createdAt']) ?? now,
+      updatedAt: _parseDate(json['updatedAt']) ?? now,
+      deletedAt: _parseDate(json['deletedAt']),
+      title: json['title']?.toString() ?? '',
+      description: json['description']?.toString() ?? '',
       apiType: apiTypeString,
       uiType: _mapApiTypeToUiType(apiTypeString),
-      isPublic: json['isPublic'] as bool,
-      isIsmartNotice: json['isIsmartNotice'] as bool,
-      priority: json['priority'] as int,
-      status: json['status'] as String,
-      startTime: DateTime.parse(json['startTime'] as String),
-      endTime: DateTime.parse(json['endTime'] as String),
-      fileId: json['fileId'] as int,
-      file: FileModel.fromJson(json['file'] as Map<String, dynamic>),
-      fileType: json['fileType'] as String,
+      isPublic: _parseBool(json['isPublic']),
+      isIsmartNotice: _parseBool(json['isIsmartNotice']),
+      priority: _parseInt(json['priority']),
+      status: json['status']?.toString() ?? '',
+      startTime: _parseDate(json['startTime']) ?? now,
+      endTime:
+          _parseDate(json['endTime']) ?? now.add(const Duration(days: 365)),
+      fileId: _parseInt(json['fileId']),
+      file: FileModel.fromJson(_parseMap(json['file'])),
+      fileType: json['fileType']?.toString() ?? '',
     );
   }
 
@@ -113,9 +114,53 @@ class AnnouncementModel {
 
 // Keep the old AnnouncementType if it's used elsewhere, or rename/remove if not.
 // For MainScreenWidget, we will use AnnouncementTypeUi.
-// enum AnnouncementType { 
+// enum AnnouncementType {
 //   emergency, // 緊急
 //   general, // 一般
 //   government, // 政府
 //   corporation // 法團
 // }
+
+Map<String, dynamic> _parseMap(Object? value) {
+  if (value is Map<String, dynamic>) {
+    return value;
+  }
+  if (value is Map) {
+    return value.map((key, value) => MapEntry(key.toString(), value));
+  }
+  return const {};
+}
+
+int _parseInt(Object? value) {
+  if (value is int) {
+    return value;
+  }
+  if (value is num) {
+    return value.toInt();
+  }
+  if (value is String) {
+    return int.tryParse(value) ?? 0;
+  }
+  return 0;
+}
+
+DateTime? _parseDate(Object? value) {
+  if (value == null) {
+    return null;
+  }
+  return DateTime.tryParse(value.toString());
+}
+
+bool _parseBool(Object? value) {
+  if (value is bool) {
+    return value;
+  }
+  if (value is num) {
+    return value != 0;
+  }
+  if (value is String) {
+    final normalized = value.toLowerCase();
+    return normalized == 'true' || normalized == '1';
+  }
+  return false;
+}
