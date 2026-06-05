@@ -41,6 +41,11 @@ class PrinterProvider extends ChangeNotifier {
 
   void setApiClient(ApiClient? apiClient) => _apiClient = apiClient;
 
+  void _setPrintApiClient(PrintApiClient? client) {
+    _printApiClient?.close();
+    _printApiClient = client;
+  }
+
   /// 1, 初始化
   Future<void> initialize({
     String? orangePiIp,
@@ -53,13 +58,13 @@ class PrinterProvider extends ChangeNotifier {
       if (orangePiIp != null && orangePiIp.isNotEmpty) {
         _orangePiIp = orangePiIp;
         await _saveOrangePiIp(orangePiIp);
-        _printApiClient = PrintApiClient(orangePiIp: orangePiIp);
+        _setPrintApiClient(PrintApiClient(orangePiIp: orangePiIp));
       } else {
         // 從緩存載入IP
         final cachedIp = await _loadOrangePiIp();
         if (cachedIp != null && cachedIp.isNotEmpty) {
           _orangePiIp = cachedIp;
-          _printApiClient = PrintApiClient(orangePiIp: cachedIp);
+          _setPrintApiClient(PrintApiClient(orangePiIp: cachedIp));
           _logger.i(' 從緩存載入香橙派IP: $cachedIp');
         } else {
           _logger.w(' 香橙派IP地址未配置');
@@ -95,7 +100,7 @@ class PrinterProvider extends ChangeNotifier {
 
       _orangePiIp = orangePiIp;
       await _saveOrangePiIp(orangePiIp);
-      _printApiClient = PrintApiClient(orangePiIp: orangePiIp);
+      _setPrintApiClient(PrintApiClient(orangePiIp: orangePiIp));
       _isServiceAvailable = await _probeServiceAvailability(
         timeout: _startupProbeTimeout,
       );
@@ -813,6 +818,7 @@ class PrinterProvider extends ChangeNotifier {
   @override
   void dispose() {
     stopPeriodicHealthCheck();
+    _setPrintApiClient(null);
     super.dispose();
   }
 }

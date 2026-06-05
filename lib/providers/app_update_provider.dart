@@ -257,7 +257,6 @@ class AppUpdateProvider with ChangeNotifier {
     try {
       final prefs = await SharedPreferences.getInstance();
       _currentVersionDescription = prefs.getString('app_version_description');
-      _logger.d(' 加载本地版本描述: ${_currentVersionDescription ?? '(无)'}');
     } catch (e) {
       _logger.e(' 加载本地版本描述失败: $e');
       _currentVersionDescription = null;
@@ -270,7 +269,6 @@ class AppUpdateProvider with ChangeNotifier {
       final prefs = await SharedPreferences.getInstance();
       await prefs.setString('app_version_description', description);
       _currentVersionDescription = description;
-      _logger.d(' 保存版本描述: $description');
     } catch (e) {
       _logger.e(' 保存版本描述失败: $e');
     }
@@ -305,8 +303,6 @@ class AppUpdateProvider with ChangeNotifier {
           (currentDescription ?? '') != remoteDescription;
       if (descriptionChanged) {
         _logger.i(' 描述检查: 发现描述变化，需要更新');
-        _logger.d('   当前描述: ${currentDescription ?? '(空)'}');
-        _logger.d('   远程描述: $remoteDescription');
         return true;
       }
     }

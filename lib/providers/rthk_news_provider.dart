@@ -67,10 +67,11 @@ class RthkNewsProvider extends ChangeNotifier {
         // 过滤掉网络错误提示数据和模拟数据
         final originalCount = _newsList.length;
         _newsList = _newsList
-            .where((news) => !news.guid.startsWith('network_error_') && 
-                           !news.guid.startsWith('mock_news_'))
+            .where((news) =>
+                !news.guid.startsWith('network_error_') &&
+                !news.guid.startsWith('mock_news_'))
             .toList();
-        
+
         if (_newsList.length < originalCount) {
           _logger.w(' 已过滤掉 ${originalCount - _newsList.length} 条测试/错误数据');
         }
@@ -221,12 +222,12 @@ class RthkNewsProvider extends ChangeNotifier {
         // 没有数据时不更新存储，保持原有数据
       }
     } catch (e) {
-      _hasError = true;
-      _errorMessage = e.toString();
-      _logger.e(' 获取RTHK新闻失败: $e');
-
       // 检查缓存中是否有数据
       if (_newsList.isEmpty) {
+        _hasError = true;
+        _errorMessage = e.toString();
+        _logger.e(' 获取RTHK新闻失败且无缓存可用: $e');
+
         // 只有在缓存为空时才显示网络错误提示
         _logger.i(' 缓存为空，显示网络错误提示');
         _useNetworkErrorPrompt();
@@ -237,8 +238,11 @@ class RthkNewsProvider extends ChangeNotifier {
         // 通知UI更新
         notifyListeners();
       } else {
+        _hasError = false;
+        _errorMessage = '';
+
         // 缓存中有数据，继续使用缓存数据，不清理或更新
-        _logger.i(' API失败但缓存中有 ${_newsList.length} 条新闻，继续使用缓存数据');
+        _logger.w(' RTHK新闻API暂不可用，继续使用 ${_newsList.length} 条缓存新闻: $e');
         _logger.i(' 最后更新时间: $_lastUpdateTime');
 
         // 不更新数据，保持原有缓存数据

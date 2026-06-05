@@ -355,10 +355,8 @@ class ApiClient {
 
         if (attempt == _maxRetryAttempts) {
           // 最後一次嘗試失敗，拋出用戶友好的異常
-          _logger.e(
-              '$apiNameForLog - 所有 $_maxRetryAttempts 次請求嘗試均失敗 (最後錯誤類型: $errorType)',
-              error: e,
-              stackTrace: stackTrace);
+          _logger.w(
+              '$apiNameForLog - 所有 $_maxRetryAttempts 次請求嘗試均失敗 (最後錯誤類型: $errorType): $e');
 
           // 拋出包含用戶友好消息的異常
           throw ApiException(
@@ -766,7 +764,7 @@ class ApiClient {
       // 處理XML響應
       return _handleRssXmlResponse(response, 'getRthkNews');
     } catch (e) {
-      _logger.e(' 獲取RTHK新聞失敗: $e');
+      _logger.w(' 獲取RTHK新聞暫時失敗: $e');
 
       // 如果是超時錯誤，提供更友好的錯誤信息
       if (e.toString().contains('超時')) {

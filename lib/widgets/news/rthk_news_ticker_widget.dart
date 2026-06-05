@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:logger/logger.dart';
 import 'package:provider/provider.dart';
 import 'package:iboard_app/providers/rthk_news_provider.dart';
 
@@ -26,7 +25,6 @@ class RthkNewsTickerWidgetState extends State<RthkNewsTickerWidget>
   List<String> _previousNewsTexts = [];
 
   bool _isPaused = false;
-  final Logger logger = Logger();
 
   // 监听器变量，确保正确移除
   VoidCallback? _animationListener;
@@ -90,10 +88,6 @@ class RthkNewsTickerWidgetState extends State<RthkNewsTickerWidget>
     // 设置合理的时长范围 (10-120秒)
     final clampedDuration = durationSeconds.clamp(10, 120);
     _controller.duration = Duration(seconds: clampedDuration);
-
-    // 添加调试信息
-    logger.d(
-        '新闻跑马灯 - 内容宽度: $maxScrollExtent, 动画时长: ${clampedDuration}s, 滚动速度: ${(maxScrollExtent / clampedDuration).toStringAsFixed(1)}px/s');
 
     // 先移除已有監聽器
     _removeListeners();

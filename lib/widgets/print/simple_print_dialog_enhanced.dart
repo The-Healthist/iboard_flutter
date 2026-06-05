@@ -161,28 +161,19 @@ class SimplePrintDialogEnhancedState extends State<SimplePrintDialogEnhanced> {
 
   ///3, 開始列印 - 完整流程（使用Base64打印）
   Future<void> _startPrint() async {
-    debugPrint('═══════════════════════════════════════════════════════');
-    debugPrint(' [打印流程] 開始執行打印流程');
-    debugPrint('═══════════════════════════════════════════════════════');
-
     if (widget.localFilePath == null) {
-      debugPrint(' [打印流程] PDF文件路徑為空');
       setState(() {
         _hasCodeError = true;
       });
       return;
     }
-    debugPrint(' [打印流程] PDF文件路徑: ${widget.localFilePath}');
 
     if (_selectedPrinter == null) {
-      debugPrint(' [打印流程] 未選擇打印機');
       setState(() {
         _hasCodeError = true;
       });
       return;
     }
-    debugPrint(
-        ' [打印流程] 選擇的打印機: ${_selectedPrinter!.displayName} (${_selectedPrinter!.ipAddress})');
 
     try {
       final appDataProvider =
@@ -191,32 +182,15 @@ class SimplePrintDialogEnhancedState extends State<SimplePrintDialogEnhanced> {
           appDataProvider.deviceSettings?.printPassWord ?? '1090119';
       final input = _codeController.text.trim();
 
-      // 調試信息
-      debugPrint('───────────────────────────────────────────────────────');
-      debugPrint(' [密碼驗證] 開始驗證列印密碼');
-      _logger.i(' 列印密碼驗證:');
-      debugPrint('   輸入密碼: "$input"');
-      _logger.i('   輸入密碼: "$input"');
-      debugPrint('   期望密碼: "$expected"');
-      _logger.i('   期望密碼: "$expected"');
-      debugPrint(
-          '   DeviceSettings: ${appDataProvider.deviceSettings != null ? "已載入" : "未載入"}');
-      _logger.i(
-          '   DeviceSettings: ${appDataProvider.deviceSettings != null ? "已載入" : "未載入"}');
-
       if (input.isEmpty || input != expected) {
-        debugPrint(' [密碼驗證] 密碼驗證失敗!');
-        debugPrint('═══════════════════════════════════════════════════════');
-        _logger.w(' 密碼驗證失敗!');
+        _logger.w(' 列印密碼驗證失敗');
         setState(() {
           _hasCodeError = true;
         });
         return;
       }
 
-      debugPrint(' [密碼驗證] 密碼驗證成功!');
-      debugPrint('───────────────────────────────────────────────────────');
-      _logger.i(' 密碼驗證成功!');
+      _logger.i(' 列印密碼驗證成功');
 
       // 保存打印參數
       final selectedPrinter = _selectedPrinter!;
@@ -226,17 +200,8 @@ class SimplePrintDialogEnhancedState extends State<SimplePrintDialogEnhanced> {
       final duplexType = _duplexType;
       final totalPages = _totalPages;
 
-      debugPrint(' [打印參數]');
-      debugPrint('   打印機: ${selectedPrinter.displayName}');
-      debugPrint('   IP地址: ${selectedPrinter.ipAddress}');
-      debugPrint('   份數: $copies');
-      debugPrint('   顏色: ${colorMode == "color" ? "彩色" : "黑白"}');
-      debugPrint('   雙面: ${duplex ? "是" : "否"}');
-      if (duplex) {
-        debugPrint('   雙面類型: ${duplexType == "long-edge" ? "長邊翻轉" : "短邊翻轉"}');
-      }
-      debugPrint('   總頁數: $totalPages');
-      debugPrint('───────────────────────────────────────────────────────');
+      _logger.i(
+          ' [打印流程] 準備打印: printer=${selectedPrinter.displayName}, copies=$copies, color=$colorMode, duplex=$duplex, pages=$totalPages');
 
       // 標記為正在打印
       setState(() {
@@ -246,9 +211,6 @@ class SimplePrintDialogEnhancedState extends State<SimplePrintDialogEnhanced> {
 
       // 取消30秒自動關閉（將在打印完成後自動關閉）
       _autoCloseTimer?.cancel();
-
-      debugPrint(' [打印流程] 啟動後台打印任務...');
-      debugPrint('═══════════════════════════════════════════════════════');
 
       // 在後台執行打印流程
       _executePrintInBackground(
@@ -260,8 +222,6 @@ class SimplePrintDialogEnhancedState extends State<SimplePrintDialogEnhanced> {
         totalPages,
       );
     } catch (e) {
-      debugPrint(' [打印流程] 打印流程啟動失敗: $e');
-      debugPrint('═══════════════════════════════════════════════════════');
       _logger.e('打印流程啟動失敗: $e');
     }
   }
@@ -621,8 +581,7 @@ class SimplePrintDialogEnhancedState extends State<SimplePrintDialogEnhanced> {
       'offline': {'severity': 'error', 'message': ' 打印機離線'},
     };
 
-    return reasons[reason] ??
-        {'severity': 'info', 'message': ' 未知狀態: $reason'};
+    return reasons[reason] ?? {'severity': 'info', 'message': ' 未知狀態: $reason'};
   }
 
   ///10, 獲取打印機狀態信息(墨盒+狀態原因)
