@@ -502,7 +502,7 @@ class SimplePrintDialogEnhancedState extends State<SimplePrintDialogEnhanced> {
   Future<Map<String, dynamic>> _getAllJobs(String printerIp) async {
     try {
       final allJobs = await _printerProvider?.getPrintJobs(printerIp);
-      return (allJobs?['jobs'] as Map<String, dynamic>?) ?? {};
+      return normalizePrinterJobsById(allJobs?['jobs']);
     } catch (e) {
       return {};
     }
@@ -513,21 +513,7 @@ class SimplePrintDialogEnhancedState extends State<SimplePrintDialogEnhanced> {
       String printerIp, int cupsJobId) async {
     try {
       final jobs = await _getAllJobs(printerIp);
-
-      for (final entry in jobs.entries) {
-        final job = entry.value as Map<String, dynamic>;
-        if (job['cups_job_id'] == cupsJobId || job['job_id'] == cupsJobId) {
-          final completed = job['completed'] as bool?;
-          if (completed == true) {
-            return 'completed';
-          }
-          final stateCode = job['state_code'] as int?;
-          if (stateCode == 9) return 'completed';
-          if (stateCode == 5) return 'processing';
-          return job['status'] as String? ?? 'unknown';
-        }
-      }
-      return 'unknown';
+      return printerJobStateFromJobs(jobs, cupsJobId);
     } catch (e) {
       return 'unknown';
     }
@@ -535,13 +521,7 @@ class SimplePrintDialogEnhancedState extends State<SimplePrintDialogEnhanced> {
 
   ///7b, 找到新增的作業
   int? _findNewJob(Set<String> oldJobIds, Map<String, dynamic> newJobs) {
-    for (final entry in newJobs.entries) {
-      if (!oldJobIds.contains(entry.key)) {
-        final job = entry.value as Map<String, dynamic>;
-        return job['cups_job_id'] as int? ?? job['job_id'] as int?;
-      }
-    }
-    return null;
+    return findNewPrinterJobId(oldJobIds, newJobs);
   }
 
   ///8, 獲取打印機錯誤原因
@@ -636,8 +616,8 @@ class SimplePrintDialogEnhancedState extends State<SimplePrintDialogEnhanced> {
 
   @override
   Widget build(BuildContext context) {
-    return WillPopScope(
-      onWillPop: () async => true, // 允許返回鍵關閉
+    return PopScope(
+      canPop: true,
       child: Dialog(
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(8),
@@ -847,7 +827,7 @@ class SimplePrintDialogEnhancedState extends State<SimplePrintDialogEnhanced> {
                     Container(
                       width: 20,
                       height: 20,
-                      decoration: BoxDecoration(
+                      decoration: const BoxDecoration(
                         color: Colors.blue,
                         shape: BoxShape.circle,
                       ),
@@ -1191,4 +1171,94 @@ class SimplePrintDialogEnhancedState extends State<SimplePrintDialogEnhanced> {
       ),
     );
   }
+}
+
+@visibleForTesting
+Map<String, dynamic> normalizePrinterJobsById(Object? jobsValue) {
+  final jobs = <String, dynamic>{};
+
+  if (jobsValue is Map) {
+    for (final entry in jobsValue.entries) {
+      final job = _mapFromObject(entry.value);
+      if (job != null) {
+        jobs[entry.key.toString()] = job;
+      }
+    }
+    return jobs;
+  }
+
+  if (jobsValue is List) {
+    for (var index = 0; index < jobsValue.length; index++) {
+      final job = _mapFromObject(jobsValue[index]);
+      if (job == null) continue;
+
+      final jobId = _intFromObject(job['cups_job_id']) ??
+          _intFromObject(job['job_id']) ??
+          index;
+      jobs[jobId.toString()] = job;
+    }
+  }
+
+  return jobs;
+}
+
+@visibleForTesting
+String printerJobStateFromJobs(Map<String, dynamic> jobs, int cupsJobId) {
+  for (final entry in jobs.entries) {
+    final job = _mapFromObject(entry.value);
+    if (job == null) continue;
+
+    if (_intFromObject(job['cups_job_id']) == cupsJobId ||
+        _intFromObject(job['job_id']) == cupsJobId) {
+      if (_boolFromObject(job['completed'])) {
+        return 'completed';
+      }
+
+      final stateCode = _intFromObject(job['state_code']);
+      if (stateCode == 9) return 'completed';
+      if (stateCode == 5) return 'processing';
+      return job['status']?.toString() ?? 'unknown';
+    }
+  }
+  return 'unknown';
+}
+
+@visibleForTesting
+int? findNewPrinterJobId(Set<String> oldJobIds, Map<String, dynamic> newJobs) {
+  for (final entry in newJobs.entries) {
+    if (oldJobIds.contains(entry.key)) continue;
+
+    final job = _mapFromObject(entry.value);
+    if (job == null) continue;
+
+    return _intFromObject(job['cups_job_id']) ?? _intFromObject(job['job_id']);
+  }
+  return null;
+}
+
+Map<String, dynamic>? _mapFromObject(Object? value) {
+  if (value is Map<String, dynamic>) {
+    return value;
+  }
+  if (value is Map) {
+    return value.map((key, value) => MapEntry(key.toString(), value));
+  }
+  return null;
+}
+
+int? _intFromObject(Object? value) {
+  if (value is int) return value;
+  if (value is num) return value.toInt();
+  if (value is String) return int.tryParse(value.trim());
+  return null;
+}
+
+bool _boolFromObject(Object? value) {
+  if (value is bool) return value;
+  if (value is num) return value != 0;
+  if (value is String) {
+    final normalized = value.trim().toLowerCase();
+    return normalized == 'true' || normalized == '1' || normalized == 'yes';
+  }
+  return false;
 }
