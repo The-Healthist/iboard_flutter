@@ -27,9 +27,10 @@ class PrinterConnectionManager {
       // 載入已保存的打印機列表
       final printersJson = prefs.getString(_printerListKey);
       if (printersJson != null) {
-        final printersList = jsonDecode(printersJson) as List;
+        final printersList = _listFromJson(jsonDecode(printersJson));
         _savedPrinters = printersList
-            .map((json) => PrinterDeviceJson.fromJson(json))
+            .map(PrinterDeviceJson.fromJson)
+            .whereType<PrinterDevice>()
             .toList();
         _logger.i(' 載入了 ${_savedPrinters.length} 個已保存的打印機');
       }
@@ -37,8 +38,9 @@ class PrinterConnectionManager {
       // 載入默認打印機
       final defaultPrinterJson = prefs.getString(_defaultPrinterKey);
       if (defaultPrinterJson != null) {
-        final defaultPrinterMap = jsonDecode(defaultPrinterJson);
-        _defaultPrinter = PrinterDeviceJson.fromJson(defaultPrinterMap);
+        _defaultPrinter = PrinterDeviceJson.fromJson(
+          jsonDecode(defaultPrinterJson),
+        );
         _logger.i(' 載入默認打印機: ${_defaultPrinter?.name}');
       }
     } catch (e) {
@@ -179,6 +181,13 @@ class PrinterConnectionManager {
       _logger.e('清除打印機數據失敗: $e');
     }
   }
+
+  List<Object?> _listFromJson(Object? value) {
+    if (value is List) {
+      return value;
+    }
+    return const [];
+  }
 }
 
 /// PrinterDevice 擴展方法，添加 JSON 序列化支持
@@ -193,13 +202,33 @@ extension PrinterDeviceJson on PrinterDevice {
     };
   }
 
-  static PrinterDevice fromJson(Map<String, dynamic> json) {
+  static PrinterDevice? fromJson(Object? value) {
+    final json = _nullableMap(value);
+    if (json == null) return null;
+
+    final id = _stringOrNull(json['id']);
+    final name = _stringOrNull(json['name']);
+    if (id == null || name == null) return null;
+
     return PrinterDevice(
-      id: json['id'] as String,
-      name: json['name'] as String,
-      ipAddress: json['ipAddress'] as String?,
-      isConnected: json['isConnected'] as bool,
-      model: json['model'] as String?,
+      id: id,
+      name: name,
+      ipAddress: _stringOrNull(json['ipAddress']),
+      isConnected: json['isConnected'] == true,
+      model: _stringOrNull(json['model']),
     );
+  }
+
+  static Map<String, dynamic>? _nullableMap(Object? value) {
+    if (value is Map<String, dynamic>) return value;
+    if (value is Map) {
+      return value.map((key, value) => MapEntry(key.toString(), value));
+    }
+    return null;
+  }
+
+  static String? _stringOrNull(Object? value) {
+    if (value is String && value.isNotEmpty) return value;
+    return null;
   }
 }
