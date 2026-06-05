@@ -44,17 +44,17 @@ class PaymentBill {
   });
 
   factory PaymentBill.fromJson(Map<String, dynamic> json) {
+    final netAmount = _parseDouble(json['net_amount']);
     return PaymentBill(
       flatCode: json['flat_code']?.toString() ?? '',
       itemId: json['item_id']?.toString() ?? '',
       trsTo: json['trs_to']?.toString() ?? '',
       billDt: json['bill_dt']?.toString() ?? '',
-      netAmount: (json['net_amount'] as num?)?.toDouble() ?? 0.0,
+      netAmount: netAmount,
       invoiceNo: json['invoice_no']?.toString() ?? '',
       remark: json['remark']?.toString(),
       unitName: json['unit_name']?.toString(),
-      paidAmount: (json['paid_amount'] as num?)?.toDouble() ??
-          ((json['net_amount'] as num?)?.toDouble() ?? 0.0),
+      paidAmount: _parseNullableDouble(json['paid_amount']) ?? netAmount,
     );
   }
 
@@ -89,7 +89,8 @@ class PaymentBill {
     String? unitName,
   }) {
     return jsonList
-        .map((e) => PaymentBill.fromJson(e as Map<String, dynamic>))
+        .whereType<Map>()
+        .map((e) => PaymentBill.fromJson(_parseMap(e)))
         .map((bill) => (unitName != null && unitName.isNotEmpty)
             ? bill.copyWith(
                 unitName: (bill.unitName == null || bill.unitName!.isEmpty)
@@ -174,29 +175,25 @@ class ThirdPartyPaymentResponse {
     // 尝试从多个可能的字段中获取QR码数据
     String? qrCodeData;
     if (json['payData'] != null) {
-      qrCodeData = json['payData'] as String?;
+      qrCodeData = json['payData']?.toString();
     } else if (json['codeUrl'] != null) {
-      qrCodeData = json['codeUrl'] as String?;
+      qrCodeData = json['codeUrl']?.toString();
     } else if (json['qr_code'] != null) {
-      qrCodeData = json['qr_code'] as String?;
+      qrCodeData = json['qr_code']?.toString();
     }
 
     return ThirdPartyPaymentResponse(
       qrCode: qrCodeData,
-      transactionId: json['channelOrderNo'] as String?,
-      orderNo: json['mchOrderNo'] as String?,
-      payOrderId: json['payOrderId'] as String?,
-      amount: json['amount'] as int?,
-      currency: json['currency'] as String?,
-      state: json['state'] as int?,
-      errCode: json['errCode'] as String?,
-      errMsg: json['errMsg'] as String?,
-      createdAt: json['createdTime'] != null
-          ? DateTime.fromMillisecondsSinceEpoch(json['createdTime'])
-          : null,
-      successTime: json['successTime'] != null
-          ? DateTime.fromMillisecondsSinceEpoch(json['successTime'])
-          : null,
+      transactionId: json['channelOrderNo']?.toString(),
+      orderNo: json['mchOrderNo']?.toString(),
+      payOrderId: json['payOrderId']?.toString(),
+      amount: _parseNullableInt(json['amount']),
+      currency: json['currency']?.toString(),
+      state: _parseNullableInt(json['state']),
+      errCode: json['errCode']?.toString(),
+      errMsg: json['errMsg']?.toString(),
+      createdAt: _parseEpochMilliseconds(json['createdTime']),
+      successTime: _parseEpochMilliseconds(json['successTime']),
     );
   }
 
@@ -271,7 +268,7 @@ class PaymentResponse {
       qrCode: json['qr_code']?.toString(),
       paymentUrl: json['payment_url']?.toString(),
       receiptId: json['receipt_id']?.toString(),
-      handlingFee: (json['handling_fee'] as num?)?.toDouble(),
+      handlingFee: _parseNullableDouble(json['handling_fee']),
       createdAt: json['created_at'] != null
           ? DateTime.tryParse(json['created_at'].toString())
           : null,
@@ -279,7 +276,7 @@ class PaymentResponse {
           ? DateTime.tryParse(json['completed_at'].toString())
           : null,
       errorMessage: json['error_message']?.toString(),
-      rawData: json['raw_data'] as Map<String, dynamic>?,
+      rawData: _nullableMap(json['raw_data']),
     );
   }
 
@@ -489,9 +486,10 @@ class PaymentConfig {
       final List<dynamic> transactionTypes = json['transaction_types'];
 
       for (final type in transactionTypes) {
-        if (type is Map<String, dynamic>) {
-          final payType = type['pay_type']?.toString();
-          final markup = (type['markup'] as num?)?.toDouble() ?? 0.0;
+        final transactionType = _nullableMap(type);
+        if (transactionType != null) {
+          final payType = transactionType['pay_type']?.toString();
+          final markup = _parseDouble(transactionType['markup']);
 
           // 映射支付類型到我們的枚舉
           if (payType == 'POS_ALIWE') {
@@ -502,7 +500,8 @@ class PaymentConfig {
             feeRates['unionpay'] = markup;
             enabledMethods.add(PaymentMethod.unionpay);
           } else if (payType == 'POS_CARD') {
-            final payTypeName = type['pay_type_name_chi']?.toString() ?? '';
+            final payTypeName =
+                transactionType['pay_type_name_chi']?.toString() ?? '';
             // 检查是否为云闪付（根据中文名判断）
             if (payTypeName.contains('雲閃付') ||
                 payTypeName.contains('银联') ||
@@ -538,10 +537,10 @@ class PaymentConfig {
           ? enabledMethods.toList(growable: false)
           : _parsePaymentMethods(json['enabled_methods']),
       feeRates: feeRates,
-      bankAccount: bankAccountJson is Map<String, dynamic>
-          ? BankAccountInfo.fromJson(bankAccountJson)
+      bankAccount: _nullableMap(bankAccountJson) != null
+          ? BankAccountInfo.fromJson(_parseMap(bankAccountJson))
           : null,
-      settings: json['settings'] as Map<String, dynamic>?,
+      settings: _nullableMap(json['settings']),
     );
   }
 
@@ -558,24 +557,29 @@ class PaymentConfig {
   static List<PaymentMethod> _parsePaymentMethods(dynamic methods) {
     if (methods == null || methods is! List) return [];
 
-    return methods.map((method) {
-      switch (method.toString().toLowerCase()) {
-        case 'wechat':
-          return PaymentMethod.wechat;
-        case 'alipay':
-          return PaymentMethod.alipay;
-        case 'unionpay':
-          return PaymentMethod.unionpay;
-        case 'card':
-          return PaymentMethod.card;
-        case 'cash':
-          return PaymentMethod.cash;
-        case 'bank_transfer':
-          return PaymentMethod.bankTransfer;
-        default:
-          return PaymentMethod.wechat;
-      }
-    }).toList();
+    return methods
+        .map((method) {
+          switch (method.toString().toLowerCase()) {
+            case 'wechat':
+              return PaymentMethod.wechat;
+            case 'alipay':
+              return PaymentMethod.alipay;
+            case 'unionpay':
+              return PaymentMethod.unionpay;
+            case 'card':
+              return PaymentMethod.card;
+            case 'cash':
+              return PaymentMethod.cash;
+            case 'bank_transfer':
+              return PaymentMethod.bankTransfer;
+            case 'cheque':
+              return PaymentMethod.cheque;
+            default:
+              return null;
+          }
+        })
+        .whereType<PaymentMethod>()
+        .toList();
   }
 
   static String _paymentMethodToString(PaymentMethod method) {
@@ -661,4 +665,59 @@ class PaymentConfig {
     final feeRate = feeRates[_getMethodKey(method)] ?? 0.0;
     return feeRate * 100; // 轉換為百分比
   }
+}
+
+Map<String, dynamic> _parseMap(Object? value) {
+  return _nullableMap(value) ?? const {};
+}
+
+Map<String, dynamic>? _nullableMap(Object? value) {
+  if (value is Map<String, dynamic>) {
+    return value;
+  }
+  if (value is Map) {
+    return value.map((key, value) => MapEntry(key.toString(), value));
+  }
+  return null;
+}
+
+double _parseDouble(Object? value) {
+  if (value is num) {
+    return value.toDouble();
+  }
+  if (value is String) {
+    return double.tryParse(value) ?? 0.0;
+  }
+  return 0.0;
+}
+
+double? _parseNullableDouble(Object? value) {
+  if (value == null || value == '') {
+    return null;
+  }
+  return _parseDouble(value);
+}
+
+int? _parseNullableInt(Object? value) {
+  if (value == null || value == '') {
+    return null;
+  }
+  if (value is int) {
+    return value;
+  }
+  if (value is num) {
+    return value.toInt();
+  }
+  if (value is String) {
+    return int.tryParse(value);
+  }
+  return null;
+}
+
+DateTime? _parseEpochMilliseconds(Object? value) {
+  final milliseconds = _parseNullableInt(value);
+  if (milliseconds == null) {
+    return null;
+  }
+  return DateTime.fromMillisecondsSinceEpoch(milliseconds);
 }

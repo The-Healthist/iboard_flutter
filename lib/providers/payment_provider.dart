@@ -61,9 +61,19 @@ class PaymentNotifier extends ChangeNotifier {
       final prefs = await SharedPreferences.getInstance();
       final paymentRecords = prefs.getStringList('payment_records') ?? [];
 
-      return paymentRecords.map((record) {
-        return json.decode(record) as Map<String, dynamic>;
-      }).toList();
+      final history = <Map<String, dynamic>>[];
+      for (final record in paymentRecords) {
+        try {
+          final decoded = json.decode(record);
+          final normalized = _nullableMap(decoded);
+          if (normalized != null) {
+            history.add(normalized);
+          }
+        } catch (_) {
+          // 忽略單條損壞記錄，保留其它可用歷史
+        }
+      }
+      return history;
     } catch (e) {
       return [];
     }
@@ -696,6 +706,16 @@ class PaymentNotifier extends ChangeNotifier {
     _stopPaymentStatusPolling();
     super.dispose();
   }
+}
+
+Map<String, dynamic>? _nullableMap(Object? value) {
+  if (value is Map<String, dynamic>) {
+    return value;
+  }
+  if (value is Map) {
+    return value.map((key, value) => MapEntry(key.toString(), value));
+  }
+  return null;
 }
 
 /// 支付狀態數據類
