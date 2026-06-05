@@ -62,7 +62,8 @@ class PrintApiClient {
         return {'success': true};
       }
       try {
-        return json.decode(decodedBody) as Map<String, dynamic>;
+        final decoded = json.decode(decodedBody);
+        return _mapFromObject(decoded) ?? {};
       } catch (e) {
         _logger.e(' [$apiName] JSON解析失敗: $e');
         throw Exception('$apiName: JSON解析失敗');
@@ -72,9 +73,10 @@ class PrintApiClient {
       String errorMessage = response.reasonPhrase ?? '未知錯誤';
       try {
         final errorData = json.decode(decodedBody);
-        if (errorData is Map<String, dynamic>) {
+        final errorMap = _mapFromObject(errorData);
+        if (errorMap != null) {
           errorMessage =
-              (errorData['message'] ?? errorData['error'])?.toString() ??
+              (errorMap['message'] ?? errorMap['error'])?.toString() ??
                   errorMessage;
         }
       } catch (_) {
@@ -195,9 +197,10 @@ class PrintApiClient {
           .timeout(_requestTimeout);
 
       final data = _handleResponse(response, '獲取打印機詳情');
+      final printerData = _mapFromObject(data['printer']);
 
-      if (data['success'] == true && data['printer'] != null) {
-        final result = PrinterDetails.fromJson(data['printer']);
+      if (data['success'] == true && printerData != null) {
+        final result = PrinterDetails.fromJson(printerData);
         _logger.i(' [打印機詳情] 成功: ${result.name}');
         return result;
       } else {
@@ -525,5 +528,15 @@ class PrintApiClient {
 
     _logger.i(' [批量測試] 完成: ${results.length}個結果');
     return results;
+  }
+
+  Map<String, dynamic>? _mapFromObject(Object? value) {
+    if (value is Map<String, dynamic>) {
+      return value;
+    }
+    if (value is Map) {
+      return value.map((key, value) => MapEntry(key.toString(), value));
+    }
+    return null;
   }
 }

@@ -7,6 +7,54 @@ import 'package:iboard_app/http/api_print.dart';
 import 'package:iboard_app/models/printer_model.dart';
 
 void main() {
+  group('PrintApiClient response parsing', () {
+    test('uses model defaults for non-map successful JSON', () async {
+      final client = PrintApiClient(
+        orangePiIp: '192.168.1.20',
+        httpClient: MockClient((request) async {
+          return http.Response(
+            jsonEncode(['unexpected']),
+            200,
+            headers: {'content-type': 'application/json'},
+          );
+        }),
+      );
+
+      final response = await client.healthCheck();
+
+      expect(response.status, 'unknown');
+      expect(response.isHealthy, isFalse);
+    });
+
+    test('rejects malformed printer details without a type cast failure',
+        () async {
+      final client = PrintApiClient(
+        orangePiIp: '192.168.1.20',
+        httpClient: MockClient((request) async {
+          return http.Response(
+            jsonEncode({
+              'success': true,
+              'printer': ['not-a-printer-map'],
+            }),
+            200,
+            headers: {'content-type': 'application/json'},
+          );
+        }),
+      );
+
+      expect(
+        () => client.getPrinterDetails(1),
+        throwsA(
+          isA<Exception>().having(
+            (error) => error.toString(),
+            'message',
+            contains('無效的響應數據'),
+          ),
+        ),
+      );
+    });
+  });
+
   group('PrintApiClient.printPdfBase64', () {
     test('submits the expected flattened print request body', () async {
       late Uri capturedUri;
