@@ -6,8 +6,8 @@ class LightningDataModel {
 
   factory LightningDataModel.fromJson(Map<String, dynamic> json) {
     return LightningDataModel(
-      place: json['place'] as String,
-      occur: (json['occur'] as String).toLowerCase() == 'true',
+      place: _parseString(json['place']),
+      occur: _parseBool(json['occur']),
     );
   }
 
@@ -27,15 +27,10 @@ class LightningInfoModel {
   LightningInfoModel({required this.data, this.startTime, this.endTime});
 
   factory LightningInfoModel.fromJson(Map<String, dynamic> json) {
-    var list = json['data'] as List?;
-    List<LightningDataModel> dataList = list
-            ?.map((i) => LightningDataModel.fromJson(i as Map<String, dynamic>))
-            .toList() ??
-        [];
     return LightningInfoModel(
-      data: dataList,
-      startTime: json['startTime'] as String?,
-      endTime: json['endTime'] as String?,
+      data: _parseObjectList(json['data'], LightningDataModel.fromJson),
+      startTime: _parseNullableString(json['startTime']),
+      endTime: _parseNullableString(json['endTime']),
     );
   }
 
@@ -65,11 +60,11 @@ class RainfallDataModel {
 
   factory RainfallDataModel.fromJson(Map<String, dynamic> json) {
     return RainfallDataModel(
-      unit: json['unit'] as String,
-      place: json['place'] as String,
-      max: json['max'] as num,
-      main: (json['main'] as String?) ?? "", // 处理null或空字符串
-      min: json['min'] as num?,
+      unit: _parseString(json['unit']),
+      place: _parseString(json['place']),
+      max: _parseNum(json['max']),
+      main: _parseString(json['main']),
+      min: _parseNullableNum(json['min']),
     );
   }
 
@@ -92,15 +87,10 @@ class RainfallInfoModel {
   RainfallInfoModel({required this.data, this.startTime, this.endTime});
 
   factory RainfallInfoModel.fromJson(Map<String, dynamic> json) {
-    var list = json['data'] as List?;
-    List<RainfallDataModel> dataList = list
-            ?.map((i) => RainfallDataModel.fromJson(i as Map<String, dynamic>))
-            .toList() ??
-        [];
     return RainfallInfoModel(
-      data: dataList,
-      startTime: json['startTime'] as String?,
-      endTime: json['endTime'] as String?,
+      data: _parseObjectList(json['data'], RainfallDataModel.fromJson),
+      startTime: _parseNullableString(json['startTime']),
+      endTime: _parseNullableString(json['endTime']),
     );
   }
 
@@ -123,9 +113,9 @@ class CurrentTemperatureDataModel {
 
   factory CurrentTemperatureDataModel.fromJson(Map<String, dynamic> json) {
     return CurrentTemperatureDataModel(
-      place: json['place'] as String,
-      value: json['value'] as int,
-      unit: json['unit'] as String,
+      place: _parseString(json['place']),
+      value: _parseInt(json['value']),
+      unit: _parseString(json['unit']),
     );
   }
 
@@ -145,14 +135,10 @@ class CurrentTemperatureInfoModel {
   CurrentTemperatureInfoModel({required this.data, required this.recordTime});
 
   factory CurrentTemperatureInfoModel.fromJson(Map<String, dynamic> json) {
-    var list = json['data'] as List;
-    List<CurrentTemperatureDataModel> dataList = list
-        .map((i) =>
-            CurrentTemperatureDataModel.fromJson(i as Map<String, dynamic>))
-        .toList();
     return CurrentTemperatureInfoModel(
-      data: dataList,
-      recordTime: json['recordTime'] as String,
+      data:
+          _parseObjectList(json['data'], CurrentTemperatureDataModel.fromJson),
+      recordTime: _parseString(json['recordTime']),
     );
   }
 
@@ -174,9 +160,9 @@ class HumidityDataModel {
 
   factory HumidityDataModel.fromJson(Map<String, dynamic> json) {
     return HumidityDataModel(
-      unit: json['unit'] as String,
-      value: json['value'] as int,
-      place: json['place'] as String,
+      unit: _parseString(json['unit']),
+      value: _parseInt(json['value']),
+      place: _parseString(json['place']),
     );
   }
 
@@ -196,13 +182,9 @@ class HumidityInfoModel {
   HumidityInfoModel({required this.recordTime, required this.data});
 
   factory HumidityInfoModel.fromJson(Map<String, dynamic> json) {
-    var list = json['data'] as List;
-    List<HumidityDataModel> dataList = list
-        .map((i) => HumidityDataModel.fromJson(i as Map<String, dynamic>))
-        .toList();
     return HumidityInfoModel(
-      recordTime: json['recordTime'] as String,
-      data: dataList,
+      recordTime: _parseString(json['recordTime']),
+      data: _parseObjectList(json['data'], HumidityDataModel.fromJson),
     );
   }
 
@@ -228,9 +210,9 @@ class UvIndexDataModel {
   ///1, 从JSON数据创建UvIndexDataModel实例，支持double和int类型的value
   factory UvIndexDataModel.fromJson(Map<String, dynamic> json) {
     return UvIndexDataModel(
-      place: json['place'] as String,
-      value: (json['value'] as num).toDouble(),
-      desc: json['desc'] as String,
+      place: _parseString(json['place']),
+      value: _parseNum(json['value']).toDouble(),
+      desc: _parseString(json['desc']),
     );
   }
 
@@ -253,13 +235,9 @@ class UvIndexInfoModel {
   });
 
   factory UvIndexInfoModel.fromJson(Map<String, dynamic> json) {
-    var list = json['data'] as List;
-    List<UvIndexDataModel> dataList = list
-        .map((i) => UvIndexDataModel.fromJson(i as Map<String, dynamic>))
-        .toList();
     return UvIndexInfoModel(
-      data: dataList,
-      recordDesc: json['recordDesc'] as String,
+      data: _parseObjectList(json['data'], UvIndexDataModel.fromJson),
+      recordDesc: _parseString(json['recordDesc']),
     );
   }
 
@@ -310,7 +288,7 @@ class CurrentWeatherDataModel {
       return null;
     }
     if (value is List) {
-      return value.map((e) => e as String).toList();
+      return _parseStringList(value);
     }
     if (value is String && value.isNotEmpty) {
       return [value];
@@ -323,7 +301,7 @@ class CurrentWeatherDataModel {
     if (value == null || value == "") {
       return null;
     }
-    return value as String?;
+    return value.toString();
   }
 
   factory CurrentWeatherDataModel.fromJson(Map<String, dynamic> json) {
@@ -332,7 +310,7 @@ class CurrentWeatherDataModel {
     if (rawWarningMessage == null || rawWarningMessage == "") {
       parsedWarningMessage = null;
     } else if (rawWarningMessage is List) {
-      parsedWarningMessage = rawWarningMessage.map((e) => e as String).toList();
+      parsedWarningMessage = _parseStringList(rawWarningMessage);
     } else if (rawWarningMessage is String) {
       if (rawWarningMessage.trim().isEmpty) {
         parsedWarningMessage = null;
@@ -347,19 +325,17 @@ class CurrentWeatherDataModel {
 
     return CurrentWeatherDataModel(
       lightning: json['lightning'] != null
-          ? LightningInfoModel.fromJson(
-              json['lightning'] as Map<String, dynamic>)
+          ? LightningInfoModel.fromJson(_parseMap(json['lightning']))
           : null,
       rainfall: json['rainfall'] != null
-          ? RainfallInfoModel.fromJson(json['rainfall'] as Map<String, dynamic>)
+          ? RainfallInfoModel.fromJson(_parseMap(json['rainfall']))
           : null,
       warningMessage: parsedWarningMessage, // Use the safely parsed value
-      icon: (json['icon'] as List<dynamic>?)?.map((e) => e as int).toList(),
+      icon: _parseIntList(json['icon']),
       iconUpdateTime: _parseEmptyString(json['iconUpdateTime']),
-      updateTime: json['updateTime'] as String,
+      updateTime: _parseString(json['updateTime']),
       temperature: json['temperature'] != null
-          ? CurrentTemperatureInfoModel.fromJson(
-              json['temperature'] as Map<String, dynamic>)
+          ? CurrentTemperatureInfoModel.fromJson(_parseMap(json['temperature']))
           : null,
       tcmessage: _parseTcMessage(json['tcmessage']),
       mintempFrom00To09: _parseEmptyString(json['mintempFrom00To09']),
@@ -368,10 +344,10 @@ class CurrentWeatherDataModel {
       rainfallJanuaryToLastMonth:
           _parseEmptyString(json['rainfallJanuaryToLastMonth']),
       humidity: json['humidity'] != null
-          ? HumidityInfoModel.fromJson(json['humidity'] as Map<String, dynamic>)
+          ? HumidityInfoModel.fromJson(_parseMap(json['humidity']))
           : null,
       uvindex: json['uvindex'] != null && json['uvindex'] != ""
-          ? UvIndexInfoModel.fromJson(json['uvindex'] as Map<String, dynamic>)
+          ? UvIndexInfoModel.fromJson(_parseMap(json['uvindex']))
           : null,
     );
   }
@@ -394,4 +370,108 @@ class CurrentWeatherDataModel {
       'uvindex': uvindex?.toJson(),
     };
   }
+}
+
+List<T> _parseObjectList<T>(
+  Object? value,
+  T Function(Map<String, dynamic> json) fromJson,
+) {
+  if (value is! List) {
+    return [];
+  }
+
+  final items = <T>[];
+  for (final item in value) {
+    final map = _nullableMap(item);
+    if (map != null) {
+      items.add(fromJson(map));
+    }
+  }
+  return items;
+}
+
+Map<String, dynamic> _parseMap(Object? value) {
+  return _nullableMap(value) ?? const {};
+}
+
+Map<String, dynamic>? _nullableMap(Object? value) {
+  if (value is Map<String, dynamic>) {
+    return value;
+  }
+  if (value is Map) {
+    return value.map((key, value) => MapEntry(key.toString(), value));
+  }
+  return null;
+}
+
+String _parseString(Object? value) {
+  return value?.toString() ?? '';
+}
+
+String? _parseNullableString(Object? value) {
+  if (value == null || value == '') {
+    return null;
+  }
+  return value.toString();
+}
+
+int _parseInt(Object? value) {
+  if (value is int) {
+    return value;
+  }
+  if (value is num) {
+    return value.toInt();
+  }
+  if (value is String) {
+    return int.tryParse(value) ?? 0;
+  }
+  return 0;
+}
+
+num _parseNum(Object? value) {
+  if (value is num) {
+    return value;
+  }
+  if (value is String) {
+    return num.tryParse(value) ?? 0;
+  }
+  return 0;
+}
+
+num? _parseNullableNum(Object? value) {
+  if (value == null || value == '') {
+    return null;
+  }
+  return _parseNum(value);
+}
+
+bool _parseBool(Object? value) {
+  if (value is bool) {
+    return value;
+  }
+  if (value is num) {
+    return value != 0;
+  }
+  if (value is String) {
+    final normalized = value.toLowerCase();
+    return normalized == 'true' || normalized == '1' || normalized == 'yes';
+  }
+  return false;
+}
+
+List<String>? _parseStringList(Object? value) {
+  if (value is! List) {
+    return null;
+  }
+  return value
+      .map((item) => item?.toString() ?? '')
+      .where((item) => item.isNotEmpty)
+      .toList();
+}
+
+List<int>? _parseIntList(Object? value) {
+  if (value is! List) {
+    return null;
+  }
+  return value.map(_parseInt).toList();
 }
