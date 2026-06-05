@@ -128,27 +128,44 @@ class Settings {
 
   factory Settings.fromJson(Map<String, dynamic> json) {
     // 支持多種可能的字段名格式
-    final printPassword = json['printPassWord'] ?? 
-                         json['printPassword'] ?? 
-                         json['print_password'] ?? 
-                         json['print_pass_word'] ?? 
-                         '1090119';
-    
+    final printPassword = json['printPassWord'] ??
+        json['printPassword'] ??
+        json['print_password'] ??
+        json['print_pass_word'] ??
+        '1090119';
+
     return Settings(
-      arrearageUpdateDuration: json['arrearageUpdateDuration'] ?? 30,
-      noticeUpdateDuration: json['noticeUpdateDuration'] ?? 5,
-      advertisementUpdateDuration: json['advertisementUpdateDuration'] ?? 10,
-      appUpdateDuration: json['appUpdateDuration'] ?? 60,
-      advertisementPlayDuration: json['advertisementPlayDuration'] ?? 10,
-      noticeStayDuration: json['noticeStayDuration'] ?? 5,
-      bottomCarouselDuration: json['bottomCarouselDuration'] ?? 10,
-      paymentTableOnePageDuration: json['paymentTableOnePageDuration'] ?? 10,
+      arrearageUpdateDuration:
+          _readPositiveInt(json['arrearageUpdateDuration'], 30),
+      noticeUpdateDuration: _readPositiveInt(json['noticeUpdateDuration'], 5),
+      advertisementUpdateDuration:
+          _readPositiveInt(json['advertisementUpdateDuration'], 10),
+      appUpdateDuration: _readPositiveInt(json['appUpdateDuration'], 60),
+      advertisementPlayDuration:
+          _readPositiveInt(json['advertisementPlayDuration'], 10),
+      noticeStayDuration: _readPositiveInt(json['noticeStayDuration'], 5),
+      bottomCarouselDuration:
+          _readPositiveInt(json['bottomCarouselDuration'], 10),
+      paymentTableOnePageDuration:
+          _readPositiveInt(json['paymentTableOnePageDuration'], 10),
       normalToAnnouncementCarouselDuration:
-          json['normalToAnnouncementCarouselDuration'] ?? 5,
-      announcementCarouselToFullAdsCarouselDuration:
-          json['announcementCarouselToFullAdsCarouselDuration'] ?? 5,
+          _readPositiveInt(json['normalToAnnouncementCarouselDuration'], 5),
+      announcementCarouselToFullAdsCarouselDuration: _readPositiveInt(
+          json['announcementCarouselToFullAdsCarouselDuration'], 5),
       printPassWord: printPassword.toString(),
-      orangePiIp: json['orangePiIp'] ?? '',
+      orangePiIp: json['orangePiIp']?.toString().trim() ?? '',
     );
+  }
+
+  static int _readPositiveInt(dynamic value, int fallback) {
+    final parsed = switch (value) {
+      int v => v,
+      double v => v.toInt(),
+      String v => int.tryParse(v.trim()),
+      _ => null,
+    };
+
+    if (parsed == null || parsed <= 0) return fallback;
+    return parsed;
   }
 }
