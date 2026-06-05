@@ -6,10 +6,7 @@ class ManagementFeeModel {
 
   factory ManagementFeeModel.fromJson(Map<String, dynamic> json) {
     return ManagementFeeModel(
-      blocks: (json['blocks'] as List<dynamic>?)
-              ?.map((block) => Block.fromJson(block as Map<String, dynamic>))
-              .toList() ??
-          [],
+      blocks: _parseObjectList(json['blocks'], Block.fromJson),
     );
   }
 
@@ -29,10 +26,7 @@ class Block {
   factory Block.fromJson(Map<String, dynamic> json) {
     return Block(
       name: json['name']?.toString() ?? '',
-      floors: (json['floors'] as List<dynamic>?)
-              ?.map((floor) => Floor.fromJson(floor as Map<String, dynamic>))
-              .toList() ??
-          [],
+      floors: _parseObjectList(json['floors'], Floor.fromJson),
     );
   }
 
@@ -53,10 +47,7 @@ class Floor {
   factory Floor.fromJson(Map<String, dynamic> json) {
     return Floor(
       name: json['name']?.toString() ?? '',
-      units: (json['units'] as List<dynamic>?)
-              ?.map((unit) => Unit.fromJson(unit as Map<String, dynamic>))
-              .toList() ??
-          [],
+      units: _parseObjectList(json['units'], Unit.fromJson),
     );
   }
 
@@ -77,10 +68,7 @@ class Unit {
   factory Unit.fromJson(Map<String, dynamic> json) {
     return Unit(
       name: json['name']?.toString() ?? '',
-      bills: (json['bills'] as List<dynamic>?)
-              ?.map((bill) => Bill.fromJson(bill as Map<String, dynamic>))
-              .toList() ??
-          [],
+      bills: _parseObjectList(json['bills'], Bill.fromJson),
     );
   }
 
@@ -147,6 +135,9 @@ class Bill {
     if (value is num) {
       return value.toDouble();
     }
+    if (value is String) {
+      return double.tryParse(value);
+    }
     return null;
   }
 
@@ -187,10 +178,7 @@ class OtherFeeModel {
 
   factory OtherFeeModel.fromJson(Map<String, dynamic> json) {
     return OtherFeeModel(
-      blocks: (json['blocks'] as List<dynamic>?)
-              ?.map((block) => Block.fromJson(block as Map<String, dynamic>))
-              .toList() ??
-          [],
+      blocks: _parseObjectList(json['blocks'], Block.fromJson),
     );
   }
 
@@ -228,6 +216,8 @@ class ArrearModel {
   });
 
   factory ArrearModel.fromJson(Map<String, dynamic> json) {
+    final now = DateTime.now();
+
     return ArrearModel(
       id: json['id']?.toString() ?? '',
       blgId: json['blg_id']?.toString() ?? json['blgId']?.toString() ?? '',
@@ -235,28 +225,12 @@ class ArrearModel {
       customerName: json['customer_name']?.toString() ??
           json['customerName']?.toString() ??
           '',
-      amount: (json['amount'] is num) ? json['amount'].toDouble() : 0.0,
-      dueDate: json['due_date'] != null
-          ? DateTime.parse(json['due_date'].toString())
-          : json['dueDate'] != null
-              ? DateTime.parse(json['dueDate'].toString())
-              : DateTime.now(),
-      createdAt: json['created_at'] != null
-          ? DateTime.parse(json['created_at'].toString())
-          : json['createdAt'] != null
-              ? DateTime.parse(json['createdAt'].toString())
-              : DateTime.now(),
-      updatedAt: json['updated_at'] != null
-          ? DateTime.parse(json['updated_at'].toString())
-          : json['updatedAt'] != null
-              ? DateTime.parse(json['updatedAt'].toString())
-              : DateTime.now(),
-      deletedAt: json['deleted_at'] != null
-          ? DateTime.parse(json['deleted_at'].toString())
-          : json['deletedAt'] != null
-              ? DateTime.parse(json['deletedAt'].toString())
-              : null,
-      isDeleted: json['is_deleted'] ?? json['isDeleted'] ?? false,
+      amount: _parseDouble(json['amount']),
+      dueDate: _parseDate(json['due_date'] ?? json['dueDate']) ?? now,
+      createdAt: _parseDate(json['created_at'] ?? json['createdAt']) ?? now,
+      updatedAt: _parseDate(json['updated_at'] ?? json['updatedAt']) ?? now,
+      deletedAt: _parseDate(json['deleted_at'] ?? json['deletedAt']),
+      isDeleted: _parseBool(json['is_deleted'] ?? json['isDeleted']),
     );
   }
 
@@ -274,4 +248,63 @@ class ArrearModel {
       'is_deleted': isDeleted,
     };
   }
+}
+
+List<T> _parseObjectList<T>(
+  Object? value,
+  T Function(Map<String, dynamic> json) fromJson,
+) {
+  if (value is! List) {
+    return [];
+  }
+
+  final items = <T>[];
+  for (final item in value) {
+    final object = _asStringKeyedMap(item);
+    if (object != null) {
+      items.add(fromJson(object));
+    }
+  }
+  return items;
+}
+
+Map<String, dynamic>? _asStringKeyedMap(Object? value) {
+  if (value is Map<String, dynamic>) {
+    return value;
+  }
+  if (value is Map) {
+    return value.map((key, value) => MapEntry(key.toString(), value));
+  }
+  return null;
+}
+
+double _parseDouble(Object? value) {
+  if (value is num) {
+    return value.toDouble();
+  }
+  if (value is String) {
+    return double.tryParse(value) ?? 0.0;
+  }
+  return 0.0;
+}
+
+DateTime? _parseDate(Object? value) {
+  if (value == null) {
+    return null;
+  }
+  return DateTime.tryParse(value.toString());
+}
+
+bool _parseBool(Object? value) {
+  if (value is bool) {
+    return value;
+  }
+  if (value is num) {
+    return value != 0;
+  }
+  if (value is String) {
+    final normalized = value.toLowerCase();
+    return normalized == 'true' || normalized == '1';
+  }
+  return false;
 }
