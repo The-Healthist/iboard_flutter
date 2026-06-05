@@ -15,6 +15,8 @@ import 'package:logger/logger.dart';
 class AppUpdateProvider with ChangeNotifier {
   final Logger _logger = Logger();
   final Dio _dio = Dio();
+  final Future<Map<String, dynamic>> Function()? _appVersionLoader;
+  final Future<Map<String, String>> Function()? _currentVersionLoader;
   CancelToken? _downloadCancelToken;
   Timer? _updateCheckTimer;
 
@@ -91,6 +93,12 @@ class AppUpdateProvider with ChangeNotifier {
       Duration(seconds: 3); // 检查更新节流3秒
   static const Duration _installThrottleDuration =
       Duration(seconds: 5); // 安装节流5秒
+
+  AppUpdateProvider({
+    Future<Map<String, dynamic>> Function()? appVersionLoader,
+    Future<Map<String, String>> Function()? currentVersionLoader,
+  })  : _appVersionLoader = appVersionLoader,
+        _currentVersionLoader = currentVersionLoader;
 
   ///2.1. 检查是否可以进行更新检查 (节流控制)
   bool get canCheckUpdate {
@@ -293,7 +301,6 @@ class AppUpdateProvider with ChangeNotifier {
 
     // 如果版本需要更新，直接返回true
     if (versionNeedsUpdate) {
-      _logger.i(' 版本号检查: 需要更新 ($currentVersion → $remoteVersion)');
       return true;
     }
 
@@ -302,12 +309,10 @@ class AppUpdateProvider with ChangeNotifier {
       final descriptionChanged =
           (currentDescription ?? '') != remoteDescription;
       if (descriptionChanged) {
-        _logger.i(' 描述检查: 发现描述变化，需要更新');
         return true;
       }
     }
 
-    _logger.i(' 版本和描述检查: 无需更新');
     return false;
   }
 
@@ -315,7 +320,6 @@ class AppUpdateProvider with ChangeNotifier {
   Future<void> checkForUpdate({bool autoDownload = false}) async {
     // 节流检查
     if (!canCheckUpdate) {
-      _logger.i(' 检查更新操作频繁，请稍后再试');
       _error = '操作频繁，请稍后再试';
       notifyListeners();
       return;
@@ -327,47 +331,44 @@ class AppUpdateProvider with ChangeNotifier {
       _error = null;
       notifyListeners();
 
-      _logger.i(' AppUpdateProvider: 開始檢查更新');
-
       // 获取当前应用版本
-      final currentVersionInfo = await VersionUtil.getCurrentAppVersion();
-      final currentVersion = currentVersionInfo['version'] ?? '1.0.0';
-      final currentBuild = currentVersionInfo['buildNumber'] ?? '1';
+      final currentVersionInfo = _currentVersionLoader == null
+          ? await VersionUtil.getCurrentAppVersion()
+          : await _currentVersionLoader();
+      final currentVersion =
+          currentVersionInfo['version']?.toString() ?? '1.0.0';
+      final currentBuild = currentVersionInfo['buildNumber']?.toString() ?? '1';
 
       _currentVersion =
           VersionUtil.formatVersionInfo(currentVersion, currentBuild);
-      _logger.i(' 當前版本: $_currentVersion');
 
       // 获取远程版本信息
-      final apiClient =
-          // ApiClient(baseUrl: 'http://test.iboard.skylinedances.com');
-          // ApiClient(baseUrl: 'http://117.72.193.54:10031');
-          ApiClient(baseUrl: 'http://39.108.49.167:10031');
-      final response = await apiClient.getAppVersion();
+      final response = _appVersionLoader == null
+          ? await ApiClient(baseUrl: 'http://39.108.49.167:10031')
+              .getAppVersion()
+          : await _appVersionLoader();
 
-      if (response['data'] == null) {
-        _logger.e(' 獲取遠程版本信息失敗: 響應數據為空');
+      final versionData = _nullableMap(response['data']);
+      if (versionData == null) {
         _error = '获取版本信息失败';
         _hasUpdate = false;
         _hasLocalApk = false;
         return;
       }
 
-      final versionData = response['data'];
-      final currentVersionData = versionData['currentVersion'];
-
+      final currentVersionData = _nullableMap(versionData['currentVersion']);
       if (currentVersionData == null) {
-        _logger.e(' 遠程版本數據為空');
         _error = '远程版本数据为空';
         _hasUpdate = false;
         _hasLocalApk = false;
         return;
       }
 
-      final remoteVersion = currentVersionData['versionNumber'] ?? '1.0.0';
-      final remoteBuild = currentVersionData['buildNumber'] ?? '1';
-      final downloadUrl = currentVersionData['downloadUrl'] ?? '';
-      final description = currentVersionData['description'] ?? '';
+      final remoteVersion =
+          currentVersionData['versionNumber']?.toString() ?? '1.0.0';
+      final remoteBuild = currentVersionData['buildNumber']?.toString() ?? '1';
+      final downloadUrl = currentVersionData['downloadUrl']?.toString() ?? '';
+      final description = currentVersionData['description']?.toString() ?? '';
 
       _remoteVersion =
           VersionUtil.formatVersionInfo(remoteVersion, remoteBuild);
@@ -375,10 +376,6 @@ class AppUpdateProvider with ChangeNotifier {
       _remoteBuildNumber = remoteBuild;
       _updateDescription = description;
       _downloadUrl = downloadUrl;
-
-      _logger.i(' 遠程版本: $_remoteVersion');
-      _logger.i(' 遠程描述: $description');
-      _logger.i(' 下載鏈接: $downloadUrl');
 
       // 加载当前版本的描述（如果存在）
       await _loadCurrentVersionDescription();
@@ -394,21 +391,18 @@ class AppUpdateProvider with ChangeNotifier {
       );
 
       if (needsUpdate) {
-        _logger.i(' 發現新版本或内容更新，需要更新');
         _hasUpdate = true;
         // 检查是否已下载
         await _checkLocalApk();
 
         // 如果需要自动下载且本地没有APK
         if (autoDownload && !_hasLocalApk) {
-          _logger.i(' 自動開始下載更新包...');
           // 延迟一点时间确保UI更新完成
           Future.delayed(const Duration(milliseconds: 500), () async {
             await downloadApk();
           });
         }
       } else {
-        _logger.i(' 當前版本已是最新版本');
         _hasUpdate = false;
         _hasLocalApk = false;
       }
@@ -616,10 +610,8 @@ class AppUpdateProvider with ChangeNotifier {
       if (await file.exists()) {
         _localApkPath = filePath;
         _hasLocalApk = true;
-        _logger.i(' AppUpdateProvider: 找到匹配的本地APK文件 - $filePath');
       } else {
         _hasLocalApk = false;
-        _logger.i(' AppUpdateProvider: 本地APK文件不存在或description已变更，需要重新下载');
         // 清理可能存在的旧版本APK文件
         await _cleanOldVersionApkFiles();
       }
@@ -936,4 +928,14 @@ class AppUpdateProvider with ChangeNotifier {
     _downloadCancelToken?.cancel();
     super.dispose();
   }
+}
+
+Map<String, dynamic>? _nullableMap(Object? value) {
+  if (value is Map<String, dynamic>) {
+    return value;
+  }
+  if (value is Map) {
+    return value.map((key, value) => MapEntry(key.toString(), value));
+  }
+  return null;
 }
