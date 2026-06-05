@@ -6,12 +6,20 @@ import 'package:iboard_app/models/weather_warning_model.dart';
 // import 'package:logger/logger.dart';
 
 class WeatherService {
-  final String _weatherApiUrl =
-      'https://data.weather.gov.hk/weatherAPI/opendata/weather.php?dataType=fnd&lang=tc';
-  final String _currentWeatherApiUrl =
-      'https://data.weather.gov.hk/weatherAPI/opendata/weather.php?dataType=rhrread&lang=tc';
-  final String _currentWeatherWarnUrl =
-      'https://data.weather.gov.hk/weatherAPI/opendata/weather.php?dataType=warnsum&lang=tc';
+  WeatherService({
+    String weatherApiUrl =
+        'https://data.weather.gov.hk/weatherAPI/opendata/weather.php?dataType=fnd&lang=tc',
+    String currentWeatherApiUrl =
+        'https://data.weather.gov.hk/weatherAPI/opendata/weather.php?dataType=rhrread&lang=tc',
+    String currentWeatherWarnUrl =
+        'https://data.weather.gov.hk/weatherAPI/opendata/weather.php?dataType=warnsum&lang=tc',
+  })  : _weatherApiUrl = weatherApiUrl,
+        _currentWeatherApiUrl = currentWeatherApiUrl,
+        _currentWeatherWarnUrl = currentWeatherWarnUrl;
+
+  final String _weatherApiUrl;
+  final String _currentWeatherApiUrl;
+  final String _currentWeatherWarnUrl;
   // final Logger _logger = Logger();
 
   // 天氣API超時配置
@@ -33,7 +41,7 @@ class WeatherService {
         // The API returns JSON that is not UTF-8 encoded by default in headers,
         // so we need to decode it explicitly with utf8.decode
         final decodedBody = utf8.decode(response.bodyBytes);
-        final jsonData = json.decode(decodedBody) as Map<String, dynamic>;
+        final jsonData = _mapFromJsonObject(json.decode(decodedBody)) ?? {};
         // _logger.i(
         //     ' [API成功] 天氣預報數據獲取成功，響應時間: ${stopwatch.elapsedMilliseconds}ms，數據大小: ${response.bodyBytes.length} bytes');
         return WeatherData.fromJson(jsonData);
@@ -78,7 +86,7 @@ class WeatherService {
       stopwatch.stop();
       if (response.statusCode == 200) {
         final decodedBody = utf8.decode(response.bodyBytes);
-        final jsonData = json.decode(decodedBody) as Map<String, dynamic>;
+        final jsonData = _mapFromJsonObject(json.decode(decodedBody)) ?? {};
         // _logger.i(
         //     ' [API成功] 當前天氣數據獲取成功，響應時間: ${stopwatch.elapsedMilliseconds}ms，數據大小: ${response.bodyBytes.length} bytes');
 
@@ -144,7 +152,7 @@ class WeatherService {
       stopwatch.stop();
       if (response.statusCode == 200) {
         final decodedBody = utf8.decode(response.bodyBytes);
-        final jsonData = json.decode(decodedBody) as Map<String, dynamic>;
+        final jsonData = _mapFromJsonObject(json.decode(decodedBody)) ?? {};
         // _logger.i(
         //     ' [API成功] 天氣警告API響應成功，響應時間: ${stopwatch.elapsedMilliseconds}ms，數據鍵: ${jsonData.keys.join(', ')}');
         // _logger.d(' [原始數據] 天氣警告原始數據: $jsonData');
@@ -186,5 +194,15 @@ class WeatherService {
       }
       return null;
     }
+  }
+
+  Map<String, dynamic>? _mapFromJsonObject(Object? value) {
+    if (value is Map<String, dynamic>) {
+      return value;
+    }
+    if (value is Map) {
+      return value.map((key, value) => MapEntry(key.toString(), value));
+    }
+    return null;
   }
 }
