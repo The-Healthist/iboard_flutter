@@ -88,6 +88,7 @@ dependencies:
 
   # WebView 實時監控
   webview_flutter: ^4.4.2
+  webview_flutter_android: ^4.11.0
 
 dev_dependencies:
   flutter_test:
