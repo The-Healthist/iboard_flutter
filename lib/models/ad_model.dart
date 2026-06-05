@@ -47,30 +47,31 @@ class AdModel {
   Duration get durationObject => Duration(seconds: duration);
 
   factory AdModel.fromJson(Map<String, dynamic> json) {
+    final now = DateTime.now();
+
     return AdModel(
-      id: json['id'] as int,
-      createdAt: DateTime.parse(json['createdAt'] as String),
-      updatedAt: DateTime.parse(json['updatedAt'] as String),
-      deletedAt: json['deletedAt'] != null
-          ? DateTime.parse(json['deletedAt'] as String)
-          : null,
-      title: json['title'] as String,
-      description: json['description'] as String,
-      type: json['type'] as String,
-      status: json['status'] as String,
-      duration: json['duration'] as int,
-      priority: json['priority'] as int,
-      startTime: DateTime.parse(json['startTime'] as String),
-      endTime: DateTime.parse(json['endTime'] as String),
-      display: _parseDisplayType(json['display'] as String),
-      fileId: json['fileId'] as int,
-      file: FileModel.fromJson(json['file'] as Map<String, dynamic>),
-      isPublic: json['isPublic'] as bool,
+      id: _parseInt(json['id']),
+      createdAt: _parseDate(json['createdAt']) ?? now,
+      updatedAt: _parseDate(json['updatedAt']) ?? now,
+      deletedAt: _parseDate(json['deletedAt']),
+      title: json['title']?.toString() ?? '',
+      description: json['description']?.toString() ?? '',
+      type: json['type']?.toString() ?? '',
+      status: json['status']?.toString() ?? '',
+      duration: _parseInt(json['duration'], defaultValue: 10),
+      priority: _parseInt(json['priority']),
+      startTime: _parseDate(json['startTime']) ?? now,
+      endTime:
+          _parseDate(json['endTime']) ?? now.add(const Duration(days: 365)),
+      display: _parseDisplayType(json['display']?.toString()),
+      fileId: _parseInt(json['fileId']),
+      file: FileModel.fromJson(_parseMap(json['file'])),
+      isPublic: _parseBool(json['isPublic']),
     );
   }
 
-  static AdDisplayType _parseDisplayType(String display) {
-    switch (display.toLowerCase()) {
+  static AdDisplayType _parseDisplayType(String? display) {
+    switch (display?.toLowerCase()) {
       case 'top':
         return AdDisplayType.top;
       case 'full':
@@ -102,4 +103,48 @@ class AdModel {
       'isPublic': isPublic,
     };
   }
+}
+
+Map<String, dynamic> _parseMap(Object? value) {
+  if (value is Map<String, dynamic>) {
+    return value;
+  }
+  if (value is Map) {
+    return value.map((key, value) => MapEntry(key.toString(), value));
+  }
+  return const {};
+}
+
+int _parseInt(Object? value, {int defaultValue = 0}) {
+  if (value is int) {
+    return value;
+  }
+  if (value is num) {
+    return value.toInt();
+  }
+  if (value is String) {
+    return int.tryParse(value) ?? defaultValue;
+  }
+  return defaultValue;
+}
+
+DateTime? _parseDate(Object? value) {
+  if (value == null) {
+    return null;
+  }
+  return DateTime.tryParse(value.toString());
+}
+
+bool _parseBool(Object? value) {
+  if (value is bool) {
+    return value;
+  }
+  if (value is num) {
+    return value != 0;
+  }
+  if (value is String) {
+    final normalized = value.toLowerCase();
+    return normalized == 'true' || normalized == '1';
+  }
+  return false;
 }

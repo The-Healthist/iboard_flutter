@@ -63,6 +63,52 @@ class AdvertisementProvider extends ChangeNotifier {
     _appDataProvider.addListener(_onAppDataChanged);
   }
 
+  List<AdModel> _parseAdvertisementList(Object? value) {
+    if (value is! List) {
+      return [];
+    }
+
+    final advertisements = <AdModel>[];
+    for (final item in value) {
+      try {
+        AdModel? advertisement;
+        if (item is Map<String, dynamic>) {
+          advertisement = AdModel.fromJson(item);
+        } else if (item is Map) {
+          advertisement = AdModel.fromJson(
+            item.map((key, value) => MapEntry(key.toString(), value)),
+          );
+        }
+
+        if (advertisement == null) {
+          continue;
+        }
+        if (_isDisplayableAdvertisement(advertisement)) {
+          advertisements.add(advertisement);
+        } else {
+          _logger.w('跳過缺少文件資料的廣告: id=${advertisement.id}');
+        }
+      } catch (e) {
+        _logger.w('跳過無效廣告緩存項', error: e);
+      }
+    }
+    return advertisements;
+  }
+
+  bool _isDisplayableAdvertisement(AdModel advertisement) {
+    return advertisement.file.url.isNotEmpty &&
+        advertisement.file.mimeType.isNotEmpty;
+  }
+
+  List<AdModel> _decodeCachedAdvertisements(String jsonString) {
+    try {
+      return _parseAdvertisementList(json.decode(jsonString));
+    } catch (e) {
+      _logger.w('廣告緩存JSON格式無效', error: e);
+      return [];
+    }
+  }
+
   ///1, 監聽AppDataProvider變更以啟動定時更新
   void _onAppDataChanged() {
     if (_appDataProvider.isLoggedIn && !_isPeriodicUpdateActive) {
@@ -115,10 +161,7 @@ class AdvertisementProvider extends ChangeNotifier {
       final prefs = await SharedPreferences.getInstance();
       final jsonString = prefs.getString(_advertisementsDataKey);
       if (jsonString != null && jsonString.isNotEmpty) {
-        final List<dynamic> adsJson = json.decode(jsonString) as List<dynamic>;
-        final List<AdModel> cachedAds = adsJson
-            .map((adJson) => AdModel.fromJson(adJson as Map<String, dynamic>))
-            .toList();
+        final cachedAds = _decodeCachedAdvertisements(jsonString);
 
         _advertisements = cachedAds;
         notifyListeners();
@@ -152,10 +195,7 @@ class AdvertisementProvider extends ChangeNotifier {
       final prefs = await SharedPreferences.getInstance();
       final jsonString = prefs.getString(_topCarouselAdvertisementsKey);
       if (jsonString != null && jsonString.isNotEmpty) {
-        final List<dynamic> adsJson = json.decode(jsonString) as List<dynamic>;
-        final List<AdModel> cachedAds = adsJson
-            .map((adJson) => AdModel.fromJson(adJson as Map<String, dynamic>))
-            .toList();
+        final cachedAds = _decodeCachedAdvertisements(jsonString);
 
         _topCarouselAdvertisements = cachedAds;
         _logger.i(' 從緩存加載頂部廣告輪播數據: ${cachedAds.length} 個廣告');
@@ -174,10 +214,7 @@ class AdvertisementProvider extends ChangeNotifier {
       final prefs = await SharedPreferences.getInstance();
       final jsonString = prefs.getString(_fullCarouselAdvertisementsKey);
       if (jsonString != null && jsonString.isNotEmpty) {
-        final List<dynamic> adsJson = json.decode(jsonString) as List<dynamic>;
-        final List<AdModel> cachedAds = adsJson
-            .map((adJson) => AdModel.fromJson(adJson as Map<String, dynamic>))
-            .toList();
+        final cachedAds = _decodeCachedAdvertisements(jsonString);
 
         _fullCarouselAdvertisements = cachedAds;
 
@@ -249,8 +286,6 @@ class AdvertisementProvider extends ChangeNotifier {
             5; // 默认5分钟
     final updateIntervalSeconds = updateIntervalMinutes * 60; // 转换为秒
     _isPeriodicUpdateActive = true;
-    debugPrint(
-        '[AdvertisementProvider]  启动广告数据定时更新，间隔: ${updateIntervalSeconds}秒');
 
     // 立即执行一次更新
     fetchAdvertisements();
@@ -259,7 +294,6 @@ class AdvertisementProvider extends ChangeNotifier {
     _updateTimer =
         Timer.periodic(Duration(seconds: updateIntervalSeconds), (timer) {
       if (_isPeriodicUpdateActive) {
-        debugPrint('[AdvertisementProvider]  执行定时广告数据更新');
         fetchAdvertisements();
       } else {
         timer.cancel();
@@ -274,7 +308,6 @@ class AdvertisementProvider extends ChangeNotifier {
       _updateTimer = null;
     }
     _isPeriodicUpdateActive = false;
-    debugPrint('[AdvertisementProvider]  停止广告数据定时更新');
   }
 
   /// 重新初始化Provider（当依赖变化时调用）
@@ -331,16 +364,14 @@ class AdvertisementProvider extends ChangeNotifier {
       // 处理顶部广告轮播数据
       final List<Map<String, dynamic>> topCarouselData =
           results[0] as List<Map<String, dynamic>>;
-      final List<AdModel> newTopCarouselAds = topCarouselData
-          .map((jsonItem) => AdModel.fromJson(jsonItem))
-          .toList();
+      final List<AdModel> newTopCarouselAds =
+          _parseAdvertisementList(topCarouselData);
 
       // 处理全屏广告轮播数据
       final List<Map<String, dynamic>> fullCarouselData =
           results[1] as List<Map<String, dynamic>>;
-      final List<AdModel> newFullCarouselAds = fullCarouselData
-          .map((jsonItem) => AdModel.fromJson(jsonItem))
-          .toList();
+      final List<AdModel> newFullCarouselAds =
+          _parseAdvertisementList(fullCarouselData);
       // 检查顶部广告轮播数据是否变化或強制初始化
       final bool hasTopCarouselChanges =
           forceInit ? true : _hasTopCarouselDataChanged(newTopCarouselAds);
