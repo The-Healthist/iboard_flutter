@@ -82,7 +82,7 @@ class AddPrinterDialogState extends State<AddPrinterDialog> {
           ),
         );
 
-        _logger.i('🖨️ 成功添加打印機: ${name.isNotEmpty ? name : ip} ($ip)');
+        _logger.i(' 成功添加打印機: ${name.isNotEmpty ? name : ip} ($ip)');
       } else {
         setState(() {
           _connectionError = '無法連接到打印機，請檢查IP地址和網絡連接';

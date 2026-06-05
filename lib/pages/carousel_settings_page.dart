@@ -6,7 +6,7 @@ import 'package:iboard_app/providers/announcement_provider.dart';
 import 'package:iboard_app/providers/advertisement_provider.dart';
 import 'package:iboard_app/providers/ad_full_carousel_provider.dart';
 import 'package:iboard_app/providers/ad_top_carousel_provider.dart';
-import 'package:iboard_app/widgets/debug_fullscreen_ad_widget.dart';
+import 'package:iboard_app/widgets/debug/debug_fullscreen_ad_widget.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart'; // 添加SharedPreferences導入
 
@@ -184,8 +184,6 @@ class CarouselSettingsPageState extends State<CarouselSettingsPage> {
 
       // 清空Provider中的數據
       if (mounted) {
-        final announcementProvider = context.read<AnnouncementProvider>();
-        final advertisementProvider = context.read<AdvertisementProvider>();
         final announcementCarouselProvider =
             context.read<AnnouncementCarouselProvider>();
         final topAdCarouselProvider = context.read<TopAdCarouselProvider>();
@@ -201,7 +199,7 @@ class CarouselSettingsPageState extends State<CarouselSettingsPage> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: const Text('✅ 輪播緩存數據已清空'),
+            content: const Text(' 輪播緩存數據已清空'),
             backgroundColor: Colors.green,
             duration: const Duration(seconds: 2),
           ),
@@ -212,7 +210,7 @@ class CarouselSettingsPageState extends State<CarouselSettingsPage> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('❌ 清空緩存失敗: $e'),
+            content: Text(' 清空緩存失敗: $e'),
             backgroundColor: Colors.red,
             duration: const Duration(seconds: 3),
           ),

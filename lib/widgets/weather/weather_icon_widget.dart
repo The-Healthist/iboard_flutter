@@ -67,7 +67,7 @@ class WeatherIconWidgetState extends State<WeatherIconWidget> {
       height: widget.height,
       fit: widget.fit,
       errorBuilder: (context, error, stackTrace) {
-        // _logger.w('⚠️ 本地天气图标加载失败，切换到网络图标: pic${widget.iconCode}.png');
+        // _logger.w(' 本地天气图标加载失败，切换到网络图标: pic${widget.iconCode}.png');
         // 本地图标加载失败，切换到网络图标
         WidgetsBinding.instance.addPostFrameCallback((_) {
           if (mounted) {
@@ -92,7 +92,7 @@ class WeatherIconWidgetState extends State<WeatherIconWidget> {
       fit: widget.fit,
       placeholder: (context, url) => _buildDefaultPlaceholder(),
       errorWidget: (context, url, error) {
-        _logger.e('❌ 网络天气图标加载失败: pic${widget.iconCode}.png', error: error);
+        _logger.e(' 网络天气图标加载失败: pic${widget.iconCode}.png', error: error);
         return _buildDefaultErrorWidget();
       },
     );
@@ -112,10 +112,10 @@ class WeatherIconWidgetState extends State<WeatherIconWidget> {
         final hasLocalIcon = snapshot.data ?? false;
 
         if (hasLocalIcon && _useLocalIcon) {
-          // _logger.d('✅ 使用本地天气图标: pic${widget.iconCode}.png');
+          // _logger.d(' 使用本地天气图标: pic${widget.iconCode}.png');
           return _buildLocalIcon();
         } else {
-          // _logger.d('🌐 使用网络天气图标: pic${widget.iconCode}.png');
+          // _logger.d(' 使用网络天气图标: pic${widget.iconCode}.png');
           return _buildNetworkIcon();
         }
       },

@@ -4,7 +4,8 @@ import 'package:iboard_app/managers/file_manager.dart';
 import 'package:iboard_app/models/ad_model.dart';
 import 'package:iboard_app/models/live_monitor_ad_model.dart';
 import 'package:iboard_app/models/monitor_models.dart';
-import 'package:iboard_app/widgets/carousel_widget.dart' as custom_carousel;
+import 'package:iboard_app/widgets/carousel/carousel_widget.dart'
+    as custom_carousel;
 import 'package:iboard_app/widgets/mainscreen/ad_top_widget.dart';
 import 'package:iboard_app/widgets/mainscreen/live_monitor_widget.dart';
 import 'package:iboard_app/utils/precise_video_pool_manager.dart' as precise;
@@ -34,7 +35,7 @@ class TopAdCarouselProvider extends ChangeNotifier {
   // 狀態管理
   bool _isTopCarouselPaused = false;
 
-  // 🎯 新增：精确视频池管理器实例
+  //  新增：精确视频池管理器实例
   final precise.PreciseVideoPoolManager _preciseVideoPoolManager =
       precise.PreciseVideoPoolManager();
 
@@ -57,7 +58,7 @@ class TopAdCarouselProvider extends ChangeNotifier {
   DateTime? get currentTopAdStartTime => _currentTopAdStartTime;
   Duration get topAdElapsedTime => _topAdElapsedTime;
 
-  /// 🎯 获取精确视频池管理器实例
+  ///  获取精确视频池管理器实例
   precise.PreciseVideoPoolManager get preciseVideoPoolManager =>
       _preciseVideoPoolManager;
 
@@ -69,14 +70,14 @@ class TopAdCarouselProvider extends ChangeNotifier {
   Future<void> refreshAllMonitorWidgets() async {
     if (!_mounted) return;
 
-    debugPrint('[TopAdCarousel] 🔄 刷新所有监控画面配置...');
-    debugPrint('[TopAdCarousel] 📊 当前有 ${_liveMonitorKeys.length} 个监控Widget缓存');
-    debugPrint('[TopAdCarousel] 📍 当前广告索引: $_currentTopAdIndex / ${topAds.length}');
+    debugPrint('[TopAdCarousel]  刷新所有监控画面配置...');
+    debugPrint('[TopAdCarousel]  当前有 ${_liveMonitorKeys.length} 个监控Widget缓存');
+    debugPrint('[TopAdCarousel]  当前广告索引: $_currentTopAdIndex / ${topAds.length}');
 
     int refreshCount = 0;
     for (final entry in _liveMonitorKeys.entries) {
       final key = entry.value;
-      debugPrint('[TopAdCarousel] 🔍 检查监控Widget: ${entry.key}');
+      debugPrint('[TopAdCarousel]  检查监控Widget: ${entry.key}');
       
       if (key.currentState != null) {
         try {
@@ -88,22 +89,22 @@ class TopAdCarouselProvider extends ChangeNotifier {
           debugPrint('[TopAdCarousel]   - 配置是否变化: $hasChanged');
           
           if (hasChanged) {
-            debugPrint('[TopAdCarousel] ✅ 监控配置有变化，重新加载: ${entry.key}');
+            debugPrint('[TopAdCarousel]  监控配置有变化，重新加载: ${entry.key}');
             await state.reloadMonitorConfig();
             refreshCount++;
             debugPrint('[TopAdCarousel]   - 刷新完成');
           } else {
-            debugPrint('[TopAdCarousel] ℹ️ 监控配置无变化，跳过: ${entry.key}');
+            debugPrint('[TopAdCarousel] ℹ 监控配置无变化，跳过: ${entry.key}');
           }
         } catch (e) {
-          debugPrint('[TopAdCarousel] ⚠️ 刷新监控失败 ${entry.key}: $e');
+          debugPrint('[TopAdCarousel]  刷新监控失败 ${entry.key}: $e');
         }
       } else {
         debugPrint('[TopAdCarousel]   - State为空，跳过');
       }
     }
 
-    debugPrint('[TopAdCarousel] ✅ 监控刷新完成，共刷新 $refreshCount 个监控画面');
+    debugPrint('[TopAdCarousel]  监控刷新完成，共刷新 $refreshCount 个监控画面');
   }
 
   ///1，更新輪播廣告列表（由AdvertisementProvider調用）
@@ -119,9 +120,9 @@ class TopAdCarouselProvider extends ChangeNotifier {
 
     if (layoutType != MonitorLayoutType.hidden && hasChannels) {
       completeAdList.add(LiveMonitorAdModel());
-      debugPrint('[TopAdCarousel] 📋 更新輪播: ${newTopAds.length}個廣告 + 實時監控');
+      debugPrint('[TopAdCarousel]  更新輪播: ${newTopAds.length}個廣告 + 實時監控');
     } else {
-      debugPrint('[TopAdCarousel] 📋 更新輪播: ${newTopAds.length}個廣告 (無實時監控)');
+      debugPrint('[TopAdCarousel]  更新輪播: ${newTopAds.length}個廣告 (無實時監控)');
     }
 
     if (_areAdsListsEqual(_topAds, completeAdList)) {
@@ -241,9 +242,9 @@ class TopAdCarouselProvider extends ChangeNotifier {
       return SizedBox.expand(
         child: LiveMonitorWidget(
           key: _liveMonitorKeys[key],
-          disableAutoInit: false, // 🔧 启用自动初始化，快速显示
+          disableAutoInit: false, //  启用自动初始化，快速显示
           onInitialized: () {
-            debugPrint('[TopAdCarousel] ✅ 實時監控初始化完成');
+            debugPrint('[TopAdCarousel]  實時監控初始化完成');
           },
         ),
       );
@@ -269,7 +270,7 @@ class TopAdCarouselProvider extends ChangeNotifier {
   void startTopAdTimer(int currentIndex, {Duration? remainingTime}) {
     _topTimer?.cancel();
 
-    // 🔧 修复：移除 topAds.length <= 1 的检查，允许单个广告（包括实时监控）也能正常计时
+    //  修复：移除 topAds.length <= 1 的检查，允许单个广告（包括实时监控）也能正常计时
     if (topAds.isEmpty ||
         currentIndex < 0 ||
         currentIndex >= topAds.length ||
@@ -284,12 +285,12 @@ class TopAdCarouselProvider extends ChangeNotifier {
     if (remainingTime != null && remainingTime > Duration.zero) {
       // 恢復播放,使用剩餘時間
       timerDuration = remainingTime;
-      debugPrint('[TopAdCarousel] ⏯️ 恢復播放,剩餘時間: ${remainingTime.inSeconds}秒');
+      debugPrint('[TopAdCarousel]  恢復播放,剩餘時間: ${remainingTime.inSeconds}秒');
     } else {
       // 新廣告,使用完整時長
       timerDuration = ad.durationObject;
       _topAdElapsedTime = Duration.zero;
-      debugPrint('[TopAdCarousel] ▶️ 開始新廣告,總時長: ${timerDuration.inSeconds}秒');
+      debugPrint('[TopAdCarousel] ▶ 開始新廣告,總時長: ${timerDuration.inSeconds}秒');
     }
 
     _currentTopAdStartTime = DateTime.now();
@@ -297,7 +298,7 @@ class TopAdCarouselProvider extends ChangeNotifier {
     _currentTopAdIndex = currentIndex;
 
     _topTimer = Timer(timerDuration, () {
-      // 🔧 修复：即使只有一个广告也要允许切换（例如实时监控到普通广告的循环）
+      //  修复：即使只有一个广告也要允许切换（例如实时监控到普通广告的循环）
       if (!_isTopCarouselPaused && _topCarouselController.widgetCount > 0) {
         // 在播放下一個廣告之前檢查是否有待處理的更新
         if (_pendingWidgetUpdate) {
@@ -307,7 +308,7 @@ class TopAdCarouselProvider extends ChangeNotifier {
 
         // 重置已播放時間
         _topAdElapsedTime = Duration.zero;
-        _pauseStartTime = null; // 🔧 重置暫停時間
+        _pauseStartTime = null; //  重置暫停時間
 
         // 如果有多个广告，切换到下一个；如果只有一个，重新开始
         if (_topCarouselController.widgetCount > 1) {
@@ -326,13 +327,13 @@ class TopAdCarouselProvider extends ChangeNotifier {
     // 设置頂部輪播为暂停状态
     _isTopCarouselPaused = true;
 
-    // 🔧 修复：只在首次暂停时计算已播放时间，避免重复累加
+    //  修复：只在首次暂停时计算已播放时间，避免重复累加
     if (_pauseStartTime == null && _currentTopAdStartTime != null) {
       _pauseStartTime = DateTime.now();
       final elapsed = _pauseStartTime!.difference(_currentTopAdStartTime!);
       _topAdElapsedTime += elapsed;
       debugPrint(
-          '[TopAdCarousel] ⏸️ 暂停时已播放: ${_topAdElapsedTime.inSeconds}秒/${_topAdDuration.inSeconds}秒');
+          '[TopAdCarousel]  暂停时已播放: ${_topAdElapsedTime.inSeconds}秒/${_topAdDuration.inSeconds}秒');
     }
 
     // 取消当前定时器
@@ -349,7 +350,7 @@ class TopAdCarouselProvider extends ChangeNotifier {
       _pauseCurrentVideo();
     }
 
-    // 🎯 关键修复：进入全屏广告时只暂停，不切换广告，避免时序冲突
+    //  关键修复：进入全屏广告时只暂停，不切换广告，避免时序冲突
 
     // 通知UI更新暂停状态，但不切换广告索引
     if (hasListeners) {
@@ -382,7 +383,7 @@ class TopAdCarouselProvider extends ChangeNotifier {
     Duration? remainingTime;
     if (_topAdElapsedTime < _topAdDuration) {
       remainingTime = _topAdDuration - _topAdElapsedTime;
-      debugPrint('[TopAdCarousel] ⏯️ 恢復播放,剩餘時間: ${remainingTime.inSeconds}秒');
+      debugPrint('[TopAdCarousel]  恢復播放,剩餘時間: ${remainingTime.inSeconds}秒');
     }
 
     // 實時監控不需要發送恢復通知
@@ -431,8 +432,8 @@ class TopAdCarouselProvider extends ChangeNotifier {
         currentAd != null && LiveMonitorAdModel.isLiveMonitor(currentAd);
 
     if (isLiveMonitor) {
-      // ⭐ 實時監控: 繼續播放剩餘時間,不切換
-      debugPrint('[TopAdCarousel] 📺 恢復實時監控,繼續播放剩餘時間');
+      //  實時監控: 繼續播放剩餘時間,不切換
+      debugPrint('[TopAdCarousel]  恢復實時監控,繼續播放剩餘時間');
 
       // 計算剩餘時間
       Duration? remainingTime;
@@ -454,15 +455,15 @@ class TopAdCarouselProvider extends ChangeNotifier {
       // 清空暫停時間
       _pauseStartTime = null;
     } else {
-      // 🎯 普通廣告: 切換到下一個廣告
-      debugPrint('[TopAdCarousel] 📹 恢復普通廣告,切換到下一個');
+      //  普通廣告: 切換到下一個廣告
+      debugPrint('[TopAdCarousel]  恢復普通廣告,切換到下一個');
 
       if (topAds.isNotEmpty && _topCarouselController.widgetCount > 1) {
         // 重置时间状态（因为切换了广告）
         _topAdElapsedTime = Duration.zero;
         _pauseStartTime = null;
 
-        // 🔧 修复：playNext会触发onPageChanged，onPageChanged会调用startTopAdTimer
+        //  修复：playNext会触发onPageChanged，onPageChanged会调用startTopAdTimer
         // 所以这里不需要再调用startTopAdTimer，避免重复
         _topCarouselController.playNext();
 
@@ -471,7 +472,7 @@ class TopAdCarouselProvider extends ChangeNotifier {
           notifyListeners();
         }
 
-        // 🔧 修复：延迟恢复媒体播放即可，不再重复调用startTopAdTimer
+        //  修复：延迟恢复媒体播放即可，不再重复调用startTopAdTimer
         Future.delayed(const Duration(milliseconds: 200), () {
           if (!_isTopCarouselPaused) {
             final currentAd = _getCurrentAd();
@@ -545,11 +546,11 @@ class TopAdCarouselProvider extends ChangeNotifier {
 
   ///10，處理頁面變化事件
   void onPageChanged(int index) {
-    // 🔧 防重複：只在索引真正變化時才處理
+    //  防重複：只在索引真正變化時才處理
     if (index == _currentTopAdIndex &&
         _topTimer != null &&
         _topTimer!.isActive) {
-      debugPrint('[TopAdCarousel] ℹ️ 頁面索引未變化 ($index)，跳過重複處理');
+      debugPrint('[TopAdCarousel] ℹ 頁面索引未變化 ($index)，跳過重複處理');
       return;
     }
 
@@ -565,7 +566,7 @@ class TopAdCarouselProvider extends ChangeNotifier {
   void _handlePageChangeResourceManagement(int newIndex) {
     if (topAds.isEmpty) return;
 
-    // 🔧 優化策略：保持實時監控在後台，不釋放資源
+    //  優化策略：保持實時監控在後台，不釋放資源
     // 切換時只確保已初始化即可
     for (int i = 0; i < topAds.length; i++) {
       final ad = topAds[i];
@@ -580,11 +581,11 @@ class TopAdCarouselProvider extends ChangeNotifier {
           final state = liveMonitorKey.currentState!;
 
           if (state.isInitialized) {
-            debugPrint('[TopAdCarousel] ✅ 實時監控已就緒 (索引: $i)');
+            debugPrint('[TopAdCarousel]  實時監控已就緒 (索引: $i)');
             // 切換到實時監控時，檢查配置是否變化並刷新
             state.checkConfigAndRefresh();
           } else if (!state.isDisposed) {
-            debugPrint('[TopAdCarousel] 📺 切換到實時監控，快速初始化 (索引: $i)');
+            debugPrint('[TopAdCarousel]  切換到實時監控，快速初始化 (索引: $i)');
           }
         }
       }
@@ -593,13 +594,13 @@ class TopAdCarouselProvider extends ChangeNotifier {
 
   ///11，暫停所有計時器（用於設置頁面）
   void pauseAllTimersForSettings() {
-    // ⭐ 保存已播放时间
+    //  保存已播放时间
     if (_currentTopAdStartTime != null) {
       final now = DateTime.now();
       final currentElapsed = now.difference(_currentTopAdStartTime!);
       _topAdElapsedTime = _topAdElapsedTime + currentElapsed;
       debugPrint(
-          '[TopAdCarousel] ⏸️ 進入設置頁面,已播放: ${_topAdElapsedTime.inSeconds}秒');
+          '[TopAdCarousel]  進入設置頁面,已播放: ${_topAdElapsedTime.inSeconds}秒');
     }
 
     _topTimer?.cancel();
@@ -634,11 +635,11 @@ class TopAdCarouselProvider extends ChangeNotifier {
     final isLiveMonitor =
         currentAd != null && LiveMonitorAdModel.isLiveMonitor(currentAd);
 
-    // ⭐ 計算剩餘時間
+    //  計算剩餘時間
     Duration? remainingTime;
     if (_topAdElapsedTime < _topAdDuration) {
       remainingTime = _topAdDuration - _topAdElapsedTime;
-      debugPrint('[TopAdCarousel] ⏯️ 從設置恢復,剩餘時間: ${remainingTime.inSeconds}秒');
+      debugPrint('[TopAdCarousel]  從設置恢復,剩餘時間: ${remainingTime.inSeconds}秒');
     }
 
     // 實時監控不需要發送恢復通知

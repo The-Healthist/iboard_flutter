@@ -5,119 +5,119 @@ class PrinterStateReasons {
       'category': 'normal',
       'severity': 'info',
       'description': '無問題',
-      'message': '✅ 打印機狀態正常',
+      'message': ' 打印機狀態正常',
       'solution': ''
     },
     'media-needed': {
       'category': 'media',
       'severity': 'warning',
       'description': '需要紙張',
-      'message': '📄 請添加紙張',
+      'message': ' 請添加紙張',
       'solution': '在紙盒中添加合適的紙張'
     },
     'media-empty': {
       'category': 'media',
       'severity': 'warning',
       'description': '紙張用完',
-      'message': '📭 紙張已用完',
+      'message': ' 紙張已用完',
       'solution': '在紙盒中添加紙張'
     },
     'media-empty-error': {
       'category': 'media',
       'severity': 'error',
       'description': '紙張用完錯誤',
-      'message': '🔴 紙張用完，無法打印',
+      'message': ' 紙張用完，無法打印',
       'solution': '立即添加紙張到紙盒中'
     },
     'media-empty-report': {
       'category': 'media',
       'severity': 'info',
       'description': '紙張空報告',
-      'message': '📭 紙盒可能為空',
+      'message': ' 紙盒可能為空',
       'solution': '檢查紙盒並根據需要添加紙張'
     },
     'media-low': {
       'category': 'media',
       'severity': 'warning',
       'description': '紙張不足',
-      'message': '⚠️ 紙張不足，請及時添加',
+      'message': ' 紙張不足，請及時添加',
       'solution': '準備添加更多紙張'
     },
     'media-jam': {
       'category': 'media',
       'severity': 'error',
       'description': '卡紙',
-      'message': '🔴 打印機卡紙',
+      'message': ' 打印機卡紙',
       'solution': '打開打印機清除卡紙，檢查紙張路徑'
     },
     'marker-supply-low': {
       'category': 'marker',
       'severity': 'warning',
       'description': '墨盒/碳粉不足',
-      'message': '🟠 墨盒/碳粉不足',
+      'message': ' 墨盒/碳粉不足',
       'solution': '準備更換墨盒或添加碳粉'
     },
     'marker-supply-empty': {
       'category': 'marker',
       'severity': 'error',
       'description': '墨盒/碳粉用完',
-      'message': '🔴 墨盒/碳粉已用完',
+      'message': ' 墨盒/碳粉已用完',
       'solution': '更換新的墨盒或添加碳粉'
     },
     'toner-low': {
       'category': 'marker',
       'severity': 'warning',
       'description': '碳粉不足',
-      'message': '🟠 碳粉不足',
+      'message': ' 碳粉不足',
       'solution': '準備更換碳粉盒'
     },
     'toner-empty': {
       'category': 'marker',
       'severity': 'error',
       'description': '碳粉用完',
-      'message': '🔴 碳粉已用完',
+      'message': ' 碳粉已用完',
       'solution': '更換新的碳粉盒'
     },
     'door-open': {
       'category': 'hardware',
       'severity': 'error',
       'description': '門未關閉',
-      'message': '🔴 打印機門未關閉',
+      'message': ' 打印機門未關閉',
       'solution': '關閉打印機的所有門和蓋子'
     },
     'cover-open': {
       'category': 'hardware',
       'severity': 'error',
       'description': '蓋子打開',
-      'message': '🔴 打印機蓋子打開',
+      'message': ' 打印機蓋子打開',
       'solution': '關閉打印機蓋子'
     },
     'offline': {
       'category': 'connection',
       'severity': 'error',
       'description': '離線',
-      'message': '⚠️ 打印機離線',
+      'message': ' 打印機離線',
       'solution': '檢查打印機電源和網絡連接'
     },
     'offline-error': {
       'category': 'connection',
       'severity': 'error',
       'description': '離線錯誤',
-      'message': '🔴 打印機離線，無法連接',
+      'message': ' 打印機離線，無法連接',
       'solution': '檢查電源、網絡連接和打印機狀態'
     },
     'output-area-full': {
       'category': 'tray',
       'severity': 'error',
       'description': '出紙區已滿',
-      'message': '🔴 出紙區已滿',
+      'message': ' 出紙區已滿',
       'solution': '清空出紙區的紙張'
     },
     'paused': {
       'category': 'control',
       'severity': 'info',
       'description': '已暫停',
-      'message': '⏸️ 打印機已暫停',
+      'message': ' 打印機已暫停',
       'solution': '恢復打印機運行'
     },
   };
@@ -129,7 +129,7 @@ class PrinterStateReasons {
           'category': 'unknown',
           'severity': 'info',
           'description': '未知狀態: $reason',
-          'message': '❓ 未知狀態: $reason',
+          'message': ' 未知狀態: $reason',
           'solution': '請查看打印機手冊或聯繫技術支持'
         };
   }
@@ -140,7 +140,7 @@ class PrinterStateReasons {
       return {
         'overall_status': 'normal',
         'severity': 'info',
-        'message': '✅ 打印機狀態正常',
+        'message': ' 打印機狀態正常',
         'issues_count': 0,
         'categories': <String>[],
         'issues': <Map<String, dynamic>>[]
@@ -175,13 +175,13 @@ class PrinterStateReasons {
 
     if (maxSeverity == 'error') {
       overallStatus = 'error';
-      summaryMessage = '🔴 打印機有 ${issues.length} 個問題需要解決';
+      summaryMessage = ' 打印機有 ${issues.length} 個問題需要解決';
     } else if (maxSeverity == 'warning') {
       overallStatus = 'warning';
-      summaryMessage = '🟠 打印機有 ${issues.length} 個警告';
+      summaryMessage = ' 打印機有 ${issues.length} 個警告';
     } else {
       overallStatus = 'info';
-      summaryMessage = 'ℹ️ 打印機有 ${issues.length} 個狀態信息';
+      summaryMessage = 'ℹ 打印機有 ${issues.length} 個狀態信息';
     }
 
     return {

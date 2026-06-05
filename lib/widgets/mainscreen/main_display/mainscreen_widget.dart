@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:iboard_app/models/announcement_model.dart';
 import 'package:iboard_app/providers/announcement_provider.dart';
-import 'package:iboard_app/providers/announcement_carousel_provider.dart';
 import 'package:iboard_app/providers/arrear_provider.dart';
 import 'package:iboard_app/providers/state_provider.dart';
 import 'package:iboard_app/widgets/mainscreen/main_display/payment_widget.dart';
@@ -59,7 +58,7 @@ class MainScreenWidgetState extends State<MainScreenWidget> {
       }
     });
   }
-  
+
   @override
   void dispose() {
     // 33, 清理時確保恢復輪播狀態
@@ -79,89 +78,116 @@ class MainScreenWidgetState extends State<MainScreenWidget> {
 
     return Expanded(
       child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 4.0), // 移除按鈕間隙
-        child: SizedBox(
-          width: double.infinity,
-          child: ElevatedButton(
-            onPressed: () {
-              setState(() {
-                _selectedFunction = chineseTitle;
-              });
+        padding: const EdgeInsets.symmetric(vertical: 4.0),
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            final buttonHeight =
+                constraints.maxHeight.isFinite ? constraints.maxHeight : 96.0;
+            final isCompact = buttonHeight < 92;
+            final isVeryCompact = buttonHeight < 76;
+            final iconSize = isVeryCompact
+                ? 20.0
+                : isCompact
+                    ? 24.0
+                    : 32.0;
+            final titleFontSize = isVeryCompact
+                ? 14.0
+                : isCompact
+                    ? 16.0
+                    : 18.0;
+            final subtitleFontSize = isVeryCompact
+                ? 10.0
+                : isCompact
+                    ? 11.0
+                    : 12.0;
+            final verticalPadding = isVeryCompact
+                ? 4.0
+                : isCompact
+                    ? 8.0
+                    : 12.0;
+            final titleGap = isVeryCompact ? 3.0 : 6.0;
+            final subtitleGap = isVeryCompact ? 1.0 : 3.0;
 
-              // 29, 處理功能按鈕點擊，電子繳費需要暫停輪播
-              if (chineseTitle == '電子繳費') {
-                _logger.i('🔵 [MainScreenWidget] 用戶點擊電子繳費按鈕 - 進入手動操作狀態（禁用超時）');
-                final carouselStateProvider = context.read<CarouselStateProvider>();
-                carouselStateProvider.enterManualOperation(disableTimeout: true);
-              } else if (chineseTitle == '通告列表') {
-                // 30, 返回通告列表時恢復輪播
-                _logger.i('🔵 [MainScreenWidget] 用戶點擊通告列表 - 恢復默認狀態');
-                final carouselStateProvider = context.read<CarouselStateProvider>();
-                carouselStateProvider.enterDefaultState();
-              }
-              // 处理功能按钮点击
-              else if (chineseTitle == '欠費查詢') {
-                _logger.i('🔵 [MainScreenWidget] 用戶點擊欠費查詢按鈕 - 在右側顯示');
-                // 不再调用回调函数，直接在右侧显示欠费查询内容
-                // widget.onAnnouncementTap?.call(null); // 注释掉原有逻辑
-                _logger.i('🔵 [MainScreenWidget] 右側顯示欠費查詢內容');
-              }
-              // 添加繳費表單功能
-              // else if (chineseTitle == '繳費表單') {
-              //   print('🔵 [MainScreenWidget] 用户点击繳費表單按钮 - 在右侧显示');
-              //   // 缴费表單现在显示全部数据，不需要选择器，所以不需要重置状态
-              //   print('🔵 [MainScreenWidget] 右侧显示缴费表單内容');
-              // }
-              // 註釋掉繳費表單功能
-              // else if (chineseTitle == '繳費表單') {
-              //   print('🔵 [MainScreenWidget] 用户点击繳費表單按钮');
-              //   // 导航到繳費表單頁面
-              //   widget.onArrearTableTap?.call();
-              //   print('🔵 [MainScreenWidget] 已调用 onArrearTableTap()');
-              // }
-              else {
-                _logger.i('$chineseTitle pressed');
-              }
-            },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: isSelected
-                  ? Theme.of(context).colorScheme.primary
-                  : null, // 使用默認背景色
-              foregroundColor: isSelected
-                  ? Theme.of(context).colorScheme.onPrimary // 選中時使用對比色文字
-                  : null, // 未選中時使用默認文字顏色
+            return SizedBox.expand(
+              child: ElevatedButton(
+                onPressed: () {
+                  setState(() {
+                    _selectedFunction = chineseTitle;
+                  });
 
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12.0),
+                  // 29, 處理功能按鈕點擊，電子繳費需要暫停輪播
+                  if (chineseTitle == '電子繳費') {
+                    _logger
+                        .i(' [MainScreenWidget] 用戶點擊電子繳費按鈕 - 進入手動操作狀態（禁用超時）');
+                    final carouselStateProvider =
+                        context.read<CarouselStateProvider>();
+                    carouselStateProvider.enterManualOperation(
+                        disableTimeout: true);
+                  } else if (chineseTitle == '通告列表') {
+                    // 30, 返回通告列表時恢復輪播
+                    _logger.i(' [MainScreenWidget] 用戶點擊通告列表 - 恢復默認狀態');
+                    final carouselStateProvider =
+                        context.read<CarouselStateProvider>();
+                    carouselStateProvider.enterDefaultState();
+                  }
+                  // 处理功能按钮点击
+                  else if (chineseTitle == '欠費查詢') {
+                    _logger.i(' [MainScreenWidget] 用戶點擊欠費查詢按鈕 - 在右側顯示');
+                    // 不再调用回调函数，直接在右侧显示欠费查询内容
+                    // widget.onAnnouncementTap?.call(null); // 注释掉原有逻辑
+                    _logger.i(' [MainScreenWidget] 右側顯示欠費查詢內容');
+                  } else {
+                    _logger.i('$chineseTitle pressed');
+                  }
+                },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: isSelected
+                      ? Theme.of(context).colorScheme.primary
+                      : null, // 使用默認背景色
+                  foregroundColor: isSelected
+                      ? Theme.of(context).colorScheme.onPrimary // 選中時使用對比色文字
+                      : null, // 未選中時使用默認文字顏色
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12.0),
+                  ),
+                  padding: EdgeInsets.symmetric(
+                    horizontal: 8.0,
+                    vertical: verticalPadding,
+                  ),
+                  minimumSize: const Size(double.infinity, 0),
+                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                ),
+                child: FittedBox(
+                  fit: BoxFit.scaleDown,
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(icon, size: iconSize),
+                      SizedBox(height: titleGap),
+                      Text(
+                        chineseTitle,
+                        style: TextStyle(
+                          fontSize: titleFontSize,
+                          fontWeight: FontWeight.bold,
+                        ),
+                        textAlign: TextAlign.center,
+                      ),
+                      SizedBox(height: subtitleGap),
+                      Text(
+                        englishTitle,
+                        style: TextStyle(
+                          fontSize: subtitleFontSize,
+                          fontWeight: FontWeight.normal,
+                        ),
+                        textAlign: TextAlign.center,
+                      ),
+                    ],
+                  ),
+                ),
               ),
-              padding: const EdgeInsets.all(16.0),
-              minimumSize: const Size(double.infinity, 0),
-            ),
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(icon, size: 32),
-                const SizedBox(height: 8),
-                Text(
-                  chineseTitle,
-                  style: const TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                  ),
-                  textAlign: TextAlign.center,
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  englishTitle,
-                  style: const TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.normal,
-                  ),
-                  textAlign: TextAlign.center,
-                ),
-              ],
-            ),
-          ),
+            );
+          },
         ),
       ),
     );
@@ -206,8 +232,6 @@ class MainScreenWidgetState extends State<MainScreenWidget> {
         return '政府';
       case AnnouncementTypeUi.corporation:
         return '法團';
-      default:
-        return ''; // Should not happen
     }
   }
 
@@ -216,19 +240,19 @@ class MainScreenWidgetState extends State<MainScreenWidget> {
     return PaymentWidget(
       onIdleTimeout: () {
         // 28, 無操作超時，恢復輪播（自動切換到通告和繳費列表）
-        debugPrint('⏰ [MainScreenWidget] 電子繳費頁面無操作超時，恢復通告輪播');
+        debugPrint(' [MainScreenWidget] 電子繳費頁面無操作超時，恢復通告輪播');
         if (mounted) {
           final carouselStateProvider = context.read<CarouselStateProvider>();
-          
+
           // 40, 使用專門的方法從手動操作狀態恢復到默認狀態
           // 這個方法會正確處理輪播恢復、全屏廣告計時器啟動等邏輯
           try {
             carouselStateProvider.exitManualOperationToDefault();
-            debugPrint('✅ [MainScreenWidget] 已調用 exitManualOperationToDefault');
+            debugPrint(' [MainScreenWidget] 已調用 exitManualOperationToDefault');
           } catch (e) {
-            debugPrint('⚠️ [MainScreenWidget] 恢復通告輪播失敗: $e');
+            debugPrint(' [MainScreenWidget] 恢復通告輪播失敗: $e');
           }
-          
+
           // 32, 重置本地選擇狀態
           setState(() {
             _selectedFunction = '通告列表';
@@ -523,7 +547,7 @@ class MainScreenWidgetState extends State<MainScreenWidget> {
                       _showArrearResults = false; // 重置查詢結果
                       // 设置單位
                       provider.setSelectedUnit(floor);
-                      _logger.i('🔍 [MainScreenWidget] 選擇單位: "$floor"');
+                      _logger.i(' [MainScreenWidget] 選擇單位: "$floor"');
                     });
                   },
                   child: Container(
@@ -655,11 +679,6 @@ class MainScreenWidgetState extends State<MainScreenWidget> {
       return 'Please Select Unit';
     }
     return 'Please Select Floor and Unit';
-  }
-
-  ///9.1, 檢查當前選擇是否有數據（委託 provider）
-  bool _hasDataForSelectedFeeType(ArrearProvider provider) {
-    return provider.hasDataForCurrentSelection;
   }
 
   ///9.2, 获取查询按钮文本
@@ -1312,11 +1331,11 @@ class MainScreenWidgetState extends State<MainScreenWidget> {
                                   '${_getAnnouncementTypeText(announcement.uiType)} - ${announcement.description}'),
                               onTap: () {
                                 _logger.i(
-                                    '📰 [MainScreenWidget] 用戶點擊通告: ${announcement.title} (類型: ${announcement.uiType})');
+                                    ' [MainScreenWidget] 用戶點擊通告: ${announcement.title} (類型: ${announcement.uiType})');
                                 // 调用回调函数传递announcement对象
                                 widget.onAnnouncementTap?.call(announcement);
                                 _logger.i(
-                                    '📰 [MainScreenWidget] 已調用 onAnnouncementTap(${announcement.title})');
+                                    ' [MainScreenWidget] 已調用 onAnnouncementTap(${announcement.title})');
                               },
                             ),
                           );
@@ -1343,47 +1362,39 @@ class MainScreenWidgetState extends State<MainScreenWidget> {
               .toList();
         }
 
-        return Scaffold(
-          body: SafeArea(
-            child: Row(
-              children: [
-                // Left Side: Function Selection
-                Expanded(
-                  flex: 2,
-                  child: Container(
-                    padding: const EdgeInsets.all(16.0),
-                    color: Colors.white,
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Expanded(
-                          child: Column(
-                            children: [
-                              _buildFunctionButton(
-                                  '通告列表', 'Announcement List', Icons.list_alt),
-                              _buildFunctionButton(
-                                  '欠費查詢', 'Payment Query', Icons.search),
-                              // _buildFunctionButton(
-                              //     '繳費表單', 'Payment Form', Icons.table_chart),
-                              _buildFunctionButton(
-                                  '電子繳費', 'Electronic Payment', Icons.payment),
-                              _buildFunctionButton(
-                                  '便利服務', 'Convenient Services', Icons.store),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ),
+        return ColoredBox(
+          color: Colors.grey.shade50,
+          child: Row(
+            children: [
+              // Left Side: Function Selection
+              Expanded(
+                flex: 2,
+                child: Container(
+                  padding: const EdgeInsets.all(12.0),
+                  color: Colors.white,
+                  child: Column(
+                    children: [
+                      _buildFunctionButton(
+                          '通告列表', 'Announcement List', Icons.list_alt),
+                      _buildFunctionButton(
+                          '欠費查詢', 'Payment Query', Icons.search),
+                      // _buildFunctionButton(
+                      //     '繳費表單', 'Payment Form', Icons.table_chart),
+                      _buildFunctionButton(
+                          '電子繳費', 'Electronic Payment', Icons.payment),
+                      _buildFunctionButton(
+                          '便利服務', 'Convenient Services', Icons.store),
+                    ],
                   ),
                 ),
-                // Right Side: Dynamic Content
-                Expanded(
-                  flex: 5,
-                  child: _buildRightContent(
-                      announcementProvider, filteredAnnouncements),
-                ),
-              ],
-            ),
+              ),
+              // Right Side: Dynamic Content
+              Expanded(
+                flex: 5,
+                child: _buildRightContent(
+                    announcementProvider, filteredAnnouncements),
+              ),
+            ],
           ),
         );
       },

@@ -198,43 +198,6 @@ class _FullAdWidgetState extends State<FullAdWidget> {
     }
   }
 
-  ///2，处理轮播切换时的清理
-  Future<void> _handleCarouselSwitch() async {
-    if (_videoController != null) {
-      await _releaseVideoControllerToPool();
-    }
-  }
-
-  ///3，暂停视频播放
-  Future<void> _pauseVideo() async {
-    if (_videoController != null) {
-      try {
-        if (_videoController!.value.isInitialized &&
-            !_videoController!.value.hasError &&
-            _videoController!.value.isPlaying) {
-          await _videoController!.pause();
-        }
-      } catch (e) {
-        // 静默处理暂停失败
-      }
-    }
-  }
-
-  ///4，恢复视频播放
-  Future<void> _resumeVideo() async {
-    if (_videoController != null) {
-      try {
-        if (_videoController!.value.isInitialized &&
-            !_videoController!.value.hasError &&
-            !_videoController!.value.isPlaying) {
-          await _videoController!.play();
-        }
-      } catch (e) {
-        // 静默处理恢复播放失败
-      }
-    }
-  }
-
   ///5，释放视频控制器到池中
   Future<void> _releaseVideoControllerToPool() async {
     if (_videoController != null && _currentFilePath != null) {
@@ -502,7 +465,7 @@ class _FullAdWidgetState extends State<FullAdWidget> {
                     borderRadius: BorderRadius.circular(20),
                   ),
                   child: const Text(
-                    '📺 静态广告展示',
+                    ' 静态广告展示',
                     style: TextStyle(
                       fontSize: 14,
                       color: Colors.white,

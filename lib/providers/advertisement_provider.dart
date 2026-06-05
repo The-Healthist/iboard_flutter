@@ -78,6 +78,7 @@ class AdvertisementProvider extends ChangeNotifier {
   }) {
     _topAdCarouselProvider = topAdCarouselProvider;
     _fullscreenAdProvider = fullscreenAdProvider;
+    _initializeCarouselProvidersWithCache();
   }
 
   ///2，保存顶部广告轮播数据到缓存
@@ -134,13 +135,13 @@ class AdvertisementProvider extends ChangeNotifier {
     // 將緩存的輪播數據傳遞給對應的Provider
     if (_topAdCarouselProvider != null &&
         _topCarouselAdvertisements.isNotEmpty) {
-      _logger.i('🔄 從緩存初始化頂部廣告輪播: ${_topCarouselAdvertisements.length} 個廣告');
+      _logger.i(' 從緩存初始化頂部廣告輪播: ${_topCarouselAdvertisements.length} 個廣告');
       _topAdCarouselProvider!.updateCarouselList(_topCarouselAdvertisements);
     }
 
     if (_fullscreenAdProvider != null &&
         _fullCarouselAdvertisements.isNotEmpty) {
-      _logger.i('🔄 從緩存初始化全屏廣告輪播: ${_fullCarouselAdvertisements.length} 個廣告');
+      _logger.i(' 從緩存初始化全屏廣告輪播: ${_fullCarouselAdvertisements.length} 個廣告');
       _fullscreenAdProvider!.updateCarouselList(_fullCarouselAdvertisements);
     }
   }
@@ -157,7 +158,7 @@ class AdvertisementProvider extends ChangeNotifier {
             .toList();
 
         _topCarouselAdvertisements = cachedAds;
-        _logger.i('✅ 從緩存加載頂部廣告輪播數據: ${cachedAds.length} 個廣告');
+        _logger.i(' 從緩存加載頂部廣告輪播數據: ${cachedAds.length} 個廣告');
         notifyListeners();
       } else {
         _logger.w('緩存中沒有找到頂部廣告輪播數據');
@@ -249,7 +250,7 @@ class AdvertisementProvider extends ChangeNotifier {
     final updateIntervalSeconds = updateIntervalMinutes * 60; // 转换为秒
     _isPeriodicUpdateActive = true;
     debugPrint(
-        '[AdvertisementProvider] ⏰ 启动广告数据定时更新，间隔: ${updateIntervalSeconds}秒');
+        '[AdvertisementProvider]  启动广告数据定时更新，间隔: ${updateIntervalSeconds}秒');
 
     // 立即执行一次更新
     fetchAdvertisements();
@@ -258,7 +259,7 @@ class AdvertisementProvider extends ChangeNotifier {
     _updateTimer =
         Timer.periodic(Duration(seconds: updateIntervalSeconds), (timer) {
       if (_isPeriodicUpdateActive) {
-        debugPrint('[AdvertisementProvider] 🔄 执行定时广告数据更新');
+        debugPrint('[AdvertisementProvider]  执行定时广告数据更新');
         fetchAdvertisements();
       } else {
         timer.cancel();
@@ -273,7 +274,7 @@ class AdvertisementProvider extends ChangeNotifier {
       _updateTimer = null;
     }
     _isPeriodicUpdateActive = false;
-    debugPrint('[AdvertisementProvider] ⏹️ 停止广告数据定时更新');
+    debugPrint('[AdvertisementProvider]  停止广告数据定时更新');
   }
 
   /// 重新初始化Provider（当依赖变化时调用）

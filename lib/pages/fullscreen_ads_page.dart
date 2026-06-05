@@ -2,7 +2,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:iboard_app/providers/advertisement_provider.dart';
 import 'package:iboard_app/providers/ad_full_carousel_provider.dart';
-import 'package:iboard_app/widgets/debug_fullad_time_widget.dart';
+import 'package:iboard_app/widgets/debug/debug_fullad_time_widget.dart';
 import 'package:provider/provider.dart';
 import 'package:logger/logger.dart';
 
@@ -50,10 +50,10 @@ class FullscreenAdsPageState extends State<FullscreenAdsPage> {
       if (fullAds.isNotEmpty) {
         fullscreenAdProvider.updateFullscreenAds(fullAds);
       } else {
-        _logger.w('⚠️ 没有可用的全屏广告数据');
+        _logger.w(' 没有可用的全屏广告数据');
       }
     } catch (e) {
-      _logger.e('❌ 初始化全屏广告失败: $e');
+      _logger.e(' 初始化全屏广告失败: $e');
     }
   }
 
@@ -74,11 +74,7 @@ class FullscreenAdsPageState extends State<FullscreenAdsPage> {
               // 有缓存数据时，无论什么错误都继续使用缓存数据
             } else if (error.contains('网络连接失败') ||
                 error.contains('请求超时') ||
-                error.contains('无法连接到服务器') ||
-                error.contains('🌐') ||
-                error.contains('⏱️') ||
-                error.contains('🔌') ||
-                error.contains('📱')) {
+                error.contains('无法连接到服务器')) {
               // 网络错误且没有缓存数据时，显示友好的离线界面而不是错误界面
               return _buildOfflineState();
             } else {
@@ -98,7 +94,7 @@ class FullscreenAdsPageState extends State<FullscreenAdsPage> {
 
           // 数据初始化已在didChangeDependencies中处理，这里不需要重复调用
 
-          // 🎯 修復：使用懶加載策略，只獲取當前需要顯示的Widget，避免多個Widget同時渲染
+          //  修復：使用懶加載策略，只獲取當前需要顯示的Widget，避免多個Widget同時渲染
           final adWidgetToShow = fullscreenAdProvider.getCurrentWidget();
 
           // 如果有要顯示的Widget，渲染它

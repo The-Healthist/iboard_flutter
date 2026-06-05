@@ -63,7 +63,7 @@ class SimplePrintDialogState extends State<SimplePrintDialog> {
               .refreshPrinters()
               .timeout(const Duration(seconds: 3));
         } on TimeoutException {
-          _logger.w('🕒 列印對話框: 刷新列印機狀態超時 (3s)');
+          _logger.w(' 列印對話框: 刷新列印機狀態超時 (3s)');
         }
         _printers = _printerProvider!.printers;
         _selectedPrinter = _printers.isNotEmpty ? _printers.first : null;
@@ -78,7 +78,7 @@ class SimplePrintDialogState extends State<SimplePrintDialog> {
         }
       });
 
-      _logger.i('🖨️ 簡化列印對話框初始化完成，載入 ${_printers.length} 個列印機');
+      _logger.i(' 簡化列印對話框初始化完成，載入 ${_printers.length} 個列印機');
     } catch (e) {
       setState(() {
         _isLoading = false;
@@ -141,9 +141,9 @@ class SimplePrintDialogState extends State<SimplePrintDialog> {
       );
 
       if (response?.success == true) {
-        _logger.i('🖨️ 已發送打印任務: ${widget.announcement.title}');
+        _logger.i(' 已發送打印任務: ${widget.announcement.title}');
       } else {
-        _logger.w('⚠️ 打印任務失敗: ${response?.message}');
+        _logger.w(' 打印任務失敗: ${response?.message}');
       }
     } catch (e) {
       // 即使出錯也不顯示錯誤對話框，只記錄日誌

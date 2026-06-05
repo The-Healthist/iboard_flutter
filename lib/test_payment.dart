@@ -14,7 +14,8 @@ class _TestPaymentPageState extends State<TestPaymentPage> {
   late ApiClient _apiClient;
   String _result = '';
   bool _isLoading = false;
-  final TextEditingController _amountController = TextEditingController(text: '0.1');
+  final TextEditingController _amountController =
+      TextEditingController(text: '0.1');
 
   @override
   void initState() {
@@ -25,7 +26,7 @@ class _TestPaymentPageState extends State<TestPaymentPage> {
   ///1, 測試微信支付
   Future<void> _testWechatPayment() async {
     if (_isLoading) return;
-    
+
     setState(() {
       _isLoading = true;
       _result = '正在創建微信支付訂單...';
@@ -37,9 +38,7 @@ class _TestPaymentPageState extends State<TestPaymentPage> {
       final random = (timestamp % 999999).toString().padLeft(6, '0');
       final orderNo = 'TEST_WX_$timestamp$random';
       final amount = double.tryParse(_amountController.text) ?? 0.1;
-      
-      print('🎯 [測試] 開始創建微信支付，訂單號: $orderNo');
-      
+
       final result = await _apiClient.createWechatPayment(
         orderNo: orderNo,
         amount: amount,
@@ -49,13 +48,13 @@ class _TestPaymentPageState extends State<TestPaymentPage> {
       );
 
       setState(() {
-        _result = '✅ 微信支付創建成功！\n\n'
+        _result = ' 微信支付創建成功！\n\n'
             '訂單號：$orderNo\n'
             '金額：HK\$ $amount\n'
             '時間戳：$timestamp\n\n'
             '完整響應數據：\n${result.toString()}';
       });
-      
+
       // 檢查各種可能的QR碼字段
       String? qrData;
       if (result.containsKey('payData')) {
@@ -68,14 +67,17 @@ class _TestPaymentPageState extends State<TestPaymentPage> {
         qrData = result['qr_code'];
         _showQrCodeDialog('微信支付QR碼 (qr_code)', qrData!);
       } else {
-        print('⚠️ [測試] 響應中沒有找到QR碼數據');
-        print('📋 [測試] 可用字段: ${result.keys.toList()}');
+        setState(() {
+          _result = ' 微信支付創建成功，但響應中沒有找到QR碼數據。\n\n'
+              '訂單號：$orderNo\n'
+              '可用字段：${result.keys.toList()}\n\n'
+              '完整響應數據：\n${result.toString()}';
+        });
       }
     } catch (e) {
       setState(() {
-        _result = '❌ 微信支付創建失敗：\n$e\n\n錯誤類型：${e.runtimeType}';
+        _result = ' 微信支付創建失敗：\n$e\n\n錯誤類型：${e.runtimeType}';
       });
-      print('💥 [測試] 微信支付創建異常: $e');
     } finally {
       setState(() {
         _isLoading = false;
@@ -86,7 +88,7 @@ class _TestPaymentPageState extends State<TestPaymentPage> {
   ///2, 測試支付寶支付
   Future<void> _testAlipayPayment() async {
     if (_isLoading) return;
-    
+
     setState(() {
       _isLoading = true;
       _result = '正在創建支付寶訂單...';
@@ -95,7 +97,7 @@ class _TestPaymentPageState extends State<TestPaymentPage> {
     try {
       final orderNo = 'test_ali_${DateTime.now().millisecondsSinceEpoch}';
       final amount = double.tryParse(_amountController.text) ?? 0.1;
-      
+
       final result = await _apiClient.createAlipayPayment(
         orderNo: orderNo,
         amount: amount,
@@ -105,19 +107,19 @@ class _TestPaymentPageState extends State<TestPaymentPage> {
       );
 
       setState(() {
-        _result = '✅ 支付寶創建成功！\n\n'
+        _result = ' 支付寶創建成功！\n\n'
             '訂單號：$orderNo\n'
             '金額：HK\$ $amount\n'
             '響應數據：\n${result.toString()}';
       });
-      
+
       // 如果返回了QR碼URL，可以顯示
       if (result.containsKey('payData')) {
         _showQrCodeDialog('支付寶QR碼', result['payData']);
       }
     } catch (e) {
       setState(() {
-        _result = '❌ 支付寶創建失敗：$e';
+        _result = ' 支付寶創建失敗：$e';
       });
     } finally {
       setState(() {
@@ -129,7 +131,7 @@ class _TestPaymentPageState extends State<TestPaymentPage> {
   ///3, 測試銀聯支付
   Future<void> _testUnionpayPayment() async {
     if (_isLoading) return;
-    
+
     setState(() {
       _isLoading = true;
       _result = '正在創建銀聯支付訂單...';
@@ -138,7 +140,7 @@ class _TestPaymentPageState extends State<TestPaymentPage> {
     try {
       final orderNo = 'test_up_${DateTime.now().millisecondsSinceEpoch}';
       final amount = double.tryParse(_amountController.text) ?? 0.1;
-      
+
       final result = await _apiClient.createUnionpayPayment(
         orderNo: orderNo,
         amount: amount,
@@ -148,19 +150,19 @@ class _TestPaymentPageState extends State<TestPaymentPage> {
       );
 
       setState(() {
-        _result = '✅ 銀聯支付創建成功！\n\n'
+        _result = ' 銀聯支付創建成功！\n\n'
             '訂單號：$orderNo\n'
             '金額：HK\$ $amount\n'
             '響應數據：\n${result.toString()}';
       });
-      
+
       // 如果返回了QR碼URL，可以顯示
       if (result.containsKey('payData')) {
         _showQrCodeDialog('銀聯支付QR碼', result['payData']);
       }
     } catch (e) {
       setState(() {
-        _result = '❌ 銀聯支付創建失敗：$e';
+        _result = ' 銀聯支付創建失敗：$e';
       });
     } finally {
       setState(() {
@@ -227,10 +229,11 @@ class _TestPaymentPageState extends State<TestPaymentPage> {
                 hintText: '請輸入支付金額，例如：0.1',
                 border: OutlineInputBorder(),
               ),
-              keyboardType: const TextInputType.numberWithOptions(decimal: true),
+              keyboardType:
+                  const TextInputType.numberWithOptions(decimal: true),
             ),
             const SizedBox(height: 16),
-            
+
             // 支付按鈕
             Row(
               children: [
@@ -275,13 +278,12 @@ class _TestPaymentPageState extends State<TestPaymentPage> {
               ],
             ),
             const SizedBox(height: 16),
-            
+
             // 載入指示器
-            if (_isLoading)
-              const LinearProgressIndicator(),
-            
+            if (_isLoading) const LinearProgressIndicator(),
+
             const SizedBox(height: 16),
-            
+
             // 結果顯示
             Expanded(
               child: Container(
@@ -301,7 +303,7 @@ class _TestPaymentPageState extends State<TestPaymentPage> {
                 ),
               ),
             ),
-            
+
             // 配置資訊
             Container(
               margin: const EdgeInsets.only(top: 16),
@@ -313,7 +315,8 @@ class _TestPaymentPageState extends State<TestPaymentPage> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text('配置資訊：', style: TextStyle(fontWeight: FontWeight.bold)),
+                  const Text('配置資訊：',
+                      style: TextStyle(fontWeight: FontWeight.bold)),
                   const SizedBox(height: 4),
                   Text('API URL: ${PaymentApiConfig.baseUrl}'),
                   Text('微信/支付寶商戶號: ${PaymentApiConfig.mchNo}'),

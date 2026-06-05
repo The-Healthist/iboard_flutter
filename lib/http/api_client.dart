@@ -1,10 +1,8 @@
 import 'dart:async';
 import 'dart:convert';
-import 'dart:io';
 import 'package:http/http.dart' as http;
 import 'package:logger/logger.dart';
 import 'package:crypto/crypto.dart';
-import 'package:flutter/foundation.dart';
 
 // 支付API配置類
 class PaymentApiConfig {
@@ -340,19 +338,19 @@ class ApiClient {
         if (e.toString().contains('Failed host lookup') ||
             e.toString().contains('No address associated with hostname')) {
           errorType = 'DNS解析失敗';
-          userFriendlyMessage = '🌐 無法連接到伺服器，請檢查網絡連接或聯繫管理員';
+          userFriendlyMessage = ' 無法連接到伺服器，請檢查網絡連接或聯繫管理員';
         } else if (e.toString().contains('SocketException')) {
           errorType = 'Socket連接錯誤';
-          userFriendlyMessage = '🔌 網絡連接異常，請檢查您的網絡設置';
+          userFriendlyMessage = ' 網絡連接異常，請檢查您的網絡設置';
         } else if (e.toString().contains('TimeoutException') ||
             e.toString().contains('請求超時')) {
           errorType = '請求超時';
-          userFriendlyMessage = '⏱️ 伺服器響應超時，請稍後重試';
+          userFriendlyMessage = ' 伺服器響應超時，請稍後重試';
         } else if (e.toString().contains('ClientException')) {
           errorType = '客戶端錯誤';
-          userFriendlyMessage = '📱 應用連接錯誤，請重啟應用或檢查網絡';
+          userFriendlyMessage = ' 應用連接錯誤，請重啟應用或檢查網絡';
         } else {
-          userFriendlyMessage = '❌ 網絡請求失敗，請稍後重試';
+          userFriendlyMessage = ' 網絡請求失敗，請稍後重試';
         }
 
         if (attempt == _maxRetryAttempts) {
@@ -751,7 +749,7 @@ class ApiClient {
       'Cache-Control': 'no-cache',
     };
 
-    _logger.i('🌐 開始獲取香港電台財經新聞RSS數據');
+    _logger.i(' 開始獲取香港電台財經新聞RSS數據');
 
     try {
       // 增加超時時間到60秒
@@ -768,13 +766,13 @@ class ApiClient {
       // 處理XML響應
       return _handleRssXmlResponse(response, 'getRthkNews');
     } catch (e) {
-      _logger.e('❌ 獲取RTHK新聞失敗: $e');
+      _logger.e(' 獲取RTHK新聞失敗: $e');
 
       // 如果是超時錯誤，提供更友好的錯誤信息
       if (e.toString().contains('超時')) {
         throw ApiException(
           statusCode: null,
-          message: '❌ RTHK新聞RSS請求超時，請檢查網絡連接或稍後重試',
+          message: ' RTHK新聞RSS請求超時，請檢查網絡連接或稍後重試',
           errorData: 'TimeoutException: ${e.toString()}',
         );
       }
@@ -934,8 +932,7 @@ class ApiClient {
     final Map<String, String> headers =
         _getHeaders(requiresAuth: true, contentType: 'application/json');
 
-    _logger
-        .i('🏥 [健康檢查] 香橙派狀態: ${orangePi['status']}, 打印機: ${printers.length}個');
+    _logger.i(' [健康檢查] 香橙派狀態: ${orangePi['status']}, 打印機: ${printers.length}個');
 
     final http.Response response = await _sendRequest(
         () => http.post(url, headers: headers, body: requestBody),
@@ -944,7 +941,7 @@ class ApiClient {
     final Map<String, dynamic> responseData =
         await _handleResponse(response, 'printersHealthCheck');
 
-    _logger.i('✅ [健康檢查] 同步完成: ${responseData['summary'] ?? 'Success'}');
+    _logger.i(' [健康檢查] 同步完成: ${responseData['summary'] ?? 'Success'}');
     return responseData;
   }
 
@@ -964,7 +961,7 @@ class ApiClient {
     final Map<String, String> headers =
         _getHeaders(requiresAuth: true, contentType: 'application/json');
 
-    _logger.i('📞 [打印回調] 香橙派: ${orangePi['status']}, 打印機: ${printers.length}個');
+    _logger.i(' [打印回調] 香橙派: ${orangePi['status']}, 打印機: ${printers.length}個');
 
     final http.Response response = await _sendRequest(
         () => http.post(url, headers: headers, body: requestBody),
@@ -973,7 +970,7 @@ class ApiClient {
     final Map<String, dynamic> responseData =
         await _handleResponse(response, 'printersCallback');
 
-    _logger.i('✅ [打印回調] 更新完成: ${responseData['summary'] ?? 'Success'}');
+    _logger.i(' [打印回調] 更新完成: ${responseData['summary'] ?? 'Success'}');
     return responseData;
   }
 
@@ -1024,9 +1021,9 @@ class ApiClient {
           _generatePaymentSign(params, PaymentApiConfig.wechatAlipayAppSecret);
       params['sign'] = signature;
 
-      _logger.i('💳 [微信支付] 開始創建訂單');
-      _logger.i('💳 [微信支付] 訂單號: $orderNo, 金額: ${params['amount']}分');
-      _logger.i('🔐 [微信支付] 請求參數: $params');
+      _logger.i(' [微信支付] 開始創建訂單');
+      _logger.i(' [微信支付] 訂單號: $orderNo, 金額: ${params['amount']}分');
+      _logger.i(' [微信支付] 請求參數: $params');
 
       final http.Response response = await _sendRequest(
           () => http.post(url,
@@ -1036,30 +1033,30 @@ class ApiClient {
       final Map<String, dynamic> responseData =
           await _handleResponse(response, 'createWechatPayment');
 
-      _logger.i('📨 [微信支付] 完整響應: $responseData');
+      _logger.i(' [微信支付] 完整響應: $responseData');
 
       if (responseData.containsKey('data') && responseData['data'] != null) {
         final data = responseData['data'];
-        _logger.i('✅ [微信支付] 創建成功！');
-        _logger.i('📱 [微信支付] 返回數據: $data');
+        _logger.i(' [微信支付] 創建成功！');
+        _logger.i(' [微信支付] 返回數據: $data');
 
         // 檢查是否包含支付數據
         if (data.containsKey('payData')) {
-          _logger.i('🎯 [微信支付] QR碼數據: ${data['payData']}');
+          _logger.i(' [微信支付] QR碼數據: ${data['payData']}');
         } else {
-          _logger.w('⚠️ [微信支付] 響應中沒有payData字段');
+          _logger.w(' [微信支付] 響應中沒有payData字段');
         }
 
         return data;
       } else {
-        _logger.e('❌ [微信支付] 響應格式異常: $responseData');
+        _logger.e(' [微信支付] 響應格式異常: $responseData');
         throw ApiException(
           message: '微信支付創建失敗: ${responseData['msg'] ?? 'Unknown error'}',
           errorData: responseData,
         );
       }
     } catch (e) {
-      _logger.e('❌ [微信支付] 創建失敗: $e');
+      _logger.e(' [微信支付] 創建失敗: $e');
       rethrow;
     } finally {
       // 移除正在處理的訂單號
@@ -1151,8 +1148,8 @@ class ApiClient {
           _generatePaymentSign(params, PaymentApiConfig.wechatAlipayAppSecret);
       params['sign'] = signature;
 
-      _logger.i('💰 [支付寶] 訂單號: $orderNo, 金額: ${params['amount']}分');
-      _logger.i('🔐 [支付寶] 簽名: $signature');
+      _logger.i(' [支付寶] 訂單號: $orderNo, 金額: ${params['amount']}分');
+      _logger.i(' [支付寶] 簽名: $signature');
 
       final http.Response response = await _sendRequest(
           () => http.post(url,
@@ -1163,7 +1160,7 @@ class ApiClient {
           await _handleResponse(response, 'createAlipayPayment');
 
       if (responseData.containsKey('data') && responseData['data'] != null) {
-        _logger.i('✅ [支付寶] 創建成功，QR碼數據: ${responseData['data']}');
+        _logger.i(' [支付寶] 創建成功，QR碼數據: ${responseData['data']}');
         return responseData['data'];
       } else {
         throw ApiException(
@@ -1172,7 +1169,7 @@ class ApiClient {
         );
       }
     } catch (e) {
-      _logger.e('❌ [支付寶] 創建失敗: $e');
+      _logger.e(' [支付寶] 創建失敗: $e');
       rethrow;
     } finally {
       // 移除正在處理的訂單號
@@ -1224,8 +1221,8 @@ class ApiClient {
           _generatePaymentSign(params, PaymentApiConfig.unionPayQrAppSecret);
       params['sign'] = signature;
 
-      _logger.i('🏦 [銀聯] 訂單號: $orderNo, 金額: ${params['amount']}分');
-      _logger.i('🔐 [銀聯] 簽名: $signature');
+      _logger.i(' [銀聯] 訂單號: $orderNo, 金額: ${params['amount']}分');
+      _logger.i(' [銀聯] 簽名: $signature');
 
       final http.Response response = await _sendRequest(
           () => http.post(url,
@@ -1236,7 +1233,7 @@ class ApiClient {
           await _handleResponse(response, 'createUnionpayPayment');
 
       if (responseData.containsKey('data') && responseData['data'] != null) {
-        _logger.i('✅ [銀聯] 創建成功，QR碼數據: ${responseData['data']}');
+        _logger.i(' [銀聯] 創建成功，QR碼數據: ${responseData['data']}');
         return responseData['data'];
       } else {
         throw ApiException(
@@ -1245,7 +1242,7 @@ class ApiClient {
         );
       }
     } catch (e) {
-      _logger.e('❌ [銀聯] 創建失敗: $e');
+      _logger.e(' [銀聯] 創建失敗: $e');
       rethrow;
     } finally {
       // 移除正在處理的訂單號
@@ -1292,7 +1289,7 @@ class ApiClient {
       final signature = _generatePaymentSign(params, appSecret);
       params['sign'] = signature;
 
-      _logger.i('🔍 [支付查詢] 訂單號: $orderNo');
+      _logger.i(' [支付查詢] 訂單號: $orderNo');
 
       final http.Response response = await _sendRequest(
           () => http.post(url,
@@ -1303,7 +1300,7 @@ class ApiClient {
           await _handleResponse(response, 'queryPaymentStatus');
 
       if (responseData.containsKey('data') && responseData['data'] != null) {
-        _logger.i('✅ [支付查詢] 查詢成功: ${responseData['data']}');
+        _logger.i(' [支付查詢] 查詢成功: ${responseData['data']}');
         return responseData['data'];
       } else {
         throw ApiException(
@@ -1312,7 +1309,7 @@ class ApiClient {
         );
       }
     } catch (e) {
-      _logger.e('❌ [支付查詢] 查詢失敗: $e');
+      _logger.e(' [支付查詢] 查詢失敗: $e');
       rethrow;
     }
   }

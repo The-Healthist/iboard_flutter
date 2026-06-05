@@ -14,9 +14,10 @@ import 'package:iboard_app/providers/ad_top_carousel_provider.dart';
 import 'package:iboard_app/providers/ad_full_carousel_provider.dart';
 import 'package:iboard_app/providers/weather_provider.dart';
 import 'package:iboard_app/providers/rthk_news_provider.dart';
-import 'package:iboard_app/widgets/carousel_widget.dart' as custom_carousel;
+import 'package:iboard_app/widgets/carousel/carousel_widget.dart'
+    as custom_carousel;
 import 'package:iboard_app/widgets/mainscreen/bottom_display/bottom_display_widget.dart';
-import 'package:iboard_app/widgets/rthk_news_ticker_widget.dart';
+import 'package:iboard_app/widgets/news/rthk_news_ticker_widget.dart';
 import 'package:iboard_app/pages/settings_page.dart';
 import 'package:provider/provider.dart';
 import 'package:iboard_app/providers/arrear_provider.dart';
@@ -66,11 +67,11 @@ class AnnouncementPageState extends State<AnnouncementPage> {
       if (_previousAppState != appState) {
         _previousAppState = appState;
 
-        // 🔧 修复：只有从全屏广告切换到手动操作状态时才跳转到主屏幕
+        //  修复：只有从全屏广告切换到手动操作状态时才跳转到主屏幕
         // 从全屏广告直接切换到默认状态时，应该保持当前轮播位置
         if (_previousAppState == AppState.fullscreenAd &&
             appState == AppState.manualOperation) {
-          // 🆕 在跳转到主屏幕前保存当前轮播索引
+          //  在跳转到主屏幕前保存当前轮播索引
           announcementCarouselProvider.saveManualOperationState();
           announcementCarouselProvider.jumpToAnnouncementIndex(0);
         }
@@ -150,18 +151,18 @@ class AnnouncementPageState extends State<AnnouncementPage> {
   void _setupProviderReferences() {
     final stateProvider = context.read<CarouselStateProvider>();
     final topAdProvider = context.read<TopAdCarouselProvider>();
-    final fullscreenAdProvider = context.read<FullscreenAdProvider>(); // 🔧 新增
+    final fullscreenAdProvider = context.read<FullscreenAdProvider>(); //  新增
     final announcementCarouselProvider =
-        context.read<AnnouncementCarouselProvider>(); // 🔧 新增
+        context.read<AnnouncementCarouselProvider>(); //  新增
     final rthkNewsProvider = context.read<RthkNewsProvider>();
 
     // 设置顶部广告轮播Provider引用（修复音视频不同步问题）
     stateProvider.setTopCarouselProvider(topAdProvider);
 
-    // 🔧 重要修复：设置全屏广告轮播Provider引用
+    //  重要修复：设置全屏广告轮播Provider引用
     stateProvider.setFullscreenAdProvider(fullscreenAdProvider);
 
-    // 🔧 关键修复：设置通告轮播Provider引用
+    //  关键修复：设置通告轮播Provider引用
     stateProvider.setAnnouncementCarouselProvider(announcementCarouselProvider);
 
     // 设置RTHK新闻Provider引用（用于直接控制跑马灯暂停恢复）
@@ -286,7 +287,7 @@ class AnnouncementPageState extends State<AnnouncementPage> {
     final stateProvider =
         Provider.of<CarouselStateProvider>(context, listen: false);
 
-    // 🔧 修复：判断是否从手动操作状态恢复
+    //  修复：判断是否从手动操作状态恢复
     final isFromManual = _previousAppState == AppState.manualOperation;
 
     // 恢复通告轮播 - 根据上一个状态决定是否为手动操作恢复

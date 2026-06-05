@@ -124,7 +124,7 @@ class DebugFullAdTimeWidgetState extends State<DebugFullAdTimeWidget> {
     if (fullscreenProvider.fullscreenAds.isEmpty) {
       return [
         const Text(
-          '📋 轮播列表: 无广告',
+          ' 轮播列表: 无广告',
           style: TextStyle(
             color: Colors.yellow,
             fontSize: 11,
@@ -135,7 +135,7 @@ class DebugFullAdTimeWidgetState extends State<DebugFullAdTimeWidget> {
 
     List<Widget> widgets = [
       Text(
-        '📋 轮播顺序 (${fullscreenProvider.fullscreenAds.length}个):',
+        ' 轮播顺序 (${fullscreenProvider.fullscreenAds.length}个):',
         style: const TextStyle(
           color: Colors.yellow,
           fontSize: 11,
@@ -154,7 +154,7 @@ class DebugFullAdTimeWidgetState extends State<DebugFullAdTimeWidget> {
 
       widgets.add(
         Text(
-          '${isCurrentAd ? "👉" : "  "}${i + 1}. $adTitle (${duration}s)',
+          '${isCurrentAd ? "" : "  "}${i + 1}. $adTitle (${duration}s)',
           style: TextStyle(
             color: isCurrentAd ? Colors.orange : Colors.white70,
             fontSize: 10,
@@ -192,7 +192,7 @@ class DebugFullAdTimeWidgetState extends State<DebugFullAdTimeWidget> {
               children: [
                 // 标题
                 const Text(
-                  '🎬 全屏广告调试',
+                  ' 全屏广告调试',
                   style: TextStyle(
                     color: Colors.orange,
                     fontSize: 14,
@@ -238,7 +238,7 @@ class DebugFullAdTimeWidgetState extends State<DebugFullAdTimeWidget> {
 
                 // 状态信息
                 Text(
-                  '状态: ${fullscreenProvider.isPaused ? "⏸️暂停" : "▶️播放"}',
+                  '状态: ${fullscreenProvider.isPaused ? "暂停" : "▶播放"}',
                   style: TextStyle(
                     color:
                         fullscreenProvider.isPaused ? Colors.red : Colors.green,

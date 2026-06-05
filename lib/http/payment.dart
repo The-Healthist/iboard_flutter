@@ -1,5 +1,4 @@
 import 'dart:convert';
-import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:logger/logger.dart';
 
@@ -171,13 +170,13 @@ class PaymentClient {
     const String endpoint = '$_baseUrl/get-building-list';
     final Uri url = Uri.parse(endpoint);
 
-    _logger.i('📋 獲取全部大廈列表');
+    _logger.i(' 獲取全部大廈列表');
 
     try {
       final response = await http.get(url).timeout(_requestTimeout);
       return _handleArrayResponse(response, '獲取大廈列表');
     } catch (e) {
-      _logger.e('❌ 獲取大廈列表失敗: $e');
+      _logger.e(' 獲取大廈列表失敗: $e');
       rethrow;
     }
   }
@@ -199,7 +198,7 @@ class PaymentClient {
     final Uri url = Uri.parse(endpoint);
     final Map<String, dynamic> requestBody = {'blg_id': blgId};
 
-    _logger.i('🏢 獲取大廈細明，大廈ID: $blgId');
+    _logger.i(' 獲取大廈細明，大廈ID: $blgId');
 
     try {
       final response = await http
@@ -212,7 +211,7 @@ class PaymentClient {
 
       return _handleResponse(response, '獲取大廈細明');
     } catch (e) {
-      _logger.e('❌ 獲取大廈細明失敗: $e');
+      _logger.e(' 獲取大廈細明失敗: $e');
       rethrow;
     }
   }
@@ -268,10 +267,6 @@ class PaymentClient {
     final Uri url = Uri.parse(endpoint);
     final Map<String, dynamic> requestBody = {'blg_id': blgId};
 
-    _logger.i('💰 獲取大廈手續費費率，大廈ID: $blgId');
-    _logger.i('💰 API端點: $endpoint');
-    _logger.i('💰 請求參數: $requestBody');
-
     try {
       final response = await http
           .post(
@@ -281,12 +276,9 @@ class PaymentClient {
           )
           .timeout(_requestTimeout);
 
-      _logger.i('💰 HTTP響應狀態碼: ${response.statusCode}');
-      _logger.i('💰 原始響應體: ${response.body}');
-
       return _handleResponse(response, '獲取大廈手續費');
     } catch (e) {
-      _logger.e('❌ 獲取大廈手續費失敗: $e');
+      _logger.e(' 獲取大廈手續費失敗: $e');
       rethrow;
     }
   }
@@ -554,12 +546,7 @@ class PaymentClient {
     final Uri url = Uri.parse(endpoint);
     final Map<String, dynamic> requestBody = {'blg_id': blgId};
 
-    debugPrint('[PaymentClient] 🏠 開始獲取大廈全部單位');
-    debugPrint('[PaymentClient] 📡 API端點: $endpoint');
-    debugPrint('[PaymentClient] 📋 請求參數: $requestBody');
-    debugPrint('[PaymentClient] 🔗 完整URL: $url');
-
-    _logger.i('🏠 獲取大廈全部單位，大廈ID: $blgId');
+    _logger.i(' 獲取大廈全部單位，大廈ID: $blgId');
 
     try {
       final response = await http
@@ -570,18 +557,9 @@ class PaymentClient {
           )
           .timeout(_requestTimeout);
 
-      debugPrint('[PaymentClient] 📊 HTTP響應狀態碼: ${response.statusCode}');
-      debugPrint('[PaymentClient] 📄 HTTP響應頭: ${response.headers}');
-      debugPrint('[PaymentClient] 📝 原始響應體: ${response.body}');
-
-      final result = _handleArrayResponse(response, '獲取大廈單位');
-      debugPrint('[PaymentClient] ✅ 成功解析單位數據: ${result.length} 條記錄');
-      debugPrint('[PaymentClient] 📋 單位數據詳情: $result');
-
-      return result;
+      return _handleArrayResponse(response, '獲取大廈單位');
     } catch (e) {
-      debugPrint('[PaymentClient] ❌ 獲取大廈單位失敗: $e');
-      _logger.e('❌ 獲取大廈單位失敗: $e');
+      _logger.e(' 獲取大廈單位失敗: $e');
       rethrow;
     }
   }
@@ -1135,7 +1113,7 @@ class PaymentClient {
       'pay_method': payMethod,
     };
 
-    _logger.i('📊 查詢歷史訂單，大廈ID: $blgId, 日期範圍: $fromDate - $toDate');
+    _logger.i(' 查詢歷史訂單，大廈ID: $blgId, 日期範圍: $fromDate - $toDate');
 
     try {
       final response = await http
@@ -1148,7 +1126,7 @@ class PaymentClient {
 
       return _handleArrayResponse(response, '查詢歷史訂單');
     } catch (e) {
-      _logger.e('❌ 查詢歷史訂單失敗: $e');
+      _logger.e(' 查詢歷史訂單失敗: $e');
       rethrow;
     }
   }
@@ -1173,7 +1151,7 @@ class PaymentClient {
     final Uri url = Uri.parse(endpoint);
     final Map<String, dynamic> requestBody = {'unit_id': unitId};
 
-    _logger.i('📄 獲取單位待繳費帳單，單位ID: $unitId');
+    _logger.i(' 獲取單位待繳費帳單，單位ID: $unitId');
 
     try {
       final response = await http
@@ -1186,7 +1164,7 @@ class PaymentClient {
 
       return _handleArrayResponse(response, '獲取待繳費帳單');
     } catch (e) {
-      _logger.e('❌ 獲取待繳費帳單失敗: $e');
+      _logger.e(' 獲取待繳費帳單失敗: $e');
       rethrow;
     }
   }
@@ -1249,7 +1227,7 @@ class PaymentClient {
       'pw': password,
     };
 
-    _logger.i('💳 上報繳費請求，設備ID: $deviceId');
+    _logger.i(' 上報繳費請求，設備ID: $deviceId');
 
     try {
       final response = await http
@@ -1262,7 +1240,7 @@ class PaymentClient {
 
       return _handleResponse(response, '上報繳費請求');
     } catch (e) {
-      _logger.e('❌ 上報繳費請求失敗: $e');
+      _logger.e(' 上報繳費請求失敗: $e');
       rethrow;
     }
   }
@@ -1756,7 +1734,7 @@ class PaymentClient {
     final Uri url = Uri.parse(endpoint);
     final Map<String, dynamic> requestBody = {'blg_id': blgId};
 
-    _logger.i('🏧 獲取待清機訂單，大廈ID: $blgId');
+    _logger.i(' 獲取待清機訂單，大廈ID: $blgId');
 
     try {
       final response = await http
@@ -1769,7 +1747,7 @@ class PaymentClient {
 
       return _handleArrayResponse(response, '獲取待清機訂單');
     } catch (e) {
-      _logger.e('❌ 獲取待清機訂單失敗: $e');
+      _logger.e(' 獲取待清機訂單失敗: $e');
       rethrow;
     }
   }
@@ -1785,7 +1763,7 @@ class PaymentClient {
     final Uri url = Uri.parse(endpoint);
     final Map<String, dynamic> requestBody = {'payment_id_list': paymentIdList};
 
-    _logger.i('🔄 執行清機操作，訂單數量: ${paymentIdList.length}');
+    _logger.i(' 執行清機操作，訂單數量: ${paymentIdList.length}');
 
     try {
       final response = await http
@@ -1798,7 +1776,7 @@ class PaymentClient {
 
       return _handleResponse(response, '執行清機操作');
     } catch (e) {
-      _logger.e('❌ 執行清機操作失敗: $e');
+      _logger.e(' 執行清機操作失敗: $e');
       rethrow;
     }
   }
@@ -1933,7 +1911,7 @@ class PaymentClient {
     final Uri url = Uri.parse(endpoint);
     final Map<String, dynamic> requestBody = {'blg_id': blgId};
 
-    _logger.i('📜 獲取歷史清機記錄，大廈ID: $blgId');
+    _logger.i(' 獲取歷史清機記錄，大廈ID: $blgId');
 
     try {
       final response = await http
@@ -1946,7 +1924,7 @@ class PaymentClient {
 
       return _handleArrayResponse(response, '獲取歷史清機記錄');
     } catch (e) {
-      _logger.e('❌ 獲取歷史清機記錄失敗: $e');
+      _logger.e(' 獲取歷史清機記錄失敗: $e');
       rethrow;
     }
   }
@@ -1999,7 +1977,7 @@ class PaymentClient {
       'record_id': recordId,
     };
 
-    _logger.i('📝 獲取清機記錄細明，大廈ID: $blgId, 記錄ID: $recordId');
+    _logger.i(' 獲取清機記錄細明，大廈ID: $blgId, 記錄ID: $recordId');
 
     try {
       final response = await http
@@ -2012,7 +1990,7 @@ class PaymentClient {
 
       return _handleResponse(response, '獲取清機記錄細明');
     } catch (e) {
-      _logger.e('❌ 獲取清機記錄細明失敗: $e');
+      _logger.e(' 獲取清機記錄細明失敗: $e');
       rethrow;
     }
   }
@@ -2035,7 +2013,7 @@ class PaymentClient {
     final Uri url = Uri.parse(endpoint);
     final Map<String, dynamic> requestBody = {'blg_id': blgId};
 
-    _logger.i('🏦 獲取大廈銀行賬戶信息，大廈ID: $blgId');
+    _logger.i(' 獲取大廈銀行賬戶信息，大廈ID: $blgId');
 
     try {
       final response = await http
@@ -2048,7 +2026,7 @@ class PaymentClient {
 
       return _handleResponse(response, '獲取大廈銀行賬戶信息');
     } catch (e) {
-      _logger.e('❌ 獲取大廈銀行賬戶信息失敗: $e');
+      _logger.e(' 獲取大廈銀行賬戶信息失敗: $e');
       rethrow;
     }
   }
@@ -2058,7 +2036,7 @@ class PaymentClient {
     final String decodedBody = utf8.decode(response.bodyBytes);
 
     if (response.statusCode >= 200 && response.statusCode < 300) {
-      _logger.i('✅ $apiName 成功 (狀態碼: ${response.statusCode})');
+      _logger.i(' $apiName 成功 (狀態碼: ${response.statusCode})');
 
       if (decodedBody.isEmpty) {
         return {};
@@ -2074,12 +2052,11 @@ class PaymentClient {
 
         return decoded is Map<String, dynamic> ? decoded : {};
       } catch (e) {
-        _logger.e('❌ 解析JSON響應失敗: $e');
+        _logger.e(' 解析JSON響應失敗: $e');
         throw Exception('解析響應數據失敗: $e');
       }
     } else {
-      _logger
-          .w('⚠️ $apiName 失敗 (狀態碼: ${response.statusCode}), 響應: $decodedBody');
+      _logger.w(' $apiName 失敗 (狀態碼: ${response.statusCode}), 響應: $decodedBody');
       throw Exception('API請求失敗，狀態碼: ${response.statusCode}');
     }
   }
@@ -2090,7 +2067,7 @@ class PaymentClient {
     final String decodedBody = utf8.decode(response.bodyBytes);
 
     if (response.statusCode >= 200 && response.statusCode < 300) {
-      _logger.i('✅ $apiName 成功 (狀態碼: ${response.statusCode})');
+      _logger.i(' $apiName 成功 (狀態碼: ${response.statusCode})');
 
       if (decodedBody.isEmpty) {
         return [];
@@ -2110,16 +2087,15 @@ class PaymentClient {
               .map((item) => Map<String, dynamic>.from(item as Map))
               .toList();
         } else {
-          _logger.w('⚠️ 期望數組響應但收到: ${decoded.runtimeType}');
+          _logger.w(' 期望數組響應但收到: ${decoded.runtimeType}');
           return [];
         }
       } catch (e) {
-        _logger.e('❌ 解析JSON數組響應失敗: $e');
+        _logger.e(' 解析JSON數組響應失敗: $e');
         throw Exception('解析響應數據失敗: $e');
       }
     } else {
-      _logger
-          .w('⚠️ $apiName 失敗 (狀態碼: ${response.statusCode}), 響應: $decodedBody');
+      _logger.w(' $apiName 失敗 (狀態碼: ${response.statusCode}), 響應: $decodedBody');
       throw Exception('API請求失敗，狀態碼: ${response.statusCode}');
     }
   }
@@ -2206,7 +2182,7 @@ class PaymentClient {
       if (buildingId != null) 'blg_id': buildingId,
     };
 
-    _logger.i('🏠 獲取物業管理費用狀態，大廈ID: $buildingId');
+    _logger.i(' 獲取物業管理費用狀態，大廈ID: $buildingId');
 
     try {
       final response = await http
@@ -2219,7 +2195,7 @@ class PaymentClient {
 
       return _handleResponse(response, '獲取物業管理費用狀態');
     } catch (e) {
-      _logger.e('❌ 獲取物業管理費用狀態失敗: $e');
+      _logger.e(' 獲取物業管理費用狀態失敗: $e');
       rethrow;
     }
   }
@@ -2238,7 +2214,7 @@ class PaymentClient {
       if (buildingId != null) 'blg_id': buildingId,
     };
 
-    _logger.i('🏠 獲取物業其他費用狀態，大廈ID: $buildingId');
+    _logger.i(' 獲取物業其他費用狀態，大廈ID: $buildingId');
 
     try {
       final response = await http
@@ -2251,7 +2227,7 @@ class PaymentClient {
 
       return _handleResponse(response, '獲取物業其他費用狀態');
     } catch (e) {
-      _logger.e('❌ 獲取物業其他費用狀態失敗: $e');
+      _logger.e(' 獲取物業其他費用狀態失敗: $e');
       rethrow;
     }
   }
@@ -2276,7 +2252,7 @@ class PaymentClient {
       if (remark != null) 'remark': remark,
     };
 
-    _logger.i('💳 創建微信支付請求，單位ID: $unitId, 金額: $amount');
+    _logger.i(' 創建微信支付請求，單位ID: $unitId, 金額: $amount');
 
     try {
       final response = await http
@@ -2289,7 +2265,7 @@ class PaymentClient {
 
       return _handleResponse(response, '創建微信支付請求');
     } catch (e) {
-      _logger.e('❌ 創建微信支付請求失敗: $e');
+      _logger.e(' 創建微信支付請求失敗: $e');
       rethrow;
     }
   }
@@ -2314,7 +2290,7 @@ class PaymentClient {
       if (remark != null) 'remark': remark,
     };
 
-    _logger.i('💳 創建支付寶支付請求，單位ID: $unitId, 金額: $amount');
+    _logger.i(' 創建支付寶支付請求，單位ID: $unitId, 金額: $amount');
 
     try {
       final response = await http
@@ -2327,7 +2303,7 @@ class PaymentClient {
 
       return _handleResponse(response, '創建支付寶支付請求');
     } catch (e) {
-      _logger.e('❌ 創建支付寶支付請求失敗: $e');
+      _logger.e(' 創建支付寶支付請求失敗: $e');
       rethrow;
     }
   }
@@ -2352,7 +2328,7 @@ class PaymentClient {
       if (remark != null) 'remark': remark,
     };
 
-    _logger.i('💳 創建雲閃付支付請求，單位ID: $unitId, 金額: $amount');
+    _logger.i(' 創建雲閃付支付請求，單位ID: $unitId, 金額: $amount');
 
     try {
       final response = await http
@@ -2365,7 +2341,7 @@ class PaymentClient {
 
       return _handleResponse(response, '創建雲閃付支付請求');
     } catch (e) {
-      _logger.e('❌ 創建雲閃付支付請求失敗: $e');
+      _logger.e(' 創建雲閃付支付請求失敗: $e');
       rethrow;
     }
   }
@@ -2381,7 +2357,7 @@ class PaymentClient {
       'payment_id': paymentId,
     };
 
-    _logger.i('🔍 查詢支付狀態，支付ID: $paymentId');
+    _logger.i(' 查詢支付狀態，支付ID: $paymentId');
 
     try {
       final response = await http
@@ -2394,7 +2370,7 @@ class PaymentClient {
 
       return _handleResponse(response, '查詢支付狀態');
     } catch (e) {
-      _logger.e('❌ 查詢支付狀態失敗: $e');
+      _logger.e(' 查詢支付狀態失敗: $e');
       rethrow;
     }
   }

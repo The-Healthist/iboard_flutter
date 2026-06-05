@@ -76,9 +76,9 @@ class _TimerDebugWidgetState extends State<TimerDebugWidget> {
         '设备ID: ${appDataProvider.deviceId ?? '未获取'}',
         '登录状态: ${appDataProvider.isLoggedIn ? '已登录' : '未登录'}',
         'Token状态: ${appDataProvider.token != null ? '有效' : '无效'}',
-        '定时登录状态: ${appDataProvider.isPeriodicLoginActive ? '✅ 运行中' : '❌ 已停止'}',
+        '定时登录状态: ${appDataProvider.isPeriodicLoginActive ? ' 运行中' : ' 已停止'}',
         '定时登录间隔: 12小时',
-        '健康检查状态: ${appDataProvider.isPeriodicHealthCheckActive ? '✅ 运行中' : '❌ 已停止'}',
+        '健康检查状态: ${appDataProvider.isPeriodicHealthCheckActive ? ' 运行中' : ' 已停止'}',
         '健康检查间隔: 30分鈡',
       ];
 
@@ -98,7 +98,7 @@ class _TimerDebugWidgetState extends State<TimerDebugWidget> {
         basicContent.addAll([
           '',
           '--- 最近一次手动登录结果 ---',
-          '状态: ${manualLoginResult['success'] ? '✅ 成功' : '❌ 失败'}',
+          '状态: ${manualLoginResult['success'] ? ' 成功' : ' 失败'}',
           '信息: ${manualLoginResult['message']}',
           '耗时: ${manualLoginResult['duration']}ms',
           '时间: ${manualLoginResult['timestamp'].toString().substring(11, 19)}',
@@ -109,7 +109,7 @@ class _TimerDebugWidgetState extends State<TimerDebugWidget> {
       }
 
       _debugInfo.add({
-        'title': '📊 定时更新基本信息',
+        'title': ' 定时更新基本信息',
         'content': basicContent,
         'manualUpdateButton': Column(
           children: [
@@ -142,7 +142,7 @@ class _TimerDebugWidgetState extends State<TimerDebugWidget> {
     } catch (e) {
       _logger.e('生成调试信息时发生错误', error: e);
       _debugInfo.add({
-        'title': '❌ 调试信息生成错误',
+        'title': ' 调试信息生成错误',
         'content': ['错误: $e'],
       });
     } finally {
@@ -160,10 +160,10 @@ class _TimerDebugWidgetState extends State<TimerDebugWidget> {
 
     List<String> content = [];
     content
-        .add('定时更新状态: ${provider.isPeriodicUpdateActive ? '✅ 运行中' : '❌ 已停止'}');
+        .add('定时更新状态: ${provider.isPeriodicUpdateActive ? ' 运行中' : ' 已停止'}');
     content.add('更新间隔: $updateInterval分鈡 (${updateInterval * 60}秒)');
-    content.add('设备设置状态: ${deviceSettings != null ? '✅ 已加载' : '❌ 未加载'}');
-    content.add('登录状态: ${appDataProvider.isLoggedIn ? '✅ 已登录' : '❌ 未登录'}');
+    content.add('设备设置状态: ${deviceSettings != null ? ' 已加载' : ' 未加载'}');
+    content.add('登录状态: ${appDataProvider.isLoggedIn ? ' 已登录' : ' 未登录'}');
     content.add('广告总数: ${provider.advertisements.length}');
     content.add('全屏广告数: ${provider.fullAdvertisements.length}');
     content.add('顶部广告数: ${provider.topAdvertisements.length}');
@@ -173,7 +173,7 @@ class _TimerDebugWidgetState extends State<TimerDebugWidget> {
     }
 
     _debugInfo.add({
-      'title': '🎬 广告定时更新状态',
+      'title': ' 广告定时更新状态',
       'content': content,
       'manualUpdateButton': _buildManualUpdateButton(
           'advertisements', '广告', _manualUpdateAdvertisements),
@@ -188,10 +188,10 @@ class _TimerDebugWidgetState extends State<TimerDebugWidget> {
 
     List<String> content = [];
     content
-        .add('定时更新状态: ${provider.isPeriodicUpdateActive ? '✅ 运行中' : '❌ 已停止'}');
+        .add('定时更新状态: ${provider.isPeriodicUpdateActive ? ' 运行中' : ' 已停止'}');
     content.add('更新间隔: $updateInterval分鈡 (${updateInterval * 60}秒)');
-    content.add('设备设置状态: ${deviceSettings != null ? '✅ 已加载' : '❌ 未加载'}');
-    content.add('登录状态: ${appDataProvider.isLoggedIn ? '✅ 已登录' : '❌ 未登录'}');
+    content.add('设备设置状态: ${deviceSettings != null ? ' 已加载' : ' 未加载'}');
+    content.add('登录状态: ${appDataProvider.isLoggedIn ? ' 已登录' : ' 未登录'}');
     content.add('通告总数: ${provider.announcements.length}');
     content.add('轮播通告数: ${provider.carouselAnnouncements.length}');
     content.add('停留时长: ${deviceSettings?.noticeStayDuration ?? 3}秒');
@@ -201,7 +201,7 @@ class _TimerDebugWidgetState extends State<TimerDebugWidget> {
     }
 
     _debugInfo.add({
-      'title': '📢 通告定时更新状态',
+      'title': ' 通告定时更新状态',
       'content': content,
       'manualUpdateButton': _buildManualUpdateButton(
           'announcements', '通告', _manualUpdateAnnouncements),
@@ -212,11 +212,11 @@ class _TimerDebugWidgetState extends State<TimerDebugWidget> {
   Future<void> _checkWeatherTimer(WeatherProvider provider) async {
     List<String> content = [];
     content
-        .add('定时更新状态: ${provider.isPeriodicUpdateActive ? '✅ 运行中' : '❌ 已停止'}');
+        .add('定时更新状态: ${provider.isPeriodicUpdateActive ? ' 运行中' : ' 已停止'}');
     content.add('更新间隔: 2小时 (7200秒)');
-    content.add('天气预报数据: ${provider.hasForecastData ? '✅ 有数据' : '❌ 无数据'}');
-    content.add('当前天气数据: ${provider.hasCurrentData ? '✅ 有数据' : '❌ 无数据'}');
-    content.add('天气警告数据: ${provider.hasWarningData ? '✅ 有数据' : '❌ 无数据'}');
+    content.add('天气预报数据: ${provider.hasForecastData ? ' 有数据' : ' 无数据'}');
+    content.add('当前天气数据: ${provider.hasCurrentData ? ' 有数据' : ' 无数据'}');
+    content.add('天气警告数据: ${provider.hasWarningData ? ' 有数据' : ' 无数据'}');
 
     if (provider.forecastError != null) {
       content.add('预报错误: ${provider.forecastError}');
@@ -229,7 +229,7 @@ class _TimerDebugWidgetState extends State<TimerDebugWidget> {
     }
 
     _debugInfo.add({
-      'title': '🌤️ 天气定时更新状态',
+      'title': ' 天气定时更新状态',
       'content': content,
       'manualUpdateButton':
           _buildManualUpdateButton('weather', '天气', _manualUpdateWeather),
@@ -244,9 +244,9 @@ class _TimerDebugWidgetState extends State<TimerDebugWidget> {
 
     List<String> content = [];
     content
-        .add('定时更新状态: ${provider.isPeriodicUpdateActive ? '✅ 运行中' : '❌ 已停止'}');
+        .add('定时更新状态: ${provider.isPeriodicUpdateActive ? ' 运行中' : ' 已停止'}');
     content.add('更新间隔: $updateInterval分鈡 (${updateInterval * 60}秒)');
-    content.add('数据状态: ${provider.hasData ? '✅ 有数据' : '❌ 无数据'}');
+    content.add('数据状态: ${provider.hasData ? ' 有数据' : ' 无数据'}');
     content.add('记录总数: ${provider.hasData ? '有数据' : '无数据'}');
     content.add('樓宇数量: ${provider.buildings.length}');
     content.add('选中樓宇: ${provider.ismartId ?? '未选择'}');
@@ -258,13 +258,13 @@ class _TimerDebugWidgetState extends State<TimerDebugWidget> {
 
     // 检查缓存状态
     final cacheStatus = await provider.getCacheStatus();
-    content.add('缓存状态: ${cacheStatus['hasCache'] ? '✅ 有缓存' : '❌ 无缓存'}');
+    content.add('缓存状态: ${cacheStatus['hasCache'] ? ' 有缓存' : ' 无缓存'}');
     if (cacheStatus['lastUpdate'] != null) {
       content.add('最后更新: ${cacheStatus['lastUpdate']}');
     }
 
     _debugInfo.add({
-      'title': '💰 欠费数据状态',
+      'title': ' 欠费数据状态',
       'content': content,
       'manualUpdateButton':
           _buildManualUpdateButton('arrears', '欠费', _manualUpdateArrears),
@@ -288,18 +288,18 @@ class _TimerDebugWidgetState extends State<TimerDebugWidget> {
 
     // 通告轮播状态
     content.add(
-        '通告轮播状态: ${announcementCarouselProvider.isMidCarouselPaused ? '⏸️ 已暂停' : '▶️ 运行中'}');
+        '通告轮播状态: ${announcementCarouselProvider.isMidCarouselPaused ? ' 已暂停' : '▶ 运行中'}');
     content.add(
         '通告轮播数量: ${announcementCarouselProvider.carouselAnnouncements.length}');
     content.add('当前通告索引: ${announcementCarouselProvider.currentNoticeIndex}');
 
     // 底部轮播状态
     content.add(
-        '底部轮播状态: ${bottomCarouselProvider.isBottomCarouselPaused ? '⏸️ 已暂停' : '▶️ 运行中'}');
+        '底部轮播状态: ${bottomCarouselProvider.isBottomCarouselPaused ? ' 已暂停' : '▶ 运行中'}');
     content.add('当前显示: ${bottomCarouselProvider.showWeather ? '天气' : '二维码'}');
 
     _debugInfo.add({
-      'title': '🔄 轮播状态管理',
+      'title': ' 轮播状态管理',
       'content': content,
     });
   }
@@ -310,8 +310,8 @@ class _TimerDebugWidgetState extends State<TimerDebugWidget> {
 
     if (deviceSettings == null) {
       _debugInfo.add({
-        'title': '⚙️ 设备设置信息',
-        'content': ['❌ 设备设置未加载'],
+        'title': ' 设备设置信息',
+        'content': [' 设备设置未加载'],
       });
       return;
     }
@@ -326,7 +326,7 @@ class _TimerDebugWidgetState extends State<TimerDebugWidget> {
     content.add('通告停留时长: ${deviceSettings.noticeStayDuration}秒');
 
     _debugInfo.add({
-      'title': '⚙️ 设备设置信息',
+      'title': ' 设备设置信息',
       'content': content,
       'manualUpdateButton': _buildManualUpdateButton(
           'device_settings', '设备设置', _manualUpdateDeviceSettings),
@@ -341,7 +341,7 @@ class _TimerDebugWidgetState extends State<TimerDebugWidget> {
       _updatingTasks.add('advertisements');
     });
 
-    // _logger.i('🎬 [手动更新] 开始手动更新广告数据');
+    // _logger.i(' [手动更新] 开始手动更新广告数据');
     final startTime = DateTime.now();
 
     try {
@@ -363,7 +363,7 @@ class _TimerDebugWidgetState extends State<TimerDebugWidget> {
         }
       };
 
-      // _logger.i('🎬 [手动更新] 广告数据更新成功，耗时: ${duration.inMilliseconds}ms');
+      // _logger.i(' [手动更新] 广告数据更新成功，耗时: ${duration.inMilliseconds}ms');
     } catch (e) {
       final endTime = DateTime.now();
       final duration = endTime.difference(startTime);
@@ -376,7 +376,7 @@ class _TimerDebugWidgetState extends State<TimerDebugWidget> {
         'error': e.toString(),
       };
 
-      _logger.e('🎬 [手动更新] 广告数据更新失败', error: e);
+      _logger.e(' [手动更新] 广告数据更新失败', error: e);
     } finally {
       setState(() {
         _updatingTasks.remove('advertisements');
@@ -393,7 +393,7 @@ class _TimerDebugWidgetState extends State<TimerDebugWidget> {
       _updatingTasks.add('announcements');
     });
 
-    // _logger.i('📢 [手动更新] 开始手动更新通告数据');
+    // _logger.i(' [手动更新] 开始手动更新通告数据');
     final startTime = DateTime.now();
 
     try {
@@ -414,7 +414,7 @@ class _TimerDebugWidgetState extends State<TimerDebugWidget> {
         }
       };
 
-      // _logger.i('📢 [手动更新] 通告数据更新成功，耗时: ${duration.inMilliseconds}ms');
+      // _logger.i(' [手动更新] 通告数据更新成功，耗时: ${duration.inMilliseconds}ms');
     } catch (e) {
       final endTime = DateTime.now();
       final duration = endTime.difference(startTime);
@@ -427,7 +427,7 @@ class _TimerDebugWidgetState extends State<TimerDebugWidget> {
         'error': e.toString(),
       };
 
-      _logger.e('📢 [手动更新] 通告数据更新失败', error: e);
+      _logger.e(' [手动更新] 通告数据更新失败', error: e);
     } finally {
       setState(() {
         _updatingTasks.remove('announcements');
@@ -444,7 +444,7 @@ class _TimerDebugWidgetState extends State<TimerDebugWidget> {
       _updatingTasks.add('weather');
     });
 
-    // _logger.i('🌤️ [手动更新] 开始手动更新天气数据');
+    // _logger.i(' [手动更新] 开始手动更新天气数据');
     final startTime = DateTime.now();
 
     try {
@@ -464,13 +464,13 @@ class _TimerDebugWidgetState extends State<TimerDebugWidget> {
         'duration': duration.inMilliseconds,
         'timestamp': endTime,
         'data': {
-          '预报数据': weatherProvider.hasForecastData ? '✅' : '❌',
-          '当前天气': weatherProvider.hasCurrentData ? '✅' : '❌',
-          '天气警告': weatherProvider.hasWarningData ? '✅' : '❌',
+          '预报数据': weatherProvider.hasForecastData ? '' : '',
+          '当前天气': weatherProvider.hasCurrentData ? '' : '',
+          '天气警告': weatherProvider.hasWarningData ? '' : '',
         }
       };
 
-      // _logger.i('🌤️ [手动更新] 天气数据更新成功，耗时: ${duration.inMilliseconds}ms');
+      // _logger.i(' [手动更新] 天气数据更新成功，耗时: ${duration.inMilliseconds}ms');
     } catch (e) {
       final endTime = DateTime.now();
       final duration = endTime.difference(startTime);
@@ -483,7 +483,7 @@ class _TimerDebugWidgetState extends State<TimerDebugWidget> {
         'error': e.toString(),
       };
 
-      _logger.e('🌤️ [手动更新] 天气数据更新失败', error: e);
+      _logger.e(' [手动更新] 天气数据更新失败', error: e);
     } finally {
       setState(() {
         _updatingTasks.remove('weather');
@@ -500,7 +500,7 @@ class _TimerDebugWidgetState extends State<TimerDebugWidget> {
       _updatingTasks.add('arrears');
     });
 
-    // _logger.i('💰 [手动更新] 开始手动更新欠费数据');
+    // _logger.i(' [手动更新] 开始手动更新欠费数据');
     final startTime = DateTime.now();
 
     try {
@@ -516,12 +516,12 @@ class _TimerDebugWidgetState extends State<TimerDebugWidget> {
         'duration': duration.inMilliseconds,
         'timestamp': endTime,
         'data': {
-          '数据状态': arrearProvider.hasData ? '✅ 有数据' : '❌ 无数据',
+          '数据状态': arrearProvider.hasData ? ' 有数据' : ' 无数据',
           '樓宇数量': arrearProvider.buildings.length,
         }
       };
 
-      // _logger.i('💰 [手动更新] 欠费数据更新成功，耗时: ${duration.inMilliseconds}ms');
+      // _logger.i(' [手动更新] 欠费数据更新成功，耗时: ${duration.inMilliseconds}ms');
     } catch (e) {
       final endTime = DateTime.now();
       final duration = endTime.difference(startTime);
@@ -534,7 +534,7 @@ class _TimerDebugWidgetState extends State<TimerDebugWidget> {
         'error': e.toString(),
       };
 
-      _logger.e('💰 [手动更新] 欠费数据更新失败', error: e);
+      _logger.e(' [手动更新] 欠费数据更新失败', error: e);
     } finally {
       setState(() {
         _updatingTasks.remove('arrears');
@@ -551,7 +551,7 @@ class _TimerDebugWidgetState extends State<TimerDebugWidget> {
       _updatingTasks.add('device_settings');
     });
 
-    // _logger.i('⚙️ [手动更新] 开始手动更新设备设置');
+    // _logger.i(' [手动更新] 开始手动更新设备设置');
     final startTime = DateTime.now();
 
     try {
@@ -568,11 +568,11 @@ class _TimerDebugWidgetState extends State<TimerDebugWidget> {
         'duration': duration.inMilliseconds,
         'timestamp': endTime,
         'data': {
-          '设置状态': appDataProvider.deviceSettings != null ? '✅ 已加载' : '❌ 未加载',
+          '设置状态': appDataProvider.deviceSettings != null ? ' 已加载' : ' 未加载',
         }
       };
 
-      // _logger.i('⚙️ [手动更新] 设备设置更新成功，耗时: ${duration.inMilliseconds}ms');
+      // _logger.i(' [手动更新] 设备设置更新成功，耗时: ${duration.inMilliseconds}ms');
     } catch (e) {
       final endTime = DateTime.now();
       final duration = endTime.difference(startTime);
@@ -585,7 +585,7 @@ class _TimerDebugWidgetState extends State<TimerDebugWidget> {
         'error': e.toString(),
       };
 
-      _logger.e('⚙️ [手动更新] 设备设置更新失败', error: e);
+      _logger.e(' [手动更新] 设备设置更新失败', error: e);
     } finally {
       setState(() {
         _updatingTasks.remove('device_settings');
@@ -602,7 +602,7 @@ class _TimerDebugWidgetState extends State<TimerDebugWidget> {
       _updatingTasks.add('manual_login');
     });
 
-    // _logger.i('🔑 [手动登录] 开始手动登录');
+    // _logger.i(' [手动登录] 开始手动登录');
     final startTime = DateTime.now();
 
     try {
@@ -620,14 +620,14 @@ class _TimerDebugWidgetState extends State<TimerDebugWidget> {
         'duration': duration.inMilliseconds,
         'timestamp': endTime,
         'data': {
-          '登录状态': appDataProvider.isLoggedIn ? '✅ 已登录' : '❌ 未登录',
-          'Token状态': appDataProvider.token != null ? '✅ 有效' : '❌ 无效',
-          '设备设置': appDataProvider.deviceSettings != null ? '✅ 已加载' : '❌ 未加载',
+          '登录状态': appDataProvider.isLoggedIn ? ' 已登录' : ' 未登录',
+          'Token状态': appDataProvider.token != null ? ' 有效' : ' 无效',
+          '设备设置': appDataProvider.deviceSettings != null ? ' 已加载' : ' 未加载',
           '设备ID': appDataProvider.deviceId ?? '未获取',
         }
       };
 
-      // _logger.i('🔑 [手动登录] 手动登录成功，耗时: ${duration.inMilliseconds}ms');
+      // _logger.i(' [手动登录] 手动登录成功，耗时: ${duration.inMilliseconds}ms');
     } catch (e) {
       final endTime = DateTime.now();
       final duration = endTime.difference(startTime);
@@ -641,14 +641,14 @@ class _TimerDebugWidgetState extends State<TimerDebugWidget> {
         'timestamp': endTime,
         'error': e.toString(),
         'data': {
-          '登录状态': appDataProvider.isLoggedIn ? '✅ 已登录' : '❌ 未登录',
-          'Token状态': appDataProvider.token != null ? '✅ 有效' : '❌ 无效',
-          '设备设置': appDataProvider.deviceSettings != null ? '✅ 已加载' : '❌ 未加载',
+          '登录状态': appDataProvider.isLoggedIn ? ' 已登录' : ' 未登录',
+          'Token状态': appDataProvider.token != null ? ' 有效' : ' 无效',
+          '设备设置': appDataProvider.deviceSettings != null ? ' 已加载' : ' 未加载',
           '设备ID': appDataProvider.deviceId ?? '未获取',
         }
       };
 
-      _logger.e('🔑 [手动登录] 手动登录失败', error: e);
+      _logger.e(' [手动登录] 手动登录失败', error: e);
     } finally {
       setState(() {
         _updatingTasks.remove('manual_login');
@@ -665,7 +665,7 @@ class _TimerDebugWidgetState extends State<TimerDebugWidget> {
       _updatingTasks.add('health_check');
     });
 
-    // _logger.i('🏥 [手动健康检查] 开始手动执行健康检查');
+    // _logger.i(' [手动健康检查] 开始手动执行健康检查');
     final startTime = DateTime.now();
 
     try {
@@ -685,7 +685,7 @@ class _TimerDebugWidgetState extends State<TimerDebugWidget> {
         }
       };
 
-      // _logger.i('🏥 [手动健康检查] 健康检查执行成功，耗时: ${duration.inMilliseconds}ms');
+      // _logger.i(' [手动健康检查] 健康检查执行成功，耗时: ${duration.inMilliseconds}ms');
     } catch (e) {
       final endTime = DateTime.now();
       final duration = endTime.difference(startTime);
@@ -698,7 +698,7 @@ class _TimerDebugWidgetState extends State<TimerDebugWidget> {
         'error': e.toString(),
       };
 
-      _logger.e('🏥 [手动健康检查] 健康检查执行失败', error: e);
+      _logger.e(' [手动健康检查] 健康检查执行失败', error: e);
     } finally {
       setState(() {
         _updatingTasks.remove('health_check');

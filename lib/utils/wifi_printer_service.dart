@@ -4,7 +4,6 @@ import 'package:printing/printing.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:logger/logger.dart';
-import 'package:path/path.dart' as path;
 
 /// 打印機設備信息
 class PrinterDevice {
@@ -86,7 +85,7 @@ class WiFiPrinterService {
   /// 1, 獲取可用的打印機列表
   Future<List<PrinterDevice>> getAvailablePrinters() async {
     try {
-      _logger.i('🖨️ 開始掃描可用打印機...');
+      _logger.i(' 開始掃描可用打印機...');
 
       // 獲取系統可用的打印機
       final printers = await Printing.listPrinters();
@@ -111,7 +110,7 @@ class WiFiPrinterService {
         ));
       }
 
-      _logger.i('🖨️ 找到 ${_availablePrinters.length} 個打印機');
+      _logger.i(' 找到 ${_availablePrinters.length} 個打印機');
       return _availablePrinters;
     } catch (e) {
       _logger.e('掃描打印機失敗: $e');
@@ -142,7 +141,7 @@ class WiFiPrinterService {
           final socket = await Socket.connect(ip, 9100,
               timeout: const Duration(seconds: 2));
           socket.destroy();
-          _logger.i('🖨️ 在 $ip 找到HP打印機');
+          _logger.i(' 在 $ip 找到HP打印機');
           return ip;
         } catch (e) {
           // 繼續檢查下一個IP
@@ -171,7 +170,7 @@ class WiFiPrinterService {
     required PrintSettings settings,
   }) async {
     try {
-      _logger.i('🖨️ 開始打印: ${settings.fileName}');
+      _logger.i(' 開始打印: ${settings.fileName}');
 
       if (settings.selectedPrinter == null) {
         _logger.e('未選擇打印機');
@@ -188,7 +187,7 @@ class WiFiPrinterService {
         format: _getPrintFormat(settings),
       );
 
-      _logger.i('🖨️ 打印任務已通過系統服務發送: ${settings.fileName}');
+      _logger.i(' 打印任務已通過系統服務發送: ${settings.fileName}');
       return true;
     } catch (e) {
       _logger.e('打印失敗: $e');
@@ -202,7 +201,7 @@ class WiFiPrinterService {
     required PrintSettings settings,
   }) async {
     try {
-      _logger.i('🖨️ 開始打印圖片: ${settings.fileName}');
+      _logger.i(' 開始打印圖片: ${settings.fileName}');
 
       if (settings.selectedPrinter == null) {
         _logger.e('未選擇打印機');
@@ -234,7 +233,7 @@ class WiFiPrinterService {
         format: _getPrintFormat(settings),
       );
 
-      _logger.i('🖨️ 圖片打印任務已發送: ${settings.fileName}');
+      _logger.i(' 圖片打印任務已發送: ${settings.fileName}');
       return true;
     } catch (e) {
       _logger.e('圖片打印失敗: $e');
@@ -267,37 +266,32 @@ class WiFiPrinterService {
     // 根據方向調整格式
     if (settings.orientation == PrintOrientation.landscape) {
       format = format.landscape;
-      _logger.d('🖨️ 設置為橫向打印');
+      _logger.d(' 設置為橫向打印');
     } else {
-      _logger.d('🖨️ 設置為縱向打印');
+      _logger.d(' 設置為縱向打印');
     }
 
     // 根據顏色設置調整（在實際應用中可能需要更多配置）
     if (!settings.isColorPrint) {
-      _logger.d('🖨️ 設置為黑白打印');
+      _logger.d(' 設置為黑白打印');
     } else {
-      _logger.d('🖨️ 設置為彩色打印');
+      _logger.d(' 設置為彩色打印');
     }
 
     // 雙面打印在printing包中通常由系統處理
     if (settings.isDoubleSided) {
-      _logger.d('🖨️ 設置為雙面打印');
+      _logger.d(' 設置為雙面打印');
     }
 
     // 頁數範圍和份數記錄
     if (settings.startPage != null && settings.endPage != null) {
-      _logger.d('🖨️ 打印頁數範圍: ${settings.startPage} - ${settings.endPage}');
+      _logger.d(' 打印頁數範圍: ${settings.startPage} - ${settings.endPage}');
     }
     if (settings.copies != null && settings.copies! > 1) {
-      _logger.d('🖨️ 打印份數: ${settings.copies}');
+      _logger.d(' 打印份數: ${settings.copies}');
     }
 
     return format;
-  }
-
-  /// 8, 獲取文件擴展名
-  String _getFileExtension(String fileName) {
-    return path.extension(fileName).toLowerCase();
   }
 
   /// 9, 直接發送到HP 7200（如果支持直接網絡打印）
@@ -307,7 +301,7 @@ class WiFiPrinterService {
     required PrintSettings settings,
   }) async {
     try {
-      _logger.i('🖨️ 直接發送到HP 7200: $ipAddress');
+      _logger.i(' 直接發送到HP 7200: $ipAddress');
 
       // 連接到打印機
       final socket = await Socket.connect(ipAddress, 9100);
@@ -317,7 +311,7 @@ class WiFiPrinterService {
       await socket.flush();
       await socket.close();
 
-      _logger.i('🖨️ 直接打印完成');
+      _logger.i(' 直接打印完成');
       return true;
     } catch (e) {
       _logger.e('直接打印到HP 7200失敗: $e');
@@ -327,7 +321,7 @@ class WiFiPrinterService {
 
   /// 10, 重新掃描打印機
   Future<void> refreshPrinters() async {
-    _logger.i('🖨️ 重新掃描打印機...');
+    _logger.i(' 重新掃描打印機...');
     await getAvailablePrinters();
   }
 
@@ -336,7 +330,7 @@ class WiFiPrinterService {
     final foundPrinters = <PrinterDevice>[];
 
     try {
-      _logger.i('🖨️ 開始掃描網絡打印機...');
+      _logger.i(' 開始掃描網絡打印機...');
 
       // 獲取本機IP地址
       final localIP = await _getLocalIPAddress();
@@ -350,7 +344,7 @@ class WiFiPrinterService {
       if (parts.length != 4) return foundPrinters;
 
       final networkBase = '${parts[0]}.${parts[1]}.${parts[2]}';
-      _logger.i('🖨️ 掃描網段: $networkBase.x');
+      _logger.i(' 掃描網段: $networkBase.x');
 
       // 常用打印機IP範圍
       final ipRanges = [
@@ -367,7 +361,7 @@ class WiFiPrinterService {
         final batch = ipRanges.skip(i).take(batchSize);
 
         _logger.d(
-            '🖨️ 掃描批次 ${(i ~/ batchSize) + 1}/${(ipRanges.length / batchSize).ceil()}');
+            ' 掃描批次 ${(i ~/ batchSize) + 1}/${(ipRanges.length / batchSize).ceil()}');
 
         final futures = batch.map((ip) => _testAndCreatePrinter(ip));
         final results = await Future.wait(futures);
@@ -375,7 +369,7 @@ class WiFiPrinterService {
         for (final printer in results) {
           if (printer != null) {
             foundPrinters.add(printer);
-            _logger.i('🖨️ 找到打印機: ${printer.name} (${printer.ipAddress})');
+            _logger.i(' 找到打印機: ${printer.name} (${printer.ipAddress})');
           }
         }
 
@@ -386,7 +380,7 @@ class WiFiPrinterService {
       _logger.e('網絡掃描失敗: $e');
     }
 
-    _logger.i('🖨️ 網絡掃描完成，找到 ${foundPrinters.length} 個打印機');
+    _logger.i(' 網絡掃描完成，找到 ${foundPrinters.length} 個打印機');
     return foundPrinters;
   }
 
@@ -402,7 +396,7 @@ class WiFiPrinterService {
             if (address.type == InternetAddressType.IPv4 &&
                 !address.isLoopback) {
               if (_isPrivateIP(address.address)) {
-                _logger.i('🖨️ 檢測到WiFi接口IP: ${address.address}');
+                _logger.i(' 檢測到WiFi接口IP: ${address.address}');
                 return address.address;
               }
             }
@@ -415,7 +409,7 @@ class WiFiPrinterService {
         for (var address in interface.addresses) {
           if (address.type == InternetAddressType.IPv4 && !address.isLoopback) {
             if (_isPrivateIP(address.address)) {
-              _logger.i('🖨️ 檢測到網絡接口IP: ${address.address}');
+              _logger.i(' 檢測到網絡接口IP: ${address.address}');
               return address.address;
             }
           }
@@ -499,7 +493,7 @@ class WiFiPrinterService {
   /// 4, 測試打印機連接（增強版本）
   Future<bool> testPrinterConnection(PrinterDevice printer) async {
     try {
-      _logger.i('🖨️ 測試打印機連接: ${printer.name}');
+      _logger.i(' 測試打印機連接: ${printer.name}');
 
       // 如果有IP地址，優先測試網絡連接
       if (printer.ipAddress != null) {
@@ -515,11 +509,11 @@ class WiFiPrinterService {
           8080, // Alternative HTTP
         ];
 
-        _logger.i('🖨️ 測試HP ENVY Inspire 7200 at $ip 的多個端口...');
+        _logger.i(' 測試HP ENVY Inspire 7200 at $ip 的多個端口...');
 
         for (int port in ports) {
           try {
-            _logger.d('🖨️ 嘗試連接 $ip:$port...');
+            _logger.d(' 嘗試連接 $ip:$port...');
             final socket = await Socket.connect(ip, port,
                 timeout: const Duration(seconds: 5) // 增加超時時間
                 );
@@ -536,16 +530,16 @@ class WiFiPrinterService {
             }
 
             await socket.close();
-            _logger.i('🖨️ ✅ 成功連接到打印機: ${printer.name} ($ip:$port)');
+            _logger.i('  成功連接到打印機: ${printer.name} ($ip:$port)');
             return true;
           } catch (e) {
             _logger.d(
-                '🖨️ ❌ 端口 $port 連接失敗: ${e.toString().contains('Connection refused') ? '連接被拒絕' : e.toString().split(':').last.trim()}');
+                '  端口 $port 連接失敗: ${e.toString().contains('Connection refused') ? '連接被拒絕' : e.toString().split(':').last.trim()}');
           }
         }
 
         // 如果所有端口都失敗，進行網絡診斷
-        _logger.w('🖨️ ⚠️  所有打印端口連接失敗，進行網絡診斷...');
+        _logger.w('   所有打印端口連接失敗，進行網絡診斷...');
 
         // 嘗試基本的網絡連接測試
         try {
@@ -553,10 +547,10 @@ class WiFiPrinterService {
               timeout: const Duration(seconds: 2)); // SSH端口
           await socket.close();
           _logger.w(
-              '🖨️ ⚠️  設備 $ip 網絡可達但打印服務不可用，請檢查：\n• 打印機是否開啟\n• 打印機網絡設置是否正確\n• 防火牆是否阻止連接');
+              '   設備 $ip 網絡可達但打印服務不可用，請檢查：\n• 打印機是否開啟\n• 打印機網絡設置是否正確\n• 防火牆是否阻止連接');
         } catch (e) {
           _logger.e(
-              '🖨️ ❌ 設備 $ip 完全不可達，請檢查：\n• IP地址是否正確\n• 設備和打印機是否在同一網絡\n• 網絡連接是否正常');
+              '  設備 $ip 完全不可達，請檢查：\n• IP地址是否正確\n• 設備和打印機是否在同一網絡\n• 網絡連接是否正常');
         }
 
         return false;

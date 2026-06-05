@@ -31,8 +31,8 @@ import 'dart:async';
 final Logger _logger = Logger();
 
 void main() {
-  WidgetsFlutterBinding.ensureInitialized();
   runZonedGuarded(() {
+    WidgetsFlutterBinding.ensureInitialized();
     runApp(
       MultiProvider(
         providers: [
@@ -273,8 +273,8 @@ class HomePageState extends State<HomePage> {
               // 設置後端API客戶端
               printerProvider.setApiClient(appDataProvider.apiClient);
 
-              // 優先從緩存載入IP，其次從設備設置獲取
-              await printerProvider.initialize();
+              // 啟動期只載入本地打印配置，避免香橙派不可用時拖慢主屏初始化。
+              await printerProvider.initialize(probeService: false);
 
               // 如果緩存中沒有IP，嘗試從設備設置獲取
               if (printerProvider.orangePiIp.isEmpty) {
@@ -282,18 +282,23 @@ class HomePageState extends State<HomePage> {
                 final orangePiIp = deviceSettings?.orangePiIp;
 
                 if (orangePiIp != null && orangePiIp.isNotEmpty) {
-                  await printerProvider.updateOrangePiIp(orangePiIp);
+                  await printerProvider.initialize(
+                    orangePiIp: orangePiIp,
+                    probeService: false,
+                  );
                   debugPrint('[初始化]從設備設置同步香橙派IP: $orangePiIp');
                 }
               }
 
-              // 如果有IP配置，啟動定時健康檢查
+              // 如果有IP配置，後台嘗試啟動健康檢查；不可用時不重試、不影響主流程。
               if (printerProvider.orangePiIp.isNotEmpty) {
-                printerProvider.startPeriodicHealthCheck(
-                  interval: const Duration(minutes: 30),
+                unawaited(
+                  printerProvider.startPeriodicHealthCheck(
+                    interval: const Duration(minutes: 30),
+                  ),
                 );
                 debugPrint(
-                    '[初始化]打印機提供者初始化完成，IP: ${printerProvider.orangePiIp}');
+                    '[初始化]打印機配置已載入，IP: ${printerProvider.orangePiIp}，健康檢查將在後台啟動');
               } else {
                 debugPrint('[初始化]香橙派IP未配置，跳過定時健康檢查');
               }
@@ -424,7 +429,7 @@ class HomePageState extends State<HomePage> {
           } else {
             debugPrint('[初始化]無設備設置，嘗試從緩存初始化組件');
 
-            // 🔧 關鍵修復：即使沒有設備設置，也要嘗試加載和使用緩存數據
+            //  關鍵修復：即使沒有設備設置，也要嘗試加載和使用緩存數據
             await _initializeFromCache(
               announcementProvider,
               announcementCarouselProvider:
@@ -435,7 +440,7 @@ class HomePageState extends State<HomePage> {
             );
           }
 
-          // 🎯 關鍵：無論上述任何步驟是否失敗，都嘗試進入主頁面
+          //  關鍵：無論上述任何步驟是否失敗，都嘗試進入主頁面
           try {
             if (mounted) {
               Navigator.pushReplacementNamed(context, '/main');
@@ -515,7 +520,7 @@ class HomePageState extends State<HomePage> {
             Provider.of<AppDataProvider>(context, listen: false));
         announcementCarouselProvider.setArrearProvider(arrearProvider);
 
-        // 🔧 關鍵修復：設置回調函數，確保輪播組件能正常工作
+        //  關鍵修復：設置回調函數，確保輪播組件能正常工作
         announcementCarouselProvider.setHomeButtonCallback(() {
           announcementCarouselProvider.jumpToAnnouncementIndex(0);
         });
@@ -584,7 +589,7 @@ class HomePageState extends State<HomePage> {
         announcementCarouselProvider.setAppDataProvider(appDataProvider);
         announcementCarouselProvider.setArrearProvider(arrearProvider);
 
-        // 🔧 緊急模式：設置緊急回調函數
+        //  緊急模式：設置緊急回調函數
         announcementCarouselProvider.setHomeButtonCallback(() {
           announcementCarouselProvider.jumpToAnnouncementIndex(0);
           debugPrint('[初始化] [緊急模式] 通过返回按钮跳转到主屏幕');
@@ -617,7 +622,7 @@ class HomePageState extends State<HomePage> {
       'TimeoutException',
       'Failed host lookup',
       'No address associated with hostname',
-      '🌐', '⏱️', '🔌', '📱' // 用户友好的网络错误图标
+      '', '', '', '' // 用户友好的网络错误图标
     ];
 
     return networkErrorKeywords.any((keyword) => error.contains(keyword));
@@ -641,11 +646,11 @@ class HomePageState extends State<HomePage> {
   ///3, 获取用户友好的错误信息
   String _getUserFriendlyError(String error) {
     if (_isNetworkError(error)) {
-      return '🌐 网络連接失败\n\n请检查网络連接后重试，或联系管理员';
+      return ' 网络連接失败\n\n请检查网络連接后重试，或联系管理员';
     } else if (_isDataParseError(error)) {
-      return '📊 服务器数据格式错误\n\n请联系管理员检查服务器配置';
+      return ' 服务器数据格式错误\n\n请联系管理员检查服务器配置';
     } else {
-      return '❌ 初始化失败\n\n错误信息: $error\n\n请联系管理员';
+      return ' 初始化失败\n\n错误信息: $error\n\n请联系管理员';
     }
   }
 

@@ -296,7 +296,7 @@ class DebugUpdateTimeWidgetState extends State<DebugUpdateTimeWidget> {
   ) {
     List<Widget> widgets = [
       const Text(
-        '📋 定时更新任务列表:',
+        ' 定时更新任务列表:',
         style: TextStyle(
           color: Colors.yellow,
           fontSize: 11,
@@ -308,7 +308,7 @@ class DebugUpdateTimeWidgetState extends State<DebugUpdateTimeWidget> {
 
     // 欠费数据更新
     widgets.add(_buildTaskItem(
-      '💰 欠费数据',
+      ' 欠费数据',
       _getArrearUpdateCountdown(arrearProvider),
       _formatTime(_getLastUpdateTimeFromCache('arrear')),
       arrearProvider.isPeriodicUpdateActive ? Colors.green : Colors.red,
@@ -316,7 +316,7 @@ class DebugUpdateTimeWidgetState extends State<DebugUpdateTimeWidget> {
 
     // 顶部广告轮播更新
     widgets.add(_buildTaskItem(
-      '📺 顶部广告轮播',
+      ' 顶部广告轮播',
       _getTopAdUpdateCountdown(advertisementProvider),
       _formatTime(_getLastUpdateTimeFromCache('advertisement')),
       advertisementProvider.isPeriodicUpdateActive ? Colors.green : Colors.red,
@@ -324,7 +324,7 @@ class DebugUpdateTimeWidgetState extends State<DebugUpdateTimeWidget> {
 
     // 全屏广告轮播更新
     widgets.add(_buildTaskItem(
-      '🎬 全屏广告轮播',
+      ' 全屏广告轮播',
       _getFullAdUpdateCountdown(advertisementProvider),
       _formatTime(_getLastUpdateTimeFromCache('advertisement')),
       advertisementProvider.isPeriodicUpdateActive ? Colors.green : Colors.red,
@@ -332,7 +332,7 @@ class DebugUpdateTimeWidgetState extends State<DebugUpdateTimeWidget> {
 
     // 通告轮播更新
     widgets.add(_buildTaskItem(
-      '📢 通告轮播',
+      ' 通告轮播',
       _getAnnouncementUpdateCountdown(announcementProvider),
       _formatTime(_getLastUpdateTimeFromCache('announcement')),
       announcementProvider.isPeriodicUpdateActive ? Colors.green : Colors.red,
@@ -340,7 +340,7 @@ class DebugUpdateTimeWidgetState extends State<DebugUpdateTimeWidget> {
 
     // 天气更新
     widgets.add(_buildTaskItem(
-      '🌤️ 天气数据',
+      ' 天气数据',
       _getWeatherUpdateCountdown(weatherProvider),
       _formatTime(_getLastUpdateTimeFromCache('weather')),
       weatherProvider.isPeriodicUpdateActive ? Colors.green : Colors.red,
@@ -348,7 +348,7 @@ class DebugUpdateTimeWidgetState extends State<DebugUpdateTimeWidget> {
 
     // 定时登录
     widgets.add(_buildTaskItem(
-      '🔐 定时登录',
+      ' 定时登录',
       _getLoginCountdown(appDataProvider),
       _formatTime(_getLastUpdateTimeFromCache('login')),
       appDataProvider.isPeriodicLoginActive ? Colors.green : Colors.red,
@@ -419,7 +419,7 @@ class DebugUpdateTimeWidgetState extends State<DebugUpdateTimeWidget> {
             children: [
               // 标题
               const Text(
-                '⏰ 定时更新调试',
+                ' 定时更新调试',
                 style: TextStyle(
                   color: Colors.blue,
                   fontSize: 14,
@@ -440,7 +440,7 @@ class DebugUpdateTimeWidgetState extends State<DebugUpdateTimeWidget> {
 
               // 系统状态信息
               const Text(
-                '🖥️ 系统状态:',
+                ' 系统状态:',
                 style: TextStyle(
                   color: Colors.yellow,
                   fontSize: 11,
@@ -449,21 +449,21 @@ class DebugUpdateTimeWidgetState extends State<DebugUpdateTimeWidget> {
               ),
               const SizedBox(height: 2),
               Text(
-                '登录: ${appDataProvider.isLoggedIn ? "✅已登录" : "❌未登录"}',
+                '登录: ${appDataProvider.isLoggedIn ? "已登录" : "未登录"}',
                 style: const TextStyle(
                   color: Colors.white70,
                   fontSize: 10,
                 ),
               ),
               Text(
-                'Token: ${appDataProvider.token != null ? "✅有效" : "❌无效"}',
+                'Token: ${appDataProvider.token != null ? "有效" : "无效"}',
                 style: const TextStyle(
                   color: Colors.white70,
                   fontSize: 10,
                 ),
               ),
               Text(
-                '设备设置: ${appDataProvider.deviceSettings != null ? "✅已加载" : "❌未加载"}',
+                '设备设置: ${appDataProvider.deviceSettings != null ? "已加载" : "未加载"}',
                 style: const TextStyle(
                   color: Colors.white70,
                   fontSize: 10,

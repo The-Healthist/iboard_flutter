@@ -26,9 +26,8 @@ class RthkNewsTickerWidgetState extends State<RthkNewsTickerWidget>
   List<String> _previousNewsTexts = [];
 
   bool _isPaused = false;
-  double _totalContentWidth = 0;
   final Logger logger = Logger();
-  
+
   // 监听器变量，确保正确移除
   VoidCallback? _animationListener;
   void Function(AnimationStatus)? _animationStatusListener;
@@ -85,14 +84,16 @@ class RthkNewsTickerWidgetState extends State<RthkNewsTickerWidget>
 
     // 简化速度控制 - 恢复历史版本的稳定算法
     const scrollSpeed = 40.0; // 固定滚动速度 (像素/秒)
-    final durationSeconds = (maxScrollExtent / scrollSpeed).ceil(); // 向上取整确保完整滚动
-    
+    final durationSeconds =
+        (maxScrollExtent / scrollSpeed).ceil(); // 向上取整确保完整滚动
+
     // 设置合理的时长范围 (10-120秒)
     final clampedDuration = durationSeconds.clamp(10, 120);
     _controller.duration = Duration(seconds: clampedDuration);
 
     // 添加调试信息
-    logger.d('新闻跑马灯 - 内容宽度: $maxScrollExtent, 动画时长: ${clampedDuration}s, 滚动速度: ${(maxScrollExtent / clampedDuration).toStringAsFixed(1)}px/s');
+    logger.d(
+        '新闻跑马灯 - 内容宽度: $maxScrollExtent, 动画时长: ${clampedDuration}s, 滚动速度: ${(maxScrollExtent / clampedDuration).toStringAsFixed(1)}px/s');
 
     // 先移除已有監聽器
     _removeListeners();
@@ -119,7 +120,7 @@ class RthkNewsTickerWidgetState extends State<RthkNewsTickerWidget>
     // 添加新監聽器
     _controller.addListener(_animationListener!);
     _controller.addStatusListener(_animationStatusListener!);
-    
+
     _isAnimating = true;
     _controller.forward();
   }
@@ -166,8 +167,7 @@ class RthkNewsTickerWidgetState extends State<RthkNewsTickerWidget>
     Future.delayed(const Duration(milliseconds: 100), () {
       if (!mounted) return;
 
-      _totalContentWidth = _calculateTotalWidth(_newsTexts);
-      
+      _calculateTotalWidth(_newsTexts);
       setState(() {});
 
       // 延迟一帧再重新开始动画，确保UI已更新

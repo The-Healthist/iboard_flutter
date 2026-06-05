@@ -1,31 +1,31 @@
 # WiFi打印服务 API 接口文档
 
-🚀 **Android专用的完整打印API系统 v2.0**
+ **Android专用的完整打印API系统 v2.0**
 
 基于CUPS的强大打印服务API，为Android应用提供完整的网络打印解决方案。支持IPP Everywhere协议连接现代WiFi打印机，通过IP地址管理打印机，接收Base64编码的PDF文件并发送打印指令，实时监控打印机状态和打印作业进度。
 
-## 🔧 **重要修复说明**
+##  **重要修复说明**
 
 **v2.0版本已修复关键BUG：**
-- ✅ 修复了 `model: "everywhere"` 参数被错误映射为Raw驱动的问题
-- ✅ 现在正确使用IPP Everywhere驱动，支持完整的IPP功能
-- ✅ 解决了 "Print job was not accepted" 错误
-- ✅ 支持复杂PDF文件的正确打印和处理
+-  修复了 `model: "everywhere"` 参数被错误映射为Raw驱动的问题
+-  现在正确使用IPP Everywhere驱动，支持完整的IPP功能
+-  解决了 "Print job was not accepted" 错误
+-  支持复杂PDF文件的正确打印和处理
 
-## ✨ 核心功能
+##  核心功能
 
-- ✅ **CUPS IPP自动发现**: 使用CUPS IPP协议自动扫描网络中的打印机
-- ✅ **简单整数ID管理**: 打印机使用简单的整数ID（1, 2, 3...），便于Android应用处理
-- ✅ **RESTful设计**: 完全符合REST API设计规范，parameters通过body传递
-- ✅ **Swagger文档**: 自动生成交互式API文档 (http://localhost:8080/api/docs/)
-- ✅ **实时状态监控**: 提供丰富的打印机状态和错误信息（缺纸、缺墨等）
-- ✅ **Base64打印**: 支持Base64编码的PDF数据直接打印（主要接口）
-- ✅ **多种打印参数**: 支持颜色模式、双面打印、纸张规格、打印质量等丰富选项
-- ✅ **作业跟踪**: 完整的打印作业状态跟踪和历史记录
-- ✅ **CUPS深度集成**: 直接访问CUPS作业队列和状态信息
-- ✅ **Docker部署**: 基于Docker Compose的一键部署方案
+-  **CUPS IPP自动发现**: 使用CUPS IPP协议自动扫描网络中的打印机
+-  **简单整数ID管理**: 打印机使用简单的整数ID（1, 2, 3...），便于Android应用处理
+-  **RESTful设计**: 完全符合REST API设计规范，parameters通过body传递
+-  **Swagger文档**: 自动生成交互式API文档 (http://localhost:8080/api/docs/)
+-  **实时状态监控**: 提供丰富的打印机状态和错误信息（缺纸、缺墨等）
+-  **Base64打印**: 支持Base64编码的PDF数据直接打印（主要接口）
+-  **多种打印参数**: 支持颜色模式、双面打印、纸张规格、打印质量等丰富选项
+-  **作业跟踪**: 完整的打印作业状态跟踪和历史记录
+-  **CUPS深度集成**: 直接访问CUPS作业队列和状态信息
+-  **Docker部署**: 基于Docker Compose的一键部署方案
 
-## 📋 完整API接口列表
+##  完整API接口列表
 
 | 编号 | 接口 | 方法 | 功能 | Android使用场景 |
 |------|------|------|------|----------------|
@@ -43,7 +43,7 @@
 |11 | `/api/printers/ip/{ip}/jobs/active` | GET | **获取指定打印机活动作业** | **实时监控页面** |
 |12 | `/api/printers/ip/{ip}/jobs/cancel-all` | POST | **取消指定打印机所有活动作业** | **紧急操作页面** |
 
-## 🔧 API详细说明和测试数据
+##  API详细说明和测试数据
 
 ### 1. 健康检查接口
 
@@ -147,16 +147,16 @@ Content-Type: application/json
 }
 ```
 
-#### 🚀 **IPP Everywhere 优化策略**
-- **🎯 强制使用IPP Everywhere驱动** - 无论用户指定什么model，都使用`everywhere`驱动
-- **🌐 优先IPP协议** - 默认使用`ipp://ip:631/ipp/print`格式，确保最佳兼容性
-- **📊 最丰富状态信息** - 支持墨盒含量、纸张状态、硬件状态等详细监控
-- **🏭 大厂打印机友好** - 对HP、Canon、Epson、Brother等品牌打印机支持最佳
+####  **IPP Everywhere 优化策略**
+- ** 强制使用IPP Everywhere驱动** - 无论用户指定什么model，都使用`everywhere`驱动
+- ** 优先IPP协议** - 默认使用`ipp://ip:631/ipp/print`格式，确保最佳兼容性
+- ** 最丰富状态信息** - 支持墨盒含量、纸张状态、硬件状态等详细监控
+- ** 大厂打印机友好** - 对HP、Canon、Epson、Brother等品牌打印机支持最佳
 
 #### 注意事项
-- 🆔 同一IP地址只能被一个打印机占用，避免冲突
-- 🔄 已存在相同IP的打印机将返回错误，需先删除
-- 📝 打印机名称默认生成为`Network_Printer_{ip}`格式
+-  同一IP地址只能被一个打印机占用，避免冲突
+-  已存在相同IP的打印机将返回错误，需先删除
+-  打印机名称默认生成为`Network_Printer_{ip}`格式
 
 #### 测试命令（PowerShell）
 ```powershell
@@ -322,7 +322,7 @@ Invoke-RestMethod -Uri "http://192.168.50.173:8080/api/printers/1" -Method GET
       "status": "idle",
       "is_online": true,
       "accepting_jobs": true,
-      "message": "🟢 打印机在线，状态正常"
+      "message": " 打印机在线，状态正常"
     },
     "created_at": "2025-09-17T06:30:00.000Z",
     "type": "network"
@@ -626,12 +626,12 @@ Invoke-RestMethod -Uri "http://192.168.50.173:8080/api/printers/ip/192.168.50.14
 ```
 
 #### 优化功能
-- ✅ **PDF格式验证** - 自动检查文件格式有效性
-- ✅ **文件大小监控** - 记录和报告文件传输大小
-- ✅ **安全文件名** - 自动处理特殊字符，防止路径注入
-- ✅ **智能参数处理** - 支持新版options格式，兼容旧版参数
-- ✅ **详细日志记录** - 完整的打印流程日志，便于调试
-- ✅ **自动清理** - 打印完成后自动删除临时文件
+-  **PDF格式验证** - 自动检查文件格式有效性
+-  **文件大小监控** - 记录和报告文件传输大小
+-  **安全文件名** - 自动处理特殊字符，防止路径注入
+-  **智能参数处理** - 支持新版options格式，兼容旧版参数
+-  **详细日志记录** - 完整的打印流程日志，便于调试
+-  **自动清理** - 打印完成后自动删除临时文件
 
 ---
 

@@ -20,11 +20,11 @@ class PrintApiClient {
   /// 1, 更新香橙派IP地址
   void updateOrangePiIp(String orangePiIp, {int port = 8080}) {
     if (orangePiIp.isEmpty) {
-      _logger.w('⚠️ 香橙派IP地址為空,請在設置中配置');
+      _logger.w(' 香橙派IP地址為空,請在設置中配置');
       throw Exception('請先在設置中配置香橙派IP地址');
     }
     _baseUrl = 'http://$orangePiIp:$port';
-    _logger.i('🔄 更新打印服務地址: $_baseUrl');
+    _logger.i(' 更新打印服務地址: $_baseUrl');
   }
 
   /// 2, 獲取當前服務地址
@@ -51,11 +51,11 @@ class PrintApiClient {
       try {
         return json.decode(decodedBody) as Map<String, dynamic>;
       } catch (e) {
-        _logger.e('❌ [$apiName] JSON解析失敗: $e');
+        _logger.e(' [$apiName] JSON解析失敗: $e');
         throw Exception('$apiName: JSON解析失敗');
       }
     } else {
-      _logger.e('❌ [$apiName] 請求失敗 (Status: ${response.statusCode})');
+      _logger.e(' [$apiName] 請求失敗 (Status: ${response.statusCode})');
       try {
         final errorData = json.decode(decodedBody);
         final errorMessage = errorData['message'] ?? '未知錯誤';
@@ -70,7 +70,7 @@ class PrintApiClient {
   /// 5, 健康檢查 - GET /api/health
   Future<HealthCheckResponse> healthCheck() async {
     try {
-      _logger.i('🏥 [健康檢查] 檢查打印服務狀態...');
+      _logger.i(' [健康檢查] 檢查打印服務狀態...');
       final response =
           await http.get(_buildUri('/api/health')).timeout(_requestTimeout);
 
@@ -78,14 +78,14 @@ class PrintApiClient {
       final result = HealthCheckResponse.fromJson(data);
 
       if (result.isHealthy) {
-        _logger.i('✅ [健康檢查] 打印服務運行正常');
+        _logger.i(' [健康檢查] 打印服務運行正常');
       } else {
-        _logger.w('⚠️ [健康檢查] 打印服務狀態異常: ${result.status}');
+        _logger.w(' [健康檢查] 打印服務狀態異常: ${result.status}');
       }
 
       return result;
     } catch (e) {
-      _logger.e('❌ [健康檢查] 失敗: $e');
+      _logger.e(' [健康檢查] 失敗: $e');
       rethrow;
     }
   }
@@ -93,7 +93,7 @@ class PrintApiClient {
   /// 6, 測試打印機連接 - POST /api/printers/test
   Future<TestConnectionResponse> testPrinterConnection(String printerIp) async {
     try {
-      _logger.i('🔌 [測試連接] 測試打印機: $printerIp');
+      _logger.i(' [測試連接] 測試打印機: $printerIp');
       final response = await http
           .post(
             _buildUri('/api/printers/test'),
@@ -106,14 +106,14 @@ class PrintApiClient {
       final result = TestConnectionResponse.fromJson(data);
 
       if (result.connected) {
-        _logger.i('✅ [測試連接] 打印機連接成功: $printerIp');
+        _logger.i(' [測試連接] 打印機連接成功: $printerIp');
       } else {
-        _logger.w('⚠️ [測試連接] 打印機連接失敗: $printerIp');
+        _logger.w(' [測試連接] 打印機連接失敗: $printerIp');
       }
 
       return result;
     } catch (e) {
-      _logger.e('❌ [測試連接] 失敗: $e');
+      _logger.e(' [測試連接] 失敗: $e');
       rethrow;
     }
   }
@@ -122,7 +122,7 @@ class PrintApiClient {
   Future<Map<String, dynamic>> connectPrinter(
       ConnectPrinterRequest request) async {
     try {
-      _logger.i('🔗 [連接打印機] IP: ${request.printerIp}, 名稱: ${request.name}');
+      _logger.i(' [連接打印機] IP: ${request.printerIp}, 名稱: ${request.name}');
       final response = await http
           .post(
             _buildUri('/api/printers/connect'),
@@ -134,14 +134,14 @@ class PrintApiClient {
       final data = _handleResponse(response, '連接打印機');
 
       if (data['success'] == true) {
-        _logger.i('✅ [連接打印機] 成功: ${request.printerIp}');
+        _logger.i(' [連接打印機] 成功: ${request.printerIp}');
       } else {
-        _logger.w('⚠️ [連接打印機] 失敗: ${data['message']}');
+        _logger.w(' [連接打印機] 失敗: ${data['message']}');
       }
 
       return data;
     } catch (e) {
-      _logger.e('❌ [連接打印機] 失敗: $e');
+      _logger.e(' [連接打印機] 失敗: $e');
       rethrow;
     }
   }
@@ -149,18 +149,18 @@ class PrintApiClient {
   /// 8, 獲取打印機列表 - GET /api/printers
   Future<PrintersListResponse> getPrintersList() async {
     try {
-      _logger.i('📋 [獲取列表] 獲取所有打印機...');
+      _logger.i(' [獲取列表] 獲取所有打印機...');
       final response =
           await http.get(_buildUri('/api/printers')).timeout(_requestTimeout);
 
       final data = _handleResponse(response, '獲取打印機列表');
       final result = PrintersListResponse.fromJson(data);
 
-      _logger.i('✅ [獲取列表] 成功獲取 ${result.count} 個打印機');
+      _logger.i(' [獲取列表] 成功獲取 ${result.count} 個打印機');
 
       return result;
     } catch (e) {
-      _logger.e('❌ [獲取列表] 失敗: $e');
+      _logger.e(' [獲取列表] 失敗: $e');
       rethrow;
     }
   }
@@ -168,7 +168,7 @@ class PrintApiClient {
   /// 9, 獲取單個打印機詳情 - GET /api/printers/{id}
   Future<PrinterDetails> getPrinterDetails(int printerId) async {
     try {
-      _logger.i('🔍 [打印機詳情] 獲取打印機 ID: $printerId');
+      _logger.i(' [打印機詳情] 獲取打印機 ID: $printerId');
       final response = await http
           .get(_buildUri('/api/printers/$printerId'))
           .timeout(_requestTimeout);
@@ -177,13 +177,13 @@ class PrintApiClient {
 
       if (data['success'] == true && data['printer'] != null) {
         final result = PrinterDetails.fromJson(data['printer']);
-        _logger.i('✅ [打印機詳情] 成功: ${result.name}');
+        _logger.i(' [打印機詳情] 成功: ${result.name}');
         return result;
       } else {
         throw Exception('獲取打印機詳情失敗: 無效的響應數據');
       }
     } catch (e) {
-      _logger.e('❌ [打印機詳情] 失敗: $e');
+      _logger.e(' [打印機詳情] 失敗: $e');
       rethrow;
     }
   }
@@ -194,7 +194,7 @@ class PrintApiClient {
     Map<String, dynamic> updates,
   ) async {
     try {
-      _logger.i('✏️ [更新打印機] ID: $printerId');
+      _logger.i(' [更新打印機] ID: $printerId');
       final response = await http
           .put(
             _buildUri('/api/printers/$printerId'),
@@ -206,12 +206,12 @@ class PrintApiClient {
       final data = _handleResponse(response, '更新打印機');
 
       if (data['success'] == true) {
-        _logger.i('✅ [更新打印機] 成功: $printerId');
+        _logger.i(' [更新打印機] 成功: $printerId');
       }
 
       return data;
     } catch (e) {
-      _logger.e('❌ [更新打印機] 失敗: $e');
+      _logger.e(' [更新打印機] 失敗: $e');
       rethrow;
     }
   }
@@ -219,7 +219,7 @@ class PrintApiClient {
   /// 11, 刪除打印機 - DELETE /api/printers/{id}
   Future<Map<String, dynamic>> deletePrinter(int printerId) async {
     try {
-      _logger.i('🗑️ [刪除打印機] ID: $printerId');
+      _logger.i(' [刪除打印機] ID: $printerId');
       final response = await http
           .delete(_buildUri('/api/printers/$printerId'))
           .timeout(_requestTimeout);
@@ -227,12 +227,12 @@ class PrintApiClient {
       final data = _handleResponse(response, '刪除打印機');
 
       if (data['success'] == true) {
-        _logger.i('✅ [刪除打印機] 成功: $printerId');
+        _logger.i(' [刪除打印機] 成功: $printerId');
       }
 
       return data;
     } catch (e) {
-      _logger.e('❌ [刪除打印機] 失敗: $e');
+      _logger.e(' [刪除打印機] 失敗: $e');
       rethrow;
     }
   }
@@ -240,7 +240,7 @@ class PrintApiClient {
   /// 12, 獲取打印機詳細配置選項 - GET /api/printers/ip/{ip}/options
   Future<PrinterOptions> getPrinterOptions(String printerIp) async {
     try {
-      _logger.i('⚙️ [打印機選項] 獲取配置: $printerIp');
+      _logger.i(' [打印機選項] 獲取配置: $printerIp');
       final response = await http
           .get(_buildUri('/api/printers/ip/$printerIp/options'))
           .timeout(_requestTimeout);
@@ -249,13 +249,13 @@ class PrintApiClient {
 
       if (data['success'] == true) {
         final result = PrinterOptions.fromJson(data);
-        _logger.i('✅ [打印機選項] 成功: ${result.printerName}');
+        _logger.i(' [打印機選項] 成功: ${result.printerName}');
         return result;
       } else {
         throw Exception('獲取打印機選項失敗: 無效的響應數據');
       }
     } catch (e) {
-      _logger.e('❌ [打印機選項] 失敗: $e');
+      _logger.e(' [打印機選項] 失敗: $e');
       rethrow;
     }
   }
@@ -269,9 +269,9 @@ class PrintApiClient {
     PrintSettings? settings,
   }) async {
     try {
-      _logger.i('🖨️ [Base64打印] 打印機: $printerIp, 文件: $filename');
+      _logger.i(' [Base64打印] 打印機: $printerIp, 文件: $filename');
       debugPrint('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-      debugPrint('📡 [PrintApiClient] 準備發送 Base64 打印請求');
+      debugPrint(' [PrintApiClient] 準備發送 Base64 打印請求');
       debugPrint('   目標URL: $_baseUrl/api/printers/ip/$printerIp/print/base64');
       debugPrint('   打印機IP: $printerIp');
       debugPrint('   文件名: $filename');
@@ -318,11 +318,11 @@ class PrintApiClient {
       final previewBody = Map<String, dynamic>.from(requestBody);
       previewBody.remove('file_data');
       previewBody['file_data_length'] = base64Data.length;
-      debugPrint('   📝 請求體預覽（扁平化格式2）:');
+      debugPrint('    請求體預覽（扁平化格式2）:');
       debugPrint('   ${json.encode(previewBody)}');
       debugPrint('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
 
-      debugPrint('🌐 [PrintApiClient] 開始發送 HTTP POST 請求...');
+      debugPrint(' [PrintApiClient] 開始發送 HTTP POST 請求...');
       final startTime = DateTime.now();
 
       final response = await http
@@ -337,37 +337,37 @@ class PrintApiClient {
 
       final duration = DateTime.now().difference(startTime);
       debugPrint(
-          '✅ [PrintApiClient] HTTP 請求完成，耗時: ${duration.inMilliseconds}ms');
+          ' [PrintApiClient] HTTP 請求完成，耗時: ${duration.inMilliseconds}ms');
       debugPrint('   狀態碼: ${response.statusCode}');
       debugPrint('   響應大小: ${response.body.length} 字符');
 
       final data = _handleResponse(response, 'Base64打印');
-      debugPrint('✅ [PrintApiClient] 響應解析成功');
+      debugPrint(' [PrintApiClient] 響應解析成功');
 
       final result = PrintJobResponse.fromJson(data);
-      debugPrint('✅ [PrintApiClient] PrintJobResponse 創建成功');
+      debugPrint(' [PrintApiClient] PrintJobResponse 創建成功');
 
       if (result.success) {
-        debugPrint('✅ [PrintApiClient] 打印任務提交成功!');
+        debugPrint(' [PrintApiClient] 打印任務提交成功!');
         debugPrint('   Job ID: ${result.jobId}');
         debugPrint('   CUPS Job ID: ${result.cupsJobId}');
         debugPrint('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
         _logger.i(
-            '✅ [Base64打印] 成功: Job ID ${result.jobId}, CUPS Job ID ${result.cupsJobId}');
+            ' [Base64打印] 成功: Job ID ${result.jobId}, CUPS Job ID ${result.cupsJobId}');
       } else {
-        debugPrint('⚠️ [PrintApiClient] 打印任務提交失敗');
+        debugPrint(' [PrintApiClient] 打印任務提交失敗');
         debugPrint('   錯誤消息: ${result.message}');
         debugPrint('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-        _logger.w('⚠️ [Base64打印] 失敗: ${result.message}');
+        _logger.w(' [Base64打印] 失敗: ${result.message}');
       }
 
       return result;
     } catch (e, stackTrace) {
-      debugPrint('❌ [PrintApiClient] 捕獲異常!');
+      debugPrint(' [PrintApiClient] 捕獲異常!');
       debugPrint('   異常類型: ${e.runtimeType}');
       debugPrint('   異常信息: $e');
       if (e.toString().contains('timeout')) {
-        debugPrint('   ⏱️  這是一個超時異常，請檢查:');
+        debugPrint('     這是一個超時異常，請檢查:');
         debugPrint('      1. 香橙派打印服務是否運行正常');
         debugPrint('      2. 網絡連接是否穩定');
         debugPrint('      3. PDF 文件是否太大');
@@ -376,7 +376,7 @@ class PrintApiClient {
       debugPrint('   堆棧跟踪:');
       debugPrint(stackTrace.toString());
       debugPrint('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-      _logger.e('❌ [Base64打印] 失敗: $e');
+      _logger.e(' [Base64打印] 失敗: $e');
       rethrow;
     }
   }
@@ -387,7 +387,7 @@ class PrintApiClient {
     String jobType = 'all',
   }) async {
     try {
-      _logger.i('📄 [打印作業] 獲取作業列表: $printerIp, 類型: $jobType');
+      _logger.i(' [打印作業] 獲取作業列表: $printerIp, 類型: $jobType');
       final queryParams = jobType != 'all' ? {'type': jobType} : null;
 
       final response = await http
@@ -398,12 +398,12 @@ class PrintApiClient {
 
       if (data['success'] == true) {
         final count = data['count'] ?? 0;
-        _logger.i('✅ [打印作業] 成功獲取 $count 個作業');
+        _logger.i(' [打印作業] 成功獲取 $count 個作業');
       }
 
       return data;
     } catch (e) {
-      _logger.e('❌ [打印作業] 失敗: $e');
+      _logger.e(' [打印作業] 失敗: $e');
       rethrow;
     }
   }
@@ -411,7 +411,7 @@ class PrintApiClient {
   /// 15, 獲取指定打印機活動作業 - GET /api/printers/ip/{ip}/jobs/active
   Future<Map<String, dynamic>> getActivePrinterJobs(String printerIp) async {
     try {
-      _logger.i('⚡ [活動作業] 獲取活動作業: $printerIp');
+      _logger.i(' [活動作業] 獲取活動作業: $printerIp');
       final response = await http
           .get(_buildUri('/api/printers/ip/$printerIp/jobs/active'))
           .timeout(_requestTimeout);
@@ -420,12 +420,12 @@ class PrintApiClient {
 
       if (data['success'] == true) {
         final count = data['count'] ?? 0;
-        _logger.i('✅ [活動作業] 成功獲取 $count 個活動作業');
+        _logger.i(' [活動作業] 成功獲取 $count 個活動作業');
       }
 
       return data;
     } catch (e) {
-      _logger.e('❌ [活動作業] 失敗: $e');
+      _logger.e(' [活動作業] 失敗: $e');
       rethrow;
     }
   }
@@ -433,7 +433,7 @@ class PrintApiClient {
   /// 16, 取消指定打印機所有活動作業 - POST /api/printers/ip/{ip}/jobs/cancel-all
   Future<Map<String, dynamic>> cancelAllPrinterJobs(String printerIp) async {
     try {
-      _logger.i('🚫 [取消作業] 取消所有活動作業: $printerIp');
+      _logger.i(' [取消作業] 取消所有活動作業: $printerIp');
       final response = await http
           .post(_buildUri('/api/printers/ip/$printerIp/jobs/cancel-all'))
           .timeout(_requestTimeout);
@@ -442,12 +442,12 @@ class PrintApiClient {
 
       if (data['success'] == true) {
         final cancelledCount = data['cancelled_count'] ?? 0;
-        _logger.i('✅ [取消作業] 成功取消 $cancelledCount 個作業');
+        _logger.i(' [取消作業] 成功取消 $cancelledCount 個作業');
       }
 
       return data;
     } catch (e) {
-      _logger.e('❌ [取消作業] 失敗: $e');
+      _logger.e(' [取消作業] 失敗: $e');
       rethrow;
     }
   }
@@ -456,13 +456,13 @@ class PrintApiClient {
   Future<bool> isServiceAvailable() async {
     try {
       if (_baseUrl.isEmpty || _baseUrl == 'http://:8080') {
-        _logger.w('⚠️ [服務檢查] 香橙派IP地址未配置');
+        _logger.w(' [服務檢查] 香橙派IP地址未配置');
         return false;
       }
       final result = await healthCheck();
       return result.isHealthy;
     } catch (e) {
-      _logger.w('⚠️ [服務檢查] 打印服務不可用: $e');
+      _logger.w(' [服務檢查] 打印服務不可用: $e');
       return false;
     }
   }
@@ -496,7 +496,7 @@ class PrintApiClient {
         orElse: () => throw Exception('未找到IP為 $printerIp 的打印機'),
       );
     } catch (e) {
-      _logger.w('⚠️ [查找打印機] 未找到: $printerIp');
+      _logger.w(' [查找打印機] 未找到: $printerIp');
       return null;
     }
   }
@@ -504,18 +504,18 @@ class PrintApiClient {
   /// 20, 獲取打印機活動作業 - GET /api/printers/ip/{printerIp}/jobs/active
   Future<Map<String, dynamic>> getPrinterActiveJobs(String printerIp) async {
     try {
-      _logger.i('📋 [活動作業] 獲取打印機活動作業: $printerIp');
+      _logger.i(' [活動作業] 獲取打印機活動作業: $printerIp');
 
       final response = await http
           .get(_buildUri('/api/printers/ip/$printerIp/jobs/active'))
           .timeout(_requestTimeout);
 
       final data = _handleResponse(response, '獲取活動作業');
-      _logger.i('✅ [活動作業] 獲取成功: ${data['count'] ?? 0}個活動作業');
+      _logger.i(' [活動作業] 獲取成功: ${data['count'] ?? 0}個活動作業');
 
       return data;
     } catch (e) {
-      _logger.e('❌ [活動作業] 失敗: $e');
+      _logger.e(' [活動作業] 失敗: $e');
       rethrow;
     }
   }
@@ -524,7 +524,7 @@ class PrintApiClient {
   Future<List<Map<String, dynamic>>> batchTestPrinters(
     List<String> printerIps,
   ) async {
-    _logger.i('🔌 [批量測試] 測試 ${printerIps.length} 個打印機連接');
+    _logger.i(' [批量測試] 測試 ${printerIps.length} 個打印機連接');
 
     final results = <Map<String, dynamic>>[];
 
@@ -546,7 +546,7 @@ class PrintApiClient {
       }
     }
 
-    _logger.i('✅ [批量測試] 完成: ${results.length}個結果');
+    _logger.i(' [批量測試] 完成: ${results.length}個結果');
     return results;
   }
 }

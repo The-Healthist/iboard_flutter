@@ -1,6 +1,5 @@
 import 'dart:async';
 import 'dart:io';
-import 'dart:typed_data';
 import 'package:flutter/foundation.dart';
 import 'package:logger/logger.dart';
 import 'package:path_provider/path_provider.dart';
@@ -20,7 +19,7 @@ class ReceiptPrinterNotifier extends ChangeNotifier {
   Future<void> initializePrinter() async {
     try {
       _updateState(_state.copyWith(isInitializing: true));
-      _logger.i('🖨️ [ReceiptPrinter] 初始化小票打印機');
+      _logger.i(' [ReceiptPrinter] 初始化小票打印機');
 
       // 檢查權限
       await _checkPermissions();
@@ -33,9 +32,9 @@ class ReceiptPrinterNotifier extends ChangeNotifier {
         isInitialized: true,
       ));
 
-      _logger.i('✅ [ReceiptPrinter] 打印機初始化完成');
+      _logger.i(' [ReceiptPrinter] 打印機初始化完成');
     } catch (e) {
-      _logger.e('❌ [ReceiptPrinter] 打印機初始化失敗: $e');
+      _logger.e(' [ReceiptPrinter] 打印機初始化失敗: $e');
       _updateState(_state.copyWith(
         isInitializing: false,
         error: '打印機初始化失敗: $e',
@@ -56,7 +55,7 @@ class ReceiptPrinterNotifier extends ChangeNotifier {
   /// 3, 查找可用打印機
   Future<void> _findAvailablePrinters() async {
     try {
-      _logger.i('🔍 [ReceiptPrinter] 查找可用打印機');
+      _logger.i(' [ReceiptPrinter] 查找可用打印機');
 
       // 使用 printing 包查找打印機
       // 這裡主要是為了檢測是否有打印機可用
@@ -67,10 +66,9 @@ class ReceiptPrinterNotifier extends ChangeNotifier {
         selectedPrinter: 'USB熱敏打印機',
       ));
 
-      _logger
-          .i('✅ [ReceiptPrinter] 找到 ${_state.availablePrinters.length} 台打印機');
+      _logger.i(' [ReceiptPrinter] 找到 ${_state.availablePrinters.length} 台打印機');
     } catch (e) {
-      _logger.e('❌ [ReceiptPrinter] 查找打印機失敗: $e');
+      _logger.e(' [ReceiptPrinter] 查找打印機失敗: $e');
       throw Exception('查找打印機失敗: $e');
     }
   }
@@ -78,14 +76,14 @@ class ReceiptPrinterNotifier extends ChangeNotifier {
   /// 4, 選擇打印機
   void selectPrinter(String printerName) {
     _updateState(_state.copyWith(selectedPrinter: printerName));
-    _logger.i('🖨️ [ReceiptPrinter] 選擇打印機: $printerName');
+    _logger.i(' [ReceiptPrinter] 選擇打印機: $printerName');
   }
 
   /// 5, 打印支付小票
   Future<void> printPaymentReceipt(Map<String, dynamic> receiptData) async {
     try {
       _updateState(_state.copyWith(isPrinting: true, error: null));
-      _logger.i('🖨️ [ReceiptPrinter] 開始打印支付小票');
+      _logger.i(' [ReceiptPrinter] 開始打印支付小票');
 
       // 生成小票 PDF
       final pdfBytes = await _generateReceiptPDF(receiptData);
@@ -106,9 +104,9 @@ class ReceiptPrinterNotifier extends ChangeNotifier {
         lastPrintTime: DateTime.now(),
       ));
 
-      _logger.i('✅ [ReceiptPrinter] 支付小票打印完成');
+      _logger.i(' [ReceiptPrinter] 支付小票打印完成');
     } catch (e) {
-      _logger.e('❌ [ReceiptPrinter] 打印支付小票失敗: $e');
+      _logger.e(' [ReceiptPrinter] 打印支付小票失敗: $e');
       _updateState(_state.copyWith(
         isPrinting: false,
         error: '打印失敗: $e',
@@ -258,7 +256,7 @@ class ReceiptPrinterNotifier extends ChangeNotifier {
   List<pw.Widget> _getBillDetails(dynamic bills) {
     if (bills == null || bills is! List) return [];
 
-    return (bills as List).map((bill) {
+    return bills.map((bill) {
       return pw.Container(
         margin: const pw.EdgeInsets.only(bottom: 4),
         child: pw.Column(
@@ -332,12 +330,12 @@ class ReceiptPrinterNotifier extends ChangeNotifier {
 
       await file.writeAsBytes(pdfBytes);
 
-      _logger.i('💾 [ReceiptPrinter] 小票已保存到: ${file.path}');
+      _logger.i(' [ReceiptPrinter] 小票已保存到: ${file.path}');
 
       // 可以在這裡添加分享功能
       // Share.shareFiles([file.path], text: '繳費小票');
     } catch (e) {
-      _logger.e('❌ [ReceiptPrinter] 保存小票失敗: $e');
+      _logger.e(' [ReceiptPrinter] 保存小票失敗: $e');
       throw Exception('保存小票失敗: $e');
     }
   }

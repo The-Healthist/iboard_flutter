@@ -1,7 +1,7 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:iboard_app/providers/app_data_provider.dart';
-import 'package:iboard_app/widgets/weather_icon_widget.dart';
+import 'package:iboard_app/widgets/weather/weather_icon_widget.dart';
 import 'package:iboard_app/providers/weather_provider.dart';
 import 'package:iboard_app/models/weather_warning_model.dart';
 import 'package:iboard_app/models/current_weather_model.dart';
@@ -177,7 +177,7 @@ class WeatherWidgetState extends State<WeatherWidget> {
         final warningKey = entry.key;
         final warningInfo = entry.value;
 
-        // 🔧 过滤掉不需要显示的警告信号
+        //  过滤掉不需要显示的警告信号
         if (_shouldSkipWarning(warningInfo.code)) {
           continue; // 跳过CANCEL和WTCPRE8警告
         }
@@ -247,7 +247,7 @@ class WeatherWidgetState extends State<WeatherWidget> {
 
   ///9，构建單个警告文字
   Widget _buildWarningText(String warningKey, WeatherWarningInfo warningInfo) {
-    // 🔧 使用新的映射系统获取警告描述
+    //  使用新的映射系统获取警告描述
     final warningDescription = WeatherWarningMapping.getWarningDescription(
         warningKey, warningInfo.code, warningInfo.type);
     const double fontSize = 14.0; // 稍微缩小字体
@@ -283,7 +283,7 @@ class WeatherWidgetState extends State<WeatherWidget> {
             now.difference(_lastLogTime!).inMinutes > 5;
 
         if (shouldLog) {
-          _logger.w('❌ 未找到位置 $_currentWeatherLocation 的匹配数据，尝试香港天文台作为备选');
+          _logger.w(' 未找到位置 $_currentWeatherLocation 的匹配数据，尝试香港天文台作为备选');
           _lastLoggedLocation = _currentWeatherLocation;
           _lastLogTime = now;
         }
@@ -292,7 +292,7 @@ class WeatherWidgetState extends State<WeatherWidget> {
           tempLocationData = currentWeatherData.temperature!.data
               .firstWhere((t) => t.place == '香港天文台');
           if (shouldLog) {
-            _logger.w('🔄 使用香港天文台数据: ${tempLocationData.value}°C');
+            _logger.w(' 使用香港天文台数据: ${tempLocationData.value}°C');
           }
         } catch (e2) {
           if (currentWeatherData.temperature!.data.isNotEmpty) {

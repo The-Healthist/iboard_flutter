@@ -31,10 +31,10 @@ class WeatherIconUtil {
     try {
       final localPath = 'assets/images/hko/pic$iconCode.png';
       await rootBundle.load(localPath);
-      // _logger.d('✅ 本地天气图标存在: pic$iconCode.png');
+      // _logger.d(' 本地天气图标存在: pic$iconCode.png');
       return true;
     } catch (e) {
-      // _logger.w('⚠️ 本地天气图标不存在: pic$iconCode.png');
+      // _logger.w(' 本地天气图标不存在: pic$iconCode.png');
       return false;
     }
   }
@@ -73,7 +73,7 @@ class WeatherIconUtil {
       case 'tsunami':
         return 'assets/images/hko/wfntsa.png';
       default:
-        // _logger.w('⚠️ 未知的天气警告类型: $warningType');
+        // _logger.w(' 未知的天气警告类型: $warningType');
         return 'assets/images/hko/wmsgnl.png'; // 默认图标
     }
   }
@@ -91,7 +91,7 @@ class WeatherIconUtil {
 
   ///8，预加载常用天气图标
   static Future<void> preloadCommonIcons() async {
-    // _logger.i('🔄 开始预加载常用天气图标...');
+    // _logger.i(' 开始预加载常用天气图标...');
 
     // 常用天气图标代码
     final commonIconCodes = [
@@ -133,17 +133,17 @@ class WeatherIconUtil {
       }
     }
     if (loadedCount < commonIconCodes.length) {
-      // _logger.w('⚠️ 部分天气图标预加载失败: $loadedCount/${commonIconCodes.length}');
+      // _logger.w(' 部分天气图标预加载失败: $loadedCount/${commonIconCodes.length}');
     } else {
-      // _logger.i('✅ 天气图标预加载完成: $loadedCount/${commonIconCodes.length}');
+      // _logger.i(' 天气图标预加载完成: $loadedCount/${commonIconCodes.length}');
     }
 
-    // _logger.i('✅ 天气图标预加载完成: $loadedCount/${commonIconCodes.length}');
+    // _logger.i(' 天气图标预加载完成: $loadedCount/${commonIconCodes.length}');
   }
 
   ///9，清理图标缓存
   static void clearCache() {
     _iconCache.clear();
-    // _logger.d('🗑️ 天气图标缓存已清理');
+    // _logger.d(' 天气图标缓存已清理');
   }
 }

@@ -31,7 +31,7 @@ class PrinterConnectionManager {
         _savedPrinters = printersList
             .map((json) => PrinterDeviceJson.fromJson(json))
             .toList();
-        _logger.i('🖨️ 載入了 ${_savedPrinters.length} 個已保存的打印機');
+        _logger.i(' 載入了 ${_savedPrinters.length} 個已保存的打印機');
       }
 
       // 載入默認打印機
@@ -39,7 +39,7 @@ class PrinterConnectionManager {
       if (defaultPrinterJson != null) {
         final defaultPrinterMap = jsonDecode(defaultPrinterJson);
         _defaultPrinter = PrinterDeviceJson.fromJson(defaultPrinterMap);
-        _logger.i('🖨️ 載入默認打印機: ${_defaultPrinter?.name}');
+        _logger.i(' 載入默認打印機: ${_defaultPrinter?.name}');
       }
     } catch (e) {
       _logger.e('初始化打印機管理器失敗: $e');
@@ -67,7 +67,7 @@ class PrinterConnectionManager {
       }
 
       await _persistToStorage();
-      _logger.i('🖨️ 保存打印機: ${printer.name}');
+      _logger.i(' 保存打印機: ${printer.name}');
     } catch (e) {
       _logger.e('保存打印機失敗: $e');
     }
@@ -81,7 +81,7 @@ class PrinterConnectionManager {
       final prefs = await SharedPreferences.getInstance();
       await prefs.setString(_defaultPrinterKey, jsonEncode(printer.toJson()));
 
-      _logger.i('🖨️ 設置默認打印機: ${printer.name}');
+      _logger.i(' 設置默認打印機: ${printer.name}');
     } catch (e) {
       _logger.e('設置默認打印機失敗: $e');
     }
@@ -100,7 +100,7 @@ class PrinterConnectionManager {
       }
 
       await _persistToStorage();
-      _logger.i('🖨️ 移除打印機: $printerId');
+      _logger.i(' 移除打印機: $printerId');
     } catch (e) {
       _logger.e('移除打印機失敗: $e');
     }
@@ -148,7 +148,7 @@ class PrinterConnectionManager {
     _savedPrinters = updatedPrinters;
     await _persistToStorage();
 
-    _logger.i('🖨️ 刷新了 ${updatedPrinters.length} 個打印機狀態');
+    _logger.i(' 刷新了 ${updatedPrinters.length} 個打印機狀態');
     return updatedPrinters;
   }
 
@@ -174,7 +174,7 @@ class PrinterConnectionManager {
       await prefs.remove(_printerListKey);
       await prefs.remove(_defaultPrinterKey);
 
-      _logger.i('🖨️ 清除所有打印機數據');
+      _logger.i(' 清除所有打印機數據');
     } catch (e) {
       _logger.e('清除打印機數據失敗: $e');
     }

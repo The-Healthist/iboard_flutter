@@ -2,13 +2,15 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:iboard_app/managers/file_manager.dart';
 import 'package:iboard_app/models/ad_model.dart';
-import 'package:iboard_app/widgets/ad_full_widget.dart';
+import 'package:iboard_app/widgets/ads/ad_full_widget.dart';
 
 import 'package:iboard_app/providers/app_data_provider.dart';
 import 'package:iboard_app/utils/precise_video_pool_manager.dart' as precise;
 
 /// 轮播顺序由后台管理，此Provider不再处理自定义顺序
 class FullscreenAdProvider extends ChangeNotifier {
+  bool _isDisposed = false;
+
   // 定时器管理
   Timer? _fullscreenTimer;
   Timer? _debugTimer;
@@ -41,7 +43,7 @@ class FullscreenAdProvider extends ChangeNotifier {
   final AppDataProvider _appDataProvider;
   static const int _defaultFullscreenAdDuration = 10; // 默认全屏广告播放时间（秒）
 
-  // 🎯 新增：精确视频池管理器实例
+  //  新增：精确视频池管理器实例
   final precise.PreciseVideoPoolManager _preciseVideoPoolManager =
       precise.PreciseVideoPoolManager();
 
@@ -78,7 +80,7 @@ class FullscreenAdProvider extends ChangeNotifier {
       _appDataProvider.deviceSettings?.advertisementPlayDuration ??
       _defaultFullscreenAdDuration;
 
-  /// 🎯 获取精确视频池管理器实例
+  ////  获取精确视频池管理器实例
   precise.PreciseVideoPoolManager get preciseVideoPoolManager =>
       _preciseVideoPoolManager;
 
@@ -104,7 +106,7 @@ class FullscreenAdProvider extends ChangeNotifier {
 
   /// 設置BuildContext用於發送通知（已移除，不再需要）
   void setContext(BuildContext context) {
-    // 🎯 移除：不再需要context发送MediaPauseNotification
+    //  移除：不再需要context发送MediaPauseNotification
   }
 
   ///1，清空轮播广告列表
@@ -125,7 +127,7 @@ class FullscreenAdProvider extends ChangeNotifier {
     // 直接更新广告列表（不再使用自定义顺序）
     _fullscreenAds = List<AdModel>.from(newAds);
 
-    // 🎯 使用智能缓存检查重新创建广告Widget
+    //  使用智能缓存检查重新创建广告Widget
     await _ensureAdWidgets();
     notifyListeners();
   }
@@ -197,7 +199,7 @@ class FullscreenAdProvider extends ChangeNotifier {
   Future<void> enterFullscreenMode() async {
     if (_isActive) return;
 
-    // 🎯 新增：進入全屏廣告模式前清理可能殘留的控制器
+    //  新增：進入全屏廣告模式前清理可能殘留的控制器
     await _cleanupPreviousControllers();
 
     _isActive = true;
@@ -242,11 +244,11 @@ class FullscreenAdProvider extends ChangeNotifier {
 
   ///9, 启动全屏广告计时（简化版本 - 只管理定时器）
   void startFullscreenAdTimer(int currentIndex) {
-    // 🔧 强化清理：确保完全取消之前的计时器
+    //  强化清理：确保完全取消之前的计时器
     _fullscreenTimer?.cancel();
     _fullscreenTimer = null;
 
-    // 🔧 强化边界检查：多重状态验证
+    //  强化边界检查：多重状态验证
     if (fullscreenAds.isEmpty) {
       return;
     }
@@ -258,7 +260,7 @@ class FullscreenAdProvider extends ChangeNotifier {
       return;
     }
 
-    // 🔧 索引边界检查
+    //  索引边界检查
     if (currentIndex < 0 || currentIndex >= fullscreenAds.length) {
       return;
     }
@@ -268,20 +270,20 @@ class FullscreenAdProvider extends ChangeNotifier {
     _adDuration = ad.durationObject;
     _currentAdIndex = currentIndex;
 
-    // 🎯 简化：不在Provider中初始化视频控制器，让Widget自己处理
+    //  简化：不在Provider中初始化视频控制器，让Widget自己处理
 
-    // 🔧 强化定时器回调：在回调中再次检查状态
+    //  强化定时器回调：在回调中再次检查状态
     if (_adDuration.inSeconds < fullscreenAdDuration) {
       _fullscreenTimer =
           Timer(Duration(seconds: _adDuration.inSeconds), () async {
-        // 🔧 多重状态检查：防止退出状态后的延迟回调
+        //  多重状态检查：防止退出状态后的延迟回调
         if (_isActive &&
             !_isPaused &&
             fullscreenAds.isNotEmpty &&
             _fullscreenTimer != null) {
           await _nextAd();
         } else {
-          // 🔧 如果状态不满足，强制清理定时器
+          //  如果状态不满足，强制清理定时器
           _fullscreenTimer?.cancel();
           _fullscreenTimer = null;
         }
@@ -289,14 +291,14 @@ class FullscreenAdProvider extends ChangeNotifier {
     } else {
       _fullscreenTimer =
           Timer(Duration(seconds: fullscreenAdDuration), () async {
-        // 🔧 多重状态检查：防止退出状态后的延迟回调
+        //  多重状态检查：防止退出状态后的延迟回调
         if (_isActive &&
             !_isPaused &&
             fullscreenAds.isNotEmpty &&
             _fullscreenTimer != null) {
           await _nextAd();
         } else {
-          // 🔧 如果状态不满足，强制清理定时器
+          //  如果状态不满足，强制清理定时器
           _fullscreenTimer?.cancel();
           _fullscreenTimer = null;
         }
@@ -306,34 +308,19 @@ class FullscreenAdProvider extends ChangeNotifier {
 
   ///10, 切换到下一个广告（私有方法）- 简化版本，移除通知机制避免冲突
   Future<void> _nextAd() async {
-    // 🔧 首要检查：如果已经退出全屏广告模式，直接返回
+    //  首要检查：如果已经退出全屏广告模式，直接返回
     if (!_isActive) {
       return;
     }
 
-    // 🔧 强化状态检查：确保在每次操作前都检查状态
+    //  强化状态检查：确保在每次操作前都检查状态
     if (fullscreenAds.isEmpty || _isPaused) {
       return;
     }
 
-    // 🔧 双重检查：防止异步操作中的状态变化
+    //  双重检查：防止异步操作中的状态变化
     if (fullscreenAds.isEmpty) {
       return;
-    }
-
-    // 🎯 重要修復：在切換前明確釋放當前廣告的控制器，避免重複初始化
-    final currentAd = getCurrentAd();
-    if (currentAd != null && currentAd.file.localFilePath != null) {
-      try {
-        // 🎯 關鍵優化：直接釋放控制器，避免重複清理
-        await _preciseVideoPoolManager.releaseController(
-          filePath: currentAd.file.localFilePath!, // 使用本地文件路徑
-          videoType: precise.VideoType.fullAd,
-          forceDispose: true, // 強制釋放解碼器資源
-        );
-      } catch (e) {
-        debugPrint('[fullscreen_ad_carousel_provider] ⚠️ 釋放上一個廣告控制器失敗: $e');
-      }
     }
 
     // 切换到下一个广告索引
@@ -352,13 +339,15 @@ class FullscreenAdProvider extends ChangeNotifier {
     // 清除当前广告的视频进度
     clearVideoProgress(fullscreenAds[_currentAdIndex].id.toString());
 
-    notifyListeners();
+    if (!_isDisposed) {
+      notifyListeners();
+    }
 
-    // 🔧 强化状态检查：在启动新定时器前再次确认状态
+    //  强化状态检查：在启动新定时器前再次确认状态
     if (_isActive && !_isPaused && fullscreenAds.isNotEmpty) {
       startFullscreenAdTimer(_currentAdIndex);
     } else {
-      // 🔧 如果状态不满足，强制清理所有定时器
+      //  如果状态不满足，强制清理所有定时器
       _fullscreenTimer?.cancel();
       _fullscreenTimer = null;
       _debugTimer?.cancel();
@@ -459,11 +448,11 @@ class FullscreenAdProvider extends ChangeNotifier {
 
   ///15, 退出全屏广告模式
   Future<void> exitFullscreenMode() async {
-    // 🔧 强制设置状态：无论当前状态如何，都强制退出
+    //  强制设置状态：无论当前状态如何，都强制退出
     _isActive = false;
     _isPaused = false;
 
-    // 🔧 强化清理：确保完全取消所有定时器，添加多重保护
+    //  强化清理：确保完全取消所有定时器，添加多重保护
     if (_fullscreenTimer != null) {
       _fullscreenTimer!.cancel();
       _fullscreenTimer = null;
@@ -481,27 +470,28 @@ class FullscreenAdProvider extends ChangeNotifier {
     // 清除所有视频进度记录
     _videoProgressMap.clear();
 
-    // 🔧 重要修复：先同步清理视频控制器，再清理Widget缓存
-    try {
-      await _cleanupPreviousControllers();
-    } catch (e) {
-      debugPrint('[fullscreen_ad_carousel_provider] ⚠️ 清理控制器失败: $e');
-    }
-
-    // 然后清理Widget缓存和FileManager缓存
-    _widgetCache.clear();
-    _fileManagerCache.clear();
-    _adWidgets.clear();
-
-    // 🎯 关键修改：将索引更新放在notifyListeners前面
+    //  关键修改：将索引更新放在notifyListeners前面
     // 为下次进入准备下一个广告（但不触发切换逻辑）
     if (fullscreenAds.isNotEmpty) {
       _currentAdIndex = (_currentAdIndex + 1) % fullscreenAds.length;
     }
 
-    // 延时通知状态变化
-    Future.delayed(const Duration(milliseconds: 500), () {
+    if (!_isDisposed) {
       notifyListeners();
+    }
+
+    Future.delayed(const Duration(milliseconds: 500), () async {
+      if (_isDisposed) return;
+
+      try {
+        await _cleanupPreviousControllers();
+      } catch (e) {
+        debugPrint('[fullscreen_ad_carousel_provider]  清理控制器失败: $e');
+      }
+
+      _widgetCache.clear();
+      _fileManagerCache.clear();
+      _adWidgets.clear();
     });
   }
 
@@ -564,14 +554,14 @@ class FullscreenAdProvider extends ChangeNotifier {
 
   ///24, 获取当前播放的Widget（懶加載策略）
   Widget? getCurrentWidget() {
-    // 🔧 重要修复：如果不在活跃状态，不返回任何Widget
+    //  重要修复：如果不在活跃状态，不返回任何Widget
     if (!_isActive) {
       return null;
     }
 
     if (_currentAdIndex >= fullscreenAds.length) return null;
 
-    // 🎯 優化：使用懶加載策略，只為當前廣告創建Widget
+    //  優化：使用懶加載策略，只為當前廣告創建Widget
     final currentAd = fullscreenAds[_currentAdIndex];
     final key = 'fullscreen_ad_${currentAd.id}_$_currentAdIndex';
 
@@ -605,12 +595,14 @@ class FullscreenAdProvider extends ChangeNotifier {
       await _preciseVideoPoolManager
           .cleanupControllersByType(precise.VideoType.fullAd);
     } catch (e) {
-      debugPrint('[fullscreen_ad_carousel_provider] ⚠️ 清理之前的控制器時出錯: $e');
+      debugPrint('[fullscreen_ad_carousel_provider]  清理之前的控制器時出錯: $e');
     }
   }
 
   @override
   void dispose() {
+    _isDisposed = true;
+
     // 取消所有定时器
     _fullscreenTimer?.cancel();
     _fullscreenTimer = null;

@@ -104,16 +104,16 @@ class MainPageState extends State<MainPage> {
       setState(() {
         _isAdsDialogOpen = false;
       });
-      // 🔧 修復：只有在真正由用戶關閉時才切換到手動操作狀態
+      //  修復：只有在真正由用戶關閉時才切換到手動操作狀態
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted) {
           final carouselProvider = context.read<CarouselStateProvider>();
           final wasInFullscreenAd =
               carouselProvider.currentAppState == AppState.fullscreenAd;
 
-          // 🔧 重要修復：檢查當前狀態，如果已經是默認狀態說明是定時器自動退出
+          //  重要修復：檢查當前狀態，如果已經是默認狀態說明是定時器自動退出
           if (carouselProvider.currentAppState == AppState.defaultState) {
-            Logger().i('🔄 全屏廣告已自動退出到默認狀態，保持默認狀態不變');
+            Logger().i(' 全屏廣告已自動退出到默認狀態，保持默認狀態不變');
 
             // 通知通告轮播提供者回到主屏幕
             final announcementCarouselProvider =
@@ -121,7 +121,7 @@ class MainPageState extends State<MainPage> {
             announcementCarouselProvider.jumpToAnnouncementIndex(0);
           } else if (wasInFullscreenAd) {
             // 只有仍在全屏廣告狀態時才認為是用戶手動關閉
-            Logger().i('🔄 用戶手動關閉全屏廣告，切換到手動操作狀態');
+            Logger().i(' 用戶手動關閉全屏廣告，切換到手動操作狀態');
             carouselProvider.enterManualOperation();
 
             // 通知通告轮播提供者回到主屏幕
@@ -187,7 +187,7 @@ class MainPageState extends State<MainPage> {
               onPointerDown: (PointerDownEvent event) {
                 // 檢測到按下後，調用用戶交互方法
                 carouselState.onUserInteraction();
-                debugPrint('[main_page] 🖱️ 檢測到用戶交互');
+                debugPrint('[main_page]  檢測到用戶交互');
               },
               child: const AnnouncementPage(),
             ),

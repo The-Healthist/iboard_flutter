@@ -72,7 +72,7 @@
 //         _isLoading = false;
 //       });
 
-//       _logger.i('🖨️ 打印對話框初始化完成，載入 ${_printers.length} 個打印機');
+//       _logger.i(' 打印對話框初始化完成，載入 ${_printers.length} 個打印機');
 //     } catch (e) {
 //       setState(() {
 //         _isLoading = false;

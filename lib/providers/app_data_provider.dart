@@ -55,7 +55,7 @@ class AppDataProvider extends ChangeNotifier {
   String? get error => _error;
   ApiClient get apiClient => _apiClient;
   String? get deviceId => _deviceId;
-  bool get isLoggedIn => _settingsModel != null && token != null;
+  bool get isLoggedIn => _settingsModel != null && token?.isNotEmpty == true;
 
   // 二维码相关getters
   String? get cachedComplaintQrCode => _cachedComplaintQrCode;
@@ -77,7 +77,7 @@ class AppDataProvider extends ChangeNotifier {
       onNeedsTokenRefresh: _handleTokenRefresh,
     );
 
-    // 🔧 優化：在構造時自動嘗試加載緩存數據，確保設置頁面能立即顯示緩存信息
+    //  優化：在構造時自動嘗試加載緩存數據，確保設置頁面能立即顯示緩存信息
     _loadInitialCacheData();
   }
 
@@ -163,7 +163,7 @@ class AppDataProvider extends ChangeNotifier {
       try {
         await initializeAndLogin();
       } catch (loginError) {
-        _logger.w('⚠️ [应用初始化] 设备登录失败，尝试从缓存加载数据', error: loginError);
+        _logger.w(' [应用初始化] 设备登录失败，尝试从缓存加载数据', error: loginError);
 
         // 登录失败，尝试从缓存加载数据
         await _loadFromCacheAsFallback();
@@ -173,7 +173,7 @@ class AppDataProvider extends ChangeNotifier {
         }
       }
     } catch (e) {
-      _logger.e('❌ [应用初始化] 应用初始化过程中发生异常', error: e);
+      _logger.e(' [应用初始化] 应用初始化过程中发生异常', error: e);
 
       // 即使发生异常，也尝试从缓存加载数据作为最后的备选方案
       try {
@@ -595,7 +595,7 @@ class AppDataProvider extends ChangeNotifier {
             fullErrorText.contains('device not found') ||
             fullErrorText.contains('device id not found') ||
             fullErrorText
-                .contains('record not found') || // 🔧 新增：record not found 检查
+                .contains('record not found') || //  新增：record not found 检查
             fullErrorText.contains('设备不存在') ||
             fullErrorText.contains('设备id无效') ||
             fullErrorText.contains('设备未找到') ||
@@ -644,7 +644,7 @@ class AppDataProvider extends ChangeNotifier {
 
           _error = null;
         } catch (registrationError) {
-          _logger.e('❌ [设备注册] 设备注册或重试登录失败', error: registrationError);
+          _logger.e(' [设备注册] 设备注册或重试登录失败', error: registrationError);
           _error = 'Device registration failed: $registrationError';
           _settingsModel = backupSettingsModel;
           if (backupSettingsModel?.token != null) {
@@ -831,7 +831,7 @@ class AppDataProvider extends ChangeNotifier {
         buildingId: 20, // 固定值
       );
     } catch (e, stackTrace) {
-      _logger.e('❌ [设备注册] 设备注册失败，设备ID: $deviceId',
+      _logger.e(' [设备注册] 设备注册失败，设备ID: $deviceId',
           error: e, stackTrace: stackTrace);
 
       // 提供更详细的错误信息
@@ -1014,7 +1014,7 @@ class AppDataProvider extends ChangeNotifier {
       _cachedComplaintQrCode = prefs.getString(_complaintQrCodeKey);
       _cachedRegistrationQrCode = prefs.getString(_registrationQrCodeKey);
     } catch (e) {
-      debugPrint('[AppDataProvider] ❌ 从缓存加载二维码路径失败: $e');
+      debugPrint('[AppDataProvider]  从缓存加载二维码路径失败: $e');
     }
   }
 
@@ -1075,7 +1075,7 @@ class AppDataProvider extends ChangeNotifier {
 
       notifyListeners();
     } catch (e) {
-      _logger.e('❌ 清除二维码缓存失败', error: e);
+      _logger.e(' 清除二维码缓存失败', error: e);
     }
   }
 
@@ -1110,13 +1110,13 @@ class AppDataProvider extends ChangeNotifier {
     }
 
     _isPeriodicLoginActive = true;
-    debugPrint('[AppDataProvider] ⏰ 启动定时登录任务，间隔: ${_loginIntervalHours}小时');
+    debugPrint('[AppDataProvider]  启动定时登录任务，间隔: ${_loginIntervalHours}小时');
 
     // 设置定时器进行周期性登录
     _loginTimer = Timer.periodic(const Duration(hours: _loginIntervalHours),
         (timer) async {
       if (_isPeriodicLoginActive && _deviceId != null) {
-        debugPrint('[AppDataProvider] 🔄 执行定时登录任务');
+        debugPrint('[AppDataProvider]  执行定时登录任务');
         final loginSuccess = await _safeLogin(context: '定时登录');
         if (loginSuccess) {
           // 定时登录成功后，刷新设置以确保配置是最新的
@@ -1135,7 +1135,7 @@ class AppDataProvider extends ChangeNotifier {
       _loginTimer = null;
     }
     _isPeriodicLoginActive = false;
-    debugPrint('[AppDataProvider] ⏹️ 停止定时登录任务');
+    debugPrint('[AppDataProvider]  停止定时登录任务');
   }
 
   /// 34，开始健康检查定时任务
@@ -1146,13 +1146,13 @@ class AppDataProvider extends ChangeNotifier {
 
     _isPeriodicHealthCheckActive = true;
     debugPrint(
-        '[AppDataProvider] ⏰ 启动健康检查定时任务，间隔: ${_healthCheckIntervalMinutes}分钟');
+        '[AppDataProvider]  启动健康检查定时任务，间隔: ${_healthCheckIntervalMinutes}分钟');
 
     // 设置定时器进行周期性健康检查
     _healthCheckTimer = Timer.periodic(
         const Duration(minutes: _healthCheckIntervalMinutes), (timer) async {
       if (_isPeriodicHealthCheckActive && isLoggedIn) {
-        debugPrint('[AppDataProvider] 🔄 执行定时健康检查任务');
+        debugPrint('[AppDataProvider]  执行定时健康检查任务');
         await performHealthCheck();
       } else {
         if (!_isPeriodicHealthCheckActive) {
@@ -1174,7 +1174,7 @@ class AppDataProvider extends ChangeNotifier {
       _healthCheckTimer = null;
     }
     _isPeriodicHealthCheckActive = false;
-    debugPrint('[AppDataProvider] ⏹️ 停止健康检查定时任务');
+    debugPrint('[AppDataProvider]  停止健康检查定时任务');
   }
 
   /// 36，执行健康检查
@@ -1195,13 +1195,13 @@ class AppDataProvider extends ChangeNotifier {
       final duration = endTime.difference(startTime);
 
       _lastHealthCheckTime = endTime;
-      _lastHealthCheckResult = '✅ 健康检查成功 (${duration.inMilliseconds}ms)';
+      _lastHealthCheckResult = ' 健康检查成功 (${duration.inMilliseconds}ms)';
 
       notifyListeners();
     } catch (e) {
       final endTime = DateTime.now();
       _lastHealthCheckTime = endTime;
-      _lastHealthCheckResult = '❌ 健康检查失败: $e';
+      _lastHealthCheckResult = ' 健康检查失败: $e';
 
       _logger.e('健康检查失败', error: e);
       notifyListeners();
@@ -1245,11 +1245,11 @@ class AppDataProvider extends ChangeNotifier {
         try {
           prefs.get(key);
         } catch (e) {
-          debugPrint('[AppDataProvider] ❌ 获取SharedPreferences键失败: $e');
+          debugPrint('[AppDataProvider]  获取SharedPreferences键失败: $e');
         }
       }
     } catch (e) {
-      debugPrint('[AppDataProvider] ❌ 获取所有SharedPreferences键失败: $e');
+      debugPrint('[AppDataProvider]  获取所有SharedPreferences键失败: $e');
     }
   }
 

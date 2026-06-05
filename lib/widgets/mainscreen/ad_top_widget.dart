@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:iboard_app/models/ad_model.dart'; // Assuming AdModel exists
 import 'package:iboard_app/managers/file_manager.dart'; // Assuming FileManager exists
 import 'package:iboard_app/providers/state_provider.dart';
-import 'package:iboard_app/widgets/carousel_widget.dart'; // 导入通知类
+import 'package:iboard_app/widgets/carousel/carousel_widget.dart'; // 导入通知类
 import 'package:iboard_app/utils/precise_video_pool_manager.dart' as precise;
 import 'package:iboard_app/providers/ad_top_carousel_provider.dart';
 import 'package:video_player/video_player.dart';
@@ -34,6 +34,10 @@ class TopAdWidgetState extends State<TopAdWidget> {
   int _retryCount = 0;
   static const int _maxRetries = 3;
   TopAdCarouselProvider? _topAdCarouselProvider;
+  bool _isDisposed = false;
+  bool _isReleasingVideo = false;
+  int _loadGeneration = 0;
+  int _mediaCommandGeneration = 0;
 
   @override
   void initState() {
@@ -49,11 +53,14 @@ class TopAdWidgetState extends State<TopAdWidget> {
 
   //1，加载广告文件
   Future<void> _loadFile([bool isRetry = false]) async {
+    if (!mounted || _isDisposed) return;
+    final int generation = ++_loadGeneration;
+
     if (!isRetry) {
       _retryCount = 0;
     }
 
-    setState(() {
+    _setStateIfActive(generation, () {
       _isLoading = true;
       _isDownloading = false;
       _error = null;
@@ -63,14 +70,16 @@ class TopAdWidgetState extends State<TopAdWidget> {
         await File(widget.ad.file.localFilePath!).exists()) {
       _localFilePath = widget.ad.file.localFilePath;
     } else {
-      setState(() {
+      _setStateIfActive(generation, () {
         _isDownloading = true;
       });
 
       final File? downloadedFile =
           await widget.fileManager.getFile(widget.ad.file);
 
-      setState(() {
+      if (!_isActiveGeneration(generation)) return;
+
+      _setStateIfActive(generation, () {
         _isDownloading = false;
       });
 
@@ -82,73 +91,83 @@ class TopAdWidgetState extends State<TopAdWidget> {
         } else {
           _retryCount++;
           await Future.delayed(Duration(seconds: 2 * _retryCount));
-          if (mounted) {
+          if (_isActiveGeneration(generation)) {
             return _loadFile(true);
           }
         }
       }
     }
 
+    if (!_isActiveGeneration(generation)) return;
+
     if (_localFilePath != null) {
       final mimeType = widget.ad.file.mimeType.toLowerCase();
       if (mimeType == 'video/mp4') {
-        _initializeVideoPlayer();
+        _initializeVideoPlayer(generation);
       } else if (mimeType.startsWith('image/')) {
-        setState(() {
+        _setStateIfActive(generation, () {
           _isLoading = false;
         });
       } else {
         _error = 'Unsupported ad file type: $mimeType';
-        setState(() {
+        _setStateIfActive(generation, () {
           _isLoading = false;
         });
       }
     } else {
-      setState(() {
+      _setStateIfActive(generation, () {
         _isLoading = false;
       });
     }
   }
 
   ///2，初始化视频播放器 - 使用视频池管理器
-  Future<void> _initializeVideoPlayer() async {
-    if (_localFilePath == null || !mounted) return;
+  Future<void> _initializeVideoPlayer(int generation) async {
+    if (_localFilePath == null || !_isActiveGeneration(generation)) return;
+    final topAdCarouselProvider =
+        _topAdCarouselProvider ?? context.read<TopAdCarouselProvider>();
+    _topAdCarouselProvider = topAdCarouselProvider;
+    final shouldMuteOnInit =
+        context.read<CarouselStateProvider>().currentAppState ==
+            AppState.fullscreenAd;
 
-    setState(() {
+    _setStateIfActive(generation, () {
       _isLoading = true;
       _error = null;
     });
 
     if (_videoController != null && _currentVideoPath != _localFilePath) {
-      _topAdCarouselProvider ??= context.read<TopAdCarouselProvider>();
-      await _topAdCarouselProvider!.preciseVideoPoolManager.releaseController(
-        filePath: _currentVideoPath!,
+      final oldPath = _currentVideoPath!;
+      _videoController = null;
+      _currentVideoPath = null;
+      _mediaCommandGeneration++;
+
+      await topAdCarouselProvider.preciseVideoPoolManager.releaseController(
+        filePath: oldPath,
         videoType: precise.VideoType.topAd,
         forceDispose: true,
       );
-      _videoController = null;
-      _currentVideoPath = null;
+      if (!_isActiveGeneration(generation)) return;
     }
 
     if (_videoController != null && _currentVideoPath == _localFilePath) {
-      setState(() {
+      _setStateIfActive(generation, () {
         _isLoading = false;
       });
       return;
     }
 
     try {
-      if (!mounted) return;
-      _topAdCarouselProvider ??= context.read<TopAdCarouselProvider>();
+      if (!_isActiveGeneration(generation)) return;
 
-      _videoController = await _topAdCarouselProvider!.preciseVideoPoolManager
+      final controller = await topAdCarouselProvider.preciseVideoPoolManager
           .getInitializedController(
         filePath: _localFilePath!,
         videoType: precise.VideoType.topAd,
         autoPlay: true,
         looping: true,
         onError: () {
-          if (mounted) {
+          if (_isActiveGeneration(generation)) {
             setState(() {
               _error = '视频控制器创建失败，将显示占位符';
               _isLoading = false;
@@ -157,30 +176,39 @@ class TopAdWidgetState extends State<TopAdWidget> {
         },
       );
 
-      if (_videoController != null) {
-        final carouselStateProvider = context.read<CarouselStateProvider>();
-        final isFullscreenAd =
-            carouselStateProvider.currentAppState == AppState.fullscreenAd;
+      if (!_isActiveGeneration(generation)) {
+        if (controller != null && _localFilePath != null) {
+          await topAdCarouselProvider.preciseVideoPoolManager.releaseController(
+            filePath: _localFilePath!,
+            videoType: precise.VideoType.topAd,
+            forceDispose: true,
+          );
+        }
+        return;
+      }
 
-        if (isFullscreenAd) {
-          await _videoController!.setVolume(0.0);
+      _videoController = controller;
+
+      if (_videoController != null) {
+        if (shouldMuteOnInit) {
+          await _setControllerVolume(_videoController!, 0.0);
         }
       }
 
-      if (_videoController != null && mounted) {
+      if (_videoController != null && _isActiveGeneration(generation)) {
         _currentVideoPath = _localFilePath;
-        setState(() {
+        _setStateIfActive(generation, () {
           _isLoading = false;
         });
-      } else if (mounted) {
-        setState(() {
+      } else if (_isActiveGeneration(generation)) {
+        _setStateIfActive(generation, () {
           _error = null;
           _isLoading = false;
         });
       }
     } catch (e) {
-      if (mounted) {
-        setState(() {
+      if (_isActiveGeneration(generation)) {
+        _setStateIfActive(generation, () {
           _error = 'Could not create video player.';
           _isLoading = false;
         });
@@ -190,33 +218,19 @@ class TopAdWidgetState extends State<TopAdWidget> {
 
   //3，暂停视频播放
   Future<void> _pauseVideo() async {
-    if (_videoController != null) {
-      try {
-        if (_videoController!.value.isInitialized &&
-            !_videoController!.value.hasError &&
-            _videoController!.value.isPlaying) {
-          await _videoController!.pause();
-          isManuallyPaused = true;
-        }
-      } catch (e) {
-        // 静默处理暂停失败
-      }
+    final controller = _videoController;
+    if (_isControllerActive(controller)) {
+      await _pauseController(controller!);
+      isManuallyPaused = true;
     }
   }
 
   //4，恢复视频播放
   Future<void> _resumeVideo() async {
-    if (_videoController != null) {
-      try {
-        if (_videoController!.value.isInitialized &&
-            !_videoController!.value.hasError &&
-            !_videoController!.value.isPlaying) {
-          await _videoController!.play();
-          isManuallyPaused = false;
-        }
-      } catch (e) {
-        // 静默处理恢复播放失败
-      }
+    final controller = _videoController;
+    if (_isControllerActive(controller)) {
+      await _playController(controller!);
+      isManuallyPaused = false;
     }
   }
 
@@ -229,34 +243,47 @@ class TopAdWidgetState extends State<TopAdWidget> {
 
   @override
   void dispose() {
+    _isDisposed = true;
+    _loadGeneration++;
+    _mediaCommandGeneration++;
     _releaseVideoController();
     super.dispose();
   }
 
   ///释放视频控制器到池中
   Future<void> _releaseVideoController({bool forceDispose = false}) async {
-    if (_videoController != null && _currentVideoPath != null) {
+    if (_isReleasingVideo) return;
+
+    final controller = _videoController;
+    final videoPath = _currentVideoPath;
+
+    _videoController = null;
+    _currentVideoPath = null;
+    _loadGeneration++;
+    _mediaCommandGeneration++;
+
+    if (controller != null && videoPath != null) {
+      _isReleasingVideo = true;
       try {
-        _topAdCarouselProvider ??= context.read<TopAdCarouselProvider>();
+        if (mounted && !_isDisposed) {
+          _topAdCarouselProvider ??= context.read<TopAdCarouselProvider>();
+        }
 
         if (_topAdCarouselProvider != null) {
-          if (_videoController!.value.isPlaying) {
-            await _videoController!.pause();
-          }
+          await _pauseController(controller);
 
           await _topAdCarouselProvider!.preciseVideoPoolManager
               .releaseController(
-            filePath: _currentVideoPath!,
+            filePath: videoPath,
             videoType: precise.VideoType.topAd,
             forceDispose: forceDispose,
           );
         }
       } catch (e) {
         // 静默处理释放控制器错误
+      } finally {
+        _isReleasingVideo = false;
       }
-
-      _videoController = null;
-      _currentVideoPath = null;
     }
   }
 
@@ -266,41 +293,30 @@ class TopAdWidgetState extends State<TopAdWidget> {
     final isMediaPaused =
         carouselStateProvider.isMediaPausedForArea(AreaType.topAd);
 
-    if (_videoController != null && _videoController!.value.isInitialized) {
-      final isPlaying = _videoController!.value.isPlaying;
+    final controller = _videoController;
+    if (_isControllerActive(controller)) {
+      final isPlaying = controller!.value.isPlaying;
       final isFullscreenAd =
           carouselStateProvider.currentAppState == AppState.fullscreenAd;
 
-      Future.delayed(const Duration(milliseconds: 50), () {
-        if (mounted &&
-            _videoController != null &&
-            _videoController!.value.isInitialized) {
-          if (isFullscreenAd) {
-            _videoController!.setVolume(0.0);
-          } else {
-            _videoController!.setVolume(1.0);
-          }
-        }
-      });
+      _scheduleMediaCommand(
+        controller,
+        const Duration(milliseconds: 50),
+        () => _setControllerVolume(controller, isFullscreenAd ? 0.0 : 1.0),
+      );
 
       if (isMediaPaused && isPlaying) {
-        Future.delayed(const Duration(milliseconds: 100), () {
-          if (mounted &&
-              _videoController != null &&
-              _videoController!.value.isInitialized &&
-              _videoController!.value.isPlaying) {
-            _videoController!.pause();
-          }
-        });
+        _scheduleMediaCommand(
+          controller,
+          const Duration(milliseconds: 100),
+          () => _pauseController(controller),
+        );
       } else if (!isMediaPaused && !isPlaying) {
-        Future.delayed(const Duration(milliseconds: 100), () {
-          if (mounted &&
-              _videoController != null &&
-              _videoController!.value.isInitialized &&
-              !_videoController!.value.isPlaying) {
-            _videoController!.play();
-          }
-        });
+        _scheduleMediaCommand(
+          controller,
+          const Duration(milliseconds: 100),
+          () => _playController(controller),
+        );
       }
     }
 
@@ -319,9 +335,7 @@ class TopAdWidgetState extends State<TopAdWidget> {
             });
           } else {
             Future.delayed(const Duration(milliseconds: 50), () {
-              if (mounted &&
-                  _videoController != null &&
-                  _videoController!.value.isInitialized &&
+              if (_isControllerActive(_videoController) &&
                   _videoController!.value.isPlaying) {
                 _pauseVideo();
               }
@@ -330,9 +344,7 @@ class TopAdWidgetState extends State<TopAdWidget> {
           return true;
         } else if (notification is MediaResumeNotification) {
           Future.delayed(const Duration(milliseconds: 50), () {
-            if (mounted &&
-                _videoController != null &&
-                _videoController!.value.isInitialized &&
+            if (_isControllerActive(_videoController) &&
                 !_videoController!.value.isPlaying) {
               _resumeVideo();
             }
@@ -409,7 +421,7 @@ class TopAdWidgetState extends State<TopAdWidget> {
       final mimeType = widget.ad.file.mimeType.toLowerCase();
 
       if (mimeType == 'video/mp4') {
-        if (_videoController != null && _videoController!.value.isInitialized) {
+        if (_isControllerActive(_videoController)) {
           contentWidget = SizedBox.expand(
             child: FittedBox(
               fit: BoxFit.fill,
@@ -495,5 +507,76 @@ class TopAdWidgetState extends State<TopAdWidget> {
         ),
       ),
     );
+  }
+
+  bool _isActiveGeneration(int generation) {
+    return mounted && !_isDisposed && generation == _loadGeneration;
+  }
+
+  void _setStateIfActive(int generation, VoidCallback update) {
+    if (_isActiveGeneration(generation)) {
+      setState(update);
+    }
+  }
+
+  bool _isControllerActive(VideoPlayerController? controller) {
+    return mounted &&
+        !_isDisposed &&
+        controller != null &&
+        identical(controller, _videoController) &&
+        controller.value.isInitialized &&
+        !controller.value.hasError;
+  }
+
+  void _scheduleMediaCommand(
+    VideoPlayerController controller,
+    Duration delay,
+    Future<void> Function() command,
+  ) {
+    final int commandGeneration = ++_mediaCommandGeneration;
+    Future.delayed(delay, () async {
+      if (commandGeneration != _mediaCommandGeneration ||
+          !_isControllerActive(controller)) {
+        return;
+      }
+
+      try {
+        await command();
+      } catch (e) {
+        // 静默处理视频控制器已被释放或平台状态变化导致的失败
+      }
+    });
+  }
+
+  Future<void> _setControllerVolume(
+      VideoPlayerController controller, double volume) async {
+    if (!_isControllerActive(controller)) return;
+    try {
+      await controller.setVolume(volume);
+    } catch (e) {
+      // 静默处理音量设置失败
+    }
+  }
+
+  Future<void> _pauseController(VideoPlayerController controller) async {
+    if (!_isControllerActive(controller)) return;
+    try {
+      if (controller.value.isPlaying) {
+        await controller.pause();
+      }
+    } catch (e) {
+      // 静默处理暂停失败
+    }
+  }
+
+  Future<void> _playController(VideoPlayerController controller) async {
+    if (!_isControllerActive(controller)) return;
+    try {
+      if (!controller.value.isPlaying) {
+        await controller.play();
+      }
+    } catch (e) {
+      // 静默处理恢复播放失败
+    }
   }
 }

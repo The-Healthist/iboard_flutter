@@ -266,7 +266,7 @@ class PrinterStatus {
       status: 'unknown',
       isOnline: false,
       acceptingJobs: false,
-      message: '🔴 打印機狀態未知',
+      message: ' 打印機狀態未知',
     );
   }
 

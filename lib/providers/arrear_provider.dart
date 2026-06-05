@@ -757,13 +757,13 @@ class ArrearProvider extends ChangeNotifier {
     final intervalMinutes = updateIntervalMinutes ?? 1;
     final intervalSeconds = intervalMinutes * 60;
     _isPeriodicUpdateActive = true;
-    debugPrint('[ArrearProvider] ⏰ 启动欠费数据定时更新，间隔: ${intervalMinutes}分钟');
+    debugPrint('[ArrearProvider]  启动欠费数据定时更新，间隔: ${intervalMinutes}分钟');
 
     forceRefreshWithCorrectIsmartId();
 
     _updateTimer = Timer.periodic(Duration(seconds: intervalSeconds), (timer) {
       if (_isPeriodicUpdateActive) {
-        debugPrint('[ArrearProvider] 🔄 执行定时欠费数据更新');
+        debugPrint('[ArrearProvider]  执行定时欠费数据更新');
         final currentTargetId = _getTargetIsmartId();
 
         if (currentTargetId == _fallbackIsmartId) {
@@ -784,7 +784,7 @@ class ArrearProvider extends ChangeNotifier {
       _updateTimer = null;
     }
     _isPeriodicUpdateActive = false;
-    debugPrint('[ArrearProvider] ⏹️ 停止欠费数据定时更新');
+    debugPrint('[ArrearProvider]  停止欠费数据定时更新');
   }
 
   ///24, 重新初始化Provider

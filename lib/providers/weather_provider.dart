@@ -161,7 +161,7 @@ class WeatherProvider extends ChangeNotifier {
           _weatherForecastData = WeatherData.fromJson(forecastData);
         } catch (e) {
           // 忽略缓存解析错误
-          debugPrint('[WeatherProvider] ❌ 天气预报数据解析失败: $e');
+          debugPrint('[WeatherProvider]  天气预报数据解析失败: $e');
         }
       }
 
@@ -173,7 +173,7 @@ class WeatherProvider extends ChangeNotifier {
           _currentWeatherData = CurrentWeatherDataModel.fromJson(currentData);
         } catch (e) {
           // 忽略缓存解析错误
-          debugPrint('[WeatherProvider] ❌ 当前天气数据解析失败: $e');
+          debugPrint('[WeatherProvider]  当前天气数据解析失败: $e');
         }
       }
 
@@ -185,7 +185,7 @@ class WeatherProvider extends ChangeNotifier {
           _weatherWarningData = WeatherWarningModel.fromJson(warningData);
         } catch (e) {
           // 忽略缓存解析错误
-          debugPrint('[WeatherProvider] ❌ 天气警告数据解析失败: $e');
+          debugPrint('[WeatherProvider]  天气警告数据解析失败: $e');
         }
       }
 
@@ -411,9 +411,9 @@ class WeatherProvider extends ChangeNotifier {
       return;
     }
     _isPeriodicUpdateActive = true;
-    debugPrint('[WeatherProvider] ⏰ 启动天气数据定时更新，间隔: ${interval.inHours}小时');
+    debugPrint('[WeatherProvider]  启动天气数据定时更新，间隔: ${interval.inHours}小时');
     _updateTimer = Timer.periodic(interval, (timer) {
-      debugPrint('[WeatherProvider] 🔄 执行定时天气数据更新');
+      debugPrint('[WeatherProvider]  执行定时天气数据更新');
       fetchAllWeatherData();
     });
 
@@ -429,7 +429,7 @@ class WeatherProvider extends ChangeNotifier {
     _updateTimer?.cancel();
     _updateTimer = null;
     _isPeriodicUpdateActive = false;
-    debugPrint('[WeatherProvider] ⏹️ 停止天气数据定时更新');
+    debugPrint('[WeatherProvider]  停止天气数据定时更新');
 
     notifyListeners();
   }
@@ -441,9 +441,9 @@ class WeatherProvider extends ChangeNotifier {
       return;
     }
     _isWarningPeriodicUpdateActive = true;
-    debugPrint('[WeatherProvider] ⏰ 启动天气警告独立定时更新，间隔: ${interval.inMinutes}分钟');
+    debugPrint('[WeatherProvider]  启动天气警告独立定时更新，间隔: ${interval.inMinutes}分钟');
     _warningUpdateTimer = Timer.periodic(interval, (timer) {
-      debugPrint('[WeatherProvider] 🔄 执行定时天气警告更新');
+      debugPrint('[WeatherProvider]  执行定时天气警告更新');
       fetchWeatherWarnings();
     });
 
@@ -459,7 +459,7 @@ class WeatherProvider extends ChangeNotifier {
     _warningUpdateTimer?.cancel();
     _warningUpdateTimer = null;
     _isWarningPeriodicUpdateActive = false;
-    debugPrint('[WeatherProvider] ⏹️ 停止天气警告定时更新');
+    debugPrint('[WeatherProvider]  停止天气警告定时更新');
 
     notifyListeners();
   }
