@@ -144,15 +144,11 @@ class ApiClient {
         }
 
         if (decoded is List) {
-          return decoded
-              .map((item) => Map<String, dynamic>.from(item as Map))
-              .toList();
+          return _mapsFromJsonList(decoded);
         } else if (decoded is Map &&
             decoded.containsKey('data') &&
             decoded['data'] is List) {
-          return (decoded['data'] as List)
-              .map((item) => Map<String, dynamic>.from(item as Map))
-              .toList();
+          return _mapsFromJsonList(decoded['data'] as List);
         } else {
           throw Exception(
               'Expected array response but got: ${decoded.runtimeType}');
@@ -328,7 +324,7 @@ class ApiClient {
 
         // 如果請求成功，跳出重試循環
         break;
-      } catch (e, stackTrace) {
+      } catch (e) {
         lastException = e is Exception ? e : Exception(e.toString());
 
         // 詳細記錄網絡錯誤類型並生成用戶友好消息
@@ -402,6 +398,14 @@ class ApiClient {
       }
     }
     return response!;
+  }
+
+  List<Map<String, dynamic>> _mapsFromJsonList(List<dynamic> items) {
+    return items
+        .whereType<Map>()
+        .map(
+            (item) => item.map((key, value) => MapEntry(key.toString(), value)))
+        .toList();
   }
 
   // --- API Methods based on httpapi.json ---
@@ -992,7 +996,7 @@ class ApiClient {
     _processingOrders.add(orderNo);
 
     try {
-      final String endpoint = '/api/pay/unifiedOrder';
+      const String endpoint = '/api/pay/unifiedOrder';
       final Uri url = _buildUri('${PaymentApiConfig.baseUrl}$endpoint', null);
 
       // 構建請求參數（完全按照Python代碼格式）
@@ -1119,7 +1123,7 @@ class ApiClient {
     _processingOrders.add(orderNo);
 
     try {
-      final String endpoint = '/api/pay/unifiedOrder';
+      const String endpoint = '/api/pay/unifiedOrder';
       final Uri url = _buildUri('${PaymentApiConfig.baseUrl}$endpoint', null);
 
       // 構建請求參數（完全按照Python代碼格式）
@@ -1192,7 +1196,7 @@ class ApiClient {
     _processingOrders.add(orderNo);
 
     try {
-      final String endpoint = '/api/pay/unifiedOrder';
+      const String endpoint = '/api/pay/unifiedOrder';
       final Uri url = _buildUri('${PaymentApiConfig.baseUrl}$endpoint', null);
 
       // 構建請求參數（完全按照Python代碼格式）
@@ -1254,7 +1258,7 @@ class ApiClient {
     String? paymentMethod, // 添加支付方式參數
   }) async {
     try {
-      final String endpoint = '/api/pay/query';
+      const String endpoint = '/api/pay/query';
       final Uri url = _buildUri('${PaymentApiConfig.baseUrl}$endpoint', null);
 
       final reqTime = DateTime.now().millisecondsSinceEpoch;
