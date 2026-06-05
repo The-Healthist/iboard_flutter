@@ -11,11 +11,11 @@ enum PaymentMethod {
 
 /// 2, 支付狀態枚舉
 enum PaymentStatus {
-  idle,      // 空閒
-  pending,   // 待處理
+  idle, // 空閒
+  pending, // 待處理
   processing, // 處理中
-  success,   // 支付成功
-  failed,    // 支付失敗
+  success, // 支付成功
+  failed, // 支付失敗
   cancelled, // 支付取消
 }
 
@@ -180,7 +180,7 @@ class ThirdPartyPaymentResponse {
     } else if (json['qr_code'] != null) {
       qrCodeData = json['qr_code'] as String?;
     }
-    
+
     return ThirdPartyPaymentResponse(
       qrCode: qrCodeData,
       transactionId: json['channelOrderNo'] as String?,
@@ -191,10 +191,10 @@ class ThirdPartyPaymentResponse {
       state: json['state'] as int?,
       errCode: json['errCode'] as String?,
       errMsg: json['errMsg'] as String?,
-      createdAt: json['createdTime'] != null 
+      createdAt: json['createdTime'] != null
           ? DateTime.fromMillisecondsSinceEpoch(json['createdTime'])
           : null,
-      successTime: json['successTime'] != null 
+      successTime: json['successTime'] != null
           ? DateTime.fromMillisecondsSinceEpoch(json['successTime'])
           : null,
     );
@@ -203,10 +203,10 @@ class ThirdPartyPaymentResponse {
   /// 是否支付成功 (根据实际API行为：state=2为支付成功)
   /// state=0:訂單生成, state=1:支付中, state=2:支付成功, state=3:支付失敗
   bool get isSuccess => state == 2;
-  
+
   /// 是否支付失敗
   bool get isFailed => state == 3 || state == -1;
-  
+
   /// 是否處理中/待支付 (state=0:訂單生成, state=1:支付中)
   bool get isProcessing => state == 0 || state == 1;
 
@@ -481,47 +481,42 @@ class PaymentConfig {
 
   factory PaymentConfig.fromJson(Map<String, dynamic> json) {
     // 處理手續費數據，從 transaction_types 數組中提取
-    Map<String, double> feeRates = {};
-    List<PaymentMethod> enabledMethods = [];
-    // print('[PaymentConfig] 🔍 解析 JSON 數據: $json');
+    final feeRates = <String, double>{};
+    final enabledMethods = <PaymentMethod>{};
+    final bankAccountJson = json['bank_account'];
 
     if (json['transaction_types'] is List) {
       final List<dynamic> transactionTypes = json['transaction_types'];
-      // print('[PaymentConfig] 🔍 找到 ${transactionTypes.length} 個交易類型');
 
       for (final type in transactionTypes) {
         if (type is Map<String, dynamic>) {
           final payType = type['pay_type']?.toString();
           final markup = (type['markup'] as num?)?.toDouble() ?? 0.0;
-          // print('[PaymentConfig] 🔍 處理類型: $payType, 費率: $markup');
 
           // 映射支付類型到我們的枚舉
           if (payType == 'POS_ALIWE') {
             feeRates['wechat'] = markup;
             feeRates['alipay'] = markup;
             enabledMethods.addAll([PaymentMethod.wechat, PaymentMethod.alipay]);
-            // print('[PaymentConfig] ✅ 設置微信/支付寶費率: $markup');
           } else if (payType == 'POS_UNIONPAY') {
             feeRates['unionpay'] = markup;
             enabledMethods.add(PaymentMethod.unionpay);
-            // print('[PaymentConfig] ✅ 設置雲閃付費率: $markup');
           } else if (payType == 'POS_CARD') {
             final payTypeName = type['pay_type_name_chi']?.toString() ?? '';
             // 检查是否为云闪付（根据中文名判断）
-            if (payTypeName.contains('雲閃付') || payTypeName.contains('银联') || 
-                payTypeName.contains('UnionPay') || payTypeName.contains('銀聯卡') ||
+            if (payTypeName.contains('雲閃付') ||
+                payTypeName.contains('银联') ||
+                payTypeName.contains('UnionPay') ||
+                payTypeName.contains('銀聯卡') ||
                 payTypeName.contains('银联卡')) {
               feeRates['unionpay'] = markup;
               enabledMethods.add(PaymentMethod.unionpay);
-              print('[PaymentConfig] ✅ 設置雲閃付費率 (POS_CARD類型): $markup');
             } else {
               // 如果没有专门的云闪付配置，但应用需要支持云闪付，则使用信用卡费率
               feeRates['card'] = markup;
               feeRates['unionpay'] = markup; // 云闪付使用信用卡费率
               enabledMethods.add(PaymentMethod.card);
               enabledMethods.add(PaymentMethod.unionpay);
-              print('[PaymentConfig] ✅ 設置信用卡費率: $markup');
-              print('[PaymentConfig] ✅ 雲閃付使用信用卡費率: $markup');
             }
           } else if (payType == 'POS_BANK') {
             feeRates['bank_transfer'] = markup;
@@ -535,31 +530,16 @@ class PaymentConfig {
           }
         }
       }
-    } else {
-      print('[PaymentConfig] ⚠️ transaction_types 不是数组或不存在');
     }
-
-    // 检查是否有微信/支付宝支付方式
-    final hasWechatAlipay = enabledMethods.contains(PaymentMethod.wechat) ||
-        enabledMethods.contains(PaymentMethod.alipay);
-    
-    // 输出最终的费率配置
-    print('[PaymentConfig] 🔍 最终费率配置: $feeRates');
-    print('[PaymentConfig] 🔍 启用的支付方式: $enabledMethods');
-    print('[PaymentConfig] 🔍 是否有微信/支付宝支付: $hasWechatAlipay');
-    // print('[PaymentConfig] 🔍 是否有微信/支付宝支付: $hasWechatAlipay');
-    // print('[PaymentConfig] 🔍 启用的支付方式: $enabledMethods');
-    // print('[PaymentConfig] 🔍 最终费率配置: $feeRates');
 
     return PaymentConfig(
       buildingId: json['building_id']?.toString() ?? '',
       enabledMethods: enabledMethods.isNotEmpty
-          ? enabledMethods
+          ? enabledMethods.toList(growable: false)
           : _parsePaymentMethods(json['enabled_methods']),
       feeRates: feeRates,
-      bankAccount: json['bank_account'] != null
-          ? BankAccountInfo.fromJson(
-              json['bank_account'] as Map<String, dynamic>)
+      bankAccount: bankAccountJson is Map<String, dynamic>
+          ? BankAccountInfo.fromJson(bankAccountJson)
           : null,
       settings: json['settings'] as Map<String, dynamic>?,
     );
@@ -578,7 +558,7 @@ class PaymentConfig {
   static List<PaymentMethod> _parsePaymentMethods(dynamic methods) {
     if (methods == null || methods is! List) return [];
 
-    return (methods as List).map((method) {
+    return methods.map((method) {
       switch (method.toString().toLowerCase()) {
         case 'wechat':
           return PaymentMethod.wechat;
@@ -596,18 +576,6 @@ class PaymentConfig {
           return PaymentMethod.wechat;
       }
     }).toList();
-  }
-
-  static Map<String, double> _parseFeeRates(dynamic rates) {
-    if (rates == null || rates is! Map) return {};
-
-    final Map<String, double> result = {};
-    (rates as Map).forEach((key, value) {
-      if (value is num) {
-        result[key.toString()] = value.toDouble();
-      }
-    });
-    return result;
   }
 
   static String _paymentMethodToString(PaymentMethod method) {

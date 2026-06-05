@@ -13,7 +13,6 @@ class PaymentNotifier extends ChangeNotifier {
   final Logger _logger = Logger();
   late final PaymentClient _paymentClient;
   ApiClient? _apiClient;
-  Timer? _pollingTimer;
   Timer? _paymentStatusTimer;
 
   PaymentState _state = const PaymentState();
@@ -21,36 +20,6 @@ class PaymentNotifier extends ChangeNotifier {
 
   PaymentNotifier() {
     _paymentClient = PaymentClient();
-  }
-
-  /// 19, 載入緩存數據
-  Future<void> _loadCachedData() async {
-    try {
-      final prefs = await SharedPreferences.getInstance();
-
-      // 載入緩存的大廈列表
-      final cachedBuildings = prefs.getString('cached_buildings');
-      if (cachedBuildings != null) {
-        final buildingsData = json.decode(cachedBuildings) as List;
-        _updateState(state.copyWith(
-          buildings: buildingsData.map((b) => BuildingInfo.fromMap(b)).toList(),
-        ));
-      }
-
-      // 載入最後選擇的大廈和單位
-      final lastBuildingId = prefs.getString('last_selected_building');
-      final lastUnitId = prefs.getString('last_selected_unit');
-
-      if (lastBuildingId != null) {
-        _updateState(state.copyWith(selectedBuildingId: lastBuildingId));
-      }
-
-      if (lastUnitId != null) {
-        _updateState(state.copyWith(selectedUnitId: lastUnitId));
-      }
-
-      // _logger.i('✅ [PaymentProvider] 緩存數據載入完成');
-    } catch (e) {}
   }
 
   /// 21, 保存支付記錄
@@ -81,8 +50,9 @@ class PaymentNotifier extends ChangeNotifier {
       }
 
       await prefs.setStringList('payment_records', paymentRecords);
-      // _logger.i('✅ [PaymentProvider] 支付記錄已保存');
-    } catch (e) {}
+    } catch (e) {
+      _logger.w(' [PaymentProvider] 保存支付記錄失敗: $e');
+    }
   }
 
   /// 22, 獲取支付歷史記錄
@@ -101,13 +71,10 @@ class PaymentNotifier extends ChangeNotifier {
 
   /// 1, 初始化支付流程
   Future<void> initializePayment({String? buildingId}) async {
-    // debugPrint('[PaymentProvider] 🎬 開始初始化支付流程，buildingId: $buildingId');
-
     _updateState(state.copyWith(
       status: PaymentStatus.pending,
       errorMessage: null,
     ));
-    // _logger.i('🎬 [PaymentProvider] 初始化支付流程');
 
     // 如果提供了 buildingId，直接加载该大厦的单位
     if (buildingId != null && buildingId.isNotEmpty) {
@@ -119,7 +86,6 @@ class PaymentNotifier extends ChangeNotifier {
   Future<void> loadBuildingList() async {
     try {
       _updateState(state.copyWith(isLoading: true));
-      // _logger.i('📋 [PaymentProvider] 載入大廈列表');
 
       final buildings = await _paymentClient.getBuildingList();
 
@@ -127,10 +93,8 @@ class PaymentNotifier extends ChangeNotifier {
         isLoading: false,
         buildings: buildings.map((b) => BuildingInfo.fromMap(b)).toList(),
       ));
-
-      // _logger.i('✅ [PaymentProvider] 大廈列表載入完成，共 ${buildings.length} 個大廈');
     } catch (e) {
-      _logger.e('❌ [PaymentProvider] 載入大廈列表失敗: $e');
+      _logger.e(' [PaymentProvider] 載入大廈列表失敗: $e');
       _updateState(state.copyWith(
         isLoading: false,
         errorMessage: '載入大廈列表失敗: $e',
@@ -141,8 +105,6 @@ class PaymentNotifier extends ChangeNotifier {
   /// 3, 選擇大廈並載入單位
   Future<void> selectBuilding(String buildingId) async {
     try {
-      // debugPrint('[PaymentProvider] 🏢 開始選擇大廈: $buildingId');
-
       _updateState(state.copyWith(
         selectedBuildingId: buildingId,
         isLoading: true,
@@ -151,24 +113,10 @@ class PaymentNotifier extends ChangeNotifier {
       ));
 
       // 載入大廈單位列表
-      // debugPrint('[PaymentProvider] 📡 調用API獲取大廈單位列表...');
       final units =
           await _paymentClient.getBuildingFlatUnits(blgId: buildingId);
 
       final unitInfos = units.map((u) => UnitInfo.fromJson(u)).toList();
-      // debugPrint('[PaymentProvider] 🔄 轉換後的單位信息: ${unitInfos.length} 個單位');
-
-      // 檢查樓層和樓座數據（用於調試）
-      // final floors = unitInfos
-      //     .map((u) => u.floorName)
-      //     .where((f) => f.isNotEmpty)
-      //     .toSet()
-      //     .toList();
-      // final blocks = unitInfos
-      //     .map((u) => u.blockName)
-      //     .where((b) => b.isNotEmpty)
-      //     .toSet()
-      //     .toList();
 
       // 先更新單位數據，使用默認支付配置
       _updateState(state.copyWith(
@@ -179,22 +127,12 @@ class PaymentNotifier extends ChangeNotifier {
 
       // getBuildingTransactionTypes
       try {
-        // debugPrint('[PaymentProvider] ⚙️ 載入支付配置...');
         final config =
             await _paymentClient.getBuildingTransactionTypes(blgId: buildingId);
-        // debugPrint('[PaymentProvider] ⚙️ 支付配置數據: $config');
 
         final paymentConfig = PaymentConfig.fromJson(config);
-        // debugPrint('[PaymentProvider] ⚙️ 解析後的費率配置: ${paymentConfig.feeRates}');
 
-        // 直接使用 API 返回的配置
         _updateState(state.copyWith(paymentConfig: paymentConfig));
-
-        // 36, 输出从API获取的费率信息
-        logPaymentRates();
-
-        //  debugPrint(
-        //  '[PaymentProvider] ⚙️ 状态更新完成，当前费率: ${state.paymentConfig?.feeRates}');
       } catch (e) {
         // 如果 API 調用失敗，創建一個空的配置，這樣會顯示支付功能不可用頁面
         final emptyConfig = PaymentConfig(
@@ -204,15 +142,8 @@ class PaymentNotifier extends ChangeNotifier {
         );
         _updateState(state.copyWith(paymentConfig: emptyConfig));
       }
-
-      //_logger.i('✅ [PaymentProvider] 大廈選擇完成，載入 ${units.length} 個單位');
-      //_logger.i(
-      //    '📋 [PaymentProvider] 單位數據示例: ${unitInfos.take(3).map((u) => '${u.floorName}樓${u.unitName}室').join(', ')}');
-
-      //debugPrint(
-      //   '[PaymentProvider] ✅ 大廈選擇完成，狀態更新: units=${unitInfos.length}, isLoading=false');
     } catch (e) {
-      _logger.e('❌ [PaymentProvider] 選擇大廈失敗: $e');
+      _logger.e(' [PaymentProvider] 選擇大廈失敗: $e');
       _updateState(state.copyWith(
         isLoading: false,
         errorMessage: '選擇大廈失敗: $e',
@@ -350,10 +281,10 @@ class PaymentNotifier extends ChangeNotifier {
       String blockName, String floorName, String unitName) {
     if (blockName.isEmpty) {
       // 如果樓座名稱為空，顯示：XX樓XX室
-      return '${floorName}樓${unitName}室';
+      return '$floorName樓$unitName室';
     } else {
       // 顯示樓座+樓層+單元，例如：01座01樓A室
-      return '${blockName}座${floorName}樓${unitName}室';
+      return '$blockName座$floorName樓$unitName室';
     }
   }
 
@@ -375,21 +306,13 @@ class PaymentNotifier extends ChangeNotifier {
 
       // 28, 加載完成後更新账单列表和狀態
       final billList = bills.map((b) => PaymentBill.fromJson(b)).toList();
-      
+
       _updateState(state.copyWith(
         isLoadingBills: false,
         bills: billList,
       ));
-      
-      // 29, 記錄账单加載結果
-      if (billList.isEmpty) {
-        // debugPrint('📋 [PaymentProvider] 該單位暫無待繳账单');
-      } else {
-        // debugPrint('📋 [PaymentProvider] 載入 ${billList.length} 張待繳账单');
-      }
-      
     } catch (e) {
-      _logger.e('❌ [PaymentProvider] 選擇單位失敗: $e');
+      _logger.e(' [PaymentProvider] 選擇單位失敗: $e');
       _updateState(state.copyWith(
         isLoadingBills: false,
         errorMessage: '載入账单失敗: $e',
@@ -439,120 +362,25 @@ class PaymentNotifier extends ChangeNotifier {
 
   /// 18, 獲取購物車項目數量
   int get cartItemCount => state.selectedBills.length;
-  
+
   /// 30, 检查是否正在加载账单
   bool get isLoadingBills => state.isLoadingBills;
-  
+
   /// 31, 检查是否有账单数据
   bool get hasBills => state.bills.isNotEmpty;
-  
+
   /// 32, 检查是否已选中单位但没有账单（用于显示"暂无账单"）
-  bool get hasNobills => state.selectedUnitId != null && 
-                        !state.isLoadingBills && 
-                        state.bills.isEmpty &&
-                        state.errorMessage == null;
-
-  /// 33, 输出当前支付配置的费率信息
-  void logPaymentRates() {
-    if (state.paymentConfig == null) {
-      debugPrint('💰 [PaymentProvider] 支付配置未加载');
-      return;
-    }
-
-    final config = state.paymentConfig!;
-    debugPrint('💰 [PaymentProvider] ===== 支付费率配置 =====');
-    debugPrint('💰 [PaymentProvider] 大厦ID: ${config.buildingId}');
-    debugPrint('💰 [PaymentProvider] 启用的支付方式: ${config.enabledMethods.map((m) => _getPaymentMethodName(m)).join(', ')}');
-    
-    if (config.feeRates.isNotEmpty) {
-      debugPrint('💰 [PaymentProvider] 费率详情:');
-      config.feeRates.forEach((method, rate) {
-        final percentage = (rate * 100).toStringAsFixed(2);
-        final methodName = _getMethodDisplayName(method);
-        debugPrint('💰 [PaymentProvider]   $methodName: $percentage% (原始值: $rate)');
-      });
-    } else {
-      debugPrint('💰 [PaymentProvider] 无费率数据');
-    }
-    debugPrint('💰 [PaymentProvider] ========================');
-  }
-
-  /// 34, 获取支付方式的显示名称（用于日志输出）
-  String _getMethodDisplayName(String methodKey) {
-    switch (methodKey) {
-      case 'wechat':
-        return '微信支付';
-      case 'alipay':
-        return '支付宝';
-      case 'unionpay':
-        return '云闪付';
-      case 'card':
-        return '信用卡';
-      case 'cash':
-        return '现金';
-      case 'bank_transfer':
-        return '银行转账';
-      case 'cheque':
-        return '支票';
-      default:
-        return methodKey;
-    }
-  }
-
-  /// 35, 输出指定支付方式的费率信息
-  void logSpecificPaymentRate(PaymentMethod method) {
-    if (state.paymentConfig == null) {
-      debugPrint('💰 [PaymentProvider] 支付配置未加载，无法获取费率');
-      return;
-    }
-
-    final methodKey = _getPaymentMethodKey(method);
-    final rate = state.paymentConfig!.feeRates[methodKey] ?? 0.0;
-    final percentage = (rate * 100).toStringAsFixed(2);
-    final methodName = _getPaymentMethodName(method);
-    
-    debugPrint('💰 [PaymentProvider] 选择的支付方式: $methodName');
-    debugPrint('💰 [PaymentProvider] API返回的费率: $percentage% (原始值: $rate)');
-    
-    if (state.selectedBills.isNotEmpty) {
-      final billAmount = state.selectedBills.fold<double>(0.0, (sum, bill) => sum + bill.netAmount);
-      final totalAmount = state.paymentConfig!.getTotalAmount(state.selectedBills, method);
-      final fee = totalAmount - billAmount;
-      
-      debugPrint('💰 [PaymentProvider] 账单金额: HK\$${billAmount.toStringAsFixed(2)}');
-      debugPrint('💰 [PaymentProvider] 手续费: HK\$${fee.toStringAsFixed(2)}');
-      debugPrint('💰 [PaymentProvider] 总金额: HK\$${totalAmount.toStringAsFixed(2)}');
-    }
-  }
-
-  /// 36, 获取支付方式对应的key
-  String _getPaymentMethodKey(PaymentMethod method) {
-    switch (method) {
-      case PaymentMethod.wechat:
-        return 'wechat';
-      case PaymentMethod.alipay:
-        return 'alipay';
-      case PaymentMethod.unionpay:
-        return 'unionpay';
-      case PaymentMethod.card:
-        return 'card';
-      case PaymentMethod.cash:
-        return 'cash';
-      case PaymentMethod.bankTransfer:
-        return 'bank_transfer';
-      case PaymentMethod.cheque:
-        return 'cheque';
-    }
-  }
+  bool get hasNobills =>
+      state.selectedUnitId != null &&
+      !state.isLoadingBills &&
+      state.bills.isEmpty &&
+      state.errorMessage == null;
 
   /// 5, 創建微信支付（線上支付）
   Future<void> createWechatPayment({
     required List<PaymentBill> selectedBills,
     String? remark,
   }) async {
-    // 37, 输出微信支付费率
-    logSpecificPaymentRate(PaymentMethod.wechat);
-    
     await _createOnlinePayment(
       PaymentMethod.wechat,
       selectedBills,
@@ -565,9 +393,6 @@ class PaymentNotifier extends ChangeNotifier {
     required List<PaymentBill> selectedBills,
     String? remark,
   }) async {
-    // 38, 输出支付宝费率
-    logSpecificPaymentRate(PaymentMethod.alipay);
-    
     await _createOnlinePayment(
       PaymentMethod.alipay,
       selectedBills,
@@ -580,9 +405,6 @@ class PaymentNotifier extends ChangeNotifier {
     required List<PaymentBill> selectedBills,
     String? remark,
   }) async {
-    // 39, 输出云闪付费率
-    logSpecificPaymentRate(PaymentMethod.unionpay);
-    
     await _createOnlinePayment(
       PaymentMethod.unionpay,
       selectedBills,
@@ -596,31 +418,21 @@ class PaymentNotifier extends ChangeNotifier {
     List<PaymentBill> selectedBills,
     String? remark,
   ) async {
-    debugPrint('🚀 [PaymentProvider] _createOnlinePayment 開始');
-    debugPrint('📊 [PaymentProvider] 支付方式: $paymentMethod');
-    debugPrint('📄 [PaymentProvider] 選擇的帳單數量: ${selectedBills.length}');
-    
     if (state.selectedBuildingId == null || state.selectedUnitId == null) {
-      debugPrint('❌ [PaymentProvider] 缺少必要信息：buildingId=${state.selectedBuildingId}, unitId=${state.selectedUnitId}');
       _updateState(state.copyWith(errorMessage: '請先選擇大廈和單位'));
       return;
     }
 
     if (_apiClient == null) {
-      debugPrint('❌ [PaymentProvider] ApiClient 未初始化');
-      _logger.e('❌ [PaymentNotifier] ApiClient 未初始化');
+      _logger.e(' [PaymentNotifier] ApiClient 未初始化');
       return;
     }
 
     try {
-      debugPrint('🚀 [PaymentProvider] 開始支付流程，支付方式: $paymentMethod');
-      
       // 清除之前的轮询
       _paymentStatusTimer?.cancel();
       _paymentStatusTimer = null;
-      debugPrint('🔄 [PaymentProvider] 已清除之前的支付状态轮询');
-      
-      debugPrint('⏳ [PaymentProvider] 設置支付狀態為處理中...');
+
       _updateState(state.copyWith(
         status: PaymentStatus.processing,
         isLoading: true,
@@ -630,35 +442,24 @@ class PaymentNotifier extends ChangeNotifier {
 
       // 生成新的訂單號
       final orderNo = _generateOrderNo();
-      debugPrint('🎫 [PaymentProvider] 生成訂單號: $orderNo');
-      
+
       // 38, 計算總金額（使用新公式：總金額 = 賬單金額 ÷ (1 - 費率)）
-      final billAmount = selectedBills.fold<double>(
-          0.0, (sum, bill) => sum + bill.netAmount);
-      
+      final billAmount =
+          selectedBills.fold<double>(0.0, (sum, bill) => sum + bill.netAmount);
+
       // 使用新方法計算總金額（包含手續費，直接進位）
-      final totalAmount = state.paymentConfig?.getTotalAmount(
-          selectedBills, paymentMethod) ?? billAmount;
-      final handlingFee = totalAmount - billAmount;
+      final totalAmount =
+          state.paymentConfig?.getTotalAmount(selectedBills, paymentMethod) ??
+              billAmount;
 
       // 構建訂單描述
-      final subject = '物業管理費繳納';
-      final body = '${selectedBills.length}筆賬單，總金額：HK\$${totalAmount.toStringAsFixed(2)}';
-
-      debugPrint('💰 [PaymentProvider] 帳單金額: $billAmount');
-      debugPrint('💸 [PaymentProvider] 手續費: $handlingFee');
-      debugPrint('💵 [PaymentProvider] 總金額: $totalAmount');
-
-      _logger.i('🔥 [PaymentNotifier] 開始創建${_getPaymentMethodName(paymentMethod)}支付訂單');
-      _logger.i('📋 [PaymentNotifier] 訂單號: $orderNo');
-      _logger.i('💰 [PaymentNotifier] 總金額: $totalAmount');
+      const subject = '物業管理費繳納';
+      final body =
+          '${selectedBills.length}筆賬單，總金額：HK\$${totalAmount.toStringAsFixed(2)}';
 
       Map<String, dynamic> responseData;
 
-      debugPrint('🌐 [PaymentProvider] 調用支付API，方式: $paymentMethod');
-      
       if (paymentMethod == PaymentMethod.wechat) {
-        debugPrint('🔥 [PaymentProvider] 創建微信支付...');
         responseData = await _apiClient!.createWechatPayment(
           orderNo: orderNo,
           amount: totalAmount,
@@ -666,7 +467,6 @@ class PaymentNotifier extends ChangeNotifier {
           body: body,
         );
       } else if (paymentMethod == PaymentMethod.alipay) {
-        debugPrint('🔥 [PaymentProvider] 創建支付寶支付...');
         responseData = await _apiClient!.createAlipayPayment(
           orderNo: orderNo,
           amount: totalAmount,
@@ -674,7 +474,6 @@ class PaymentNotifier extends ChangeNotifier {
           body: body,
         );
       } else if (paymentMethod == PaymentMethod.unionpay) {
-        debugPrint('🔥 [PaymentProvider] 創建雲閃付支付...');
         responseData = await _apiClient!.createUnionpayPayment(
           orderNo: orderNo,
           amount: totalAmount,
@@ -685,11 +484,9 @@ class PaymentNotifier extends ChangeNotifier {
         throw Exception('不支持的支付方式: $paymentMethod');
       }
 
-      debugPrint('📦 [PaymentProvider] API返回數據: $responseData');
-      
-      final thirdPartyResponse = ThirdPartyPaymentResponse.fromJson(responseData);
-      debugPrint('📋 [PaymentProvider] 解析後的響應: state=${thirdPartyResponse.state}, QR碼長度=${thirdPartyResponse.qrCode?.length ?? 0}');
-      
+      final thirdPartyResponse =
+          ThirdPartyPaymentResponse.fromJson(responseData);
+
       // 36, 創建訂單時強制使用processing狀態，不管API返回什麼state
       // 只有輪詢查詢時才根據state判斷是否支付成功
       final paymentResponse = PaymentResponse(
@@ -701,7 +498,6 @@ class PaymentNotifier extends ChangeNotifier {
         completedAt: null, // 創建時不應該有完成時間
         errorMessage: thirdPartyResponse.errMsg,
       );
-      debugPrint('💳 [PaymentProvider] 轉換後的支付響應: status=processing, QR碼長度=${paymentResponse.qrCode?.length ?? 0}');
 
       _updateState(state.copyWith(
         isLoading: false,
@@ -710,16 +506,10 @@ class PaymentNotifier extends ChangeNotifier {
         selectedBills: selectedBills,
       ));
 
-      debugPrint('✅ [PaymentProvider] 支付狀態已更新，開始輪詢...');
-
       // 開始輪詢支付狀態
       _startNewPaymentStatusPolling(orderNo, paymentMethod);
-      
-      _logger.i('✅ [PaymentNotifier] ${_getPaymentMethodName(paymentMethod)}支付訂單創建成功');
     } catch (e) {
-      debugPrint('💥 [PaymentProvider] 支付創建失敗: $e');
-      debugPrint('📊 [PaymentProvider] 錯誤類型: ${e.runtimeType}');
-      _logger.e('❌ [PaymentProvider] 創建支付失敗: $e');
+      _logger.e(' [PaymentProvider] 創建支付失敗: $e');
       _updateState(state.copyWith(
         status: PaymentStatus.failed,
         isLoading: false,
@@ -728,45 +518,23 @@ class PaymentNotifier extends ChangeNotifier {
     }
   }
 
-  /// 30, 獲取支付方式名稱
-  String _getPaymentMethodName(PaymentMethod method) {
-    switch (method) {
-      case PaymentMethod.wechat:
-        return '微信';
-      case PaymentMethod.alipay:
-        return '支付寶';
-      case PaymentMethod.unionpay:
-        return '雲閃付';
-      default:
-        return '未知';
-    }
-  }
-
   /// 31, 生成訂單號
   String _generateOrderNo() {
     final timestamp = DateTime.now().millisecondsSinceEpoch;
     final random = Random().nextInt(999999).toString().padLeft(6, '0');
-    final orderNo = 'PAY$timestamp$random';
-    debugPrint('🎯 [PaymentProvider] 生成新訂單號: $orderNo');
-    return orderNo;
+    return 'PAY$timestamp$random';
   }
 
   /// 32, 新的輪詢支付狀態方法
   void _startNewPaymentStatusPolling(String orderNo, PaymentMethod method) {
-    String appId;
-    String appSecret;
-    String paymentMethodStr;  // 45, 添加支付方式字符串
+    String paymentMethodStr; // 45, 添加支付方式字符串
 
     switch (method) {
       case PaymentMethod.wechat:
       case PaymentMethod.alipay:
-        appId = PaymentApiConfig.qrCodeAppId;
-        appSecret = PaymentApiConfig.qrCodeAppSecret;
         paymentMethodStr = 'wechat_alipay';
         break;
       case PaymentMethod.unionpay:
-        appId = PaymentApiConfig.unionPayQrAppId;
-        appSecret = PaymentApiConfig.unionPayQrAppSecret;
         paymentMethodStr = 'unionpay';
         break;
       default:
@@ -780,15 +548,12 @@ class PaymentNotifier extends ChangeNotifier {
         try {
           final responseData = await _apiClient!.queryPaymentStatus(
             orderNo: orderNo,
-            paymentMethod: paymentMethodStr,  // 46, 傳遞支付方式參數
+            paymentMethod: paymentMethodStr, // 46, 傳遞支付方式參數
           );
 
-          final thirdPartyResponse = ThirdPartyPaymentResponse.fromJson(responseData);
-          
-          // 33, 記錄支付狀態信息便於調試
-          debugPrint('💳 [支付輪詢] 訂單號: $orderNo, state: ${thirdPartyResponse.state}');
-          debugPrint('💳 [支付輪詢] isSuccess: ${thirdPartyResponse.isSuccess}, isFailed: ${thirdPartyResponse.isFailed}, isProcessing: ${thirdPartyResponse.isProcessing}');
-          
+          final thirdPartyResponse =
+              ThirdPartyPaymentResponse.fromJson(responseData);
+
           // 34, 只有在確實支付成功時才更新為成功狀態（state=2表示支付成功）
           // 根據第三方支付接口：state=0:訂單生成, state=1:支付中, state=2:支付成功, state=3:支付失敗
           if (thirdPartyResponse.state == 2) {
@@ -798,14 +563,8 @@ class PaymentNotifier extends ChangeNotifier {
               status: PaymentStatus.success,
               paymentResponse: paymentResponse,
             ));
-            _logger.i('✅ [PaymentNotifier] 支付成功，state=2');
-            
-            // 47, 输出后端返回的完整支付数据
-            _logPaymentSuccessData(responseData);
-            
             // 保存支付記錄
             await _savePaymentRecord(paymentResponse);
-            
           } else if (thirdPartyResponse.isFailed) {
             timer.cancel();
             final paymentResponse = thirdPartyResponse.toPaymentResponse();
@@ -814,14 +573,10 @@ class PaymentNotifier extends ChangeNotifier {
               paymentResponse: paymentResponse,
               errorMessage: '支付失敗：${thirdPartyResponse.errMsg}',
             ));
-            _logger.e('❌ [PaymentNotifier] 支付失敗: ${thirdPartyResponse.errMsg}');
-          } else {
-            // 35, 仍在處理中或待支付狀態，繼續輪詢
-            debugPrint('⏳ [支付輪詢] 訂單處理中，繼續輪詢...');
+            _logger.e(' [PaymentNotifier] 支付失敗: ${thirdPartyResponse.errMsg}');
           }
-          
         } catch (e) {
-          _logger.e('❌ [PaymentNotifier] 查詢支付狀態失敗: $e');
+          _logger.e(' [PaymentNotifier] 查詢支付狀態失敗: $e');
         }
       },
     );
@@ -838,94 +593,10 @@ class PaymentNotifier extends ChangeNotifier {
     });
   }
 
-  /// 8, 開始輪詢支付狀態（保持舊接口兼容性）
-  void _startPaymentStatusPolling(String paymentId) {
-    _stopPaymentStatusPolling();
-
-    _pollingTimer = Timer.periodic(const Duration(seconds: 3), (timer) async {
-      await _checkPaymentStatus(paymentId);
-    });
-  }
-
-  /// 47, 输出支付成功后后端返回的完整数据
-  void _logPaymentSuccessData(Map<String, dynamic> responseData) {
-    debugPrint('');
-    debugPrint('💰💰💰 ===== 支付成功！后端返回数据 ===== 💰💰💰');
-    debugPrint('');
-    
-    // 按字母顺序排序并输出所有字段
-    final sortedKeys = responseData.keys.toList()..sort();
-    for (final key in sortedKeys) {
-      final value = responseData[key];
-      debugPrint('$key: $value');
-    }
-    
-    debugPrint('');
-    debugPrint('💰💰💰 ===== 支付数据输出完毕 ===== 💰💰💰');
-    debugPrint('');
-  }
-
   /// 9, 停止輪詢支付狀態
   void _stopPaymentStatusPolling() {
-    _pollingTimer?.cancel();
-    _pollingTimer = null;
     _paymentStatusTimer?.cancel();
     _paymentStatusTimer = null;
-  }
-
-  /// 10, 檢查支付狀態
-  Future<void> _checkPaymentStatus(String paymentId) async {
-    try {
-      final response =
-          await _paymentClient.queryPaymentStatus(paymentId: paymentId);
-      final status = PaymentStatus.values.firstWhere(
-        (s) => s.name == response['status'],
-        orElse: () => PaymentStatus.pending,
-      );
-
-      final updatedResponse = state.paymentResponse?.copyWith(
-        status: status,
-        completedAt: status == PaymentStatus.success ? DateTime.now() : null,
-      );
-
-      _updateState(state.copyWith(
-        status: status,
-        paymentResponse: updatedResponse,
-      ));
-
-      if (status == PaymentStatus.success || status == PaymentStatus.failed) {
-        _stopPaymentStatusPolling();
-
-        if (status == PaymentStatus.success) {
-          await _handlePaymentSuccess();
-          // 保存支付記錄
-          if (updatedResponse != null) {
-            await _savePaymentRecord(updatedResponse);
-          }
-        }
-      }
-    } catch (e) {
-      _logger.e('❌ [PaymentProvider] 檢查支付狀態失敗: $e');
-    }
-  }
-
-  /// 11, 處理支付成功
-  Future<void> _handlePaymentSuccess() async {
-    // 創建小票數據
-    if (state.paymentResponse != null && state.selectedBills.isNotEmpty) {
-      final receiptData = _paymentClient.createReceiptData(
-        paymentId: state.paymentResponse!.paymentId,
-        buildingName: _getBuildingName(),
-        unitName: _getUnitName(),
-        paymentMethod: _getPaymentMethodDisplayName(),
-        totalAmount: _calculateTotalAmount(),
-        bills: state.selectedBills.map((b) => b.toJson()).toList(),
-        paymentTime: DateTime.now(),
-        transactionId: state.paymentResponse!.transactionId,
-      );
-
-      _updateState(state.copyWith(receiptData: receiptData));
-    }
   }
 
   /// 12, 取消支付
@@ -940,7 +611,6 @@ class PaymentNotifier extends ChangeNotifier {
       isLoading: false,
       selectedBills: [], // 清空已選賬單，讓用戶重新選擇
     ));
-    debugPrint('🔄 [PaymentProvider] 取消支付，已清除二維碼和支付狀態');
   }
 
   /// 13, 重置支付狀態（完全重置，慎用）
@@ -966,23 +636,16 @@ class PaymentNotifier extends ChangeNotifier {
       bills: [],
       receiptData: null,
     ));
-    debugPrint('🔄 [PaymentProvider] 支付完成重置，保留大廈配置，清除選擇狀態');
   }
 
   /// 44, 清除支付響應（保持處理狀態但移除二維碼）
   void clearPaymentResponse() {
-    debugPrint('[PaymentProvider] 🔄 開始清除支付響應...');
-    debugPrint('[PaymentProvider] 📱 清除前狀態: ${state.status}, hasQrCode: ${state.paymentResponse?.qrCode != null}');
-    
     _state = state.copyWith(
       status: PaymentStatus.processing, // 明確保持processing狀態
       clearPaymentResponse: true, // 使用標志明確清除paymentResponse
       isLoading: true,
     );
     notifyListeners();
-    
-    debugPrint('[PaymentProvider] ✅ 清除後狀態: ${state.status}, hasQrCode: ${state.paymentResponse?.qrCode != null}');
-    debugPrint('[PaymentProvider] 🔄 已清除支付響應，等待新二維碼');
   }
 
   /// 14, 獲取大廈名稱
@@ -1007,18 +670,6 @@ class PaymentNotifier extends ChangeNotifier {
       ),
     );
     return '${unit.blockName}${unit.floorName}${unit.unitName}';
-  }
-
-  /// 16, 獲取支付方式顯示名稱
-  String _getPaymentMethodDisplayName() {
-    if (state.paymentResponse == null) return '';
-
-    switch (state.paymentResponse!.status) {
-      case PaymentStatus.success:
-        return state.selectedBills.isNotEmpty ? '微信支付' : '支付寶';
-      default:
-        return '';
-    }
   }
 
   /// 17, 計算總金額
@@ -1109,7 +760,9 @@ class PaymentState {
       selectedBuildingId: selectedBuildingId ?? this.selectedBuildingId,
       selectedUnitId: selectedUnitId ?? this.selectedUnitId,
       // 如果clearPaymentResponse为true，则设置为null；否则使用传入值或保留旧值
-      paymentResponse: clearPaymentResponse ? null : (paymentResponse ?? this.paymentResponse),
+      paymentResponse: clearPaymentResponse
+          ? null
+          : (paymentResponse ?? this.paymentResponse),
       paymentConfig: paymentConfig ?? this.paymentConfig,
       receiptData: receiptData ?? this.receiptData,
     );
