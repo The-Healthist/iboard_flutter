@@ -42,7 +42,6 @@ class RthkNewsProvider extends ChangeNotifier {
   bool get isScrollingPaused => _isScrollingPaused;
 
   RthkNewsProvider(this._apiClient) {
-    _logger.i(' RthkNewsProvider 初始化完成');
     _initializeData();
     _startUpdateTimer();
   }
@@ -60,34 +59,28 @@ class RthkNewsProvider extends ChangeNotifier {
       // 加载新闻列表
       final newsJson = prefs.getString(_storageKey);
       if (newsJson != null) {
-        final List<dynamic> newsData = json.decode(newsJson);
-        _newsList =
-            newsData.map((item) => RthkNewsModel.fromJson(item)).toList();
+        final decoded = json.decode(newsJson);
+        if (decoded is List) {
+          _newsList = decoded
+              .whereType<Map>()
+              .map((item) => RthkNewsModel.fromJson(_parseMap(item)))
+              .toList();
+        } else {
+          _newsList = [];
+        }
 
         // 过滤掉网络错误提示数据和模拟数据
-        final originalCount = _newsList.length;
         _newsList = _newsList
             .where((news) =>
                 !news.guid.startsWith('network_error_') &&
                 !news.guid.startsWith('mock_news_'))
             .toList();
-
-        if (_newsList.length < originalCount) {
-          _logger.w(' 已过滤掉 ${originalCount - _newsList.length} 条测试/错误数据');
-        }
-
-        _logger.i(' 从本地存储加载了 ${_newsList.length} 条新闻');
-      } else {
-        _logger.i(' 本地存储中没有新闻数据');
       }
 
       // 加载最后更新时间
       final lastUpdateStr = prefs.getString(_lastUpdateKey);
       if (lastUpdateStr != null) {
         _lastUpdateTime = DateTime.tryParse(lastUpdateStr);
-        _logger.i(' 最后更新时间: $_lastUpdateTime');
-      } else {
-        _logger.i(' 本地存储中没有最后更新时间记录');
       }
 
       notifyListeners();
@@ -114,8 +107,6 @@ class RthkNewsProvider extends ChangeNotifier {
         await prefs.setString(
             _lastUpdateKey, _lastUpdateTime!.toIso8601String());
       }
-
-      _logger.i(' 新闻数据已保存到本地存储');
     } catch (e) {
       _logger.e(' 保存到本地存储失败: $e');
     }
@@ -129,8 +120,6 @@ class RthkNewsProvider extends ChangeNotifier {
     _updateTimer = Timer.periodic(const Duration(minutes: 30), (timer) {
       _checkAndUpdate();
     });
-
-    _logger.i(' RTHK新闻更新定时器已启动，更新间隔: 30分鈡');
   }
 
   ///5, 检查并执行更新
@@ -142,8 +131,6 @@ class RthkNewsProvider extends ChangeNotifier {
       }
     }
 
-    _logger.i(' 执行定时新闻更新');
-
     // 记录更新前的新闻数量，用于判断是否成功
     final newsCountBeforeUpdate = _newsList.length;
 
@@ -151,11 +138,9 @@ class RthkNewsProvider extends ChangeNotifier {
       await fetchRthkNews();
 
       // 检查更新是否成功（新闻数量是否有变化）
-      if (_newsList.length != newsCountBeforeUpdate) {
-        _logger
-            .i(' 定时更新成功，新闻数量从 $newsCountBeforeUpdate 更新为 ${_newsList.length}');
-      } else {
-        _logger.i('ℹ 定时更新完成，新闻数量未变化（${_newsList.length}）');
+      final didUpdate = _newsList.length != newsCountBeforeUpdate;
+      if (!didUpdate && _newsList.isEmpty) {
+        _logger.w(' 定时更新完成但仍无新闻数据');
       }
     } catch (e) {
       _logger.e(' 定时更新失败: $e');
@@ -169,13 +154,11 @@ class RthkNewsProvider extends ChangeNotifier {
     if (!forceUpdate && _lastUpdateTime != null) {
       final timeSinceLastUpdate = DateTime.now().difference(_lastUpdateTime!);
       if (timeSinceLastUpdate < _updateInterval) {
-        _logger.i(' 距离上次更新不足30分鈡，跳过更新');
         return;
       }
     }
 
     if (_isLoading) {
-      _logger.i(' 新闻更新已在进行中，跳过重复请求');
       return;
     }
 
@@ -185,10 +168,7 @@ class RthkNewsProvider extends ChangeNotifier {
     notifyListeners();
 
     try {
-      _logger.i(' 开始获取RTHK新闻数据');
-
       final List<Map<String, dynamic>> rawNews = await _apiClient.getRthkNews();
-      _logger.i(' 从API获取到 ${rawNews.length} 条原始新闻数据');
 
       if (rawNews.isNotEmpty) {
         // 转换为模型对象
@@ -197,8 +177,6 @@ class RthkNewsProvider extends ChangeNotifier {
             .where((news) => news.title.isNotEmpty) // 过滤掉无效的新闻
             .toList();
 
-        _logger.i(' 转换后得到 ${newNewsList.length} 条有效新闻');
-
         // 按发布时间排序（最新的在前）
         newNewsList.sort((a, b) => b.pubDate.compareTo(a.pubDate));
 
@@ -206,7 +184,6 @@ class RthkNewsProvider extends ChangeNotifier {
           // 只有成功获取到有效数据时才更新
           _newsList = newNewsList;
           _lastUpdateTime = DateTime.now();
-          _logger.i(' 成功获取 ${_newsList.length} 条RTHK新闻');
 
           // 保存到本地存储
           await _saveToLocalStorage();
@@ -229,7 +206,6 @@ class RthkNewsProvider extends ChangeNotifier {
         _logger.e(' 获取RTHK新闻失败且无缓存可用: $e');
 
         // 只有在缓存为空时才显示网络错误提示
-        _logger.i(' 缓存为空，显示网络错误提示');
         _useNetworkErrorPrompt();
 
         // 网络错误提示也要保存到本地存储
@@ -243,7 +219,6 @@ class RthkNewsProvider extends ChangeNotifier {
 
         // 缓存中有数据，继续使用缓存数据，不清理或更新
         _logger.w(' RTHK新闻API暂不可用，继续使用 ${_newsList.length} 条缓存新闻: $e');
-        _logger.i(' 最后更新时间: $_lastUpdateTime');
 
         // 不更新数据，保持原有缓存数据
         // 不调用notifyListeners()，避免UI刷新
@@ -269,13 +244,11 @@ class RthkNewsProvider extends ChangeNotifier {
     ];
 
     _lastUpdateTime = now;
-    _logger.i(' 网络連接失败，显示错误提示信息');
     _logger.w(' 注意：显示网络連接失败提示，而不是模拟数据');
   }
 
   ///7, 手动刷新新闻
   Future<void> refreshNews() async {
-    _logger.i(' 手动刷新新闻数据');
     await fetchRthkNews(forceUpdate: true);
   }
 
@@ -287,7 +260,6 @@ class RthkNewsProvider extends ChangeNotifier {
     _errorMessage = '';
     _saveToLocalStorage();
     notifyListeners();
-    _logger.i(' 新闻数据已清空');
   }
 
   ///8.1, 获取当前数据状态信息
@@ -319,7 +291,6 @@ class RthkNewsProvider extends ChangeNotifier {
   void pauseScrolling() {
     if (!_isScrollingPaused) {
       _isScrollingPaused = true;
-      _logger.i(' RTHK新闻跑马灯已暂停');
       notifyListeners();
     }
   }
@@ -328,7 +299,6 @@ class RthkNewsProvider extends ChangeNotifier {
   void resumeScrolling() {
     if (_isScrollingPaused) {
       _isScrollingPaused = false;
-      _logger.i('▶ RTHK新闻跑马灯已恢复');
       notifyListeners();
     }
   }
@@ -338,4 +308,18 @@ class RthkNewsProvider extends ChangeNotifier {
     _updateTimer?.cancel();
     super.dispose();
   }
+}
+
+Map<String, dynamic> _parseMap(Object? value) {
+  return _nullableMap(value) ?? const {};
+}
+
+Map<String, dynamic>? _nullableMap(Object? value) {
+  if (value is Map<String, dynamic>) {
+    return value;
+  }
+  if (value is Map) {
+    return value.map((key, value) => MapEntry(key.toString(), value));
+  }
+  return null;
 }
