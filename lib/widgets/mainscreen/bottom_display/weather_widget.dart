@@ -35,6 +35,16 @@ class WeatherWidgetState extends State<WeatherWidget> {
   Timer? _timeUpdateTimer;
   DateTime _currentTime = DateTime.now();
 
+  static const double _dateFontSize = 13.0;
+  static const double _timeFontSize = 24.0;
+  static const double _placeFontSize = 19.0;
+  static const double _temperatureFontSize = 22.0;
+  static const double _warningTextFontSize = 17.0;
+  static const double _forecastHeaderFontSize = 13.0;
+  static const double _forecastDateFontSize = 18.0;
+  static const double _forecastTempFontSize = 17.0;
+  static const double _forecastIconSize = 44.0;
+
   // 日志缓存，避免重复日志输出
   String? _lastLoggedLocation;
   DateTime? _lastLogTime;
@@ -152,6 +162,21 @@ class WeatherWidgetState extends State<WeatherWidget> {
     }
   }
 
+  Widget _singleLineText(
+    String text, {
+    required TextStyle style,
+    TextAlign textAlign = TextAlign.center,
+  }) {
+    return Text(
+      text,
+      style: style,
+      textAlign: textAlign,
+      maxLines: 1,
+      overflow: TextOverflow.ellipsis,
+      softWrap: false,
+    );
+  }
+
   ///6，判断是否应该跳过显示某个警告信号
   bool _shouldSkipWarning(String warningCode) {
     // 不显示的警告信号列表
@@ -235,7 +260,7 @@ class WeatherWidgetState extends State<WeatherWidget> {
         width: iconSize,
         height: iconSize,
         errorBuilder: (context, error, stackTrace) {
-          return Icon(
+          return const Icon(
             Icons.warning,
             size: iconSize,
             color: Colors.orange,
@@ -250,20 +275,19 @@ class WeatherWidgetState extends State<WeatherWidget> {
     //  使用新的映射系统获取警告描述
     final warningDescription = WeatherWarningMapping.getWarningDescription(
         warningKey, warningInfo.code, warningInfo.type);
-    const double fontSize = 14.0; // 稍微缩小字体
-
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 1.0),
-      child: Text(
-        warningDescription,
-        style: const TextStyle(
-          fontSize: fontSize,
-          fontWeight: FontWeight.bold,
-          color: Color.fromARGB(255, 8, 12, 133),
+    return SizedBox(
+      width: double.infinity,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 1.0, horizontal: 6.0),
+        child: _singleLineText(
+          warningDescription,
+          style: const TextStyle(
+            fontSize: _warningTextFontSize,
+            fontWeight: FontWeight.bold,
+            color: Color.fromARGB(255, 8, 12, 133),
+          ),
+          textAlign: TextAlign.center,
         ),
-        textAlign: TextAlign.center,
-        overflow: TextOverflow.visible,
-        softWrap: true,
       ),
     );
   }
@@ -322,10 +346,11 @@ class WeatherWidgetState extends State<WeatherWidget> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Padding(
-            padding: const EdgeInsets.only(left: 4.0, top: 2.0, bottom: 4.0),
-            child: Text(
+            padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 3.0),
+            child: _singleLineText(
               '$formattedDate ($formattedWeekday)',
-              style: TextStyle(fontSize: 10, color: Colors.blueGrey[600]),
+              style: TextStyle(
+                  fontSize: _dateFontSize, color: Colors.blueGrey[600]),
               textAlign: TextAlign.left,
             ),
           ),
@@ -335,10 +360,10 @@ class WeatherWidgetState extends State<WeatherWidget> {
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.center,
                 children: [
-                  Text(
+                  _singleLineText(
                     DateFormat('HH:mm').format(_currentTime),
                     style: TextStyle(
-                      fontSize: 18,
+                      fontSize: _timeFontSize,
                       fontWeight: FontWeight.bold,
                       color: Colors.blueGrey[800],
                     ),
@@ -351,10 +376,10 @@ class WeatherWidgetState extends State<WeatherWidget> {
                       if (buildingName != null && buildingName.isNotEmpty) {
                         return Column(
                           children: [
-                            Text(
+                            _singleLineText(
                               buildingName,
                               style: TextStyle(
-                                  fontSize: 15,
+                                  fontSize: _placeFontSize,
                                   fontWeight: FontWeight.bold,
                                   color: Colors.blueGrey[800]),
                               textAlign: TextAlign.center,
@@ -366,14 +391,14 @@ class WeatherWidgetState extends State<WeatherWidget> {
                       return const SizedBox.shrink();
                     },
                   ),
-                  Text(
+                  _singleLineText(
                     _currentWeatherLocation != '香港天文台'
                         ? _currentWeatherLocation
                         : (tempLocationData != null
                             ? tempLocationData.place
                             : '即時天氣'),
                     style: TextStyle(
-                        fontSize: 15,
+                        fontSize: _placeFontSize,
                         fontWeight: FontWeight.bold,
                         color: Colors.blueGrey[800]),
                     textAlign: TextAlign.center,
@@ -388,12 +413,12 @@ class WeatherWidgetState extends State<WeatherWidget> {
                   if (currentIcon == null && tempLocationData == null)
                     const SizedBox(height: 45),
                   const SizedBox(height: 6),
-                  Text(
+                  _singleLineText(
                     tempLocationData != null
                         ? '${tempLocationData.value}°${tempLocationData.unit}'
                         : '--°C',
                     style: TextStyle(
-                        fontSize: 16,
+                        fontSize: _temperatureFontSize,
                         fontWeight: FontWeight.bold,
                         color: Colors.blue[800]),
                   ),
@@ -440,10 +465,11 @@ class WeatherWidgetState extends State<WeatherWidget> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Padding(
-            padding: const EdgeInsets.only(left: 4.0, top: 2.0, bottom: 4.0),
-            child: Text(
+            padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 3.0),
+            child: _singleLineText(
               '$formattedDate ($formattedWeekday)',
-              style: TextStyle(fontSize: 10, color: Colors.blueGrey[600]),
+              style: TextStyle(
+                  fontSize: _dateFontSize, color: Colors.blueGrey[600]),
               textAlign: TextAlign.left,
             ),
           ),
@@ -471,10 +497,10 @@ class WeatherWidgetState extends State<WeatherWidget> {
                   ),
                   // 温度信息 - 放在最下方，直接显示数值
                   if (tempLocationData != null) ...[
-                    Text(
+                    _singleLineText(
                       '${tempLocationData.value}°${tempLocationData.unit}',
                       style: TextStyle(
-                        fontSize: 16,
+                        fontSize: _temperatureFontSize,
                         fontWeight: FontWeight.bold,
                         color: Colors.blue[800],
                       ),
@@ -515,10 +541,10 @@ class WeatherWidgetState extends State<WeatherWidget> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Text(
+            _singleLineText(
               DateFormat('HH:mm').format(_currentTime),
               style: TextStyle(
-                fontSize: 16,
+                fontSize: _timeFontSize,
                 fontWeight: FontWeight.bold,
                 color: Colors.blueGrey[800],
               ),
@@ -535,8 +561,8 @@ class WeatherWidgetState extends State<WeatherWidget> {
                         ? Colors.orange
                         : Colors.grey),
             const SizedBox(height: 8),
-            Text(errorText,
-                style: const TextStyle(fontSize: 12, color: Colors.grey)),
+            _singleLineText(errorText,
+                style: const TextStyle(fontSize: 15, color: Colors.grey)),
             if (hasError && weatherProvider.currentError!.contains('解析错误')) ...[
               const SizedBox(height: 4),
               const Text('請檢查網絡連接或稍後重試',
@@ -606,7 +632,7 @@ class WeatherWidgetState extends State<WeatherWidget> {
             const Icon(Icons.cloud_off, size: 40, color: Colors.grey),
             const SizedBox(height: 8),
             const Text('天氣預報暫時無法取得',
-                style: TextStyle(fontSize: 12, color: Colors.grey)),
+                style: TextStyle(fontSize: 15, color: Colors.grey)),
             const SizedBox(height: 8),
             ElevatedButton.icon(
               onPressed: () => weatherProvider.fetchWeatherForecast(),
@@ -637,7 +663,11 @@ class WeatherWidgetState extends State<WeatherWidget> {
           padding: const EdgeInsets.only(left: 4.0, bottom: 0.0, top: 2.0),
           child: Text(
             '未來六天 (更新於: ${DateFormat('HH:mm').format(DateTime.parse(forecastData.updateTime))})',
-            style: TextStyle(fontSize: 10, color: Colors.grey[700]),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            softWrap: false,
+            style: TextStyle(
+                fontSize: _forecastHeaderFontSize, color: Colors.grey[700]),
           ),
         ),
         Expanded(
@@ -663,40 +693,45 @@ class WeatherWidgetState extends State<WeatherWidget> {
                     margin: const EdgeInsets.symmetric(
                         horizontal: 3.0, vertical: 3.0),
                     child: Padding(
-                      padding: const EdgeInsets.all(8.0),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 5.0, vertical: 6.0),
                       child: Column(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          Text(
+                          _singleLineText(
                             _formatDate(forecast.forecastDate),
                             style: const TextStyle(
-                                fontWeight: FontWeight.bold, fontSize: 14),
+                                fontWeight: FontWeight.bold,
+                                fontSize: _forecastDateFontSize),
                             textAlign: TextAlign.center,
                           ),
-                          Text(
+                          _singleLineText(
                             '星期${forecast.week.substring(2)}',
                             style: const TextStyle(
-                                fontWeight: FontWeight.bold, fontSize: 14),
+                                fontWeight: FontWeight.bold,
+                                fontSize: _forecastDateFontSize),
                             textAlign: TextAlign.center,
                           ),
                           const SizedBox(height: 3),
                           CachedNetworkImage(
                             imageUrl: _getWeatherIconUrl(forecast.forecastIcon),
-                            width: 38,
-                            height: 38,
+                            width: _forecastIconSize,
+                            height: _forecastIconSize,
                             placeholder: (context, url) => const SizedBox(
                                 width: 18,
                                 height: 18,
                                 child: CircularProgressIndicator(
                                     strokeWidth: 1.5)),
-                            errorWidget: (context, url, error) =>
-                                const Icon(Icons.cloud_off, size: 35),
+                            errorWidget: (context, url, error) => const Icon(
+                                Icons.cloud_off,
+                                size: _forecastIconSize),
                           ),
                           const SizedBox(height: 3),
-                          Text(
+                          _singleLineText(
                             '${forecast.forecastMintemp.value}°${forecast.forecastMintemp.unit} - ${forecast.forecastMaxtemp.value}°${forecast.forecastMaxtemp.unit}',
                             style: const TextStyle(
-                                fontWeight: FontWeight.bold, fontSize: 12),
+                                fontWeight: FontWeight.bold,
+                                fontSize: _forecastTempFontSize),
                             textAlign: TextAlign.center,
                           ),
                         ],

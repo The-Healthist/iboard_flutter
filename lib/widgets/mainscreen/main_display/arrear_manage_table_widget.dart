@@ -41,7 +41,7 @@ class ArrearManagementTableWidgetState
             width: 40,
             height: 40,
             decoration: BoxDecoration(
-              color: Colors.black.withOpacity(0.6),
+              color: Colors.black.withValues(alpha: 0.6),
               shape: BoxShape.circle,
             ),
             alignment: Alignment.center,
@@ -188,7 +188,7 @@ class ArrearManagementTableWidgetState
         borderRadius: BorderRadius.circular(12),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.06),
+            color: Colors.black.withValues(alpha: 0.06),
             blurRadius: 8,
             offset: const Offset(0, 2),
           ),
@@ -271,8 +271,9 @@ class ArrearManagementTableWidgetState
                         '單位',
                         style: TextStyle(
                           color: Colors.white,
-                          fontWeight: FontWeight.w600,
-                          fontSize: 14,
+                          fontWeight: FontWeight.w800,
+                          fontSize: 16,
+                          height: 1.05,
                         ),
                         textAlign: TextAlign.left,
                       ),
@@ -286,8 +287,9 @@ class ArrearManagementTableWidgetState
                             header,
                             style: const TextStyle(
                               color: Colors.white,
-                              fontWeight: FontWeight.w600,
-                              fontSize: 14,
+                              fontWeight: FontWeight.w800,
+                              fontSize: 16,
+                              height: 1.05,
                             ),
                             textAlign: TextAlign.left,
                           ),
@@ -315,9 +317,10 @@ class ArrearManagementTableWidgetState
                           child: Text(
                             record['單位']?.toString() ?? '-',
                             style: const TextStyle(
-                              fontWeight: FontWeight.w500,
+                              fontWeight: FontWeight.w800,
                               color: Colors.black87,
-                              fontSize: 13,
+                              fontSize: 15,
+                              height: 1.05,
                             ),
                           ),
                         ),
@@ -378,10 +381,10 @@ class ArrearManagementTableWidgetState
       String blockName, String floorName, String unitName) {
     if (blockName.isEmpty) {
       // 如果樓座名称为空，显示：XX 樓XX室
-      return '${floorName}樓${unitName}室';
+      return '$floorName樓$unitName室';
     } else {
       // 显示樓座+樓层+單元，例如：01座01樓A室
-      return '${blockName}座${floorName}樓${unitName}室';
+      return '$blockName座$floorName樓$unitName室';
     }
   }
 
@@ -397,8 +400,9 @@ class ArrearManagementTableWidgetState
       child: Text(
         _getStatusText(value),
         style: TextStyle(
-          fontSize: 11, // 減少字體大小
-          fontWeight: FontWeight.w500,
+          fontSize: 14,
+          fontWeight: FontWeight.w800,
+          height: 1.05,
           color: _getStatusTextColor(value),
         ),
         textAlign: TextAlign.center,
@@ -492,7 +496,7 @@ class ArrearManagementTableWidgetState
             style: ElevatedButton.styleFrom(
               backgroundColor: _currentPage > 1
                   ? Theme.of(context).primaryColor
-                  : Theme.of(context).primaryColor.withOpacity(0.12),
+                  : Theme.of(context).primaryColor.withValues(alpha: 0.12),
               foregroundColor: _currentPage > 1
                   ? Colors.white
                   : Theme.of(context).primaryColor,
@@ -531,7 +535,7 @@ class ArrearManagementTableWidgetState
             style: ElevatedButton.styleFrom(
               backgroundColor: _currentPage < totalPages
                   ? Theme.of(context).primaryColor
-                  : Theme.of(context).primaryColor.withOpacity(0.12),
+                  : Theme.of(context).primaryColor.withValues(alpha: 0.12),
               foregroundColor: _currentPage < totalPages
                   ? Colors.white
                   : Theme.of(context).primaryColor,

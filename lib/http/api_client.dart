@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'package:http/http.dart' as http;
+import 'package:iboard_app/http/payment_gateway.dart';
 import 'package:logger/logger.dart';
 import 'package:crypto/crypto.dart';
 
@@ -56,7 +57,7 @@ class ApiException implements Exception {
   }
 }
 
-class ApiClient {
+class ApiClient implements PaymentGateway {
   final String _baseUrl;
   String? _token;
   final Logger _logger = Logger();
@@ -254,61 +255,8 @@ class ApiClient {
     bool isLoginRequest = false,
     bool isHealthTestRequest = false,
   }) async {
-    // 區塊 1: 預檢健康檢查 (如果適用)
-    if (!isLoginRequest &&
-        !isHealthTestRequest &&
-        _token != null &&
-        _token!.isNotEmpty) {
-      try {
-        // healthTest() 本身會呼叫 _sendRequest 並將 isHealthTestRequest 設為 true
-        await healthTest();
-      } on ApiException catch (e) {
-        if (e.statusCode == 401) {
-          _logger.w('為 $apiNameForLog 進行的預檢健康檢查因 401 失敗。嘗試刷新令牌。');
-          if (onNeedsTokenRefresh == null) {
-            _logger.w('onNeedsTokenRefresh 為空，無法刷新令牌。重新拋出健康檢查的 401 錯誤。');
-            rethrow;
-          }
-
-          try {
-            final newToken = await _initiateAndGetTokenRefreshFuture();
-            if (newToken != null && newToken.isNotEmpty) {
-              // 令牌透過 $apiNameForLog 的健康檢查成功刷新。主請求將繼續。
-              // 可選：重新運行 healthTest 以確認，但會增加延遲。
-              // await healthTest();
-            } else {
-              _logger.w(
-                  '為 $apiNameForLog 進行的 401 健康檢查後，令牌刷新未產生新令牌。重新拋出原始的 401 錯誤。');
-              throw ApiException(
-                  statusCode: e.statusCode,
-                  message: '健康檢查 401 後刷新令牌失敗 (無新令牌)。',
-                  errorData: e.errorData);
-            }
-          } catch (refreshError) {
-            _logger.e('為 $apiNameForLog 處理 401 健康檢查後等待令牌刷新時出錯。',
-                error: refreshError);
-            throw ApiException(
-                statusCode: e.statusCode,
-                message: '健康檢查 401 後令牌刷新過程失敗: $refreshError',
-                errorData: e.errorData);
-          }
-        } else {
-          // 來自健康檢查的非 401 ApiException
-          // 對於 500 錯誤等服務器端問題，我們將允許主請求繼續，而不是完全失敗。
-          // 這可以防止服務器問題阻止所有請求。
-          _logger.w(
-              '為 $apiNameForLog 進行的預檢健康檢查因非 401 ApiException 失敗 (狀態: ${e.statusCode})。允許主請求繼續。錯誤: ${e.message}');
-          // 對於非 401 錯誤，不拋出，讓主請求繼續
-        }
-      } catch (otherError) {
-        // 捕獲來自 healthTest() 的其他非 ApiException 錯誤
-        // 對於意外錯誤，我們也將允許主請求繼續
-        _logger.w('為 $apiNameForLog 進行的預檢健康檢查因意外錯誤失敗。允許主請求繼續。錯誤: $otherError');
-        // 對於意外錯誤，不拋出，讓主請求繼續
-      }
-    }
-
-    // 區塊 2: 執行帶有超時和重試的主請求
+    // 執行帶有超時和重試的主請求。避免每個 API 前都做 healthTest；
+    // 只有真實請求返回 401 時才刷新 token 並重試一次。
     http.Response? response;
     Exception? lastException;
 
@@ -375,8 +323,8 @@ class ApiClient {
       throw lastException ?? Exception('請求失敗，未知錯誤 - $apiNameForLog');
     }
 
-    // 區塊 3: 處理主請求的 401 (重試邏輯)
-    if (response.statusCode == 401 && !isLoginRequest) {
+    // 處理主請求的 401。healthTest 自身不在這裡刷新，避免健康檢查遞歸。
+    if (response.statusCode == 401 && !isLoginRequest && !isHealthTestRequest) {
       _logger.w('為實際請求 $apiNameForLog 收到 401。嘗試刷新令牌。');
       if (onNeedsTokenRefresh == null) {
         _logger.w(
@@ -991,6 +939,7 @@ class ApiClient {
   static final Set<String> _processingOrders = <String>{};
 
   /// 22, 創建微信支付訂單 - 完全按照Python代碼實現
+  @override
   Future<Map<String, dynamic>> createWechatPayment({
     required String orderNo,
     required double amount,
@@ -1118,6 +1067,7 @@ class ApiClient {
 
   /// 23, 創建支付寶支付訂單
   /// 23, 創建支付寶支付訂單
+  @override
   Future<Map<String, dynamic>> createAlipayPayment({
     required String orderNo,
     required double amount,
@@ -1191,6 +1141,7 @@ class ApiClient {
   }
 
   /// 24, 創建銀聯支付訂單
+  @override
   Future<Map<String, dynamic>> createUnionpayPayment({
     required String orderNo,
     required double amount,
@@ -1264,6 +1215,7 @@ class ApiClient {
   }
 
   /// 25, 查詢支付狀態
+  @override
   Future<Map<String, dynamic>> queryPaymentStatus({
     required String orderNo,
     String? paymentMethod, // 添加支付方式參數

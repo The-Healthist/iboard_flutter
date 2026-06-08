@@ -6,10 +6,45 @@ import 'package:iboard_app/providers/payment_provider.dart';
 import 'package:iboard_app/providers/app_data_provider.dart';
 import 'package:iboard_app/models/payment_model.dart';
 
+enum PaymentWidgetViewMode {
+  initializing,
+  unavailable,
+  selectorWithUnavailablePayment,
+  active,
+}
+
+const TextStyle _billTableHeaderTextStyle = TextStyle(
+  fontSize: 16,
+  fontWeight: FontWeight.w800,
+  height: 1.15,
+  color: Colors.black87,
+);
+
+const TextStyle _billTableCellTextStyle = TextStyle(
+  fontSize: 16,
+  fontWeight: FontWeight.w700,
+  height: 1.18,
+);
+
+const TextStyle _billTableAmountTextStyle = TextStyle(
+  fontSize: 17,
+  fontWeight: FontWeight.w800,
+  height: 1.15,
+);
+
 class PaymentWidget extends StatefulWidget {
   final VoidCallback? onIdleTimeout; // 20, 無操作超時回調
+  final bool resetOnEnter;
+  final bool initializeFromBuilding;
+  final Duration idleTimeout;
 
-  const PaymentWidget({super.key, this.onIdleTimeout});
+  const PaymentWidget({
+    super.key,
+    this.onIdleTimeout,
+    this.resetOnEnter = true,
+    this.initializeFromBuilding = true,
+    this.idleTimeout = const Duration(seconds: 100),
+  });
 
   @override
   State<PaymentWidget> createState() => _PaymentWidgetState();
@@ -23,7 +58,6 @@ class _PaymentWidgetState extends State<PaymentWidget> {
 
   // 21, 無操作計時器相關
   Timer? _idleTimer;
-  static const _idleTimeout = Duration(seconds: 100); // 100秒無操作超時
   // 14, 暫時注釋掉開發中訊息變數
   // bool _showDevelopmentMessage = false; // 是否顯示開發中訊息
 
@@ -35,20 +69,25 @@ class _PaymentWidgetState extends State<PaymentWidget> {
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
       // 進入時清空殘留的購物車與支付方式
-      try {
-        final notifier = context.read<PaymentNotifier>();
-        notifier.clearCart();
-        // 18, 重置支付狀態，清除之前的二維碼和成功信息
-        notifier.resetPayment();
-      } catch (_) {}
-      setState(() {
-        _selectedPaymentMethod = null;
-        _selectedBlock = null;
-        _selectedFloor = null;
-        _selectedUnit = null;
-      });
+      if (widget.resetOnEnter) {
+        try {
+          final notifier = context.read<PaymentNotifier>();
+          notifier.clearCart();
+          // 18, 重置支付狀態，清除之前的二維碼和成功信息
+          notifier.resetPayment();
+        } catch (_) {}
+        setState(() {
+          _selectedPaymentMethod = null;
+          _selectedBlock = null;
+          _selectedFloor = null;
+          _selectedUnit = null;
+        });
+      }
 
       // 2, 檢查是否需要初始化支付
+      if (!widget.initializeFromBuilding) {
+        return;
+      }
       final appDataProvider =
           Provider.of<AppDataProvider>(context, listen: false);
       final ismartId = appDataProvider.buildingInfo?.ismartId;
@@ -86,7 +125,7 @@ class _PaymentWidgetState extends State<PaymentWidget> {
   /// 24, 啟動無操作計時器
   void _startIdleTimer() {
     _idleTimer?.cancel();
-    _idleTimer = Timer(_idleTimeout, () {
+    _idleTimer = Timer(widget.idleTimeout, () {
       // 調用回調返回輪播
       widget.onIdleTimeout?.call();
     });
@@ -130,9 +169,10 @@ class _PaymentWidgetState extends State<PaymentWidget> {
       child: Consumer<PaymentNotifier>(
         builder: (context, paymentNotifier, child) {
           final paymentState = paymentNotifier.state;
+          final viewMode = determinePaymentWidgetViewMode(paymentState);
 
           // 根據載入狀態決定顯示內容
-          if (paymentState.isLoading && paymentState.paymentConfig == null) {
+          if (viewMode == PaymentWidgetViewMode.initializing) {
             return Container(
               padding: const EdgeInsets.fromLTRB(16.0, 20.0, 16.0, 20.0),
               child: Column(
@@ -152,10 +192,11 @@ class _PaymentWidgetState extends State<PaymentWidget> {
           }
 
           // 24, 如果支付配置為空或支付方式為空，但有單位數據，仍顯示選擇器
-          if (paymentState.paymentConfig == null ||
-              (paymentState.paymentConfig?.enabledMethods.isEmpty ?? true)) {
+          if (viewMode == PaymentWidgetViewMode.unavailable ||
+              viewMode ==
+                  PaymentWidgetViewMode.selectorWithUnavailablePayment) {
             // 如果沒有單位數據，顯示背景圖
-            if (paymentState.units.isEmpty) {
+            if (viewMode == PaymentWidgetViewMode.unavailable) {
               return _buildPaymentNotAvailablePage();
             }
 
@@ -431,7 +472,7 @@ class _PaymentWidgetState extends State<PaymentWidget> {
       PaymentNotifier paymentNotifier, PaymentState paymentState) {
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(12),
@@ -454,17 +495,95 @@ class _PaymentWidgetState extends State<PaymentWidget> {
           // 樓座選擇器（如果有多個樓座）
           if (paymentNotifier.shouldShowBlockSelector) ...[
             _buildBlockSelector(paymentNotifier, paymentState),
-            const SizedBox(height: 16),
+            const SizedBox(height: 18),
           ],
 
           // 樓層選擇器
           _buildFloorSelector(paymentNotifier, paymentState),
 
-          const SizedBox(height: 16),
+          const SizedBox(height: 18),
 
           // 單位選擇器
           _buildUnitSelector(paymentNotifier, paymentState),
         ],
+      ),
+    );
+  }
+
+  Widget _buildPaymentSectionTitle(String title) {
+    return Text(
+      title,
+      style: const TextStyle(
+        fontSize: 22,
+        fontWeight: FontWeight.w800,
+        height: 1.15,
+        color: Colors.black87,
+      ),
+    );
+  }
+
+  Widget _buildPaymentOptionChip({
+    required String text,
+    required bool isSelected,
+    required VoidCallback onTap,
+  }) {
+    final primaryColor = Theme.of(context).colorScheme.primary;
+
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(10),
+        child: Container(
+          constraints: const BoxConstraints(
+            minWidth: 66,
+            minHeight: 50,
+          ),
+          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 13),
+          decoration: BoxDecoration(
+            color: isSelected ? primaryColor : Colors.grey.shade100,
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(
+              color: isSelected ? primaryColor : Colors.grey.shade300,
+              width: isSelected ? 2 : 1,
+            ),
+          ),
+          child: Text(
+            text,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(
+              fontSize: 20,
+              fontWeight: FontWeight.w800,
+              height: 1.1,
+              color: isSelected ? Colors.white : Colors.black87,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildPaymentEmptyHint(String text) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+      decoration: BoxDecoration(
+        color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.10),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: Colors.grey.shade200),
+      ),
+      child: Center(
+        child: Text(
+          text,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: TextStyle(
+            fontSize: 18,
+            color: Colors.grey.shade700,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
       ),
     );
   }
@@ -476,10 +595,10 @@ class _PaymentWidgetState extends State<PaymentWidget> {
         final buildingInfo = appDataProvider.buildingInfo;
         return Container(
           width: double.infinity,
-          padding: const EdgeInsets.all(12),
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
           decoration: BoxDecoration(
             color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.1),
-            borderRadius: BorderRadius.circular(8),
+            borderRadius: BorderRadius.circular(10),
             border: Border.all(
                 color: Theme.of(context)
                     .colorScheme
@@ -491,17 +610,20 @@ class _PaymentWidgetState extends State<PaymentWidget> {
               Icon(
                 Icons.business,
                 color: Theme.of(context).colorScheme.primary,
-                size: 20,
+                size: 24,
               ),
-              const SizedBox(width: 8),
+              const SizedBox(width: 10),
               Expanded(
                 child: Text(
                   '當前大廈：${buildingInfo?.name ?? '未選擇'}',
                   style: const TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w600,
+                    fontSize: 20,
+                    fontWeight: FontWeight.w800,
+                    height: 1.15,
                     color: Colors.black87,
                   ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                 ),
               ),
             ],
@@ -519,22 +641,17 @@ class _PaymentWidgetState extends State<PaymentWidget> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text(
-          '選擇樓座',
-          style: TextStyle(
-            fontSize: 16,
-            fontWeight: FontWeight.w600,
-            color: Colors.black87,
-          ),
-        ),
+        _buildPaymentSectionTitle('選擇樓座'),
         const SizedBox(height: 12),
         Wrap(
           alignment: WrapAlignment.start,
-          spacing: 8,
-          runSpacing: 8,
+          spacing: 10,
+          runSpacing: 10,
           children: blocks.map((block) {
             final isSelected = _selectedBlock == block;
-            return GestureDetector(
+            return _buildPaymentOptionChip(
+              text: '$block座',
+              isSelected: isSelected,
               onTap: () {
                 setState(() {
                   _selectedBlock = block;
@@ -544,29 +661,6 @@ class _PaymentWidgetState extends State<PaymentWidget> {
                 });
                 paymentNotifier.clearCart();
               },
-              child: Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                decoration: BoxDecoration(
-                  color: isSelected
-                      ? Theme.of(context).colorScheme.primary
-                      : Colors.grey.shade100,
-                  borderRadius: BorderRadius.circular(20),
-                  border: Border.all(
-                    color: isSelected
-                        ? Theme.of(context).colorScheme.primary
-                        : Colors.grey.shade300,
-                  ),
-                ),
-                child: Text(
-                  '$block座',
-                  style: TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w500,
-                    color: isSelected ? Colors.white : Colors.black87,
-                  ),
-                ),
-              ),
             );
           }).toList(),
         ),
@@ -584,44 +678,22 @@ class _PaymentWidgetState extends State<PaymentWidget> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text(
-          '選擇樓層',
-          style: TextStyle(
-            fontSize: 16,
-            fontWeight: FontWeight.w600,
-            color: Colors.black87,
-          ),
-        ),
+        _buildPaymentSectionTitle('選擇樓層'),
         const SizedBox(height: 12),
         if (floors.isEmpty) ...[
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color:
-                  Theme.of(context).colorScheme.primary.withValues(alpha: 0.10),
-              borderRadius: BorderRadius.circular(8),
-              border: Border.all(color: Colors.grey.shade200),
-            ),
-            child: Center(
-              child: Text(
-                paymentNotifier.shouldShowBlockSelector ? '請先選擇樓座' : '暫無樓層數據',
-                style: TextStyle(
-                  fontSize: 14,
-                  color: Colors.grey.shade600,
-                  fontWeight: FontWeight.w500,
-                ),
-              ),
-            ),
+          _buildPaymentEmptyHint(
+            paymentNotifier.shouldShowBlockSelector ? '請先選擇樓座' : '暫無樓層數據',
           ),
         ] else ...[
           Wrap(
             alignment: WrapAlignment.start,
-            spacing: 8,
-            runSpacing: 8,
+            spacing: 10,
+            runSpacing: 10,
             children: floors.map((floor) {
               final isSelected = _selectedFloor == floor;
-              return GestureDetector(
+              return _buildPaymentOptionChip(
+                text: floor,
+                isSelected: isSelected,
                 onTap: () {
                   setState(() {
                     _selectedFloor = floor;
@@ -630,30 +702,6 @@ class _PaymentWidgetState extends State<PaymentWidget> {
                   });
                   paymentNotifier.clearCart();
                 },
-                child: Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                  decoration: BoxDecoration(
-                    color: isSelected
-                        ? Theme.of(context).primaryColor
-                        : Colors.grey.shade100,
-                    borderRadius: BorderRadius.circular(8),
-                    border: Border.all(
-                      color: isSelected
-                          ? Theme.of(context).primaryColor
-                          : Colors.grey.shade300,
-                      width: 1,
-                    ),
-                  ),
-                  child: Text(
-                    floor, // 只顯示樓層數字，不顯示"樓"字
-                    style: TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w500,
-                      color: isSelected ? Colors.white : Colors.black87,
-                    ),
-                  ),
-                ),
               );
             }).toList(),
           ),
@@ -680,65 +728,22 @@ class _PaymentWidgetState extends State<PaymentWidget> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text(
-          '選擇單位',
-          style: TextStyle(
-            fontSize: 16,
-            fontWeight: FontWeight.w600,
-            color: Colors.black87,
-          ),
-        ),
+        _buildPaymentSectionTitle('選擇單位'),
         const SizedBox(height: 12),
         if (_selectedFloor == null) ...[
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color:
-                  Theme.of(context).colorScheme.primary.withValues(alpha: 0.10),
-              borderRadius: BorderRadius.circular(8),
-              border: Border.all(color: Colors.grey.shade200),
-            ),
-            child: Center(
-              child: Text(
-                '請先選擇樓層',
-                style: TextStyle(
-                  fontSize: 14,
-                  color: Colors.grey.shade600,
-                  fontWeight: FontWeight.w500,
-                ),
-              ),
-            ),
-          ),
+          _buildPaymentEmptyHint('請先選擇樓層'),
         ] else if (units.isEmpty) ...[
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color:
-                  Theme.of(context).colorScheme.primary.withValues(alpha: 0.10),
-              borderRadius: BorderRadius.circular(8),
-              border: Border.all(color: Colors.grey.shade200),
-            ),
-            child: Center(
-              child: Text(
-                '暫無單位數據',
-                style: TextStyle(
-                  fontSize: 14,
-                  color: Colors.grey.shade600,
-                  fontWeight: FontWeight.w500,
-                ),
-              ),
-            ),
-          ),
+          _buildPaymentEmptyHint('暫無單位數據'),
         ] else ...[
           Wrap(
             alignment: WrapAlignment.start,
-            spacing: 8,
-            runSpacing: 8,
+            spacing: 10,
+            runSpacing: 10,
             children: units.map((unit) {
               final isSelected = _selectedUnit == unit.unitId;
-              return GestureDetector(
+              return _buildPaymentOptionChip(
+                text: unit.unitName,
+                isSelected: isSelected,
                 onTap: () {
                   setState(() {
                     _selectedUnit = unit.unitId;
@@ -747,30 +752,6 @@ class _PaymentWidgetState extends State<PaymentWidget> {
                   paymentNotifier.selectUnit(unit.unitId);
                   paymentNotifier.clearCart();
                 },
-                child: Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                  decoration: BoxDecoration(
-                    color: isSelected
-                        ? Theme.of(context).primaryColor
-                        : Colors.grey.shade100,
-                    borderRadius: BorderRadius.circular(8),
-                    border: Border.all(
-                      color: isSelected
-                          ? Theme.of(context).primaryColor
-                          : Colors.grey.shade300,
-                      width: 1,
-                    ),
-                  ),
-                  child: Text(
-                    unit.unitName, // 只顯示單位號碼，不顯示樓層信息
-                    style: TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w500,
-                      color: isSelected ? Colors.white : Colors.black87,
-                    ),
-                  ),
-                ),
               );
             }).toList(),
           ),
@@ -787,6 +768,8 @@ class _PaymentWidgetState extends State<PaymentWidget> {
     // 过滤出可以缴费的账单（金额大于1分钱）用于全选功能
     final payableBills =
         paymentState.bills.where((bill) => bill.netAmount >= 0.01).toList();
+    final allPayableSelected = payableBills.isNotEmpty &&
+        paymentState.selectedBills.length == payableBills.length;
 
     return Container(
       width: double.infinity,
@@ -811,38 +794,55 @@ class _PaymentWidgetState extends State<PaymentWidget> {
               const Text(
                 '選擇需要繳費的賬單',
                 style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w600,
+                  fontSize: 20,
+                  fontWeight: FontWeight.w800,
                   color: Colors.black87,
                 ),
               ),
               // 39, 只有當有可繳費賬單時才顯示全選按鈕
               if (payableBills.isNotEmpty)
-                TextButton(
-                  onPressed: () {
-                    if (paymentState.selectedBills.length ==
-                        payableBills.length) {
-                      paymentNotifier.clearCart();
-                    } else {
-                      // 42, 一次性選擇所有金額大於0的賬單
-                      paymentNotifier.selectBillsFromList(payableBills);
-                    }
-                  },
-                  child: Text(
-                    paymentState.selectedBills.length == payableBills.length
-                        ? '取消全選'
-                        : '全選',
-                    style: TextStyle(
-                      fontSize: 14,
-                      color: Theme.of(context).colorScheme.primary,
+                InkWell(
+                  borderRadius: BorderRadius.circular(8),
+                  onTap: () => _toggleAllPayableBills(
+                    paymentNotifier,
+                    paymentState,
+                    payableBills,
+                  ),
+                  child: Padding(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Checkbox(
+                          value: allPayableSelected,
+                          visualDensity: VisualDensity.compact,
+                          materialTapTargetSize:
+                              MaterialTapTargetSize.shrinkWrap,
+                          activeColor: Theme.of(context).colorScheme.primary,
+                          onChanged: (_) => _toggleAllPayableBills(
+                            paymentNotifier,
+                            paymentState,
+                            payableBills,
+                          ),
+                        ),
+                        const SizedBox(width: 4),
+                        Text(
+                          '全選',
+                          style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.w800,
+                            color: Theme.of(context).colorScheme.primary,
+                          ),
+                        ),
+                      ],
                     ),
                   ),
                 ),
             ],
           ),
           const SizedBox(height: 12),
-          // 58, 始终显示所有账单，不管金额是否为0
-          ...billsToShow.map((bill) => _buildBillItem(paymentNotifier, bill)),
+          _buildBillTable(paymentNotifier, billsToShow),
           // 43, 當選中的賬單總金額為0時，顯示「暫時沒有賬單可以支付」提示
           if (paymentState.selectedBills.isNotEmpty &&
               paymentNotifier.cartTotalAmount < 0.01) ...[
@@ -881,6 +881,90 @@ class _PaymentWidgetState extends State<PaymentWidget> {
     );
   }
 
+  void _toggleAllPayableBills(
+    PaymentNotifier paymentNotifier,
+    PaymentState paymentState,
+    List<PaymentBill> payableBills,
+  ) {
+    if (paymentState.selectedBills.length == payableBills.length) {
+      paymentNotifier.clearCart();
+    } else {
+      // 42, 一次性選擇所有金額大於0的賬單
+      paymentNotifier.selectBillsFromList(payableBills);
+    }
+  }
+
+  Widget _buildBillTable(
+    PaymentNotifier paymentNotifier,
+    List<PaymentBill> bills,
+  ) {
+    return Container(
+      width: double.infinity,
+      decoration: BoxDecoration(
+        border: Border.all(color: Colors.grey.shade200),
+        borderRadius: BorderRadius.circular(10),
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: Column(
+        children: [
+          _buildBillTableHeader(),
+          ...bills.map((bill) => _buildBillItem(paymentNotifier, bill)),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildBillTableHeader() {
+    return Container(
+      color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.08),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
+      child: const Row(
+        children: [
+          SizedBox(width: 38),
+          Expanded(
+            flex: 10,
+            child: Text(
+              '管理費',
+              style: _billTableHeaderTextStyle,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+          SizedBox(width: 8),
+          Expanded(
+            flex: 10,
+            child: Text(
+              '期間',
+              style: _billTableHeaderTextStyle,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+          SizedBox(width: 8),
+          Expanded(
+            flex: 15,
+            child: Text(
+              '發票號碼',
+              style: _billTableHeaderTextStyle,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+          SizedBox(width: 8),
+          Expanded(
+            flex: 10,
+            child: Text(
+              '金額',
+              style: _billTableHeaderTextStyle,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   /// 8, 構建賬單項目
   Widget _buildBillItem(PaymentNotifier paymentNotifier, PaymentBill bill) {
     final isSelected = paymentNotifier.state.selectedBills
@@ -889,49 +973,91 @@ class _PaymentWidgetState extends State<PaymentWidget> {
     // 小于1分钱（0.01）的都视为0元账单
     final isZeroAmount = bill.netAmount < 0.01;
 
-    return Container(
-      margin: const EdgeInsets.only(bottom: 8),
-      child: CheckboxListTile(
-        value: isZeroAmount ? false : isSelected, // 56, 强制0元账单不被选中
-        onChanged: isZeroAmount
-            ? null
-            : (bool? value) {
-                // 57, 0元账单完全禁用
-                if (value == true) {
-                  paymentNotifier.addBillToCart(bill);
-                } else {
-                  paymentNotifier.removeBillFromCart(bill);
-                }
-              },
-        title: Text(
-          bill.itemId,
-          style: TextStyle(
-            fontSize: 14,
-            fontWeight: FontWeight.w500,
-            color: isZeroAmount ? Colors.grey : Colors.black87, // 52, 0元账单显示灰色
+    final textColor = isZeroAmount ? Colors.grey : Colors.black87;
+    final amountColor = isZeroAmount ? Colors.grey : Colors.red.shade700;
+
+    return InkWell(
+      onTap: isZeroAmount
+          ? null
+          : () {
+              if (isSelected) {
+                paymentNotifier.removeBillFromCart(bill);
+              } else {
+                paymentNotifier.addBillToCart(bill);
+              }
+            },
+      child: Container(
+        decoration: BoxDecoration(
+          color: isSelected
+              ? Theme.of(context).colorScheme.primary.withValues(alpha: 0.06)
+              : Colors.white,
+          border: Border(
+            top: BorderSide(color: Colors.grey.shade200),
           ),
         ),
-        subtitle: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
+        child: Row(
           children: [
-            Text('期間：${bill.trsTo}',
-                style: TextStyle(color: isZeroAmount ? Colors.grey : null)),
-            Text('金額：HK\$${bill.netAmount.toStringAsFixed(2)}',
-                style: TextStyle(color: isZeroAmount ? Colors.grey : null)),
-            Text('發票號：${bill.invoiceNo}',
-                style: TextStyle(color: isZeroAmount ? Colors.grey : null)),
+            SizedBox(
+              width: 38,
+              child: Checkbox(
+                value: isZeroAmount ? false : isSelected,
+                visualDensity: VisualDensity.compact,
+                materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                activeColor: Theme.of(context).colorScheme.primary,
+                onChanged: isZeroAmount
+                    ? null
+                    : (bool? value) {
+                        // 57, 0元账单完全禁用
+                        if (value == true) {
+                          paymentNotifier.addBillToCart(bill);
+                        } else {
+                          paymentNotifier.removeBillFromCart(bill);
+                        }
+                      },
+              ),
+            ),
+            Expanded(
+              flex: 10,
+              child: Text(
+                bill.itemId,
+                style: _billTableCellTextStyle.copyWith(color: textColor),
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              flex: 10,
+              child: Text(
+                bill.trsTo,
+                style: _billTableCellTextStyle.copyWith(color: textColor),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              flex: 15,
+              child: Text(
+                bill.invoiceNo,
+                style: _billTableCellTextStyle.copyWith(color: textColor),
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              flex: 10,
+              child: Text(
+                'HK\$${bill.netAmount.toStringAsFixed(2)}',
+                style: _billTableAmountTextStyle.copyWith(color: amountColor),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
           ],
         ),
-        secondary: Text(
-          'HK\$${bill.netAmount.toStringAsFixed(2)}',
-          style: TextStyle(
-            fontSize: 16,
-            fontWeight: FontWeight.bold,
-            color: isZeroAmount ? Colors.grey : Colors.red, // 53, 金额显示灰色或红色
-          ),
-        ),
-        activeColor: Theme.of(context).colorScheme.primary,
-        contentPadding: EdgeInsets.zero,
       ),
     );
   }
@@ -1133,45 +1259,65 @@ class _PaymentWidgetState extends State<PaymentWidget> {
             ),
           ),
           const SizedBox(height: 12),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              const Text('賬單費用：'),
-              Text('HK\$${billAmount.toStringAsFixed(2)}'),
-            ],
+          _buildAmountLine(
+            label: '賬單費用：',
+            amount: 'HK\$${billAmount.toStringAsFixed(2)}',
           ),
           const SizedBox(height: 8),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(
-                  '手續費${_selectedPaymentMethod != null && paymentState.paymentConfig != null ? '(${paymentState.paymentConfig!.getFeeRatePercentage(_selectedPaymentMethod!).toStringAsFixed(2)}%)' : ''}：'),
-              Text('HK\$${handlingFee.toStringAsFixed(2)}'),
-            ],
+          _buildAmountLine(
+            label:
+                '手續費${_selectedPaymentMethod != null && paymentState.paymentConfig != null ? '(${paymentState.paymentConfig!.getFeeRatePercentage(_selectedPaymentMethod!).toStringAsFixed(2)}%)' : ''}：',
+            amount: 'HK\$${handlingFee.toStringAsFixed(2)}',
           ),
           const Divider(),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              const Text(
-                '總計：',
-                style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-              Text(
-                'HK\$${totalAmount.toStringAsFixed(2)}',
-                style: const TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.red,
-                ),
-              ),
-            ],
+          _buildAmountLine(
+            label: '總計：',
+            amount: 'HK\$${totalAmount.toStringAsFixed(2)}',
+            labelStyle: const TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.bold,
+            ),
+            amountStyle: const TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.bold,
+              color: Colors.red,
+            ),
           ),
         ],
       ),
+    );
+  }
+
+  Widget _buildAmountLine({
+    required String label,
+    required String amount,
+    TextStyle? labelStyle,
+    TextStyle? amountStyle,
+  }) {
+    return Row(
+      children: [
+        Expanded(
+          child: Text(
+            label,
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+            style: labelStyle,
+          ),
+        ),
+        const SizedBox(width: 12),
+        Flexible(
+          child: Align(
+            alignment: Alignment.centerRight,
+            child: Text(
+              amount,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              textAlign: TextAlign.right,
+              style: amountStyle,
+            ),
+          ),
+        ),
+      ],
     );
   }
 
@@ -1364,37 +1510,50 @@ class _PaymentWidgetState extends State<PaymentWidget> {
             ),
           ),
           const SizedBox(height: 16),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.center,
+          Wrap(
+            alignment: WrapAlignment.center,
+            spacing: 16,
+            runSpacing: 8,
             children: [
-              ElevatedButton.icon(
-                onPressed: () {
-                  // 這裡可以添加打印小票的邏輯
-                },
-                icon: const Icon(Icons.print),
-                label: const Text('打印小票'),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Theme.of(context).colorScheme.primary,
-                  foregroundColor: Colors.white,
+              ConstrainedBox(
+                constraints: const BoxConstraints(minWidth: 112),
+                child: ElevatedButton.icon(
+                  onPressed: () {
+                    // 這裡可以添加打印小票的邏輯
+                  },
+                  icon: const Icon(Icons.print),
+                  label: const Text(
+                    '打印小票',
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Theme.of(context).colorScheme.primary,
+                    foregroundColor: Colors.white,
+                  ),
                 ),
               ),
-              const SizedBox(width: 16),
-              ElevatedButton.icon(
-                onPressed: () {
-                  // 18, 支付完成後重置狀態，保留大廈配置，清除選擇狀態
-                  paymentNotifier.resetAfterPaymentComplete();
-                  setState(() {
-                    _selectedPaymentMethod = null;
-                    _selectedBlock = null;
-                    _selectedFloor = null;
-                    _selectedUnit = null;
-                  });
-                },
-                icon: const Icon(Icons.check),
-                label: const Text('完成'),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.green,
-                  foregroundColor: Colors.white,
+              ConstrainedBox(
+                constraints: const BoxConstraints(minWidth: 96),
+                child: ElevatedButton.icon(
+                  onPressed: () {
+                    // 18, 支付完成後重置狀態，保留大廈配置，清除選擇狀態
+                    paymentNotifier.resetAfterPaymentComplete();
+                    setState(() {
+                      _selectedPaymentMethod = null;
+                      _selectedBlock = null;
+                      _selectedFloor = null;
+                      _selectedUnit = null;
+                    });
+                  },
+                  icon: const Icon(Icons.check),
+                  label: const Text(
+                    '完成',
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.green,
+                    foregroundColor: Colors.white,
+                  ),
                 ),
               ),
             ],
@@ -1589,4 +1748,21 @@ class _PaymentWidgetState extends State<PaymentWidget> {
       ),
     );
   }
+}
+
+@visibleForTesting
+PaymentWidgetViewMode determinePaymentWidgetViewMode(PaymentState state) {
+  if (state.isLoading && state.paymentConfig == null) {
+    return PaymentWidgetViewMode.initializing;
+  }
+
+  final hasEnabledPaymentMethods =
+      state.paymentConfig?.enabledMethods.isNotEmpty == true;
+  if (!hasEnabledPaymentMethods) {
+    return state.units.isEmpty
+        ? PaymentWidgetViewMode.unavailable
+        : PaymentWidgetViewMode.selectorWithUnavailablePayment;
+  }
+
+  return PaymentWidgetViewMode.active;
 }

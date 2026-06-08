@@ -8,13 +8,13 @@ class PreciseVideoPoolManager {
   static PreciseVideoPoolManager? _instance;
 
   final Map<String, _PreciseVideoWrapper> _controllerPool = {};
-  static const int _maxControllerPool = 20; // 控制器缓存上限
+  static const int _maxControllerPool = 4; // 控制器缓存上限，低内存设备避免长期堆积
 
   /// 已初始化的控制器（占用解码器）
   final Set<String> _initializedControllers = {};
   final Set<String> _playingControllers = {}; // 正在播放
-  static const int _maxInitializedDecoders = 6; //  修复：增加到6个解码器，提供缓冲空间
-  static const int _maxConcurrentPlaying = 4; //  修复：支持顶部+全屏+预热，最多4个同时播放
+  static const int _maxInitializedDecoders = 2; // 只保留当前/过渡中的解码器
+  static const int _maxConcurrentPlaying = 1; // RK3568 上同时播放多个视频容易触发 LMK
 
   /// 预初始化策略：当前播放
   String? _currentTopAdKey; // 当前顶部广告
@@ -127,6 +127,11 @@ class PreciseVideoPoolManager {
 
     //  新增：檢查是否有相同文件路徑但不同類型的控制器正在播放
     await _checkAndHandleFilePathConflict(filePath, videoType, key);
+
+    // 全屏广告切换最容易发生旧/新 ExoPlayer 重叠，先清理同类型旧控制器。
+    if (videoType == VideoType.fullAd) {
+      await cleanupControllersByType(videoType, exceptKey: key);
+    }
 
     try {
       // 1. 检查是否已有初始化的控制器
@@ -323,6 +328,11 @@ class PreciseVideoPoolManager {
         _updateCurrentPlayingState(null, videoType);
       }
     } catch (e) {
+      _controllerPool.remove(key);
+      _initializedControllers.remove(key);
+      _playingControllers.remove(key);
+      _lastUsed.remove(key);
+      _updateCurrentPlayingState(null, videoType);
     } finally {
       _releasingKeys.remove(key);
 
@@ -485,45 +495,19 @@ class PreciseVideoPoolManager {
       return;
     }
 
-    // 找到最少使用且非当前播放的初始化控制器
-    String? targetKey;
-    DateTime? oldestTime;
-    int leastUsageCount = -1;
-
-    for (final key in _initializedControllers) {
-      // 不释放当前正在播放的
-      if (_playingControllers.contains(key)) {
-        continue;
-      }
-
-      // 不释放当前显示的主要视频
-      if (key == _currentTopAdKey || key == _currentFullAdKey) {
-        continue;
-      }
-
-      final wrapper = _controllerPool[key];
-      if (wrapper == null) continue;
-
-      final lastUsedTime = _lastUsed[key] ?? DateTime.now();
-      final usageCount = wrapper.useCount;
-
-      // 优先选择使用次数少且最旧的控制器
-      bool shouldSelect = false;
-      if (targetKey == null) {
-        shouldSelect = true;
-      } else if (usageCount < leastUsageCount) {
-        shouldSelect = true;
-      } else if (usageCount == leastUsageCount &&
-          lastUsedTime.isBefore(oldestTime!)) {
-        shouldSelect = true;
-      }
-
-      if (shouldSelect) {
-        oldestTime = lastUsedTime;
-        targetKey = key;
-        leastUsageCount = usageCount;
-      }
-    }
+    final targetKey = VideoPoolResourcePolicy.selectDecoderToRelease(
+      initializedKeys: _initializedControllers,
+      playingKeys: _playingControllers,
+      protectedKeys: {
+        if (_currentTopAdKey != null) _currentTopAdKey!,
+        if (_currentFullAdKey != null) _currentFullAdKey!,
+      },
+      usageCounts: _controllerPool.map(
+        (key, wrapper) => MapEntry(key, wrapper.useCount),
+      ),
+      lastUsed: _lastUsed,
+      now: DateTime.now(),
+    );
 
     if (targetKey != null && _controllerPool.containsKey(targetKey)) {
       final wrapper = _controllerPool[targetKey]!;
@@ -589,35 +573,15 @@ class PreciseVideoPoolManager {
       return;
     }
 
-    // 找到最旧的播放控制器（优先暂停使用次数多的）
-    String? targetKey;
-    DateTime? oldestTime;
-    int mostUsageCount = -1;
-
-    for (final key in _playingControllers) {
-      final wrapper = _controllerPool[key];
-      if (wrapper == null) continue;
-
-      final lastUsedTime = _lastUsed[key] ?? DateTime.now();
-      final usageCount = wrapper.useCount;
-
-      bool shouldSelect = false;
-      if (targetKey == null) {
-        shouldSelect = true;
-      } else if (usageCount > mostUsageCount) {
-        // 优先暂停使用次数多的（说明不太重要）
-        shouldSelect = true;
-      } else if (usageCount == mostUsageCount &&
-          lastUsedTime.isBefore(oldestTime!)) {
-        shouldSelect = true;
-      }
-
-      if (shouldSelect) {
-        oldestTime = lastUsedTime;
-        targetKey = key;
-        mostUsageCount = usageCount;
-      }
-    }
+    final targetKey = VideoPoolResourcePolicy.selectPlayingKeyToPause(
+      playingKeys: _playingControllers,
+      availableKeys: _controllerPool.keys.toSet(),
+      usageCounts: _controllerPool.map(
+        (key, wrapper) => MapEntry(key, wrapper.useCount),
+      ),
+      lastUsed: _lastUsed,
+      now: DateTime.now(),
+    );
 
     if (targetKey != null && _controllerPool.containsKey(targetKey)) {
       final wrapper = _controllerPool[targetKey]!;
@@ -697,7 +661,10 @@ class PreciseVideoPoolManager {
   }
 
   /// 9b.  清理指定类型的所有控制器（新增方法）
-  Future<void> cleanupControllersByType(VideoType videoType) async {
+  Future<void> cleanupControllersByType(
+    VideoType videoType, {
+    String? exceptKey,
+  }) async {
     final keysToRemove = <String>[];
 
     // 1. 找到所有该类型的控制器
@@ -705,7 +672,7 @@ class PreciseVideoPoolManager {
       final key = entry.key;
       final wrapper = entry.value;
 
-      if (wrapper.videoType == videoType) {
+      if (wrapper.videoType == videoType && key != exceptKey) {
         keysToRemove.add(key);
       }
     }
@@ -1000,6 +967,77 @@ enum VideoType {
 
 extension VideoTypeExtension on VideoType {
   String get name => toString().split('.').last;
+}
+
+@visibleForTesting
+class VideoPoolResourcePolicy {
+  static String? selectDecoderToRelease({
+    required Iterable<String> initializedKeys,
+    required Set<String> playingKeys,
+    required Set<String> protectedKeys,
+    required Map<String, int> usageCounts,
+    required Map<String, DateTime> lastUsed,
+    required DateTime now,
+  }) {
+    String? targetKey;
+    DateTime? oldestTime;
+    int leastUsageCount = 0;
+
+    for (final key in initializedKeys) {
+      if (playingKeys.contains(key) || protectedKeys.contains(key)) {
+        continue;
+      }
+      if (!usageCounts.containsKey(key)) {
+        continue;
+      }
+
+      final keyLastUsed = lastUsed[key] ?? now;
+      final keyUsageCount = usageCounts[key] ?? 0;
+
+      if (targetKey == null ||
+          keyUsageCount < leastUsageCount ||
+          (keyUsageCount == leastUsageCount &&
+              keyLastUsed.isBefore(oldestTime!))) {
+        targetKey = key;
+        oldestTime = keyLastUsed;
+        leastUsageCount = keyUsageCount;
+      }
+    }
+
+    return targetKey;
+  }
+
+  static String? selectPlayingKeyToPause({
+    required Iterable<String> playingKeys,
+    required Set<String> availableKeys,
+    required Map<String, int> usageCounts,
+    required Map<String, DateTime> lastUsed,
+    required DateTime now,
+  }) {
+    String? targetKey;
+    DateTime? oldestTime;
+    int mostUsageCount = 0;
+
+    for (final key in playingKeys) {
+      if (!availableKeys.contains(key)) {
+        continue;
+      }
+
+      final keyLastUsed = lastUsed[key] ?? now;
+      final keyUsageCount = usageCounts[key] ?? 0;
+
+      if (targetKey == null ||
+          keyUsageCount > mostUsageCount ||
+          (keyUsageCount == mostUsageCount &&
+              keyLastUsed.isBefore(oldestTime!))) {
+        targetKey = key;
+        oldestTime = keyLastUsed;
+        mostUsageCount = keyUsageCount;
+      }
+    }
+
+    return targetKey;
+  }
 }
 
 ///  解码器占用详细说明类

@@ -1,9 +1,6 @@
 import 'dart:async'; // Added import for Timer
 
-import 'package:flutter/foundation.dart' show listEquals;
 import 'package:flutter/material.dart';
-import 'package:flutter/gestures.dart'; // Added for PointerDeviceKind
-import 'package:iboard_app/models/announcement_model.dart';
 import 'package:iboard_app/pages/fullscreen_ads_page.dart';
 import 'package:iboard_app/pages/mainscreen_page.dart';
 import 'package:iboard_app/providers/announcement_provider.dart';
@@ -22,7 +19,6 @@ class MainPage extends StatefulWidget {
 
 class MainPageState extends State<MainPage> {
   Timer? _mainTimer;
-  List<AnnouncementModel>? _previousAnnouncementsForBuild;
   bool _isAdsDialogOpen = false;
   @override
   void initState() {
@@ -114,11 +110,6 @@ class MainPageState extends State<MainPage> {
           //  重要修復：檢查當前狀態，如果已經是默認狀態說明是定時器自動退出
           if (carouselProvider.currentAppState == AppState.defaultState) {
             Logger().i(' 全屏廣告已自動退出到默認狀態，保持默認狀態不變');
-
-            // 通知通告轮播提供者回到主屏幕
-            final announcementCarouselProvider =
-                context.read<AnnouncementCarouselProvider>();
-            announcementCarouselProvider.jumpToAnnouncementIndex(0);
           } else if (wasInFullscreenAd) {
             // 只有仍在全屏廣告狀態時才認為是用戶手動關閉
             Logger().i(' 用戶手動關閉全屏廣告，切換到手動操作狀態');
@@ -163,37 +154,16 @@ class MainPageState extends State<MainPage> {
 
   @override
   Widget build(BuildContext context) {
-    // Listen to AnnouncementProvider for changes
-    final announcementProvider = context.watch<AnnouncementProvider>();
-    final currentAnnouncements =
-        announcementProvider.carouselAnnouncements; // 使用轮播通告数据
-
-    // If announcements have changed, re-initialize the mid widgets
-    if (_previousAnnouncementsForBuild == null ||
-        !listEquals(_previousAnnouncementsForBuild, currentAnnouncements)) {
-      if (mounted) {
-        // Ensure widget is still in the tree
-        _previousAnnouncementsForBuild =
-            List.from(currentAnnouncements); // Update the stored list
-      }
-    }
-
-    return Consumer<CarouselStateProvider>(
-      builder: (context, carouselState, child) {
-        // Normal Page Layout
-        return Scaffold(
-          body: SafeArea(
-            child: Listener(
-              onPointerDown: (PointerDownEvent event) {
-                // 檢測到按下後，調用用戶交互方法
-                carouselState.onUserInteraction();
-                debugPrint('[main_page]  檢測到用戶交互');
-              },
-              child: const AnnouncementPage(),
-            ),
-          ),
-        );
-      },
+    return Scaffold(
+      body: SafeArea(
+        child: Listener(
+          onPointerDown: (PointerDownEvent event) {
+            context.read<CarouselStateProvider>().onUserInteraction();
+            debugPrint('[main_page]  檢測到用戶交互');
+          },
+          child: const AnnouncementPage(),
+        ),
+      ),
     );
   }
 }

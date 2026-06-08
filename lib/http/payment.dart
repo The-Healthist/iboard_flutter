@@ -1,10 +1,11 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
+import 'package:iboard_app/http/payment_data_source.dart';
 import 'package:logger/logger.dart';
 
 /// iSmartPOS 支付系統客戶端
 /// 基於 AWS API Gateway 的支付和物業管理系統接口集成
-class PaymentClient {
+class PaymentClient implements PaymentDataSource {
   static const String _defaultBaseUrl =
       'https://uqf0jqfm77.execute-api.ap-east-1.amazonaws.com/prod/v1';
   final String _baseUrl;
@@ -182,6 +183,7 @@ class PaymentClient {
 ] */
   /// 1, 獲取全部「大廈」
   /// Endpoint: GET /v1/get-building-list
+  @override
   Future<List<Map<String, dynamic>>> getBuildingList() async {
     final Uri url = _buildUri('/get-building-list');
 
@@ -275,6 +277,7 @@ class PaymentClient {
   /// 3, 請求指定「大廈」「手續費」
   /// Endpoint: POST /v1/pos/building-tran-types
   /// Body: {"blg_id": "string"}
+  @override
   Future<Map<String, dynamic>> getBuildingTransactionTypes(
       {required String blgId}) async {
     final Uri url = _buildUri('/pos/building-tran-types');
@@ -553,6 +556,7 @@ class PaymentClient {
   /// 4, 獲取指定「大廈」全部「單位」
   /// Endpoint: POST /v1/building-flat-units
   /// Body: {"blg_id": "string"}
+  @override
   Future<List<Map<String, dynamic>>> getBuildingFlatUnits(
       {required String blgId}) async {
     final Uri url = _buildUri('/building-flat-units');
@@ -1156,6 +1160,7 @@ class PaymentClient {
   /// 6, 獲取指定「單位」「待繳費帳單」
   /// Endpoint: POST /v1/building-flat-unit-bills
   /// Body: {"unit_id": "string"}
+  @override
   Future<List<Map<String, dynamic>>> getBuildingFlatUnitBills(
       {required String unitId}) async {
     final Uri url = _buildUri('/building-flat-unit-bills');

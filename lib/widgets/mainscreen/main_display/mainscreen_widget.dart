@@ -86,20 +86,20 @@ class MainScreenWidgetState extends State<MainScreenWidget> {
             final isCompact = buttonHeight < 92;
             final isVeryCompact = buttonHeight < 76;
             final iconSize = isVeryCompact
-                ? 20.0
+                ? 22.0
                 : isCompact
-                    ? 24.0
-                    : 32.0;
+                    ? 28.0
+                    : 36.0;
             final titleFontSize = isVeryCompact
-                ? 14.0
+                ? 17.0
                 : isCompact
-                    ? 16.0
-                    : 18.0;
+                    ? 20.0
+                    : 24.0;
             final subtitleFontSize = isVeryCompact
-                ? 10.0
+                ? 12.0
                 : isCompact
-                    ? 11.0
-                    : 12.0;
+                    ? 14.0
+                    : 16.0;
             final verticalPadding = isVeryCompact
                 ? 4.0
                 : isCompact
@@ -169,18 +169,24 @@ class MainScreenWidgetState extends State<MainScreenWidget> {
                         chineseTitle,
                         style: TextStyle(
                           fontSize: titleFontSize,
-                          fontWeight: FontWeight.bold,
+                          fontWeight: FontWeight.w800,
+                          height: 1.08,
                         ),
                         textAlign: TextAlign.center,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                       ),
                       SizedBox(height: subtitleGap),
                       Text(
                         englishTitle,
                         style: TextStyle(
                           fontSize: subtitleFontSize,
-                          fontWeight: FontWeight.normal,
+                          fontWeight: FontWeight.w700,
+                          height: 1.08,
                         ),
                         textAlign: TextAlign.center,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                       ),
                     ],
                   ),
@@ -201,9 +207,18 @@ class MainScreenWidgetState extends State<MainScreenWidget> {
         runSpacing: 4.0,
         // Use AnnouncementTypeUi.values
         children: AnnouncementTypeUi.values.map((type) {
+          final isSelected = _selectedAnnouncementType == type;
           return ChoiceChip(
-            label: Text(_getAnnouncementTypeText(type)),
-            selected: _selectedAnnouncementType == type,
+            label: Text(
+              _getAnnouncementTypeText(type),
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: isSelected ? FontWeight.w800 : FontWeight.w700,
+              ),
+            ),
+            selected: isSelected,
+            labelPadding:
+                const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
             onSelected: (selected) {
               if (selected) {
                 setState(() {
@@ -308,26 +323,109 @@ class MainScreenWidgetState extends State<MainScreenWidget> {
   Widget _buildArrearSelectorContainer(ArrearProvider provider) {
     return Container(
       width: double.infinity, //占据全部的widget
-      padding: const EdgeInsets.all(10),
+      padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(12),
       ),
-      child: Column(
-        children: [
-          // 樓座选择器（只有当有多个非空名称的樓座时才显示）
-          if (provider.shouldShowBlockSelector) ...[
-            _buildArrearBlockSelector(provider),
-            const SizedBox(height: 10),
-          ],
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxHeight: 360),
+        child: SingleChildScrollView(
+          child: Column(
+            children: [
+              // 樓座选择器（只有当有多个非空名称的樓座时才显示）
+              if (provider.shouldShowBlockSelector) ...[
+                _buildArrearBlockSelector(provider),
+                const SizedBox(height: 14),
+              ],
 
-          // 樓層選擇器
-          _buildArrearBuildingSelector(provider),
+              // 樓層選擇器
+              _buildArrearBuildingSelector(provider),
 
-          const SizedBox(height: 10),
+              const SizedBox(height: 14),
 
-          // 單位選擇器
-          _buildArrearFloorSelector(provider),
-        ],
+              // 單位選擇器
+              _buildArrearFloorSelector(provider),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildArrearSectionTitle(String title) {
+    return Text(
+      title,
+      style: const TextStyle(
+        fontSize: 22,
+        fontWeight: FontWeight.w800,
+        height: 1.15,
+        color: Colors.black87,
+      ),
+    );
+  }
+
+  Widget _buildArrearOptionChip({
+    required String text,
+    required bool isSelected,
+    required VoidCallback onTap,
+  }) {
+    final primaryColor = Theme.of(context).primaryColor;
+
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(10),
+        child: Container(
+          constraints: const BoxConstraints(
+            minWidth: 66,
+            minHeight: 50,
+          ),
+          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 13),
+          decoration: BoxDecoration(
+            color: isSelected ? primaryColor : Colors.grey.shade100,
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(
+              color: isSelected ? primaryColor : Colors.grey.shade300,
+              width: isSelected ? 2 : 1,
+            ),
+          ),
+          child: Text(
+            text,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(
+              fontSize: 20,
+              fontWeight: FontWeight.w800,
+              height: 1.1,
+              color: isSelected ? Colors.white : Colors.black87,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildArrearEmptyHint(String text) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+      decoration: BoxDecoration(
+        color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.10),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: Colors.grey.shade200),
+      ),
+      child: Center(
+        child: Text(
+          text,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: TextStyle(
+            fontSize: 18,
+            color: Colors.grey.shade700,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
       ),
     );
   }
@@ -341,22 +439,17 @@ class MainScreenWidgetState extends State<MainScreenWidget> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
-            '選擇座數',
-            style: TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.w600,
-              color: Colors.black87,
-            ),
-          ),
+          _buildArrearSectionTitle('選擇座數'),
           const SizedBox(height: 12),
           Wrap(
             alignment: WrapAlignment.start,
-            spacing: 8,
-            runSpacing: 8,
+            spacing: 10,
+            runSpacing: 10,
             children: blocks.map((block) {
               final isSelected = _selectedBlock == block;
-              return GestureDetector(
+              return _buildArrearOptionChip(
+                text: '$block座',
+                isSelected: isSelected,
                 onTap: () {
                   setState(() {
                     _selectedBlock = block;
@@ -367,30 +460,6 @@ class MainScreenWidgetState extends State<MainScreenWidget> {
                     provider.setSelectedBlock(block);
                   });
                 },
-                child: Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                  decoration: BoxDecoration(
-                    color: isSelected
-                        ? Theme.of(context).primaryColor
-                        : Colors.grey.shade100,
-                    borderRadius: BorderRadius.circular(8),
-                    border: Border.all(
-                      color: isSelected
-                          ? Theme.of(context).primaryColor
-                          : Colors.grey.shade300,
-                      width: 1,
-                    ),
-                  ),
-                  child: Text(
-                    '${block}座',
-                    style: TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w500,
-                      color: isSelected ? Colors.white : Colors.black87,
-                    ),
-                  ),
-                ),
               );
             }).toList(),
           ),
@@ -408,44 +477,23 @@ class MainScreenWidgetState extends State<MainScreenWidget> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
-            '選擇樓層',
-            style: TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.w600,
-              color: Colors.black87,
-            ),
-          ),
+          _buildArrearSectionTitle('選擇樓層'),
           const SizedBox(height: 12),
           // 如果没有樓层数据，显示相应提示
           if (buildings.isEmpty) ...[
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: Theme.of(context).colorScheme.primary.withOpacity(0.10),
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: Colors.grey.shade200),
-              ),
-              child: Center(
-                child: Text(
-                  provider.blocks.length > 1 ? '請先選擇樓座' : '暫無樓層數據',
-                  style: TextStyle(
-                    fontSize: 14,
-                    color: Colors.grey.shade600,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-              ),
+            _buildArrearEmptyHint(
+              provider.blocks.length > 1 ? '請先選擇樓座' : '暫無樓層數據',
             ),
           ] else ...[
             Wrap(
               alignment: WrapAlignment.start, // 確保左對齊
-              spacing: 8,
-              runSpacing: 8,
+              spacing: 10,
+              runSpacing: 10,
               children: buildings.map((building) {
                 final isSelected = _selectedBuilding == building;
-                return GestureDetector(
+                return _buildArrearOptionChip(
+                  text: building,
+                  isSelected: isSelected,
                   onTap: () {
                     setState(() {
                       _selectedBuilding = building;
@@ -455,30 +503,6 @@ class MainScreenWidgetState extends State<MainScreenWidget> {
                       provider.setSelectedFloor(building);
                     });
                   },
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 16, vertical: 12),
-                    decoration: BoxDecoration(
-                      color: isSelected
-                          ? Theme.of(context).primaryColor
-                          : Colors.grey.shade100,
-                      borderRadius: BorderRadius.circular(8),
-                      border: Border.all(
-                        color: isSelected
-                            ? Theme.of(context).primaryColor
-                            : Colors.grey.shade300,
-                        width: 1,
-                      ),
-                    ),
-                    child: Text(
-                      building,
-                      style: TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w500,
-                        color: isSelected ? Colors.white : Colors.black87,
-                      ),
-                    ),
-                  ),
                 );
               }).toList(),
             ),
@@ -499,48 +523,25 @@ class MainScreenWidgetState extends State<MainScreenWidget> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
-            '選擇單位',
-            style: TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.w600,
-              color: Colors.black87,
-            ),
-          ),
+          _buildArrearSectionTitle('選擇單位'),
           const SizedBox(height: 12),
           // 如果没有單位数据，显示相应提示
           if (floors.isEmpty) ...[
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: Theme.of(context).colorScheme.primary.withOpacity(0.10),
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: Colors.grey.shade200),
-              ),
-              child: Center(
-                child: Text(
-                  '請先選擇樓層',
-                  style: TextStyle(
-                    fontSize: 14,
-                    color: Colors.grey.shade600,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-              ),
-            ),
+            _buildArrearEmptyHint('請先選擇樓層'),
           ] else ...[
             Wrap(
               alignment: WrapAlignment.start, // 確保左對齊與樓層選擇器一致
-              spacing: 8,
-              runSpacing: 8,
+              spacing: 10,
+              runSpacing: 10,
               children: floors.map((floor) {
                 final isSelected = _selectedFloor == floor;
                 // 检查该單位是否有其他分摊费用（根据费用类型决定是否显示淡紫色）
                 // final hasOtherFees =
                 //     provider.hasOtherFees(_selectedBuilding!, floor);
 
-                return GestureDetector(
+                return _buildArrearOptionChip(
+                  text: floor,
+                  isSelected: isSelected,
                   onTap: () {
                     setState(() {
                       _selectedFloor = floor;
@@ -550,34 +551,6 @@ class MainScreenWidgetState extends State<MainScreenWidget> {
                       _logger.i(' [MainScreenWidget] 選擇單位: "$floor"');
                     });
                   },
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 16, vertical: 12),
-                    decoration: BoxDecoration(
-                      color: isSelected
-                          ? Theme.of(context).primaryColor
-                          // : hasOtherFees
-                          //     ? Colors.purple.shade100
-                          : Colors.grey.shade100,
-                      borderRadius: BorderRadius.circular(8),
-                      border: Border.all(
-                        color: isSelected
-                            ? Theme.of(context).primaryColor
-                            // : hasOtherFees
-                            //     ? Colors.purple.shade300
-                            : Colors.grey.shade300,
-                        width: 1,
-                      ),
-                    ),
-                    child: Text(
-                      floor,
-                      style: TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w500,
-                        color: isSelected ? Colors.white : Colors.black87,
-                      ),
-                    ),
-                  ),
                 );
               }).toList(),
             ),
@@ -605,11 +578,11 @@ class MainScreenWidgetState extends State<MainScreenWidget> {
         style: ElevatedButton.styleFrom(
           backgroundColor: hasDataForSelection
               ? Theme.of(context).primaryColor
-              : Theme.of(context).colorScheme.primary.withOpacity(0.12),
+              : Theme.of(context).colorScheme.primary.withValues(alpha: 0.12),
           foregroundColor: hasDataForSelection ? Colors.white : Colors.black87,
-          padding: const EdgeInsets.symmetric(vertical: 8), // 保持原有 padding
+          padding: const EdgeInsets.symmetric(vertical: 7),
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(8),
+            borderRadius: BorderRadius.circular(10),
           ),
           elevation: hasDataForSelection ? 2 : 0,
         ),
@@ -621,8 +594,9 @@ class MainScreenWidgetState extends State<MainScreenWidget> {
                   ? _getInvalidSelectionText(provider)
                   : _getQueryButtonText(provider),
               style: const TextStyle(
-                fontSize: 14, // 保持原有文字大小
-                fontWeight: FontWeight.w600,
+                fontSize: 18,
+                fontWeight: FontWeight.w800,
+                height: 1.05,
               ),
             ),
             const SizedBox(height: 1),
@@ -632,8 +606,9 @@ class MainScreenWidgetState extends State<MainScreenWidget> {
                   ? _getInvalidSelectionEnglishText(provider)
                   : 'Query Payment Records',
               style: const TextStyle(
-                fontSize: 10,
-                fontWeight: FontWeight.normal,
+                fontSize: 12,
+                fontWeight: FontWeight.w700,
+                height: 1.05,
               ),
             ),
           ],
@@ -732,7 +707,7 @@ class MainScreenWidgetState extends State<MainScreenWidget> {
     return Container(
       padding: const EdgeInsets.all(0),
       decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.primary.withOpacity(0.12),
+        color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.12),
         borderRadius: BorderRadius.circular(12),
       ),
       child: Center(
@@ -781,7 +756,7 @@ class MainScreenWidgetState extends State<MainScreenWidget> {
         borderRadius: BorderRadius.circular(12),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.06),
+            color: Colors.black.withValues(alpha: 0.06),
             blurRadius: 8,
             offset: const Offset(0, 2),
           ),
@@ -1166,14 +1141,14 @@ class MainScreenWidgetState extends State<MainScreenWidget> {
         backgroundColor: isSelected
             ? Theme.of(context).primaryColor
             : !hasData
-                ? Theme.of(context).colorScheme.primary.withOpacity(0.12)
-                : Theme.of(context).colorScheme.primary.withOpacity(0.12),
+                ? Theme.of(context).colorScheme.primary.withValues(alpha: 0.12)
+                : Theme.of(context).colorScheme.primary.withValues(alpha: 0.12),
         foregroundColor: isSelected
             ? Colors.white
             : !hasData
                 ? Colors.black87
                 : Colors.black87,
-        padding: const EdgeInsets.symmetric(vertical: 6),
+        padding: const EdgeInsets.symmetric(vertical: 5),
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(8),
         ),
@@ -1184,16 +1159,18 @@ class MainScreenWidgetState extends State<MainScreenWidget> {
           Text(
             chineseTitle,
             style: const TextStyle(
-              fontSize: 14,
-              fontWeight: FontWeight.w600,
+              fontSize: 18,
+              fontWeight: FontWeight.w800,
+              height: 1.05,
             ),
           ),
           const SizedBox(height: 1),
           Text(
             englishTitle,
             style: const TextStyle(
-              fontSize: 10,
-              fontWeight: FontWeight.normal,
+              fontSize: 12,
+              fontWeight: FontWeight.w700,
+              height: 1.05,
             ),
           ),
         ],
@@ -1326,9 +1303,29 @@ class MainScreenWidgetState extends State<MainScreenWidget> {
                           return Card(
                             margin: const EdgeInsets.symmetric(vertical: 4.0),
                             child: ListTile(
-                              title: Text(announcement.title),
+                              contentPadding: const EdgeInsets.symmetric(
+                                  horizontal: 18.0, vertical: 8.0),
+                              title: Text(
+                                announcement.title,
+                                style: const TextStyle(
+                                  fontSize: 22,
+                                  fontWeight: FontWeight.w800,
+                                  height: 1.25,
+                                ),
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
+                              ),
                               subtitle: Text(
-                                  '${_getAnnouncementTypeText(announcement.uiType)} - ${announcement.description}'),
+                                '${_getAnnouncementTypeText(announcement.uiType)} - ${announcement.description}',
+                                style: TextStyle(
+                                  fontSize: 17,
+                                  fontWeight: FontWeight.w600,
+                                  color: Colors.grey.shade700,
+                                  height: 1.25,
+                                ),
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
+                              ),
                               onTap: () {
                                 _logger.i(
                                     ' [MainScreenWidget] 用戶點擊通告: ${announcement.title} (類型: ${announcement.uiType})');

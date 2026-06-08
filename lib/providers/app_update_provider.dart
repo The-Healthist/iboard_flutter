@@ -19,6 +19,8 @@ class AppUpdateProvider with ChangeNotifier {
   final Future<Map<String, String>> Function()? _currentVersionLoader;
   CancelToken? _downloadCancelToken;
   Timer? _updateCheckTimer;
+  static const String _apkMimeType = 'application/vnd.android.package-archive';
+  static const int _minValidApkSizeBytes = 1024 * 1024;
 
   // 当前版本信息
   String? _currentVersion;
@@ -457,13 +459,18 @@ class AppUpdateProvider with ChangeNotifier {
       // 检查文件是否已存在
       final file = File(filePath);
       if (await file.exists()) {
-        _logger.i(' APK文件已存在: $filePath');
-        _localApkPath = filePath;
-        _hasLocalApk = true;
-        _downloadProgress = 100;
-        _isDownloading = false;
-        notifyListeners();
-        return;
+        if (await _isValidApkFile(file)) {
+          _logger.i(' APK文件已存在: $filePath');
+          _localApkPath = filePath;
+          _hasLocalApk = true;
+          _downloadProgress = 100;
+          _isDownloading = false;
+          notifyListeners();
+          return;
+        }
+
+        _logger.w(' 已存在APK无效，删除后重新下载: $filePath');
+        await file.delete();
       }
 
       // 创建取消令牌
@@ -495,10 +502,18 @@ class AppUpdateProvider with ChangeNotifier {
       // 验证文件是否下载成功
       if (await file.exists()) {
         final fileSize = await file.length();
-        _logger.i(' APK下載成功: $filePath ($fileSize bytes)');
-        _localApkPath = filePath;
-        _hasLocalApk = true;
-        _downloadProgress = 100;
+        if (await _isValidApkFile(file)) {
+          _logger.i(' APK下載成功: $filePath ($fileSize bytes)');
+          _localApkPath = filePath;
+          _hasLocalApk = true;
+          _downloadProgress = 100;
+        } else {
+          _logger.e(' APK文件校验失败: $filePath ($fileSize bytes)');
+          await file.delete();
+          _error = '下载的安装包无效，请重新下载';
+          _hasLocalApk = false;
+          _localApkPath = null;
+        }
       } else {
         _logger.e(' APK文件下載失敗');
         _error = '文件下载失败';
@@ -558,6 +573,15 @@ class AppUpdateProvider with ChangeNotifier {
         return;
       }
 
+      if (!await _isValidApkFile(file)) {
+        _logger.e(' APK文件无效，已删除: $_localApkPath');
+        await file.delete();
+        _localApkPath = null;
+        _hasLocalApk = false;
+        _error = '安装包文件无效，请重新下载';
+        return;
+      }
+
       // 请求安装权限
       final installPermission = await _requestInstallPermission();
       if (!installPermission) {
@@ -567,7 +591,7 @@ class AppUpdateProvider with ChangeNotifier {
       }
 
       // 打开APK文件进行安装
-      final result = await OpenFile.open(_localApkPath!);
+      final result = await OpenFile.open(_localApkPath!, type: _apkMimeType);
 
       if (result.type == ResultType.done) {
         _logger.i(' APK安裝程序已啟動');
@@ -608,8 +632,15 @@ class AppUpdateProvider with ChangeNotifier {
 
       final file = File(filePath);
       if (await file.exists()) {
-        _localApkPath = filePath;
-        _hasLocalApk = true;
+        if (await _isValidApkFile(file)) {
+          _localApkPath = filePath;
+          _hasLocalApk = true;
+        } else {
+          _logger.w(' 本地APK文件无效，已删除: $filePath');
+          await file.delete();
+          _localApkPath = null;
+          _hasLocalApk = false;
+        }
       } else {
         _hasLocalApk = false;
         // 清理可能存在的旧版本APK文件
@@ -715,6 +746,44 @@ class AppUpdateProvider with ChangeNotifier {
     return true;
   }
 
+  Future<bool> _isValidApkFile(File file) async {
+    try {
+      if (!await file.exists()) {
+        return false;
+      }
+
+      final length = await file.length();
+      if (length < _minValidApkSizeBytes) {
+        _logger.w(' APK文件大小异常: ${file.path} ($length bytes)');
+        return false;
+      }
+
+      final raf = await file.open();
+      try {
+        final header = await raf.read(4);
+        if (header.length < 4) {
+          return false;
+        }
+
+        final isZip = header[0] == 0x50 &&
+            header[1] == 0x4B &&
+            header[2] == 0x03 &&
+            header[3] == 0x04;
+        if (!isZip) {
+          _logger.w(' APK文件头异常: ${file.path}');
+          return false;
+        }
+      } finally {
+        await raf.close();
+      }
+
+      return true;
+    } catch (e) {
+      _logger.e(' APK文件校验异常: $e');
+      return false;
+    }
+  }
+
   ///10. 使用系统下载管理器下载APK
   Future<void> downloadWithSystemDownloader() async {
     try {
@@ -795,12 +864,15 @@ class AppUpdateProvider with ChangeNotifier {
 
       for (final file in files) {
         if (file is File && file.path.contains(fileName)) {
-          _logger.i(' 在系統下載文件夾找到APK: ${file.path}');
-          _localApkPath = file.path;
-          _hasLocalApk = true;
-          _downloadProgress = 100;
-          notifyListeners();
-          return true;
+          if (await _isValidApkFile(file)) {
+            _logger.i(' 在系統下載文件夾找到APK: ${file.path}');
+            _localApkPath = file.path;
+            _hasLocalApk = true;
+            _downloadProgress = 100;
+            notifyListeners();
+            return true;
+          }
+          _logger.w(' 系统下载文件夹中的APK无效: ${file.path}');
         }
       }
 

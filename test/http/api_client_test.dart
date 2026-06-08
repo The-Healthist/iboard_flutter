@@ -85,6 +85,71 @@ void main() {
       }
     });
   });
+
+  group('ApiClient token refresh', () {
+    test('refreshes after a real 401 without preflight health checks',
+        () async {
+      var carouselCalls = 0;
+      var loginCalls = 0;
+      var healthCalls = 0;
+
+      final server = await _handlerServer((request) {
+        if (request.uri.path == '/api/device/client/health_test') {
+          healthCalls++;
+          request.response.statusCode = HttpStatus.unauthorized;
+          request.response.headers.contentType = ContentType.json;
+          request.response.write(jsonEncode({'error': 'expired'}));
+          return;
+        }
+
+        if (request.uri.path == '/api/device/login') {
+          loginCalls++;
+          request.response.headers.contentType = ContentType.json;
+          request.response.write(jsonEncode({'token': 'new-token'}));
+          return;
+        }
+
+        if (request.uri.path ==
+            '/api/device/client/carousel/top_advertisements') {
+          carouselCalls++;
+          request.response.headers.contentType = ContentType.json;
+          if (carouselCalls == 1) {
+            request.response.statusCode = HttpStatus.unauthorized;
+            request.response.write(jsonEncode({'error': 'expired'}));
+          } else {
+            request.response.write(jsonEncode([
+              {'id': 1, 'title': 'refreshed'},
+            ]));
+          }
+          return;
+        }
+
+        request.response.statusCode = HttpStatus.notFound;
+      });
+
+      try {
+        late final ApiClient client;
+        client = ApiClient(
+          baseUrl: 'http://127.0.0.1:${server.port}',
+          onNeedsTokenRefresh: () async {
+            final response = await client.login(deviceId: 'device-1');
+            return response['token'] as String?;
+          },
+        )..setAuthToken('expired-token');
+
+        final rows = await client.getCarouselTopAdvertisements();
+
+        expect(rows, [
+          {'id': 1, 'title': 'refreshed'},
+        ]);
+        expect(healthCalls, 0);
+        expect(loginCalls, 1);
+        expect(carouselCalls, 2);
+      } finally {
+        await server.close(force: true);
+      }
+    });
+  });
 }
 
 Future<HttpServer> _jsonServer(Object responseBody) async {
@@ -92,6 +157,17 @@ Future<HttpServer> _jsonServer(Object responseBody) async {
   server.listen((request) {
     request.response.headers.contentType = ContentType.json;
     request.response.write(jsonEncode(responseBody));
+    request.response.close();
+  });
+  return server;
+}
+
+Future<HttpServer> _handlerServer(
+  void Function(HttpRequest request) handler,
+) async {
+  final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+  server.listen((request) {
+    handler(request);
     request.response.close();
   });
   return server;

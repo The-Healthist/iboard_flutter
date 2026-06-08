@@ -274,7 +274,8 @@ class _CarouselWidgetState extends State<CarouselWidget>
   void smartUpdateCarousel(
       Map<String, Widget> newWidgetMap, List<String> newOrderedKeys) {
     if (newOrderedKeys.isEmpty) {
-      clearCarouselArray();
+      // Keep the current frame when an async refresh temporarily has no data.
+      // Clearing immediately causes a visible placeholder flash between states.
       return;
     }
 
@@ -610,7 +611,7 @@ class _CarouselWidgetState extends State<CarouselWidget>
                       shape: BoxShape.circle,
                       color: _currentIndex == index
                           ? Theme.of(context).primaryColor
-                          : Colors.grey.withOpacity(0.4),
+                          : Colors.grey.withValues(alpha: 0.4),
                     ),
                   );
                 }),

@@ -18,7 +18,7 @@ class FullscreenAdProvider extends ChangeNotifier {
 
   // 广告数据 - 使用AdvertisementProvider的轮播数据
   List<AdModel> _fullscreenAds = [];
-  List<Widget> _adWidgets = [];
+  final List<Widget> _adWidgets = [];
 
   // Widget缓存机制 - 避免重建正在播放的Widget
   final Map<String, Widget> _widgetCache = {};
@@ -29,6 +29,7 @@ class FullscreenAdProvider extends ChangeNotifier {
   bool _isActive = false;
 
   int _currentAdIndex = 0;
+  int _widgetGeneration = 0;
 
   // 时间记录
   DateTime? _currentAdStartTime;
@@ -94,13 +95,9 @@ class FullscreenAdProvider extends ChangeNotifier {
 
     _fullscreenAds = List<AdModel>.from(newFullscreenAds);
 
-    // 智能更新：如果正在播放，延迟更新Widget
-    if (_isActive && !_isPaused) {
-      // 标记需要更新，在下次切换时执行
-      _pendingWidgetUpdate = true;
-    } else {
-      // 不在播放状态，可以安全更新
-      await _smartCreateAdWidgets();
+    _pendingWidgetUpdate = _isActive && !_isPaused;
+    if (!_pendingWidgetUpdate) {
+      _clearAdWidgetCache();
     }
     notifyListeners();
   }
@@ -113,7 +110,7 @@ class FullscreenAdProvider extends ChangeNotifier {
   ///1，清空轮播广告列表
   void clearCarouselList() {
     _fullscreenAds.clear();
-    _adWidgets.clear();
+    _clearAdWidgetCache();
     // 清空全屏广告轮播列表
     notifyListeners();
   }
@@ -128,68 +125,13 @@ class FullscreenAdProvider extends ChangeNotifier {
     // 直接更新广告列表（不再使用自定义顺序）
     _fullscreenAds = List<AdModel>.from(newAds);
 
-    //  使用智能缓存检查重新创建广告Widget
-    await _ensureAdWidgets();
+    _clearAdWidgetCache();
     notifyListeners();
   }
 
   ///3, 检查两个广告列表是否相等
   bool _areAdsListsEqual(List<AdModel> list1, List<AdModel> list2) {
     return areCarouselAdListsEqual(list1, list2);
-  }
-
-  ///4, 智能创建广告Widget（使用缓存）
-  Future<void> _smartCreateAdWidgets() async {
-    final List<Widget> newWidgets = [];
-    final Set<String> usedKeys = {};
-
-    for (int i = 0; i < fullscreenAds.length; i++) {
-      final ad = fullscreenAds[i];
-      final key = 'fullscreen_ad_${ad.id}_$i';
-      usedKeys.add(key);
-
-      // 检查缓存中是否已有此Widget
-      if (_widgetCache.containsKey(key)) {
-        // 使用缓存的Widget
-        newWidgets.add(_widgetCache[key]!);
-      } else {
-        // 创建新Widget并缓存
-        final widget = await _createCachedAdWidget(ad, i);
-        _widgetCache[key] = widget;
-        newWidgets.add(widget);
-      }
-    }
-
-    // 清理不再使用的缓存
-    _widgetCache.removeWhere((key, value) => !usedKeys.contains(key));
-    _fileManagerCache.removeWhere((key, value) => !usedKeys.contains(key));
-
-    _adWidgets = newWidgets;
-    _pendingWidgetUpdate = false;
-  }
-
-  ///6, 创建缓存的广告Widget
-  Future<Widget> _createCachedAdWidget(AdModel ad, int index) async {
-    final key = 'fullscreen_ad_${ad.id}_$index';
-
-    // 重用或创建FileManager
-    if (!_fileManagerCache.containsKey(key)) {
-      _fileManagerCache[key] = FileManager();
-    }
-    final fileManager = _fileManagerCache[key]!;
-    // 确保文件已下载到本地
-    await fileManager.getFile(ad.file);
-
-    return FullAdWidget(
-      key: ValueKey(key),
-      ad: ad,
-      fileManager: fileManager,
-      // 始终从头开始播放
-      initialPlaybackPosition: Duration.zero,
-      onVideoProgressChanged: (adId, position) {
-        saveVideoProgress(adId, position);
-      },
-    );
   }
 
   ///7, 进入全屏广告模式并开始轮播
@@ -209,34 +151,12 @@ class FullscreenAdProvider extends ChangeNotifier {
         // 修正无效的广告索引: $_currentAdIndex → 0
         _currentAdIndex = 0;
       }
-      // 确保是否有广告Widget
-      await _ensureAdWidgets();
-
       startFullscreenAdTimer(_currentAdIndex);
       startDebugTimer();
       _currentStateStartTime = DateTime.now();
     }
 
     notifyListeners();
-  }
-
-  ///8, 确保广告Widget存在（智能缓存检查）
-  Future<void> _ensureAdWidgets() async {
-    final List<Widget> widgets = [];
-
-    for (int i = 0; i < fullscreenAds.length; i++) {
-      final ad = fullscreenAds[i];
-      final key = 'fullscreen_ad_${ad.id}_$i';
-      if (_widgetCache.containsKey(key)) {
-        widgets.add(_widgetCache[key]!);
-      } else {
-        final widget = await _createCachedAdWidget(ad, i);
-        _widgetCache[key] = widget;
-        widgets.add(widget);
-      }
-    }
-
-    _adWidgets = widgets;
   }
 
   ///9, 启动全屏广告计时（简化版本 - 只管理定时器）
@@ -320,13 +240,18 @@ class FullscreenAdProvider extends ChangeNotifier {
       return;
     }
 
+    // 切换前先释放旧全屏视频控制器，避免新旧 ExoPlayer 重叠导致内存峰值。
+    await _cleanupPreviousControllers();
+
     // 切换到下一个广告索引
     _currentAdIndex = (_currentAdIndex + 1) % fullscreenAds.length;
 
     // 检查是否有待更新的Widget
     if (_pendingWidgetUpdate) {
-      await _smartCreateAdWidgets();
+      _pendingWidgetUpdate = false;
     }
+
+    _clearAdWidgetCache();
 
     // 重置时间记录
     _adElapsedTime = Duration.zero;
@@ -486,9 +411,7 @@ class FullscreenAdProvider extends ChangeNotifier {
         _ignoreCleanupError();
       }
 
-      _widgetCache.clear();
-      _fileManagerCache.clear();
-      _adWidgets.clear();
+      _clearAdWidgetCache();
     });
   }
 
@@ -560,7 +483,8 @@ class FullscreenAdProvider extends ChangeNotifier {
 
     //  優化：使用懶加載策略，只為當前廣告創建Widget
     final currentAd = fullscreenAds[_currentAdIndex];
-    final key = 'fullscreen_ad_${currentAd.id}_$_currentAdIndex';
+    final key =
+        'fullscreen_ad_${currentAd.id}_${_currentAdIndex}_$_widgetGeneration';
 
     // 檢查緩存中是否已有Widget
     if (_widgetCache.containsKey(key)) {
@@ -596,6 +520,13 @@ class FullscreenAdProvider extends ChangeNotifier {
     }
   }
 
+  void _clearAdWidgetCache() {
+    _widgetCache.clear();
+    _fileManagerCache.clear();
+    _adWidgets.clear();
+    _widgetGeneration++;
+  }
+
   @override
   void dispose() {
     _isDisposed = true;
@@ -608,8 +539,7 @@ class FullscreenAdProvider extends ChangeNotifier {
     _debugTimer = null;
 
     // 清理缓存 - 保留这些，因为需要清理内存引用
-    _widgetCache.clear();
-    _fileManagerCache.clear();
+    _clearAdWidgetCache();
 
     // 控制器由 EnhancedVideoPoolManager 统一管理，无需在此处理
     _videoProgressCache.clear();

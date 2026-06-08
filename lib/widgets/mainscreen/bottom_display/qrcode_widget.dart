@@ -228,7 +228,17 @@ class QrcodeWidgetState extends State<QrcodeWidget> {
                 ? 10.0
                 : 16.0;
         final double qrSize =
-            (cardWidth - padding * 2 - gap - 56).clamp(56.0, 100.0);
+            (cardWidth - padding * 2 - gap - 92).clamp(84.0, 136.0);
+        final double titleFontSize = veryCompact
+            ? 16.0
+            : compact
+                ? 19.0
+                : 22.0;
+        final double subtitleFontSize = veryCompact
+            ? 14.0
+            : compact
+                ? 16.0
+                : 19.0;
 
         return Container(
           decoration: BoxDecoration(
@@ -270,8 +280,8 @@ class QrcodeWidgetState extends State<QrcodeWidget> {
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: TextStyle(
-                        fontSize: compact ? 12 : 14,
-                        fontWeight: FontWeight.w600,
+                        fontSize: titleFontSize,
+                        fontWeight: FontWeight.w700,
                         color: Colors.blueGrey[800],
                       ),
                     ),
@@ -279,7 +289,8 @@ class QrcodeWidgetState extends State<QrcodeWidget> {
                     Text(
                       subtitle,
                       style: TextStyle(
-                        fontSize: compact ? 10 : 12,
+                        fontSize: subtitleFontSize,
+                        fontWeight: FontWeight.w600,
                         color: Colors.blueGrey[600],
                       ),
                       maxLines: 2,

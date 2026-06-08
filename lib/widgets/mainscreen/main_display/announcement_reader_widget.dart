@@ -1,8 +1,10 @@
 import 'dart:async';
 import 'dart:io';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:iboard_app/models/announcement_model.dart'; // Changed import
 import 'package:iboard_app/managers/managers.dart';
+import 'package:iboard_app/managers/pdf_page_cache_manager.dart';
 import 'package:iboard_app/providers/state_provider.dart';
 import 'package:flutter_pdfview/flutter_pdfview.dart';
 import 'package:video_player/video_player.dart';
@@ -15,6 +17,8 @@ class AnnouncementReaderWidget extends StatefulWidget {
   final FileManager fileManager;
   final VoidCallback? onHomeButtonPressed;
   final bool isInCarouselMode; // 是否在轮播模式中
+  final int? carouselIndex;
+  final ValueListenable<int>? visibleCarouselIndexListenable;
 
   // 新增：視頻播放進度回調
   final Function(Duration)? onVideoProgressChanged;
@@ -32,6 +36,8 @@ class AnnouncementReaderWidget extends StatefulWidget {
     required this.fileManager,
     this.onHomeButtonPressed,
     this.isInCarouselMode = false, // 默认不在轮播模式
+    this.carouselIndex,
+    this.visibleCarouselIndexListenable,
     this.onVideoProgressChanged,
     this.initialPlaybackPosition,
     this.onPdfCompleted,
@@ -54,6 +60,9 @@ class AnnouncementReaderWidgetState extends State<AnnouncementReaderWidget> {
   // PDF 控制相關
   int _totalPages = 0;
   int _currentPage = 0;
+  List<String> _pdfPageImagePaths = const [];
+  bool _isRenderingPdfImages = false;
+  bool _isPdfImageLoadStarted = false;
   Timer? _pdfPageTimer;
   bool _isPdfAutoPlaying = false;
   bool _isPdfPaginationPaused = false; // PDF分頁暂停状态
@@ -62,6 +71,7 @@ class AnnouncementReaderWidgetState extends State<AnnouncementReaderWidget> {
   void initState() {
     super.initState();
     _loadFile();
+    widget.visibleCarouselIndexListenable?.addListener(_onVisibleIndexChanged);
 
     // 如果有初始播放位置，設置它
     if (widget.initialPlaybackPosition != null) {
@@ -69,11 +79,29 @@ class AnnouncementReaderWidgetState extends State<AnnouncementReaderWidget> {
     }
   }
 
+  @override
+  void didUpdateWidget(covariant AnnouncementReaderWidget oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.visibleCarouselIndexListenable !=
+        widget.visibleCarouselIndexListenable) {
+      oldWidget.visibleCarouselIndexListenable
+          ?.removeListener(_onVisibleIndexChanged);
+      widget.visibleCarouselIndexListenable
+          ?.addListener(_onVisibleIndexChanged);
+    }
+    _startPdfImageLoadIfReady();
+  }
+
   Future<void> _loadFile() async {
     if (!mounted) return; // Added mounted check
     setState(() {
       _isLoading = true;
       _error = null;
+      _pdfPageImagePaths = const [];
+      _totalPages = 0;
+      _currentPage = 0;
+      _isRenderingPdfImages = false;
+      _isPdfImageLoadStarted = false;
     });
 
     if (widget.announcement.file.localFilePath != null &&
@@ -98,6 +126,13 @@ class AnnouncementReaderWidgetState extends State<AnnouncementReaderWidget> {
       if (mimeType == 'video/mp4') {
         _initializeVideoPlayer();
       } else {
+        if (mimeType == 'application/pdf' && widget.isInCarouselMode) {
+          setState(() {
+            _isLoading = false;
+          });
+          _startPdfImageLoadIfReady();
+          return;
+        }
         if (mounted) {
           setState(() {
             _isLoading = false;
@@ -111,6 +146,34 @@ class AnnouncementReaderWidgetState extends State<AnnouncementReaderWidget> {
         });
       }
     }
+  }
+
+  void _onVisibleIndexChanged() {
+    _startPdfImageLoadIfReady();
+  }
+
+  bool get _isCurrentCarouselPage {
+    if (!widget.isInCarouselMode) {
+      return true;
+    }
+    final carouselIndex = widget.carouselIndex;
+    final visibleIndex = widget.visibleCarouselIndexListenable?.value;
+    return carouselIndex != null &&
+        visibleIndex != null &&
+        carouselIndex == visibleIndex;
+  }
+
+  void _startPdfImageLoadIfReady() {
+    if (!mounted ||
+        !widget.isInCarouselMode ||
+        _localFilePath == null ||
+        _isPdfImageLoadStarted ||
+        !_isCurrentCarouselPage) {
+      return;
+    }
+
+    _isPdfImageLoadStarted = true;
+    _loadPdfPageImagesForCarousel();
   }
 
   void _initializeVideoPlayer() {
@@ -153,6 +216,50 @@ class AnnouncementReaderWidgetState extends State<AnnouncementReaderWidget> {
     });
   }
 
+  Future<void> _loadPdfPageImagesForCarousel() async {
+    if (_localFilePath == null || !mounted) return;
+
+    setState(() {
+      _isRenderingPdfImages = true;
+    });
+
+    try {
+      final result = await PdfPageCacheManager.instance.getPageImages(
+        pdfFile: File(_localFilePath!),
+        cacheKey: _pdfCacheKey,
+      );
+
+      if (!mounted) return;
+
+      setState(() {
+        _pdfPageImagePaths = result.pagePaths;
+        _totalPages = result.pagePaths.length;
+        _currentPage = 0;
+        _isRenderingPdfImages = false;
+        _isLoading = false;
+      });
+
+      if (_totalPages > 1) {
+        _startPdfAutoPlay();
+      }
+    } catch (error) {
+      if (!mounted) return;
+      setState(() {
+        _isRenderingPdfImages = false;
+        _isLoading = false;
+        _error = 'Could not prepare PDF preview.';
+      });
+    }
+  }
+
+  String get _pdfCacheKey {
+    final file = widget.announcement.file;
+    if (file.md5.isNotEmpty) {
+      return 'file_${file.id}_${file.md5}';
+    }
+    return 'file_${file.id}_${widget.announcement.updatedAt.millisecondsSinceEpoch}';
+  }
+
   /// 視頻播放進度變化監聽器
   void _onVideoProgressChanged() {
     if (_videoController != null &&
@@ -176,6 +283,8 @@ class AnnouncementReaderWidgetState extends State<AnnouncementReaderWidget> {
 
     // 清理PDF相關
     _stopPdfAutoPlay();
+    widget.visibleCarouselIndexListenable
+        ?.removeListener(_onVisibleIndexChanged);
     _pdfController = null;
 
     super.dispose();
@@ -232,6 +341,8 @@ class AnnouncementReaderWidgetState extends State<AnnouncementReaderWidget> {
       );
     }
 
+    final mimeType = widget.announcement.file.mimeType.toLowerCase();
+
     if (_localFilePath == null) {
       return const Center(
         child: Column(
@@ -260,12 +371,12 @@ class AnnouncementReaderWidgetState extends State<AnnouncementReaderWidget> {
       );
     }
 
-    final mimeType = widget.announcement.file.mimeType.toLowerCase();
-
     // 主要內容區域
     Widget contentWidget;
 
-    if (mimeType == 'application/pdf') {
+    if (mimeType == 'application/pdf' && widget.isInCarouselMode) {
+      contentWidget = _buildPdfImageCarouselView();
+    } else if (mimeType == 'application/pdf') {
       contentWidget = Stack(
         children: [
           PDFView(
@@ -307,7 +418,7 @@ class AnnouncementReaderWidgetState extends State<AnnouncementReaderWidget> {
               child: Container(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                 decoration: BoxDecoration(
-                  color: Colors.black.withOpacity(0.7),
+                  color: Colors.black.withValues(alpha: 0.7),
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: Text(
@@ -394,7 +505,7 @@ class AnnouncementReaderWidgetState extends State<AnnouncementReaderWidget> {
                 child: Container(
                   padding: const EdgeInsets.all(8),
                   decoration: BoxDecoration(
-                    color: Colors.black.withOpacity(0.6),
+                    color: Colors.black.withValues(alpha: 0.6),
                     borderRadius: BorderRadius.circular(20),
                   ),
                   child: const Icon(
@@ -421,7 +532,7 @@ class AnnouncementReaderWidgetState extends State<AnnouncementReaderWidget> {
                     width: 40,
                     height: 40,
                     decoration: BoxDecoration(
-                      color: Colors.black.withOpacity(0.6),
+                      color: Colors.black.withValues(alpha: 0.6),
                       shape: BoxShape.circle,
                     ),
                     alignment: Alignment.center,
@@ -586,6 +697,58 @@ class AnnouncementReaderWidgetState extends State<AnnouncementReaderWidget> {
     }
   }
 
+  Widget _buildPdfImageCarouselView() {
+    if (_isRenderingPdfImages || _pdfPageImagePaths.isEmpty) {
+      if (_isCurrentCarouselPage) {
+        return const Center(child: CircularProgressIndicator());
+      }
+      return const SizedBox.expand(
+        child: ColoredBox(color: Colors.white),
+      );
+    }
+
+    final String pagePath = _pdfPageImagePaths[
+        _currentPage.clamp(0, _pdfPageImagePaths.length - 1)];
+
+    return Stack(
+      children: [
+        Positioned.fill(
+          child: Container(
+            color: Colors.white,
+            child: Image.file(
+              File(pagePath),
+              fit: BoxFit.contain,
+              gaplessPlayback: true,
+              errorBuilder: (context, error, stackTrace) {
+                return const Center(child: Text('Could not display PDF page.'));
+              },
+            ),
+          ),
+        ),
+        if (_totalPages > 1)
+          Positioned(
+            bottom: 16,
+            right: 16,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              decoration: BoxDecoration(
+                color: Colors.black.withValues(alpha: 0.7),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Text(
+                '${_currentPage + 1}/$_totalPages',
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ),
+          ),
+      ],
+    );
+  }
+
   ///19, 啟動PDF自動翻頁 - 仅在轮播模式下启动
   void _startPdfAutoPlay() {
     // debugPrint(
@@ -654,12 +817,19 @@ class AnnouncementReaderWidgetState extends State<AnnouncementReaderWidget> {
       if (_currentPage < _totalPages - 1) {
         // 切換到下一頁
         final nextPage = _currentPage + 1;
-        final success = await _pdfController?.setPage(nextPage);
 
-        if (success == true) {
+        if (_pdfPageImagePaths.isNotEmpty) {
           setState(() {
             _currentPage = nextPage;
           });
+        } else {
+          final success = await _pdfController?.setPage(nextPage);
+
+          if (success == true) {
+            setState(() {
+              _currentPage = nextPage;
+            });
+          }
         }
       } else {
         // 已到最後一頁，通知外部可以切換通告了

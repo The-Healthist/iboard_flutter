@@ -202,7 +202,8 @@ class ThirdPartyPaymentResponse {
   bool get isSuccess => state == 2;
 
   /// 是否支付失敗
-  bool get isFailed => state == 3 || state == -1;
+  bool get isFailed =>
+      state == 3 || state == 4 || state == 5 || state == 6 || state == -1;
 
   /// 是否處理中/待支付 (state=0:訂單生成, state=1:支付中)
   bool get isProcessing => state == 0 || state == 1;

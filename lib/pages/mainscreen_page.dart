@@ -1,7 +1,5 @@
 import 'dart:async'; // Added import for Timer
 
-import 'package:flutter/foundation.dart'
-    show listEquals; // Added import for listEquals
 import 'package:flutter/material.dart';
 import 'package:iboard_app/models/ad_model.dart';
 import 'package:iboard_app/models/announcement_model.dart';
@@ -43,6 +41,8 @@ class AnnouncementPageState extends State<AnnouncementPage> {
   bool _isBottomCarouselPaused = false;
   AppState? _previousAppState;
   AppState? _lastLoggedAppState; // 添加用于追踪上次记录的应用状态
+  String? _previousAnnouncementSignature;
+  String? _previousAdvertisementSignature;
 
   // 设备ID点击计数相关
   int _deviceIdClickCount = 0; // 设备ID点击次数
@@ -459,227 +459,349 @@ class AnnouncementPageState extends State<AnnouncementPage> {
     }
   }
 
+  void _handleAppStateChange(AppState currentAppState) {
+    if (_previousAppState == currentAppState) return;
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+
+      _updateCarouselStateBasedOnAppState(currentAppState);
+
+      if (currentAppState == AppState.fullscreenAd) {
+        _pauseAllCarousels();
+      } else if (currentAppState == AppState.manualOperation) {
+        _handleManualOperationMode();
+      } else if (currentAppState == AppState.defaultState) {
+        _resumeAllCarousels();
+      }
+    });
+
+    _previousAppState = currentAppState;
+  }
+
+  void _handleAnnouncementDataChange(_AnnouncementListenerData data) {
+    if (_previousAnnouncementSignature == data.signature) return;
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+
+      final currentCarouselAnnouncements = data.carouselAnnouncements;
+      final bool shouldUpdate = currentCarouselAnnouncements.isNotEmpty ||
+          _previousAnnouncementsForBuild == null ||
+          (_previousAnnouncementsForBuild != null &&
+              _previousAnnouncementsForBuild!.isNotEmpty &&
+              currentCarouselAnnouncements.isEmpty);
+
+      if (shouldUpdate) {
+        try {
+          _initializeMidWidgets();
+          _previousAnnouncementsForBuild =
+              List.from(currentCarouselAnnouncements);
+          _previousAnnouncementSignature = data.signature;
+        } catch (e) {
+          debugPrint('[MainScreenPage] 初始化中部轮播失败，保持现有状态: $e');
+        }
+      } else if (data.error != null) {
+        debugPrint('[MainScreenPage] 通告获取错误: ${data.error}');
+      }
+    });
+  }
+
+  void _handleAdvertisementDataChange(_AdvertisementListenerData data) {
+    if (_previousAdvertisementSignature == data.signature) return;
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+
+      final currentAdvertisements = data.topAdvertisements;
+      if (currentAdvertisements.isNotEmpty ||
+          _previousAdvertisementsForBuild == null) {
+        try {
+          _initializeTopWidgets();
+
+          final fullAdCarouselProvider = context.read<FullscreenAdProvider>();
+          fullAdCarouselProvider.updateFullscreenAds(data.fullAdvertisements);
+
+          _previousAdvertisementsForBuild = List.from(currentAdvertisements);
+          _previousAdvertisementSignature = data.signature;
+        } catch (e) {
+          debugPrint('[MainScreenPage] 初始化顶部轮播失败，保持现有状态: $e');
+        }
+      } else if (data.error != null) {
+        debugPrint('[MainScreenPage] 广告获取错误: ${data.error}');
+      }
+    });
+  }
+
   @override
 
   ///12，处理视频播放器的初始化和播放
   Widget build(BuildContext context) {
-    // Listen to AnnouncementProvider for changes
-    final announcementProvider = context.watch<AnnouncementProvider>();
-    final currentCarouselAnnouncements =
-        announcementProvider.carouselAnnouncements; // 监听轮播专用通告数组
-
-    // listen to AdvertisementProvider for changes
-    final advertisementProvider = context.watch<AdvertisementProvider>();
-    final currentAdvertisements = advertisementProvider.topAdvertisements;
-
-    // Listen to AppDataProvider for device ID
-    final appDataProvider = context.watch<AppDataProvider>();
-    final deviceId = appDataProvider.deviceId;
-
-    // Listen to CarouselStateProvider for fullscreen ad state changes
-    final carouselStateProvider = context.watch<CarouselStateProvider>();
-    final currentAppState = carouselStateProvider.currentAppState;
-
-    // listen to state changes for carousel and media control
-    if (_previousAppState != currentAppState) {
-      // use addPostFrameCallback to delay all state update operations, avoid setState during build
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (!mounted) return;
-
-        // 更新轮播状态基于当前应用状态
-        _updateCarouselStateBasedOnAppState(currentAppState);
-
-        if (currentAppState == AppState.fullscreenAd) {
-          _pauseAllCarousels();
-        } else if (currentAppState == AppState.manualOperation) {
-          _handleManualOperationMode();
-        } else if (currentAppState == AppState.defaultState) {
-          // 確保通告輪播在默認狀態下恢復
-          _resumeAllCarousels();
-        }
-      });
-
-      _previousAppState = currentAppState;
-    }
-
-    // If carousel announcements have changed, re-initialize the mid widgets
-    // 现在监听轮播通告数组的变化而不是所有通告的变化
-    if (_previousAnnouncementsForBuild == null ||
-        !listEquals(
-            _previousAnnouncementsForBuild, currentCarouselAnnouncements)) {
-      // 使用 addPostFrameCallback 延迟执行状态更新，避免 setState during build
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (!mounted) return;
-
-        // 检查新的通告数据是否有效，或者是否从有数据变为无数据
-        final bool shouldUpdate = currentCarouselAnnouncements.isNotEmpty ||
-            _previousAnnouncementsForBuild == null ||
-            (_previousAnnouncementsForBuild != null &&
-                _previousAnnouncementsForBuild!.isNotEmpty &&
-                currentCarouselAnnouncements.isEmpty);
-
-        if (shouldUpdate) {
-          try {
-            _initializeMidWidgets();
-            _previousAnnouncementsForBuild =
-                List.from(currentCarouselAnnouncements); // 更新存储的轮播通告列表
-          } catch (e) {
-            debugPrint('[MainScreenPage] 初始化中部轮播失败，保持现有状态: $e');
-            // 不更新 _previousAnnouncementsForBuild，保持现有状态
-          }
-        } else {
-          // 新数据为空但有旧数据，记录警告但不更新（保持现有轮播继续工作）
-          // 检查是否有网络错误信息
-          if (announcementProvider.error != null) {
-            debugPrint(
-                '[MainScreenPage] 通告获取错误: ${announcementProvider.error}');
-          }
-        }
-      });
-    }
-
-    // If advertisements have changed, re-initialize the top widgets
-    if (_previousAdvertisementsForBuild == null ||
-        !listEquals(_previousAdvertisementsForBuild, currentAdvertisements)) {
-      // 使用 addPostFrameCallback 延迟执行状态更新，避免 setState during build
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (!mounted) return;
-
-        // 检查新的广告数据是否有效
-        if (currentAdvertisements.isNotEmpty ||
-            _previousAdvertisementsForBuild == null) {
-          // 只有当新数据非空或首次初始化时才更新
-          try {
-            _initializeTopWidgets();
-
-            // 同时更新全屏广告数据
-            final fullAdCarouselProvider = context.read<FullscreenAdProvider>();
-            final fullAds = advertisementProvider.fullAdvertisements;
-            fullAdCarouselProvider.updateFullscreenAds(fullAds);
-
-            _previousAdvertisementsForBuild =
-                List.from(currentAdvertisements); // Update the stored list
-          } catch (e) {
-            debugPrint('[MainScreenPage] 初始化顶部轮播失败，保持现有状态: $e');
-            // 不更新 _previousAdvertisementsForBuild，保持现有状态
-          }
-        } else {
-          // 新数据为空但有旧数据，记录警告但不更新
-          // 检查是否有网络错误信息
-          if (advertisementProvider.error != null) {
-            debugPrint(
-                '[MainScreenPage] 广告获取错误: ${advertisementProvider.error}');
-          }
-        }
-      });
-    }
-
     return Scaffold(
       body: SafeArea(
-        child: Column(
+        child: Stack(
           children: [
-            // 上部區域 - 6/24 比例
-            Expanded(
-              flex: 6,
-              child: SizedBox(
-                  width: double.infinity,
-                  child: Consumer<TopAdCarouselProvider>(
-                      builder: (context, topAdProvider, child) {
-                    return custom_carousel.CarouselWidget(
-                      controller: topAdProvider.topCarouselController,
-                      // autoPlayDuration is effectively managed by _startTopAdTimer
-                      showIndicators: false,
-                      allowManualSwipe: false,
-                      onPageChanged: (index) {
-                        if (topAdProvider.topAds.length > 1) {
-                          topAdProvider.onPageChanged(index);
-                        }
-                        // setState(() {
-                        //   _topCurrentIndex = index;
-                        // });
-                      },
-                    );
-                  })),
-            ),
-            // 中部區域 - 14/24 比例
-            Expanded(
-              flex: 14,
-              child: Container(
-                width: double.infinity,
-                color: Colors.grey.shade50, // Background for the carousel area
-                child: Stack(
-                  children: [
-                    // 轮播内容 - 始终存在，不被销毁
-                    Consumer<AnnouncementCarouselProvider>(
-                      builder: (context, announcementCarouselProvider, child) {
-                        return custom_carousel.CarouselWidget(
-                          controller: announcementCarouselProvider
-                              .midCarouselController,
-                          showIndicators: false,
-                          allowManualSwipe: false,
-                          onPageChanged: (index) {},
-                        );
-                      },
-                    ),
-                    // 欠费查询覆盖层 - 已删除，功能整合到MainScreenWidget
-                  ],
+            const _AnnouncementDataListener(),
+            const _AdvertisementDataListener(),
+            const _AppStateListener(),
+            Column(
+              children: [
+                // 上部區域 - 6/24 比例
+                Expanded(
+                  flex: 6,
+                  child: RepaintBoundary(
+                    child: SizedBox(
+                        width: double.infinity,
+                        child: Consumer<TopAdCarouselProvider>(
+                            builder: (context, topAdProvider, child) {
+                          return custom_carousel.CarouselWidget(
+                            controller: topAdProvider.topCarouselController,
+                            // autoPlayDuration is effectively managed by _startTopAdTimer
+                            showIndicators: false,
+                            allowManualSwipe: false,
+                            onPageChanged: (index) {
+                              if (topAdProvider.topAds.length > 1) {
+                                topAdProvider.onPageChanged(index);
+                              }
+                              // setState(() {
+                              //   _topCurrentIndex = index;
+                              // });
+                            },
+                          );
+                        })),
+                  ),
                 ),
-              ),
-            ),
-            // 底部區域 - 4/24 比例 (天气和二维码轮播区域)
-            Expanded(
-              flex: 4,
-              child: SizedBox(
-                width: double.infinity,
-                child: Column(
-                  children: [
-                    // 新闻跑马灯 - 1/8 比例
-                    Container(
-                      height: 40,
+                // 中部區域 - 14/24 比例
+                Expanded(
+                  flex: 14,
+                  child: RepaintBoundary(
+                    child: Container(
                       width: double.infinity,
-                      margin: const EdgeInsets.symmetric(
-                          horizontal: 8, vertical: 4),
-                      child: LayoutBuilder(
-                        builder: (context, constraints) {
-                          return RthkNewsTickerWidget(
+                      color: Colors.grey.shade50,
+                      child: Stack(
+                        children: [
+                          // 轮播内容 - 始终存在，不被销毁
+                          Consumer<AnnouncementCarouselProvider>(
+                            builder:
+                                (context, announcementCarouselProvider, child) {
+                              return custom_carousel.CarouselWidget(
+                                controller: announcementCarouselProvider
+                                    .midCarouselController,
+                                showIndicators: false,
+                                allowManualSwipe: false,
+                                onPageChanged: (index) {
+                                  announcementCarouselProvider
+                                      .updateVisibleCarouselIndex(index);
+                                },
+                              );
+                            },
+                          ),
+                          // 欠费查询覆盖层 - 已删除，功能整合到MainScreenWidget
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+                // 底部區域 - 4/24 比例 (天气和二维码轮播区域)
+                Expanded(
+                  flex: 4,
+                  child: SizedBox(
+                    width: double.infinity,
+                    child: Column(
+                      children: [
+                        // 新闻跑马灯 - 1/8 比例
+                        RepaintBoundary(
+                          child: Container(
                             height: 40,
-                            width: constraints.maxWidth,
+                            width: double.infinity,
+                            margin: const EdgeInsets.symmetric(
+                                horizontal: 8, vertical: 4),
+                            child: LayoutBuilder(
+                              builder: (context, constraints) {
+                                return RthkNewsTickerWidget(
+                                  height: 40,
+                                  width: constraints.maxWidth,
+                                );
+                              },
+                            ),
+                          ),
+                        ),
+                        // 底部轮播 - 7/8 比例
+                        const Expanded(
+                          child: RepaintBoundary(
+                            child: BottomDisplayWidget(),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                // 设备ID显示区域 - 1/24 比例
+                Container(
+                  width: double.infinity,
+                  height: 20,
+                  padding: const EdgeInsets.symmetric(horizontal: 8),
+                  child: Center(
+                    child: GestureDetector(
+                      onTap: _handleDeviceIdClick,
+                      child: Selector<AppDataProvider, String?>(
+                        selector: (_, appDataProvider) =>
+                            appDataProvider.deviceId,
+                        builder: (context, deviceId, child) {
+                          return Text(
+                            deviceId != null ? '設備ID: $deviceId' : '設備ID: 未知',
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: Colors.grey.shade700,
+                              fontWeight: FontWeight.w500,
+                            ),
+                            overflow: TextOverflow.ellipsis,
+                            maxLines: 1,
                           );
                         },
                       ),
                     ),
-                    // 底部轮播 - 7/8 比例
-                    const Expanded(
-                      child: BottomDisplayWidget(),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-            // 设备ID显示区域 - 1/24 比例
-            Container(
-              width: double.infinity,
-              height: 20,
-              padding: const EdgeInsets.symmetric(horizontal: 8),
-              child: Center(
-                child: GestureDetector(
-                  onTap: _handleDeviceIdClick,
-                  child: Text(
-                    deviceId != null ? '設備ID: $deviceId' : '設備ID: 未知',
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: Colors.grey.shade700,
-                      fontWeight: FontWeight.w500,
-                    ),
-                    overflow: TextOverflow.ellipsis,
-                    maxLines: 1,
                   ),
                 ),
-              ),
+              ],
             ),
           ],
         ),
       ),
     );
   }
+}
+
+class _AppStateListener extends StatelessWidget {
+  const _AppStateListener();
+
+  @override
+  Widget build(BuildContext context) {
+    return Selector<CarouselStateProvider, AppState>(
+      selector: (_, provider) => provider.currentAppState,
+      builder: (context, appState, child) {
+        context
+            .findAncestorStateOfType<AnnouncementPageState>()
+            ?._handleAppStateChange(appState);
+        return const SizedBox.shrink();
+      },
+    );
+  }
+}
+
+class _AnnouncementDataListener extends StatelessWidget {
+  const _AnnouncementDataListener();
+
+  @override
+  Widget build(BuildContext context) {
+    return Selector<AnnouncementProvider, _AnnouncementListenerData>(
+      selector: (_, provider) => _AnnouncementListenerData(
+        carouselAnnouncements: provider.carouselAnnouncements,
+        error: provider.error,
+      ),
+      builder: (context, data, child) {
+        context
+            .findAncestorStateOfType<AnnouncementPageState>()
+            ?._handleAnnouncementDataChange(data);
+        return const SizedBox.shrink();
+      },
+    );
+  }
+}
+
+class _AdvertisementDataListener extends StatelessWidget {
+  const _AdvertisementDataListener();
+
+  @override
+  Widget build(BuildContext context) {
+    return Selector<AdvertisementProvider, _AdvertisementListenerData>(
+      selector: (_, provider) => _AdvertisementListenerData(
+        topAdvertisements: provider.topCarouselAdvertisements.isNotEmpty
+            ? provider.topCarouselAdvertisements
+            : provider.topAdvertisements,
+        fullAdvertisements: provider.fullCarouselAdvertisements.isNotEmpty
+            ? provider.fullCarouselAdvertisements
+            : provider.fullAdvertisements,
+        error: provider.error,
+      ),
+      builder: (context, data, child) {
+        context
+            .findAncestorStateOfType<AnnouncementPageState>()
+            ?._handleAdvertisementDataChange(data);
+        return const SizedBox.shrink();
+      },
+    );
+  }
+}
+
+@immutable
+class _AnnouncementListenerData {
+  final List<AnnouncementModel> carouselAnnouncements;
+  final String? error;
+  final String signature;
+
+  _AnnouncementListenerData({
+    required List<AnnouncementModel> carouselAnnouncements,
+    required this.error,
+  })  : carouselAnnouncements = List.unmodifiable(carouselAnnouncements),
+        signature = carouselAnnouncements.map(_announcementSignature).join('|');
+
+  @override
+  bool operator ==(Object other) {
+    return other is _AnnouncementListenerData &&
+        other.signature == signature &&
+        other.error == error;
+  }
+
+  @override
+  int get hashCode => Object.hash(signature, error);
+}
+
+@immutable
+class _AdvertisementListenerData {
+  final List<AdModel> topAdvertisements;
+  final List<AdModel> fullAdvertisements;
+  final String? error;
+  final String signature;
+
+  _AdvertisementListenerData({
+    required List<AdModel> topAdvertisements,
+    required List<AdModel> fullAdvertisements,
+    required this.error,
+  })  : topAdvertisements = List.unmodifiable(topAdvertisements),
+        fullAdvertisements = List.unmodifiable(fullAdvertisements),
+        signature = [
+          topAdvertisements.map(_adSignature).join('|'),
+          fullAdvertisements.map(_adSignature).join('|'),
+        ].join('::');
+
+  @override
+  bool operator ==(Object other) {
+    return other is _AdvertisementListenerData &&
+        other.signature == signature &&
+        other.error == error;
+  }
+
+  @override
+  int get hashCode => Object.hash(signature, error);
+}
+
+String _announcementSignature(AnnouncementModel announcement) {
+  return [
+    announcement.id,
+    announcement.title,
+    announcement.description,
+    announcement.file.url,
+    announcement.file.localFilePath,
+  ].join(':');
+}
+
+String _adSignature(AdModel ad) {
+  return [
+    ad.id,
+    ad.title,
+    ad.file.url,
+    ad.file.localFilePath,
+    ad.duration,
+  ].join(':');
 }

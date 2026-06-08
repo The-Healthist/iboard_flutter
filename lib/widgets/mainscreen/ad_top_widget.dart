@@ -23,7 +23,7 @@ class TopAdWidget extends StatefulWidget {
   TopAdWidgetState createState() => TopAdWidgetState();
 }
 
-class TopAdWidgetState extends State<TopAdWidget> {
+class TopAdWidgetState extends State<TopAdWidget> with WidgetsBindingObserver {
   VideoPlayerController? _videoController;
   bool _isLoading = true;
   String? _localFilePath;
@@ -38,10 +38,13 @@ class TopAdWidgetState extends State<TopAdWidget> {
   bool _isReleasingVideo = false;
   int _loadGeneration = 0;
   int _mediaCommandGeneration = 0;
+  bool? _lastAppliedMediaPaused;
+  bool? _lastAppliedFullscreenAd;
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _loadFile();
   }
 
@@ -200,6 +203,7 @@ class TopAdWidgetState extends State<TopAdWidget> {
         _setStateIfActive(generation, () {
           _isLoading = false;
         });
+        _syncMediaStateFromContext();
       } else if (_isActiveGeneration(generation)) {
         _setStateIfActive(generation, () {
           _error = null;
@@ -244,10 +248,17 @@ class TopAdWidgetState extends State<TopAdWidget> {
   @override
   void dispose() {
     _isDisposed = true;
+    WidgetsBinding.instance.removeObserver(this);
     _loadGeneration++;
     _mediaCommandGeneration++;
     _releaseVideoController();
     super.dispose();
+  }
+
+  @override
+  void didHaveMemoryPressure() {
+    _releaseVideoController(forceDispose: true);
+    super.didHaveMemoryPressure();
   }
 
   ///释放视频控制器到池中
@@ -261,6 +272,8 @@ class TopAdWidgetState extends State<TopAdWidget> {
     _currentVideoPath = null;
     _loadGeneration++;
     _mediaCommandGeneration++;
+    _lastAppliedMediaPaused = null;
+    _lastAppliedFullscreenAd = null;
 
     if (controller != null && videoPath != null) {
       _isReleasingVideo = true;
@@ -292,33 +305,10 @@ class TopAdWidgetState extends State<TopAdWidget> {
     final carouselStateProvider = context.watch<CarouselStateProvider>();
     final isMediaPaused =
         carouselStateProvider.isMediaPausedForArea(AreaType.topAd);
-
-    final controller = _videoController;
-    if (_isControllerActive(controller)) {
-      final isPlaying = controller!.value.isPlaying;
-      final isFullscreenAd =
-          carouselStateProvider.currentAppState == AppState.fullscreenAd;
-
-      _scheduleMediaCommand(
-        controller,
-        const Duration(milliseconds: 50),
-        () => _setControllerVolume(controller, isFullscreenAd ? 0.0 : 1.0),
-      );
-
-      if (isMediaPaused && isPlaying) {
-        _scheduleMediaCommand(
-          controller,
-          const Duration(milliseconds: 100),
-          () => _pauseController(controller),
-        );
-      } else if (!isMediaPaused && !isPlaying) {
-        _scheduleMediaCommand(
-          controller,
-          const Duration(milliseconds: 100),
-          () => _playController(controller),
-        );
-      }
-    }
+    final isFullscreenAd =
+        carouselStateProvider.currentAppState == AppState.fullscreenAd;
+    _syncMediaState(
+        isMediaPaused: isMediaPaused, isFullscreenAd: isFullscreenAd);
 
     return NotificationListener<Notification>(
       onNotification: (notification) {
@@ -489,7 +479,7 @@ class TopAdWidgetState extends State<TopAdWidget> {
             Icon(
               Icons.video_library_outlined,
               size: 40,
-              color: Colors.white.withOpacity(0.8),
+              color: Colors.white.withValues(alpha: 0.8),
             ),
             const SizedBox(height: 8),
             Text(
@@ -497,7 +487,7 @@ class TopAdWidgetState extends State<TopAdWidget> {
               style: TextStyle(
                 fontSize: 14,
                 fontWeight: FontWeight.w500,
-                color: Colors.white.withOpacity(0.9),
+                color: Colors.white.withValues(alpha: 0.9),
               ),
               textAlign: TextAlign.center,
               maxLines: 2,
@@ -526,6 +516,50 @@ class TopAdWidgetState extends State<TopAdWidget> {
         identical(controller, _videoController) &&
         controller.value.isInitialized &&
         !controller.value.hasError;
+  }
+
+  void _syncMediaStateFromContext() {
+    if (!mounted || _isDisposed) return;
+    final carouselStateProvider = context.read<CarouselStateProvider>();
+    _syncMediaState(
+      isMediaPaused: carouselStateProvider.isMediaPausedForArea(AreaType.topAd),
+      isFullscreenAd:
+          carouselStateProvider.currentAppState == AppState.fullscreenAd,
+    );
+  }
+
+  void _syncMediaState({
+    required bool isMediaPaused,
+    required bool isFullscreenAd,
+  }) {
+    final controller = _videoController;
+    if (!_isControllerActive(controller)) return;
+    final hasChanged = _lastAppliedMediaPaused != isMediaPaused ||
+        _lastAppliedFullscreenAd != isFullscreenAd;
+    if (!hasChanged) return;
+
+    _lastAppliedMediaPaused = isMediaPaused;
+    _lastAppliedFullscreenAd = isFullscreenAd;
+
+    _scheduleMediaCommand(
+      controller!,
+      Duration.zero,
+      () => _setControllerVolume(controller, isFullscreenAd ? 0.0 : 1.0),
+    );
+
+    if (isMediaPaused && controller.value.isPlaying) {
+      _scheduleMediaCommand(
+        controller,
+        Duration.zero,
+        () => _pauseController(controller),
+      );
+    } else if (!isMediaPaused && !controller.value.isPlaying) {
+      _scheduleMediaCommand(
+        controller,
+        Duration.zero,
+        () => _playController(controller),
+      );
+    }
   }
 
   void _scheduleMediaCommand(

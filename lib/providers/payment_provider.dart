@@ -6,20 +6,31 @@ import 'package:logger/logger.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:iboard_app/http/payment.dart';
 import 'package:iboard_app/http/api_client.dart';
+import 'package:iboard_app/http/payment_data_source.dart';
+import 'package:iboard_app/http/payment_gateway.dart';
 import 'package:iboard_app/models/payment_model.dart';
 
 /// 支付狀態通知器
 class PaymentNotifier extends ChangeNotifier {
   final Logger _logger = Logger();
-  late final PaymentClient _paymentClient;
-  ApiClient? _apiClient;
+  late final PaymentDataSource _paymentClient;
+  PaymentGateway? _paymentGateway;
   Timer? _paymentStatusTimer;
+  Timer? _paymentStatusTimeoutTimer;
+  final Duration _paymentStatusPollInterval;
+  final Duration _paymentStatusTimeout;
+  bool _isPaymentStatusQueryInFlight = false;
 
   PaymentState _state = const PaymentState();
   PaymentState get state => _state;
 
-  PaymentNotifier() {
-    _paymentClient = PaymentClient();
+  PaymentNotifier({
+    PaymentDataSource? paymentClient,
+    Duration paymentStatusPollInterval = const Duration(seconds: 3),
+    Duration paymentStatusTimeout = const Duration(minutes: 5),
+  })  : _paymentStatusPollInterval = paymentStatusPollInterval,
+        _paymentStatusTimeout = paymentStatusTimeout {
+    _paymentClient = paymentClient ?? PaymentClient();
   }
 
   /// 21, 保存支付記錄
@@ -83,7 +94,7 @@ class PaymentNotifier extends ChangeNotifier {
   Future<void> initializePayment({String? buildingId}) async {
     _updateState(state.copyWith(
       status: PaymentStatus.pending,
-      errorMessage: null,
+      clearErrorMessage: true,
     ));
 
     // 如果提供了 buildingId，直接加载该大厦的单位
@@ -118,8 +129,10 @@ class PaymentNotifier extends ChangeNotifier {
       _updateState(state.copyWith(
         selectedBuildingId: buildingId,
         isLoading: true,
-        selectedUnitId: null,
+        clearSelectedUnitId: true,
         bills: [],
+        selectedBills: [],
+        clearErrorMessage: true,
       ));
 
       // 載入大廈單位列表
@@ -307,7 +320,7 @@ class PaymentNotifier extends ChangeNotifier {
         isLoadingBills: true,
         bills: [],
         selectedBills: [], //清空選中的繳費table
-        errorMessage: null, // 清除之前的錯誤信息
+        clearErrorMessage: true, // 清除之前的錯誤信息
       ));
 
       // 載入待繳費帳單
@@ -433,21 +446,25 @@ class PaymentNotifier extends ChangeNotifier {
       return;
     }
 
-    if (_apiClient == null) {
+    if (_paymentGateway == null) {
       _logger.e(' [PaymentNotifier] ApiClient 未初始化');
+      _updateState(state.copyWith(
+        status: PaymentStatus.failed,
+        isLoading: false,
+        errorMessage: '支付服務未初始化',
+      ));
       return;
     }
 
     try {
       // 清除之前的轮询
-      _paymentStatusTimer?.cancel();
-      _paymentStatusTimer = null;
+      _stopPaymentStatusPolling();
 
       _updateState(state.copyWith(
         status: PaymentStatus.processing,
         isLoading: true,
-        errorMessage: null,
-        paymentResponse: null, // 清除之前的支付響應
+        clearErrorMessage: true,
+        clearPaymentResponse: true, // 清除之前的支付響應
       ));
 
       // 生成新的訂單號
@@ -470,21 +487,21 @@ class PaymentNotifier extends ChangeNotifier {
       Map<String, dynamic> responseData;
 
       if (paymentMethod == PaymentMethod.wechat) {
-        responseData = await _apiClient!.createWechatPayment(
+        responseData = await _paymentGateway!.createWechatPayment(
           orderNo: orderNo,
           amount: totalAmount,
           subject: subject,
           body: body,
         );
       } else if (paymentMethod == PaymentMethod.alipay) {
-        responseData = await _apiClient!.createAlipayPayment(
+        responseData = await _paymentGateway!.createAlipayPayment(
           orderNo: orderNo,
           amount: totalAmount,
           subject: subject,
           body: body,
         );
       } else if (paymentMethod == PaymentMethod.unionpay) {
-        responseData = await _apiClient!.createUnionpayPayment(
+        responseData = await _paymentGateway!.createUnionpayPayment(
           orderNo: orderNo,
           amount: totalAmount,
           subject: subject,
@@ -552,11 +569,21 @@ class PaymentNotifier extends ChangeNotifier {
     }
 
     _paymentStatusTimer?.cancel();
+    _paymentStatusTimeoutTimer?.cancel();
+    _isPaymentStatusQueryInFlight = false;
     _paymentStatusTimer = Timer.periodic(
-      const Duration(seconds: 3),
+      _paymentStatusPollInterval,
       (timer) async {
+        if (state.status != PaymentStatus.processing) {
+          _stopPaymentStatusPolling();
+          return;
+        }
+        if (_isPaymentStatusQueryInFlight) {
+          return;
+        }
+        _isPaymentStatusQueryInFlight = true;
         try {
-          final responseData = await _apiClient!.queryPaymentStatus(
+          final responseData = await _paymentGateway!.queryPaymentStatus(
             orderNo: orderNo,
             paymentMethod: paymentMethodStr, // 46, 傳遞支付方式參數
           );
@@ -566,34 +593,44 @@ class PaymentNotifier extends ChangeNotifier {
 
           // 34, 只有在確實支付成功時才更新為成功狀態（state=2表示支付成功）
           // 根據第三方支付接口：state=0:訂單生成, state=1:支付中, state=2:支付成功, state=3:支付失敗
-          if (thirdPartyResponse.state == 2) {
-            timer.cancel();
+          if (thirdPartyResponse.isSuccess) {
             final paymentResponse = thirdPartyResponse.toPaymentResponse();
             _updateState(state.copyWith(
               status: PaymentStatus.success,
               paymentResponse: paymentResponse,
             ));
+            _stopPaymentStatusPolling();
             // 保存支付記錄
             await _savePaymentRecord(paymentResponse);
           } else if (thirdPartyResponse.isFailed) {
-            timer.cancel();
             final paymentResponse = thirdPartyResponse.toPaymentResponse();
             _updateState(state.copyWith(
               status: PaymentStatus.failed,
               paymentResponse: paymentResponse,
               errorMessage: '支付失敗：${thirdPartyResponse.errMsg}',
             ));
+            _stopPaymentStatusPolling();
             _logger.e(' [PaymentNotifier] 支付失敗: ${thirdPartyResponse.errMsg}');
+          } else if (!thirdPartyResponse.isProcessing) {
+            final paymentResponse = thirdPartyResponse.toPaymentResponse();
+            _updateState(state.copyWith(
+              status: PaymentStatus.failed,
+              paymentResponse: paymentResponse,
+              errorMessage: '支付狀態異常，請重新嘗試',
+            ));
+            _stopPaymentStatusPolling();
           }
         } catch (e) {
           _logger.e(' [PaymentNotifier] 查詢支付狀態失敗: $e');
+        } finally {
+          _isPaymentStatusQueryInFlight = false;
         }
       },
     );
 
     // 5分鐘後停止輪詢
-    Timer(const Duration(minutes: 5), () {
-      _paymentStatusTimer?.cancel();
+    _paymentStatusTimeoutTimer = Timer(_paymentStatusTimeout, () {
+      _stopPaymentStatusPolling();
       if (state.status == PaymentStatus.processing) {
         _updateState(state.copyWith(
           status: PaymentStatus.failed,
@@ -607,6 +644,9 @@ class PaymentNotifier extends ChangeNotifier {
   void _stopPaymentStatusPolling() {
     _paymentStatusTimer?.cancel();
     _paymentStatusTimer = null;
+    _paymentStatusTimeoutTimer?.cancel();
+    _paymentStatusTimeoutTimer = null;
+    _isPaymentStatusQueryInFlight = false;
   }
 
   /// 12, 取消支付
@@ -616,8 +656,8 @@ class PaymentNotifier extends ChangeNotifier {
     // 這樣二維碼會消失，但用戶可以繼續選擇其他支付方式
     _updateState(state.copyWith(
       status: PaymentStatus.pending,
-      paymentResponse: null,
-      errorMessage: null,
+      clearPaymentResponse: true,
+      clearErrorMessage: true,
       isLoading: false,
       selectedBills: [], // 清空已選賬單，讓用戶重新選擇
     ));
@@ -637,14 +677,14 @@ class PaymentNotifier extends ChangeNotifier {
     // 保留 paymentConfig、units 和 selectedBuildingId，只清除支付相關狀態
     _updateState(state.copyWith(
       status: PaymentStatus.pending,
-      paymentResponse: null,
-      errorMessage: null,
+      clearPaymentResponse: true,
+      clearErrorMessage: true,
       isLoading: false,
       isLoadingBills: false,
-      selectedUnitId: null,
+      clearSelectedUnitId: true,
       selectedBills: [],
       bills: [],
-      receiptData: null,
+      clearReceiptData: true,
     ));
   }
 
@@ -698,7 +738,18 @@ class PaymentNotifier extends ChangeNotifier {
 
   /// 29, 設置 API 客戶端
   void setApiClient(ApiClient apiClient) {
-    _apiClient = apiClient;
+    setPaymentGateway(apiClient);
+  }
+
+  @visibleForTesting
+  void setPaymentGateway(PaymentGateway paymentGateway) {
+    _paymentGateway = paymentGateway;
+  }
+
+  @visibleForTesting
+  void debugSetState(PaymentState state) {
+    _state = state;
+    notifyListeners();
   }
 
   @override
@@ -766,25 +817,35 @@ class PaymentState {
     PaymentResponse? paymentResponse,
     PaymentConfig? paymentConfig,
     Map<String, dynamic>? receiptData,
+    bool clearErrorMessage = false,
+    bool clearSelectedBuildingId = false,
+    bool clearSelectedUnitId = false,
     bool clearPaymentResponse = false, // 新增：明确清除paymentResponse的标志
+    bool clearPaymentConfig = false,
+    bool clearReceiptData = false,
   }) {
     return PaymentState(
       isLoading: isLoading ?? this.isLoading,
       isLoadingBills: isLoadingBills ?? this.isLoadingBills, // 26, 更新账单加载状态
       status: status ?? this.status,
-      errorMessage: errorMessage,
+      errorMessage:
+          clearErrorMessage ? null : (errorMessage ?? this.errorMessage),
       buildings: buildings ?? this.buildings,
       units: units ?? this.units,
       bills: bills ?? this.bills,
       selectedBills: selectedBills ?? this.selectedBills,
-      selectedBuildingId: selectedBuildingId ?? this.selectedBuildingId,
-      selectedUnitId: selectedUnitId ?? this.selectedUnitId,
+      selectedBuildingId: clearSelectedBuildingId
+          ? null
+          : (selectedBuildingId ?? this.selectedBuildingId),
+      selectedUnitId:
+          clearSelectedUnitId ? null : (selectedUnitId ?? this.selectedUnitId),
       // 如果clearPaymentResponse为true，则设置为null；否则使用传入值或保留旧值
       paymentResponse: clearPaymentResponse
           ? null
           : (paymentResponse ?? this.paymentResponse),
-      paymentConfig: paymentConfig ?? this.paymentConfig,
-      receiptData: receiptData ?? this.receiptData,
+      paymentConfig:
+          clearPaymentConfig ? null : (paymentConfig ?? this.paymentConfig),
+      receiptData: clearReceiptData ? null : (receiptData ?? this.receiptData),
     );
   }
 }

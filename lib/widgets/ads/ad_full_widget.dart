@@ -29,7 +29,8 @@ class FullAdWidget extends StatefulWidget {
   State<FullAdWidget> createState() => _FullAdWidgetState();
 }
 
-class _FullAdWidgetState extends State<FullAdWidget> {
+class _FullAdWidgetState extends State<FullAdWidget>
+    with WidgetsBindingObserver {
   VideoPlayerController? _videoController;
   bool _isVideoInitialized = false;
   bool _isLoadingVideo = false;
@@ -37,9 +38,13 @@ class _FullAdWidgetState extends State<FullAdWidget> {
   String? _currentFilePath;
   bool _isReleasing = false;
   FullscreenAdProvider? _fullscreenAdProvider;
+  late Future<File?> _adFileFuture;
+
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    _adFileFuture = widget.fileManager.getFile(widget.ad.file);
     // 在 initState 中尝试获取 FullscreenAdProvider
     WidgetsBinding.instance.addPostFrameCallback((_) {
       try {
@@ -60,9 +65,20 @@ class _FullAdWidgetState extends State<FullAdWidget> {
     }
   }
 
+  @override
+  void didUpdateWidget(covariant FullAdWidget oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.ad.file.url != widget.ad.file.url ||
+        oldWidget.ad.file.localFilePath != widget.ad.file.localFilePath) {
+      _adFileFuture = widget.fileManager.getFile(widget.ad.file);
+    }
+  }
+
   /// 初始化视频播放器
   Future<void> _initializeVideoPlayer() async {
     if (_videoController != null || !mounted) return;
+    _fullscreenAdProvider ??= context.read<FullscreenAdProvider>();
+    final fullscreenAdProvider = _fullscreenAdProvider!;
 
     setState(() {
       _isLoadingVideo = true;
@@ -70,7 +86,7 @@ class _FullAdWidgetState extends State<FullAdWidget> {
     });
 
     try {
-      final File? localFile = await widget.fileManager.getFile(widget.ad.file);
+      final File? localFile = await _adFileFuture;
       if (!mounted) return;
 
       if (localFile == null || !await localFile.exists()) {
@@ -79,9 +95,7 @@ class _FullAdWidgetState extends State<FullAdWidget> {
 
       _currentFilePath = localFile.path;
 
-      _fullscreenAdProvider ??= context.read<FullscreenAdProvider>();
-
-      _videoController = await _fullscreenAdProvider!.preciseVideoPoolManager
+      _videoController = await fullscreenAdProvider.preciseVideoPoolManager
           .getInitializedController(
         filePath: _currentFilePath!,
         videoType: precise.VideoType.fullAd,
@@ -162,6 +176,7 @@ class _FullAdWidgetState extends State<FullAdWidget> {
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     if (_isReleasing) {
       super.dispose();
       return;
@@ -184,6 +199,20 @@ class _FullAdWidgetState extends State<FullAdWidget> {
     super.dispose();
   }
 
+  @override
+  void didHaveMemoryPressure() {
+    if (_videoController != null && _currentFilePath != null) {
+      try {
+        _videoController!.removeListener(_onVideoProgressChanged);
+      } catch (_) {}
+      _releaseVideoControllerToPool();
+      _videoController = null;
+      _currentFilePath = null;
+      _isVideoInitialized = false;
+    }
+    super.didHaveMemoryPressure();
+  }
+
   ///1，视频播放进度变化监听器
   void _onVideoProgressChanged() {
     try {
@@ -202,15 +231,13 @@ class _FullAdWidgetState extends State<FullAdWidget> {
   Future<void> _releaseVideoControllerToPool() async {
     if (_videoController != null && _currentFilePath != null) {
       try {
+        final fullscreenAdProvider = _fullscreenAdProvider;
         if (_videoController!.value.isPlaying) {
           await _videoController!.pause();
         }
 
-        _fullscreenAdProvider ??= context.read<FullscreenAdProvider>();
-
-        if (_fullscreenAdProvider != null) {
-          await _fullscreenAdProvider!.preciseVideoPoolManager
-              .releaseController(
+        if (fullscreenAdProvider != null) {
+          await fullscreenAdProvider.preciseVideoPoolManager.releaseController(
             filePath: _currentFilePath!,
             videoType: precise.VideoType.fullAd,
             forceDispose: true,
@@ -258,7 +285,7 @@ class _FullAdWidgetState extends State<FullAdWidget> {
   ///7，構建圖片廣告
   Widget _buildImageAd() {
     return FutureBuilder<File?>(
-      future: widget.fileManager.getFile(widget.ad.file),
+      future: _adFileFuture,
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
           return Container(
@@ -384,8 +411,8 @@ class _FullAdWidgetState extends State<FullAdWidget> {
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
           colors: [
-            const Color(0xFF2196F3).withOpacity(0.8),
-            const Color(0xFF1976D2).withOpacity(0.9),
+            const Color(0xFF2196F3).withValues(alpha: 0.8),
+            const Color(0xFF1976D2).withValues(alpha: 0.9),
           ],
         ),
       ),
@@ -404,10 +431,10 @@ class _FullAdWidgetState extends State<FullAdWidget> {
                   width: 80,
                   height: 80,
                   decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.2),
+                    color: Colors.white.withValues(alpha: 0.2),
                     borderRadius: BorderRadius.circular(20),
                     border: Border.all(
-                      color: Colors.white.withOpacity(0.3),
+                      color: Colors.white.withValues(alpha: 0.3),
                       width: 2,
                     ),
                   ),
@@ -461,7 +488,7 @@ class _FullAdWidgetState extends State<FullAdWidget> {
                   padding:
                       const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
                   decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.2),
+                    color: Colors.white.withValues(alpha: 0.2),
                     borderRadius: BorderRadius.circular(20),
                   ),
                   child: const Text(
