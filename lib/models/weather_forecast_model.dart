@@ -6,8 +6,8 @@ class Temperature {
 
   factory Temperature.fromJson(Map<String, dynamic> json) {
     return Temperature(
-      value: json['value'] as int,
-      unit: json['unit'] as String,
+      value: _parseInt(json['value']),
+      unit: _parseString(json['unit']),
     );
   }
 
@@ -46,22 +46,20 @@ class WeatherForecastModel {
 
   factory WeatherForecastModel.fromJson(Map<String, dynamic> json) {
     return WeatherForecastModel(
-      forecastDate: json['forecastDate'] as String,
-      week: json['week'] as String,
-      forecastWind: json['forecastWind'] as String,
-      forecastWeather: json['forecastWeather'] as String,
-      forecastMaxtemp:
-          Temperature.fromJson(json['forecastMaxtemp'] as Map<String, dynamic>),
-      forecastMintemp:
-          Temperature.fromJson(json['forecastMintemp'] as Map<String, dynamic>),
+      forecastDate: _parseString(json['forecastDate']),
+      week: _parseString(json['week']),
+      forecastWind: _parseString(json['forecastWind']),
+      forecastWeather: _parseString(json['forecastWeather']),
+      forecastMaxtemp: Temperature.fromJson(_parseMap(json['forecastMaxtemp'])),
+      forecastMintemp: Temperature.fromJson(_parseMap(json['forecastMintemp'])),
       forecastMaxrh: json['forecastMaxrh'] != null
-          ? Temperature.fromJson(json['forecastMaxrh'] as Map<String, dynamic>)
+          ? Temperature.fromJson(_parseMap(json['forecastMaxrh']))
           : null,
       forecastMinrh: json['forecastMinrh'] != null
-          ? Temperature.fromJson(json['forecastMinrh'] as Map<String, dynamic>)
+          ? Temperature.fromJson(_parseMap(json['forecastMinrh']))
           : null,
-      forecastIcon: json['ForecastIcon'] as int,
-      psr: json['PSR'] as String,
+      forecastIcon: _parseInt(json['ForecastIcon']),
+      psr: _parseString(json['PSR']),
     );
   }
 
@@ -96,10 +94,10 @@ class SeaTemp {
 
   factory SeaTemp.fromJson(Map<String, dynamic> json) {
     return SeaTemp(
-      place: json['place'] as String,
-      value: json['value'] as int,
-      unit: json['unit'] as String,
-      recordTime: json['recordTime'] as String,
+      place: _parseString(json['place']),
+      value: _parseInt(json['value']),
+      unit: _parseString(json['unit']),
+      recordTime: _parseString(json['recordTime']),
     );
   }
 
@@ -121,8 +119,8 @@ class SoilTempDepth {
 
   factory SoilTempDepth.fromJson(Map<String, dynamic> json) {
     return SoilTempDepth(
-      unit: json['unit'] as String,
-      value: (json['value'] as num).toDouble(),
+      unit: _parseString(json['unit']),
+      value: _parseDouble(json['value']),
     );
   }
 
@@ -151,11 +149,11 @@ class SoilTemp {
 
   factory SoilTemp.fromJson(Map<String, dynamic> json) {
     return SoilTemp(
-      place: json['place'] as String,
-      value: (json['value'] as num).toDouble(),
-      unit: json['unit'] as String,
-      recordTime: json['recordTime'] as String,
-      depth: SoilTempDepth.fromJson(json['depth'] as Map<String, dynamic>),
+      place: _parseString(json['place']),
+      value: _parseDouble(json['value']),
+      unit: _parseString(json['unit']),
+      recordTime: _parseString(json['recordTime']),
+      depth: SoilTempDepth.fromJson(_parseMap(json['depth'])),
     );
   }
 
@@ -187,27 +185,17 @@ class WeatherData {
   });
 
   factory WeatherData.fromJson(Map<String, dynamic> json) {
-    var forecastList = json['weatherForecast'] as List;
-    List<WeatherForecastModel> forecasts = forecastList
-        .map((i) => WeatherForecastModel.fromJson(i as Map<String, dynamic>))
-        .toList();
-
-    var soilTempList = json['soilTemp'] as List?;
-    List<SoilTemp>? soilTemps;
-    if (soilTempList != null) {
-      soilTemps = soilTempList
-          .map((i) => SoilTemp.fromJson(i as Map<String, dynamic>))
-          .toList();
-    }
-
     return WeatherData(
-      generalSituation: json['generalSituation'] as String,
-      weatherForecast: forecasts,
-      updateTime: json['updateTime'] as String,
+      generalSituation: _parseString(json['generalSituation']),
+      weatherForecast: _parseObjectList(
+          json['weatherForecast'], WeatherForecastModel.fromJson),
+      updateTime: _parseString(json['updateTime']),
       seaTemp: json['seaTemp'] != null
-          ? SeaTemp.fromJson(json['seaTemp'] as Map<String, dynamic>)
+          ? SeaTemp.fromJson(_parseMap(json['seaTemp']))
           : null,
-      soilTemp: soilTemps,
+      soilTemp: json['soilTemp'] is List
+          ? _parseObjectList(json['soilTemp'], SoilTemp.fromJson)
+          : null,
     );
   }
 
@@ -220,4 +208,63 @@ class WeatherData {
       'soilTemp': soilTemp?.map((s) => s.toJson()).toList(),
     };
   }
+}
+
+List<T> _parseObjectList<T>(
+  Object? value,
+  T Function(Map<String, dynamic> json) fromJson,
+) {
+  if (value is! List) {
+    return [];
+  }
+
+  final items = <T>[];
+  for (final item in value) {
+    final map = _nullableMap(item);
+    if (map != null) {
+      items.add(fromJson(map));
+    }
+  }
+  return items;
+}
+
+Map<String, dynamic> _parseMap(Object? value) {
+  return _nullableMap(value) ?? const {};
+}
+
+Map<String, dynamic>? _nullableMap(Object? value) {
+  if (value is Map<String, dynamic>) {
+    return value;
+  }
+  if (value is Map) {
+    return value.map((key, value) => MapEntry(key.toString(), value));
+  }
+  return null;
+}
+
+String _parseString(Object? value) {
+  return value?.toString() ?? '';
+}
+
+int _parseInt(Object? value) {
+  if (value is int) {
+    return value;
+  }
+  if (value is num) {
+    return value.toInt();
+  }
+  if (value is String) {
+    return int.tryParse(value) ?? 0;
+  }
+  return 0;
+}
+
+double _parseDouble(Object? value) {
+  if (value is num) {
+    return value.toDouble();
+  }
+  if (value is String) {
+    return double.tryParse(value) ?? 0;
+  }
+  return 0;
 }

@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:iboard_app/models/ad_model.dart'; // Assuming AdModel exists
 import 'package:iboard_app/managers/file_manager.dart'; // Assuming FileManager exists
 import 'package:iboard_app/providers/state_provider.dart';
-import 'package:iboard_app/widgets/carousel_widget.dart'; // 导入通知类
+import 'package:iboard_app/widgets/carousel/carousel_widget.dart'; // 导入通知类
 import 'package:iboard_app/utils/precise_video_pool_manager.dart' as precise;
 import 'package:iboard_app/providers/ad_top_carousel_provider.dart';
 import 'package:video_player/video_player.dart';

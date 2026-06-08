@@ -56,7 +56,7 @@ class ErrorPage extends StatelessWidget {
               // 重新加载按钮
               ElevatedButton(
                 onPressed: () {
-                  // _logger.i('🔄 用户点击重新加载按钮');
+                  // _logger.i(' 用户点击重新加载按钮');
                   onRetry();
                 },
                 style: ElevatedButton.styleFrom(
@@ -82,7 +82,7 @@ class ErrorPage extends StatelessWidget {
               // 返回主頁按钮
               TextButton(
                 onPressed: () {
-                  // _logger.i('🏠 用户点击返回主頁按钮');
+                  // _logger.i(' 用户点击返回主頁按钮');
                   onRetry();
                 },
                 child: Text(

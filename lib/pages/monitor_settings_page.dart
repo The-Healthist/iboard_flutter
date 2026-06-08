@@ -4,8 +4,50 @@ import 'package:http/http.dart' as http;
 import 'package:iboard_app/models/monitor_models.dart';
 import 'package:iboard_app/providers/app_data_provider.dart';
 import 'package:iboard_app/providers/advertisement_provider.dart';
+import 'package:iboard_app/providers/ad_top_carousel_provider.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+
+class MonitorChannelKey {
+  final int orangepiId;
+  final String channelName;
+
+  const MonitorChannelKey({
+    required this.orangepiId,
+    required this.channelName,
+  });
+}
+
+MonitorChannelKey? parseMonitorChannelKey(String channelKey) {
+  final separatorIndex = channelKey.indexOf('_');
+  if (separatorIndex <= 0 || separatorIndex == channelKey.length - 1) {
+    return null;
+  }
+
+  final orangepiId = int.tryParse(channelKey.substring(0, separatorIndex));
+  if (orangepiId == null) return null;
+
+  return MonitorChannelKey(
+    orangepiId: orangepiId,
+    channelName: channelKey.substring(separatorIndex + 1),
+  );
+}
+
+String getMonitorChannelDisplayName(
+  String channelKey,
+  List<Orangepi> orangepis,
+) {
+  final parsedKey = parseMonitorChannelKey(channelKey);
+  if (parsedKey == null) return channelKey;
+
+  for (final orangepi in orangepis) {
+    if (orangepi.orangepi_id == parsedKey.orangepiId) {
+      return '${orangepi.orangepi_name}-${parsedKey.channelName}';
+    }
+  }
+
+  return parsedKey.channelName;
+}
 
 class MonitorSettingsPage extends StatefulWidget {
   const MonitorSettingsPage({super.key});
@@ -45,6 +87,7 @@ class MonitorSettingsPageState extends State<MonitorSettingsPage> {
       final savedChannels = prefs.getStringList('monitor_selected_channels');
       final savedLayout = prefs.getString('monitor_layout_type');
 
+      if (!mounted) return;
       setState(() {
         _currentApiUrl = savedApiUrl ?? _currentApiUrl;
         _apiUrlController.text = _currentApiUrl;
@@ -66,6 +109,7 @@ class MonitorSettingsPageState extends State<MonitorSettingsPage> {
       final ismartId = appDataProvider.settingsModel?.building.ismartId;
 
       if (ismartId != null && ismartId.isNotEmpty) {
+        if (!mounted) return;
         setState(() {
           _currentIsmartId = ismartId;
         });
@@ -80,15 +124,19 @@ class MonitorSettingsPageState extends State<MonitorSettingsPage> {
   }
 
   ///3, 保存設定
-  Future<void> _saveSettings() async {
+  Future<bool> _saveSettings() async {
     try {
       final prefs = await SharedPreferences.getInstance();
       await prefs.setString('monitor_api_url', _currentApiUrl);
       await prefs.setStringList(
           'monitor_selected_channels', _selectedChannels.toList());
       await prefs.setString('monitor_layout_type', _selectedLayout.name);
+      return true;
     } catch (e) {
-      _showError('保存失敗: ${e.toString()}');
+      if (mounted) {
+        _showError('保存失敗: ${e.toString()}');
+      }
+      return false;
     }
   }
 
@@ -99,6 +147,7 @@ class MonitorSettingsPageState extends State<MonitorSettingsPage> {
       return;
     }
 
+    if (!mounted) return;
     setState(() {
       _isLoading = true;
     });
@@ -119,12 +168,13 @@ class MonitorSettingsPageState extends State<MonitorSettingsPage> {
         ).toJson()),
       );
 
+      if (!mounted) return;
       if (response.statusCode == 200) {
-        final monitorResponse = MonitorResponse.fromJson(
-          jsonDecode(response.body),
-        );
+        final monitorResponse =
+            MonitorResponse.fromJsonObject(jsonDecode(response.body));
 
         if (monitorResponse.success) {
+          if (!mounted) return;
           setState(() {
             _orangepis = monitorResponse.data.orangepis;
             _currentApiUrl = apiUrl;
@@ -137,11 +187,15 @@ class MonitorSettingsPageState extends State<MonitorSettingsPage> {
         _showError('網路請求失敗: ${response.statusCode}');
       }
     } catch (e) {
-      _showError('請求失敗: ${e.toString()}');
+      if (mounted) {
+        _showError('請求失敗: ${e.toString()}');
+      }
     } finally {
-      setState(() {
-        _isLoading = false;
-      });
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
     }
   }
 
@@ -185,22 +239,7 @@ class MonitorSettingsPageState extends State<MonitorSettingsPage> {
 
   ///8, 獲取已選中通道的顯示名稱
   String _getChannelDisplayName(String channelKey) {
-    final parts = channelKey.split('_');
-    if (parts.length >= 2) {
-      final channelName = parts[1];
-      if (_orangepis.isNotEmpty) {
-        final orangepiId = int.tryParse(parts[0]);
-        if (orangepiId != null) {
-          final orangepi = _orangepis.firstWhere(
-            (o) => o.orangepi_id == orangepiId,
-            orElse: () => _orangepis.first,
-          );
-          return '${orangepi.orangepi_name}-$channelName';
-        }
-      }
-      return channelName;
-    }
-    return channelKey;
+    return getMonitorChannelDisplayName(channelKey, _orangepis);
   }
 
   ///3, 顯示成功消息
@@ -228,18 +267,26 @@ class MonitorSettingsPageState extends State<MonitorSettingsPage> {
       _selectedChannels.clear();
     }
 
-    await _saveSettings();
+    final saved = await _saveSettings();
+    if (!saved || !mounted) return;
 
-    // 触发广告轮播更新，以便重新读取监控配置
+    //  立即刷新监控画面配置（不等待广告轮播）
+    try {
+      final topAdCarouselProvider =
+          Provider.of<TopAdCarouselProvider>(context, listen: false);
+      await topAdCarouselProvider.refreshAllMonitorWidgets();
+    } catch (_) {}
+
+    if (!mounted) return;
+    // 触发广告轮播更新，以便重新读取监控配置（用于下次轮播）
     try {
       final advertisementProvider =
           Provider.of<AdvertisementProvider>(context, listen: false);
       await advertisementProvider.fetchAdvertisements(forceInit: true);
-    } catch (e) {
-      debugPrint('[MonitorSettings] 触发广告更新失败: $e');
-    }
+    } catch (_) {}
 
-    _showSuccess('監控通道設定已保存');
+    if (!mounted) return;
+    _showSuccess('監控通道設定已保存並立即生效');
 
     _notifyLiveMonitorUpdate();
   }
@@ -275,7 +322,7 @@ class MonitorSettingsPageState extends State<MonitorSettingsPage> {
         borderRadius: BorderRadius.circular(12),
         boxShadow: [
           BoxShadow(
-            color: Colors.grey.withOpacity(0.1),
+            color: Colors.grey.withValues(alpha: 0.1),
             spreadRadius: 1,
             blurRadius: 6,
             offset: const Offset(0, 2),
@@ -418,7 +465,7 @@ class MonitorSettingsPageState extends State<MonitorSettingsPage> {
                   color: Colors.white,
                   boxShadow: [
                     BoxShadow(
-                      color: Colors.grey.withOpacity(0.05),
+                      color: Colors.grey.withValues(alpha: 0.05),
                       spreadRadius: 1,
                       blurRadius: 3,
                       offset: const Offset(0, 2),
@@ -470,7 +517,7 @@ class MonitorSettingsPageState extends State<MonitorSettingsPage> {
                           borderRadius: BorderRadius.circular(12),
                           boxShadow: [
                             BoxShadow(
-                              color: Colors.grey.withOpacity(0.1),
+                              color: Colors.grey.withValues(alpha: 0.1),
                               spreadRadius: 1,
                               blurRadius: 6,
                               offset: const Offset(0, 2),
@@ -560,16 +607,6 @@ class MonitorSettingsPageState extends State<MonitorSettingsPage> {
                                       onPressed: _isLoading
                                           ? null
                                           : _onRefreshButtonPressed,
-                                      child: _isLoading
-                                          ? SizedBox(
-                                              width: 16,
-                                              height: 16,
-                                              child: CircularProgressIndicator(
-                                                strokeWidth: 2,
-                                                color: Colors.white,
-                                              ),
-                                            )
-                                          : const Text('刷新'),
                                       style: ElevatedButton.styleFrom(
                                         backgroundColor: Colors.blue.shade600,
                                         foregroundColor: Colors.white,
@@ -582,6 +619,16 @@ class MonitorSettingsPageState extends State<MonitorSettingsPage> {
                                               BorderRadius.circular(8),
                                         ),
                                       ),
+                                      child: _isLoading
+                                          ? const SizedBox(
+                                              width: 16,
+                                              height: 16,
+                                              child: CircularProgressIndicator(
+                                                strokeWidth: 2,
+                                                color: Colors.white,
+                                              ),
+                                            )
+                                          : const Text('刷新'),
                                     ),
                                   ],
                                 ),
@@ -589,7 +636,7 @@ class MonitorSettingsPageState extends State<MonitorSettingsPage> {
                             ),
                             const SizedBox(height: 24),
 
-                            /// 🎯 布局选择部分
+                            ///  布局选择部分
                             Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
@@ -807,7 +854,7 @@ class MonitorSettingsPageState extends State<MonitorSettingsPage> {
                             borderRadius: BorderRadius.circular(12),
                             boxShadow: [
                               BoxShadow(
-                                color: Colors.grey.withOpacity(0.1),
+                                color: Colors.grey.withValues(alpha: 0.1),
                                 spreadRadius: 1,
                                 blurRadius: 6,
                                 offset: const Offset(0, 2),

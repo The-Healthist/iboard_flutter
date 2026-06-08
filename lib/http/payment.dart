@@ -1,16 +1,32 @@
 import 'dart:convert';
-import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
+import 'package:iboard_app/http/payment_data_source.dart';
 import 'package:logger/logger.dart';
 
 /// iSmartPOS 支付系統客戶端
 /// 基於 AWS API Gateway 的支付和物業管理系統接口集成
-class PaymentClient {
-  static const String _baseUrl =
+class PaymentClient implements PaymentDataSource {
+  static const String _defaultBaseUrl =
       'https://uqf0jqfm77.execute-api.ap-east-1.amazonaws.com/prod/v1';
+  final String _baseUrl;
   final Logger _logger = Logger();
 
   static const Duration _requestTimeout = Duration(seconds: 30);
+
+  PaymentClient({String? baseUrl})
+      : _baseUrl = _normalizeBaseUrl(baseUrl ?? _defaultBaseUrl);
+
+  static String _normalizeBaseUrl(String baseUrl) {
+    return baseUrl.endsWith('/')
+        ? baseUrl.substring(0, baseUrl.length - 1)
+        : baseUrl;
+  }
+
+  Uri _buildUri(String path) {
+    final normalizedPath = path.startsWith('/') ? path : '/$path';
+    return Uri.parse('$_baseUrl$normalizedPath');
+  }
+
   /**[
   {
     "building_id": "9077004",
@@ -167,17 +183,17 @@ class PaymentClient {
 ] */
   /// 1, 獲取全部「大廈」
   /// Endpoint: GET /v1/get-building-list
+  @override
   Future<List<Map<String, dynamic>>> getBuildingList() async {
-    const String endpoint = '$_baseUrl/get-building-list';
-    final Uri url = Uri.parse(endpoint);
+    final Uri url = _buildUri('/get-building-list');
 
-    _logger.i('📋 獲取全部大廈列表');
+    _logger.i(' 獲取全部大廈列表');
 
     try {
       final response = await http.get(url).timeout(_requestTimeout);
       return _handleArrayResponse(response, '獲取大廈列表');
     } catch (e) {
-      _logger.e('❌ 獲取大廈列表失敗: $e');
+      _logger.e(' 獲取大廈列表失敗: $e');
       rethrow;
     }
   }
@@ -195,11 +211,10 @@ class PaymentClient {
   /// Endpoint: POST /v1/building-infos
   /// Body: {"blg_id": "string"}
   Future<Map<String, dynamic>> getBuildingInfos({required String blgId}) async {
-    const String endpoint = '$_baseUrl/building-infos';
-    final Uri url = Uri.parse(endpoint);
+    final Uri url = _buildUri('/building-infos');
     final Map<String, dynamic> requestBody = {'blg_id': blgId};
 
-    _logger.i('🏢 獲取大廈細明，大廈ID: $blgId');
+    _logger.i(' 獲取大廈細明，大廈ID: $blgId');
 
     try {
       final response = await http
@@ -212,7 +227,7 @@ class PaymentClient {
 
       return _handleResponse(response, '獲取大廈細明');
     } catch (e) {
-      _logger.e('❌ 獲取大廈細明失敗: $e');
+      _logger.e(' 獲取大廈細明失敗: $e');
       rethrow;
     }
   }
@@ -262,15 +277,11 @@ class PaymentClient {
   /// 3, 請求指定「大廈」「手續費」
   /// Endpoint: POST /v1/pos/building-tran-types
   /// Body: {"blg_id": "string"}
+  @override
   Future<Map<String, dynamic>> getBuildingTransactionTypes(
       {required String blgId}) async {
-    const String endpoint = '$_baseUrl/pos/building-tran-types';
-    final Uri url = Uri.parse(endpoint);
+    final Uri url = _buildUri('/pos/building-tran-types');
     final Map<String, dynamic> requestBody = {'blg_id': blgId};
-
-    _logger.i('💰 獲取大廈手續費費率，大廈ID: $blgId');
-    _logger.i('💰 API端點: $endpoint');
-    _logger.i('💰 請求參數: $requestBody');
 
     try {
       final response = await http
@@ -281,12 +292,9 @@ class PaymentClient {
           )
           .timeout(_requestTimeout);
 
-      _logger.i('💰 HTTP響應狀態碼: ${response.statusCode}');
-      _logger.i('💰 原始響應體: ${response.body}');
-
       return _handleResponse(response, '獲取大廈手續費');
     } catch (e) {
-      _logger.e('❌ 獲取大廈手續費失敗: $e');
+      _logger.e(' 獲取大廈手續費失敗: $e');
       rethrow;
     }
   }
@@ -548,18 +556,13 @@ class PaymentClient {
   /// 4, 獲取指定「大廈」全部「單位」
   /// Endpoint: POST /v1/building-flat-units
   /// Body: {"blg_id": "string"}
+  @override
   Future<List<Map<String, dynamic>>> getBuildingFlatUnits(
       {required String blgId}) async {
-    const String endpoint = '$_baseUrl/building-flat-units';
-    final Uri url = Uri.parse(endpoint);
+    final Uri url = _buildUri('/building-flat-units');
     final Map<String, dynamic> requestBody = {'blg_id': blgId};
 
-    debugPrint('[PaymentClient] 🏠 開始獲取大廈全部單位');
-    debugPrint('[PaymentClient] 📡 API端點: $endpoint');
-    debugPrint('[PaymentClient] 📋 請求參數: $requestBody');
-    debugPrint('[PaymentClient] 🔗 完整URL: $url');
-
-    _logger.i('🏠 獲取大廈全部單位，大廈ID: $blgId');
+    _logger.i(' 獲取大廈全部單位，大廈ID: $blgId');
 
     try {
       final response = await http
@@ -570,18 +573,9 @@ class PaymentClient {
           )
           .timeout(_requestTimeout);
 
-      debugPrint('[PaymentClient] 📊 HTTP響應狀態碼: ${response.statusCode}');
-      debugPrint('[PaymentClient] 📄 HTTP響應頭: ${response.headers}');
-      debugPrint('[PaymentClient] 📝 原始響應體: ${response.body}');
-
-      final result = _handleArrayResponse(response, '獲取大廈單位');
-      debugPrint('[PaymentClient] ✅ 成功解析單位數據: ${result.length} 條記錄');
-      debugPrint('[PaymentClient] 📋 單位數據詳情: $result');
-
-      return result;
+      return _handleArrayResponse(response, '獲取大廈單位');
     } catch (e) {
-      debugPrint('[PaymentClient] ❌ 獲取大廈單位失敗: $e');
-      _logger.e('❌ 獲取大廈單位失敗: $e');
+      _logger.e(' 獲取大廈單位失敗: $e');
       rethrow;
     }
   }
@@ -1125,8 +1119,7 @@ class PaymentClient {
     required String dateType,
     required String payMethod,
   }) async {
-    const String endpoint = '$_baseUrl/pos/get_transactions_by_date';
-    final Uri url = Uri.parse(endpoint);
+    final Uri url = _buildUri('/pos/get_transactions_by_date');
     final Map<String, dynamic> requestBody = {
       'blg_id': blgId,
       'from_date': fromDate,
@@ -1135,7 +1128,7 @@ class PaymentClient {
       'pay_method': payMethod,
     };
 
-    _logger.i('📊 查詢歷史訂單，大廈ID: $blgId, 日期範圍: $fromDate - $toDate');
+    _logger.i(' 查詢歷史訂單，大廈ID: $blgId, 日期範圍: $fromDate - $toDate');
 
     try {
       final response = await http
@@ -1148,7 +1141,7 @@ class PaymentClient {
 
       return _handleArrayResponse(response, '查詢歷史訂單');
     } catch (e) {
-      _logger.e('❌ 查詢歷史訂單失敗: $e');
+      _logger.e(' 查詢歷史訂單失敗: $e');
       rethrow;
     }
   }
@@ -1167,13 +1160,13 @@ class PaymentClient {
   /// 6, 獲取指定「單位」「待繳費帳單」
   /// Endpoint: POST /v1/building-flat-unit-bills
   /// Body: {"unit_id": "string"}
+  @override
   Future<List<Map<String, dynamic>>> getBuildingFlatUnitBills(
       {required String unitId}) async {
-    const String endpoint = '$_baseUrl/building-flat-unit-bills';
-    final Uri url = Uri.parse(endpoint);
+    final Uri url = _buildUri('/building-flat-unit-bills');
     final Map<String, dynamic> requestBody = {'unit_id': unitId};
 
-    _logger.i('📄 獲取單位待繳費帳單，單位ID: $unitId');
+    _logger.i(' 獲取單位待繳費帳單，單位ID: $unitId');
 
     try {
       final response = await http
@@ -1186,7 +1179,7 @@ class PaymentClient {
 
       return _handleArrayResponse(response, '獲取待繳費帳單');
     } catch (e) {
-      _logger.e('❌ 獲取待繳費帳單失敗: $e');
+      _logger.e(' 獲取待繳費帳單失敗: $e');
       rethrow;
     }
   }
@@ -1240,8 +1233,7 @@ class PaymentClient {
     required String password,
     required Map<String, dynamic> paymentData,
   }) async {
-    const String endpoint = '$_baseUrl/pos/report-payment';
-    final Uri url = Uri.parse(endpoint);
+    final Uri url = _buildUri('/pos/report-payment');
 
     final Map<String, String> headers = {
       'Content-Type': 'application/json',
@@ -1249,7 +1241,7 @@ class PaymentClient {
       'pw': password,
     };
 
-    _logger.i('💳 上報繳費請求，設備ID: $deviceId');
+    _logger.i(' 上報繳費請求，設備ID: $deviceId');
 
     try {
       final response = await http
@@ -1262,7 +1254,7 @@ class PaymentClient {
 
       return _handleResponse(response, '上報繳費請求');
     } catch (e) {
-      _logger.e('❌ 上報繳費請求失敗: $e');
+      _logger.e(' 上報繳費請求失敗: $e');
       rethrow;
     }
   }
@@ -1752,11 +1744,10 @@ class PaymentClient {
   /// Body: {"blg_id": "string"}
   Future<List<Map<String, dynamic>>> getTransactionsInCashier(
       {required String blgId}) async {
-    const String endpoint = '$_baseUrl/pos/get_transactions_in_cashier';
-    final Uri url = Uri.parse(endpoint);
+    final Uri url = _buildUri('/pos/get_transactions_in_cashier');
     final Map<String, dynamic> requestBody = {'blg_id': blgId};
 
-    _logger.i('🏧 獲取待清機訂單，大廈ID: $blgId');
+    _logger.i(' 獲取待清機訂單，大廈ID: $blgId');
 
     try {
       final response = await http
@@ -1769,7 +1760,7 @@ class PaymentClient {
 
       return _handleArrayResponse(response, '獲取待清機訂單');
     } catch (e) {
-      _logger.e('❌ 獲取待清機訂單失敗: $e');
+      _logger.e(' 獲取待清機訂單失敗: $e');
       rethrow;
     }
   }
@@ -1780,12 +1771,10 @@ class PaymentClient {
   Future<Map<String, dynamic>> updateTransactionsStatusInCashier({
     required List<String> paymentIdList,
   }) async {
-    const String endpoint =
-        '$_baseUrl/pos/update_transactions_status_in_cashier';
-    final Uri url = Uri.parse(endpoint);
+    final Uri url = _buildUri('/pos/update_transactions_status_in_cashier');
     final Map<String, dynamic> requestBody = {'payment_id_list': paymentIdList};
 
-    _logger.i('🔄 執行清機操作，訂單數量: ${paymentIdList.length}');
+    _logger.i(' 執行清機操作，訂單數量: ${paymentIdList.length}');
 
     try {
       final response = await http
@@ -1798,7 +1787,7 @@ class PaymentClient {
 
       return _handleResponse(response, '執行清機操作');
     } catch (e) {
-      _logger.e('❌ 執行清機操作失敗: $e');
+      _logger.e(' 執行清機操作失敗: $e');
       rethrow;
     }
   }
@@ -1929,11 +1918,10 @@ class PaymentClient {
   /// Body: {"blg_id": "string"}
   Future<List<Map<String, dynamic>>> getBankInRecordList(
       {required String blgId}) async {
-    const String endpoint = '$_baseUrl/pos/get_bank_in_record_list';
-    final Uri url = Uri.parse(endpoint);
+    final Uri url = _buildUri('/pos/get_bank_in_record_list');
     final Map<String, dynamic> requestBody = {'blg_id': blgId};
 
-    _logger.i('📜 獲取歷史清機記錄，大廈ID: $blgId');
+    _logger.i(' 獲取歷史清機記錄，大廈ID: $blgId');
 
     try {
       final response = await http
@@ -1946,7 +1934,7 @@ class PaymentClient {
 
       return _handleArrayResponse(response, '獲取歷史清機記錄');
     } catch (e) {
-      _logger.e('❌ 獲取歷史清機記錄失敗: $e');
+      _logger.e(' 獲取歷史清機記錄失敗: $e');
       rethrow;
     }
   }
@@ -1992,14 +1980,13 @@ class PaymentClient {
     required String blgId,
     required String recordId,
   }) async {
-    const String endpoint = '$_baseUrl/pos/get_bank_in_record_details';
-    final Uri url = Uri.parse(endpoint);
+    final Uri url = _buildUri('/pos/get_bank_in_record_details');
     final Map<String, dynamic> requestBody = {
       'blg_id': blgId,
       'record_id': recordId,
     };
 
-    _logger.i('📝 獲取清機記錄細明，大廈ID: $blgId, 記錄ID: $recordId');
+    _logger.i(' 獲取清機記錄細明，大廈ID: $blgId, 記錄ID: $recordId');
 
     try {
       final response = await http
@@ -2012,7 +1999,7 @@ class PaymentClient {
 
       return _handleResponse(response, '獲取清機記錄細明');
     } catch (e) {
-      _logger.e('❌ 獲取清機記錄細明失敗: $e');
+      _logger.e(' 獲取清機記錄細明失敗: $e');
       rethrow;
     }
   }
@@ -2031,11 +2018,10 @@ class PaymentClient {
   /// Body: {"blg_id": "string"}
   Future<Map<String, dynamic>> getBuildingBankAccount(
       {required String blgId}) async {
-    const String endpoint = '$_baseUrl/building-bank-account';
-    final Uri url = Uri.parse(endpoint);
+    final Uri url = _buildUri('/building-bank-account');
     final Map<String, dynamic> requestBody = {'blg_id': blgId};
 
-    _logger.i('🏦 獲取大廈銀行賬戶信息，大廈ID: $blgId');
+    _logger.i(' 獲取大廈銀行賬戶信息，大廈ID: $blgId');
 
     try {
       final response = await http
@@ -2048,7 +2034,7 @@ class PaymentClient {
 
       return _handleResponse(response, '獲取大廈銀行賬戶信息');
     } catch (e) {
-      _logger.e('❌ 獲取大廈銀行賬戶信息失敗: $e');
+      _logger.e(' 獲取大廈銀行賬戶信息失敗: $e');
       rethrow;
     }
   }
@@ -2058,7 +2044,7 @@ class PaymentClient {
     final String decodedBody = utf8.decode(response.bodyBytes);
 
     if (response.statusCode >= 200 && response.statusCode < 300) {
-      _logger.i('✅ $apiName 成功 (狀態碼: ${response.statusCode})');
+      _logger.i(' $apiName 成功 (狀態碼: ${response.statusCode})');
 
       if (decodedBody.isEmpty) {
         return {};
@@ -2074,12 +2060,11 @@ class PaymentClient {
 
         return decoded is Map<String, dynamic> ? decoded : {};
       } catch (e) {
-        _logger.e('❌ 解析JSON響應失敗: $e');
+        _logger.e(' 解析JSON響應失敗: $e');
         throw Exception('解析響應數據失敗: $e');
       }
     } else {
-      _logger
-          .w('⚠️ $apiName 失敗 (狀態碼: ${response.statusCode}), 響應: $decodedBody');
+      _logger.w(' $apiName 失敗 (狀態碼: ${response.statusCode}), 響應: $decodedBody');
       throw Exception('API請求失敗，狀態碼: ${response.statusCode}');
     }
   }
@@ -2090,7 +2075,7 @@ class PaymentClient {
     final String decodedBody = utf8.decode(response.bodyBytes);
 
     if (response.statusCode >= 200 && response.statusCode < 300) {
-      _logger.i('✅ $apiName 成功 (狀態碼: ${response.statusCode})');
+      _logger.i(' $apiName 成功 (狀態碼: ${response.statusCode})');
 
       if (decodedBody.isEmpty) {
         return [];
@@ -2100,28 +2085,35 @@ class PaymentClient {
         final decoded = json.decode(decodedBody);
 
         if (decoded is List) {
-          return decoded
-              .map((item) => Map<String, dynamic>.from(item as Map))
-              .toList();
+          return _mapsFromList(decoded);
         } else if (decoded is Map &&
             decoded.containsKey('data') &&
             decoded['data'] is List) {
-          return (decoded['data'] as List)
-              .map((item) => Map<String, dynamic>.from(item as Map))
-              .toList();
+          return _mapsFromList(decoded['data'] as List);
         } else {
-          _logger.w('⚠️ 期望數組響應但收到: ${decoded.runtimeType}');
+          _logger.w(' 期望數組響應但收到: ${decoded.runtimeType}');
           return [];
         }
       } catch (e) {
-        _logger.e('❌ 解析JSON數組響應失敗: $e');
+        _logger.e(' 解析JSON數組響應失敗: $e');
         throw Exception('解析響應數據失敗: $e');
       }
     } else {
-      _logger
-          .w('⚠️ $apiName 失敗 (狀態碼: ${response.statusCode}), 響應: $decodedBody');
+      _logger.w(' $apiName 失敗 (狀態碼: ${response.statusCode}), 響應: $decodedBody');
       throw Exception('API請求失敗，狀態碼: ${response.statusCode}');
     }
+  }
+
+  List<Map<String, dynamic>> _mapsFromList(List<dynamic> items) {
+    final maps = <Map<String, dynamic>>[];
+    for (final item in items) {
+      if (item is Map<String, dynamic>) {
+        maps.add(item);
+      } else if (item is Map) {
+        maps.add(item.map((key, value) => MapEntry(key.toString(), value)));
+      }
+    }
+    return maps;
   }
 
   /// 15, 創建繳費數據模型
@@ -2198,15 +2190,13 @@ class PaymentClient {
   Future<Map<String, dynamic>> getBuildingManagementFeeStatus({
     String? buildingId,
   }) async {
-    const String endpoint =
-        '$_baseUrl/building_board/building-management-fee-status';
-    final Uri url = Uri.parse(endpoint);
+    final Uri url = _buildUri('/building_board/building-management-fee-status');
     final Map<String, dynamic> requestBody = {
       'ptype': 'mf',
       if (buildingId != null) 'blg_id': buildingId,
     };
 
-    _logger.i('🏠 獲取物業管理費用狀態，大廈ID: $buildingId');
+    _logger.i(' 獲取物業管理費用狀態，大廈ID: $buildingId');
 
     try {
       final response = await http
@@ -2219,7 +2209,7 @@ class PaymentClient {
 
       return _handleResponse(response, '獲取物業管理費用狀態');
     } catch (e) {
-      _logger.e('❌ 獲取物業管理費用狀態失敗: $e');
+      _logger.e(' 獲取物業管理費用狀態失敗: $e');
       rethrow;
     }
   }
@@ -2230,15 +2220,13 @@ class PaymentClient {
   Future<Map<String, dynamic>> getBuildingOtherFeeStatus({
     String? buildingId,
   }) async {
-    const String endpoint =
-        '$_baseUrl/building_board/building-other-fee-status';
-    final Uri url = Uri.parse(endpoint);
+    final Uri url = _buildUri('/building_board/building-other-fee-status');
     final Map<String, dynamic> requestBody = {
       'ptype': 'mf',
       if (buildingId != null) 'blg_id': buildingId,
     };
 
-    _logger.i('🏠 獲取物業其他費用狀態，大廈ID: $buildingId');
+    _logger.i(' 獲取物業其他費用狀態，大廈ID: $buildingId');
 
     try {
       final response = await http
@@ -2251,7 +2239,7 @@ class PaymentClient {
 
       return _handleResponse(response, '獲取物業其他費用狀態');
     } catch (e) {
-      _logger.e('❌ 獲取物業其他費用狀態失敗: $e');
+      _logger.e(' 獲取物業其他費用狀態失敗: $e');
       rethrow;
     }
   }
@@ -2265,8 +2253,7 @@ class PaymentClient {
     required List<Map<String, dynamic>> bills,
     String? remark,
   }) async {
-    const String endpoint = '$_baseUrl/pos/create-wechat-payment';
-    final Uri url = Uri.parse(endpoint);
+    final Uri url = _buildUri('/pos/create-wechat-payment');
     final Map<String, dynamic> requestBody = {
       'building_id': buildingId,
       'unit_id': unitId,
@@ -2276,7 +2263,7 @@ class PaymentClient {
       if (remark != null) 'remark': remark,
     };
 
-    _logger.i('💳 創建微信支付請求，單位ID: $unitId, 金額: $amount');
+    _logger.i(' 創建微信支付請求，單位ID: $unitId, 金額: $amount');
 
     try {
       final response = await http
@@ -2289,7 +2276,7 @@ class PaymentClient {
 
       return _handleResponse(response, '創建微信支付請求');
     } catch (e) {
-      _logger.e('❌ 創建微信支付請求失敗: $e');
+      _logger.e(' 創建微信支付請求失敗: $e');
       rethrow;
     }
   }
@@ -2303,8 +2290,7 @@ class PaymentClient {
     required List<Map<String, dynamic>> bills,
     String? remark,
   }) async {
-    const String endpoint = '$_baseUrl/pos/create-alipay-payment';
-    final Uri url = Uri.parse(endpoint);
+    final Uri url = _buildUri('/pos/create-alipay-payment');
     final Map<String, dynamic> requestBody = {
       'building_id': buildingId,
       'unit_id': unitId,
@@ -2314,7 +2300,7 @@ class PaymentClient {
       if (remark != null) 'remark': remark,
     };
 
-    _logger.i('💳 創建支付寶支付請求，單位ID: $unitId, 金額: $amount');
+    _logger.i(' 創建支付寶支付請求，單位ID: $unitId, 金額: $amount');
 
     try {
       final response = await http
@@ -2327,7 +2313,44 @@ class PaymentClient {
 
       return _handleResponse(response, '創建支付寶支付請求');
     } catch (e) {
-      _logger.e('❌ 創建支付寶支付請求失敗: $e');
+      _logger.e(' 創建支付寶支付請求失敗: $e');
+      rethrow;
+    }
+  }
+
+  /// 20.1, 創建雲閃付支付請求
+  /// 用於生成雲閃付支付二維碼或支付鏈接
+  Future<Map<String, dynamic>> createUnionpayPayment({
+    required String buildingId,
+    required String unitId,
+    required double amount,
+    required List<Map<String, dynamic>> bills,
+    String? remark,
+  }) async {
+    final Uri url = _buildUri('/pos/create-unionpay-payment');
+    final Map<String, dynamic> requestBody = {
+      'building_id': buildingId,
+      'unit_id': unitId,
+      'amount': amount.toStringAsFixed(2),
+      'payment_method': 'UNIONPAY',
+      'bills': bills,
+      if (remark != null) 'remark': remark,
+    };
+
+    _logger.i(' 創建雲閃付支付請求，單位ID: $unitId, 金額: $amount');
+
+    try {
+      final response = await http
+          .post(
+            url,
+            headers: {'Content-Type': 'application/json'},
+            body: json.encode(requestBody),
+          )
+          .timeout(_requestTimeout);
+
+      return _handleResponse(response, '創建雲閃付支付請求');
+    } catch (e) {
+      _logger.e(' 創建雲閃付支付請求失敗: $e');
       rethrow;
     }
   }
@@ -2337,13 +2360,12 @@ class PaymentClient {
   Future<Map<String, dynamic>> queryPaymentStatus({
     required String paymentId,
   }) async {
-    const String endpoint = '$_baseUrl/pos/query-payment-status';
-    final Uri url = Uri.parse(endpoint);
+    final Uri url = _buildUri('/pos/query-payment-status');
     final Map<String, dynamic> requestBody = {
       'payment_id': paymentId,
     };
 
-    _logger.i('🔍 查詢支付狀態，支付ID: $paymentId');
+    _logger.i(' 查詢支付狀態，支付ID: $paymentId');
 
     try {
       final response = await http
@@ -2356,7 +2378,7 @@ class PaymentClient {
 
       return _handleResponse(response, '查詢支付狀態');
     } catch (e) {
-      _logger.e('❌ 查詢支付狀態失敗: $e');
+      _logger.e(' 查詢支付狀態失敗: $e');
       rethrow;
     }
   }

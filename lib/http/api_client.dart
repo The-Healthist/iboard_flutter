@@ -1,7 +1,46 @@
 import 'dart:async';
 import 'dart:convert';
 import 'package:http/http.dart' as http;
+import 'package:iboard_app/http/payment_gateway.dart';
 import 'package:logger/logger.dart';
+import 'package:crypto/crypto.dart';
+
+// 支付API配置類
+class PaymentApiConfig {
+  // ============ 生產環境配置 ============
+  static const String baseUrl = 'https://api-pay.gnete.com.hk';
+  static const String mchNo = 'M1767163761'; // 生產環境商戶號
+
+  // 微信/支付宝/云闪付支付配置 - 二维码（C2B）- 生產環境統一配置
+  static const String wechatAlipayAppId = '6954c771e4b012d6d79a6a08';
+  static const String wechatAlipayAppSecret =
+      '2fSsOWIuI6yTSCmAv2kCKDWB5eLLQ3HgBNSU';
+
+  // 银联支付配置 - 云闪付二维码（C2B）- 生產環境與微信支付寶相同
+  static const String unionPayMchNo = 'M1767163761'; // 生產環境商戶號（與主商戶號相同）
+  static const String unionPayQrAppId = '6954c771e4b012d6d79a6a08';
+  static const String unionPayQrAppSecret =
+      '2fSsOWIuI6yTSCmAv2kCKDWB5eLLQ3HgBNSU';
+
+  // 向后兼容的字段（避免代码中的引用报错）
+  @Deprecated('使用 wechatAlipayAppId 替代')
+  static const String qrCodeAppId = '6954c771e4b012d6d79a6a08';
+  @Deprecated('使用 wechatAlipayAppSecret 替代')
+  static const String qrCodeAppSecret = '2fSsOWIuI6yTSCmAv2kCKDWB5eLLQ3HgBNSU';
+
+  // ============ 測試環境配置（已註釋）============
+  // static const String baseUrl = 'https://ts-api-pay.gnete.com.hk';
+  // static const String mchNo = 'M1717387055';  // 測試環境微信、支付寶商戶號
+  //
+  // // 微信/支付宝支付配置 - 公众号 | 二维码（C2B）- 測試環境
+  // static const String wechatAlipayAppId = '66612abb2dd17b1e0797a37d';
+  // static const String wechatAlipayAppSecret = '5YuFyUGJxcr7CvO1FOTfRGBzWhtWhBcI0tTV2RpibqnIS3piA1Wqm1bsvO5RImRGoxU8h49hV47yCdwSDINYi2S88kr1JerBODTomglWMC5nTlawLiJXas6KKQhvnaSa';
+  //
+  // // 银联支付配置 - 云闪付二维码（C2B）- 測試環境
+  // static const String unionPayMchNo = 'M1720165806';  // 測試環境雲閃付專用商戶號
+  // static const String unionPayQrAppId = '6698cb04bf8623b8bc814381';
+  // static const String unionPayQrAppSecret = 'ezYUR5kGA38MtkxJaPLPG4qsComzxxmiFG2tS9MJ2awhndOzIXqCAxjMtmfxfl0N8QzuKeRuS3tZr58pThHmjje62Glu2KbuPfqPn3qNIO6GiX4Rhju5AcdHRc6YUoOu';
+}
 
 // Custom exception class for API-related errors
 class ApiException implements Exception {
@@ -18,7 +57,7 @@ class ApiException implements Exception {
   }
 }
 
-class ApiClient {
+class ApiClient implements PaymentGateway {
   final String _baseUrl;
   String? _token;
   final Logger _logger = Logger();
@@ -106,15 +145,11 @@ class ApiClient {
         }
 
         if (decoded is List) {
-          return decoded
-              .map((item) => Map<String, dynamic>.from(item as Map))
-              .toList();
+          return _mapsFromJsonList(decoded);
         } else if (decoded is Map &&
             decoded.containsKey('data') &&
             decoded['data'] is List) {
-          return (decoded['data'] as List)
-              .map((item) => Map<String, dynamic>.from(item as Map))
-              .toList();
+          return _mapsFromJsonList(decoded['data'] as List);
         } else {
           throw Exception(
               'Expected array response but got: ${decoded.runtimeType}');
@@ -158,7 +193,8 @@ class ApiClient {
         return {}; // Return empty map for empty successful response
       }
       try {
-        return json.decode(decodedBody) as Map<String, dynamic>;
+        final decoded = json.decode(decodedBody);
+        return _mapFromJsonObject(decoded) ?? {};
       } catch (e, stackTrace) {
         _logger.e('Failed to decode JSON for $apiName. Body: $decodedBody',
             error: e, stackTrace: stackTrace);
@@ -219,61 +255,8 @@ class ApiClient {
     bool isLoginRequest = false,
     bool isHealthTestRequest = false,
   }) async {
-    // 區塊 1: 預檢健康檢查 (如果適用)
-    if (!isLoginRequest &&
-        !isHealthTestRequest &&
-        _token != null &&
-        _token!.isNotEmpty) {
-      try {
-        // healthTest() 本身會呼叫 _sendRequest 並將 isHealthTestRequest 設為 true
-        await healthTest();
-      } on ApiException catch (e) {
-        if (e.statusCode == 401) {
-          _logger.w('為 $apiNameForLog 進行的預檢健康檢查因 401 失敗。嘗試刷新令牌。');
-          if (onNeedsTokenRefresh == null) {
-            _logger.w('onNeedsTokenRefresh 為空，無法刷新令牌。重新拋出健康檢查的 401 錯誤。');
-            rethrow;
-          }
-
-          try {
-            final newToken = await _initiateAndGetTokenRefreshFuture();
-            if (newToken != null && newToken.isNotEmpty) {
-              // 令牌透過 $apiNameForLog 的健康檢查成功刷新。主請求將繼續。
-              // 可選：重新運行 healthTest 以確認，但會增加延遲。
-              // await healthTest();
-            } else {
-              _logger.w(
-                  '為 $apiNameForLog 進行的 401 健康檢查後，令牌刷新未產生新令牌。重新拋出原始的 401 錯誤。');
-              throw ApiException(
-                  statusCode: e.statusCode,
-                  message: '健康檢查 401 後刷新令牌失敗 (無新令牌)。',
-                  errorData: e.errorData);
-            }
-          } catch (refreshError) {
-            _logger.e('為 $apiNameForLog 處理 401 健康檢查後等待令牌刷新時出錯。',
-                error: refreshError);
-            throw ApiException(
-                statusCode: e.statusCode,
-                message: '健康檢查 401 後令牌刷新過程失敗: $refreshError',
-                errorData: e.errorData);
-          }
-        } else {
-          // 來自健康檢查的非 401 ApiException
-          // 對於 500 錯誤等服務器端問題，我們將允許主請求繼續，而不是完全失敗。
-          // 這可以防止服務器問題阻止所有請求。
-          _logger.w(
-              '為 $apiNameForLog 進行的預檢健康檢查因非 401 ApiException 失敗 (狀態: ${e.statusCode})。允許主請求繼續。錯誤: ${e.message}');
-          // 對於非 401 錯誤，不拋出，讓主請求繼續
-        }
-      } catch (otherError) {
-        // 捕獲來自 healthTest() 的其他非 ApiException 錯誤
-        // 對於意外錯誤，我們也將允許主請求繼續
-        _logger.w('為 $apiNameForLog 進行的預檢健康檢查因意外錯誤失敗。允許主請求繼續。錯誤: $otherError');
-        // 對於意外錯誤，不拋出，讓主請求繼續
-      }
-    }
-
-    // 區塊 2: 執行帶有超時和重試的主請求
+    // 執行帶有超時和重試的主請求。避免每個 API 前都做 healthTest；
+    // 只有真實請求返回 401 時才刷新 token 並重試一次。
     http.Response? response;
     Exception? lastException;
 
@@ -290,7 +273,7 @@ class ApiClient {
 
         // 如果請求成功，跳出重試循環
         break;
-      } catch (e, stackTrace) {
+      } catch (e) {
         lastException = e is Exception ? e : Exception(e.toString());
 
         // 詳細記錄網絡錯誤類型並生成用戶友好消息
@@ -300,27 +283,25 @@ class ApiClient {
         if (e.toString().contains('Failed host lookup') ||
             e.toString().contains('No address associated with hostname')) {
           errorType = 'DNS解析失敗';
-          userFriendlyMessage = '🌐 無法連接到伺服器，請檢查網絡連接或聯繫管理員';
+          userFriendlyMessage = ' 無法連接到伺服器，請檢查網絡連接或聯繫管理員';
         } else if (e.toString().contains('SocketException')) {
           errorType = 'Socket連接錯誤';
-          userFriendlyMessage = '🔌 網絡連接異常，請檢查您的網絡設置';
+          userFriendlyMessage = ' 網絡連接異常，請檢查您的網絡設置';
         } else if (e.toString().contains('TimeoutException') ||
             e.toString().contains('請求超時')) {
           errorType = '請求超時';
-          userFriendlyMessage = '⏱️ 伺服器響應超時，請稍後重試';
+          userFriendlyMessage = ' 伺服器響應超時，請稍後重試';
         } else if (e.toString().contains('ClientException')) {
           errorType = '客戶端錯誤';
-          userFriendlyMessage = '📱 應用連接錯誤，請重啟應用或檢查網絡';
+          userFriendlyMessage = ' 應用連接錯誤，請重啟應用或檢查網絡';
         } else {
-          userFriendlyMessage = '❌ 網絡請求失敗，請稍後重試';
+          userFriendlyMessage = ' 網絡請求失敗，請稍後重試';
         }
 
         if (attempt == _maxRetryAttempts) {
           // 最後一次嘗試失敗，拋出用戶友好的異常
-          _logger.e(
-              '$apiNameForLog - 所有 $_maxRetryAttempts 次請求嘗試均失敗 (最後錯誤類型: $errorType)',
-              error: e,
-              stackTrace: stackTrace);
+          _logger.w(
+              '$apiNameForLog - 所有 $_maxRetryAttempts 次請求嘗試均失敗 (最後錯誤類型: $errorType): $e');
 
           // 拋出包含用戶友好消息的異常
           throw ApiException(
@@ -342,8 +323,8 @@ class ApiClient {
       throw lastException ?? Exception('請求失敗，未知錯誤 - $apiNameForLog');
     }
 
-    // 區塊 3: 處理主請求的 401 (重試邏輯)
-    if (response.statusCode == 401 && !isLoginRequest) {
+    // 處理主請求的 401。healthTest 自身不在這裡刷新，避免健康檢查遞歸。
+    if (response.statusCode == 401 && !isLoginRequest && !isHealthTestRequest) {
       _logger.w('為實際請求 $apiNameForLog 收到 401。嘗試刷新令牌。');
       if (onNeedsTokenRefresh == null) {
         _logger.w(
@@ -366,6 +347,24 @@ class ApiClient {
       }
     }
     return response!;
+  }
+
+  List<Map<String, dynamic>> _mapsFromJsonList(List<dynamic> items) {
+    return items
+        .whereType<Map>()
+        .map(
+            (item) => item.map((key, value) => MapEntry(key.toString(), value)))
+        .toList();
+  }
+
+  Map<String, dynamic>? _mapFromJsonObject(Object? value) {
+    if (value is Map<String, dynamic>) {
+      return value;
+    }
+    if (value is Map) {
+      return value.map((key, value) => MapEntry(key.toString(), value));
+    }
+    return null;
   }
 
   // --- API Methods based on httpapi.json ---
@@ -711,7 +710,7 @@ class ApiClient {
       'Cache-Control': 'no-cache',
     };
 
-    _logger.i('🌐 開始獲取香港電台財經新聞RSS數據');
+    _logger.i(' 開始獲取香港電台財經新聞RSS數據');
 
     try {
       // 增加超時時間到60秒
@@ -728,13 +727,13 @@ class ApiClient {
       // 處理XML響應
       return _handleRssXmlResponse(response, 'getRthkNews');
     } catch (e) {
-      _logger.e('❌ 獲取RTHK新聞失敗: $e');
+      _logger.w(' 獲取RTHK新聞暫時失敗: $e');
 
       // 如果是超時錯誤，提供更友好的錯誤信息
       if (e.toString().contains('超時')) {
         throw ApiException(
           statusCode: null,
-          message: '❌ RTHK新聞RSS請求超時，請檢查網絡連接或稍後重試',
+          message: ' RTHK新聞RSS請求超時，請檢查網絡連接或稍後重試',
           errorData: 'TimeoutException: ${e.toString()}',
         );
       }
@@ -894,8 +893,7 @@ class ApiClient {
     final Map<String, String> headers =
         _getHeaders(requiresAuth: true, contentType: 'application/json');
 
-    _logger
-        .i('🏥 [健康檢查] 香橙派狀態: ${orangePi['status']}, 打印機: ${printers.length}個');
+    _logger.i(' [健康檢查] 香橙派狀態: ${orangePi['status']}, 打印機: ${printers.length}個');
 
     final http.Response response = await _sendRequest(
         () => http.post(url, headers: headers, body: requestBody),
@@ -904,7 +902,7 @@ class ApiClient {
     final Map<String, dynamic> responseData =
         await _handleResponse(response, 'printersHealthCheck');
 
-    _logger.i('✅ [健康檢查] 同步完成: ${responseData['summary'] ?? 'Success'}');
+    _logger.i(' [健康檢查] 同步完成: ${responseData['summary'] ?? 'Success'}');
     return responseData;
   }
 
@@ -924,7 +922,7 @@ class ApiClient {
     final Map<String, String> headers =
         _getHeaders(requiresAuth: true, contentType: 'application/json');
 
-    _logger.i('📞 [打印回調] 香橙派: ${orangePi['status']}, 打印機: ${printers.length}個');
+    _logger.i(' [打印回調] 香橙派: ${orangePi['status']}, 打印機: ${printers.length}個');
 
     final http.Response response = await _sendRequest(
         () => http.post(url, headers: headers, body: requestBody),
@@ -933,7 +931,351 @@ class ApiClient {
     final Map<String, dynamic> responseData =
         await _handleResponse(response, 'printersCallback');
 
-    _logger.i('✅ [打印回調] 更新完成: ${responseData['summary'] ?? 'Success'}');
+    _logger.i(' [打印回調] 更新完成: ${responseData['summary'] ?? 'Success'}');
     return responseData;
+  }
+
+  // 防重複請求的訂單號緩存
+  static final Set<String> _processingOrders = <String>{};
+
+  /// 22, 創建微信支付訂單 - 完全按照Python代碼實現
+  @override
+  Future<Map<String, dynamic>> createWechatPayment({
+    required String orderNo,
+    required double amount,
+    required String subject,
+    String? body,
+    String? returnUrl,
+  }) async {
+    // 防重複請求檢查
+    if (_processingOrders.contains(orderNo)) {
+      throw ApiException(
+        message: '訂單 $orderNo 正在處理中，請勿重複提交',
+      );
+    }
+    _processingOrders.add(orderNo);
+
+    try {
+      const String endpoint = '/api/pay/unifiedOrder';
+      final Uri url = _buildUri('${PaymentApiConfig.baseUrl}$endpoint', null);
+
+      // 構建請求參數（完全按照Python代碼格式）
+      final reqTime = DateTime.now().millisecondsSinceEpoch; // 13位毫秒時間戳
+
+      final params = <String, dynamic>{
+        'mchNo': PaymentApiConfig.mchNo,
+        'appId': PaymentApiConfig.wechatAlipayAppId,
+        'mchOrderNo': orderNo,
+        'wayCode': 'WX_QR', // 微信二維碼支付
+        'amount': (amount * 100).toInt(), // 轉為分，使用int類型
+        'currency': 'HKD',
+        'subject': subject,
+        'body': body ?? subject,
+        'notifyUrl': 'https://ismart.seventy2.hk/test_webhook/',
+        'returnUrl': returnUrl ?? 'https://ismart-pay.li-iop.com/',
+        'reqTime': reqTime,
+        'version': '1.0',
+        'signType': 'MD5',
+      };
+
+      // 生成簽名
+      final signature =
+          _generatePaymentSign(params, PaymentApiConfig.wechatAlipayAppSecret);
+      params['sign'] = signature;
+
+      _logger.i(' [微信支付] 開始創建訂單');
+      _logger.i(' [微信支付] 訂單號: $orderNo, 金額: ${params['amount']}分');
+      _logger.i(' [微信支付] 請求參數: $params');
+
+      final http.Response response = await _sendRequest(
+          () => http.post(url,
+              headers: _getPaymentHeaders(), body: json.encode(params)),
+          apiNameForLog: 'createWechatPayment');
+
+      final Map<String, dynamic> responseData =
+          await _handleResponse(response, 'createWechatPayment');
+
+      _logger.i(' [微信支付] 完整響應: $responseData');
+
+      if (responseData.containsKey('data') && responseData['data'] != null) {
+        final data = responseData['data'];
+        _logger.i(' [微信支付] 創建成功！');
+        _logger.i(' [微信支付] 返回數據: $data');
+
+        // 檢查是否包含支付數據
+        if (data.containsKey('payData')) {
+          _logger.i(' [微信支付] QR碼數據: ${data['payData']}');
+        } else {
+          _logger.w(' [微信支付] 響應中沒有payData字段');
+        }
+
+        return data;
+      } else {
+        _logger.e(' [微信支付] 響應格式異常: $responseData');
+        throw ApiException(
+          message: '微信支付創建失敗: ${responseData['msg'] ?? 'Unknown error'}',
+          errorData: responseData,
+        );
+      }
+    } catch (e) {
+      _logger.e(' [微信支付] 創建失敗: $e');
+      rethrow;
+    } finally {
+      // 移除正在處理的訂單號
+      _processingOrders.remove(orderNo);
+    }
+  }
+
+  /// 專門用於支付的簽名生成方法 - 完全按照Python代碼和API規則實現
+  String _generatePaymentSign(Map<String, dynamic> params, String appSecret) {
+    // 1. 移除空值參數和sign參數，只保留有效參數
+    final filteredParams = <String, dynamic>{};
+    params.forEach((key, value) {
+      if (key != 'sign' && value != null && value.toString().isNotEmpty) {
+        filteredParams[key] = value;
+      }
+    });
+
+    // 2. 按照 ASCII 字典序排序
+    final sortedKeys = filteredParams.keys.toList()..sort();
+
+    // 3. 拼接參數字符串（key=value&格式）
+    final paramList = <String>[];
+    for (final key in sortedKeys) {
+      paramList.add('$key=${filteredParams[key]}');
+    }
+    final paramString = paramList.join('&');
+
+    // 4. 拼接密鑰
+    final stringToSign = '$paramString&key=$appSecret';
+
+    // 5. MD5 加密並轉大寫
+    final bytes = utf8.encode(stringToSign);
+    final digest = md5.convert(bytes);
+    final signature = digest.toString().toUpperCase();
+
+    return signature;
+  }
+
+  /// 獲取支付請求頭
+  Map<String, String> _getPaymentHeaders() {
+    return {
+      'Content-Type': 'application/json;charset=UTF-8',
+      'User-Agent': 'FlutterApp/1.0',
+    };
+  }
+
+  /// 23, 創建支付寶支付訂單
+  /// 23, 創建支付寶支付訂單
+  @override
+  Future<Map<String, dynamic>> createAlipayPayment({
+    required String orderNo,
+    required double amount,
+    required String subject,
+    String? body,
+    String? returnUrl,
+  }) async {
+    // 防重複請求檢查
+    if (_processingOrders.contains(orderNo)) {
+      throw ApiException(
+        message: '訂單 $orderNo 正在處理中，請勿重複提交',
+      );
+    }
+    _processingOrders.add(orderNo);
+
+    try {
+      const String endpoint = '/api/pay/unifiedOrder';
+      final Uri url = _buildUri('${PaymentApiConfig.baseUrl}$endpoint', null);
+
+      // 構建請求參數（完全按照Python代碼格式）
+      final reqTime = DateTime.now().millisecondsSinceEpoch; // 13位毫秒時間戳
+
+      final params = <String, dynamic>{
+        'mchNo': PaymentApiConfig.mchNo,
+        'appId': PaymentApiConfig.wechatAlipayAppId,
+        'mchOrderNo': orderNo,
+        'wayCode': 'ALI_H5', // 支付寶H5支付，返回URL後生成QR碼供用戶掃描
+        'amount': (amount * 100).toInt(), // 轉為分，使用int類型
+        'currency': 'HKD',
+        'subject': subject,
+        'body': body ?? subject,
+        'notifyUrl': 'https://ismart.seventy2.hk/test_webhook/',
+        'returnUrl': returnUrl ?? 'https://ismart-pay.li-iop.com/',
+        'reqTime': reqTime,
+        'version': '1.0',
+        'signType': 'MD5',
+      };
+
+      // 生成簽名
+      final signature =
+          _generatePaymentSign(params, PaymentApiConfig.wechatAlipayAppSecret);
+      params['sign'] = signature;
+
+      _logger.i(' [支付寶] 訂單號: $orderNo, 金額: ${params['amount']}分');
+      _logger.i(' [支付寶] 簽名: $signature');
+
+      final http.Response response = await _sendRequest(
+          () => http.post(url,
+              headers: _getPaymentHeaders(), body: json.encode(params)),
+          apiNameForLog: 'createAlipayPayment');
+
+      final Map<String, dynamic> responseData =
+          await _handleResponse(response, 'createAlipayPayment');
+
+      if (responseData.containsKey('data') && responseData['data'] != null) {
+        _logger.i(' [支付寶] 創建成功，QR碼數據: ${responseData['data']}');
+        return responseData['data'];
+      } else {
+        throw ApiException(
+          message: '支付寶創建失敗: ${responseData['msg'] ?? 'Unknown error'}',
+          errorData: responseData,
+        );
+      }
+    } catch (e) {
+      _logger.e(' [支付寶] 創建失敗: $e');
+      rethrow;
+    } finally {
+      // 移除正在處理的訂單號
+      _processingOrders.remove(orderNo);
+    }
+  }
+
+  /// 24, 創建銀聯支付訂單
+  @override
+  Future<Map<String, dynamic>> createUnionpayPayment({
+    required String orderNo,
+    required double amount,
+    required String subject,
+    String? body,
+    String? returnUrl,
+  }) async {
+    // 防重複請求檢查
+    if (_processingOrders.contains(orderNo)) {
+      throw ApiException(
+        message: '訂單 $orderNo 正在處理中，請勿重複提交',
+      );
+    }
+    _processingOrders.add(orderNo);
+
+    try {
+      const String endpoint = '/api/pay/unifiedOrder';
+      final Uri url = _buildUri('${PaymentApiConfig.baseUrl}$endpoint', null);
+
+      // 構建請求參數（完全按照Python代碼格式）
+      final reqTime = DateTime.now().millisecondsSinceEpoch; // 13位毫秒時間戳
+
+      final params = <String, dynamic>{
+        'mchNo': PaymentApiConfig.unionPayMchNo, // 使用雲閃付專用商戶號
+        'appId': PaymentApiConfig.unionPayQrAppId,
+        'mchOrderNo': orderNo,
+        'wayCode': 'YSF_QR', // 云闪付二维码支付
+        'amount': (amount * 100).toInt(), // 轉為分，使用int類型
+        'currency': 'HKD',
+        'subject': subject,
+        'body': body ?? subject,
+        'notifyUrl': 'https://ismart.seventy2.hk/test_webhook/',
+        'returnUrl': returnUrl ?? 'https://ismart-pay.li-iop.com/',
+        'reqTime': reqTime,
+        'version': '1.0',
+        'signType': 'MD5',
+      };
+
+      // 生成簽名
+      final signature =
+          _generatePaymentSign(params, PaymentApiConfig.unionPayQrAppSecret);
+      params['sign'] = signature;
+
+      _logger.i(' [銀聯] 訂單號: $orderNo, 金額: ${params['amount']}分');
+      _logger.i(' [銀聯] 簽名: $signature');
+
+      final http.Response response = await _sendRequest(
+          () => http.post(url,
+              headers: _getPaymentHeaders(), body: json.encode(params)),
+          apiNameForLog: 'createUnionpayPayment');
+
+      final Map<String, dynamic> responseData =
+          await _handleResponse(response, 'createUnionpayPayment');
+
+      if (responseData.containsKey('data') && responseData['data'] != null) {
+        _logger.i(' [銀聯] 創建成功，QR碼數據: ${responseData['data']}');
+        return responseData['data'];
+      } else {
+        throw ApiException(
+          message: '銀聯支付創建失敗: ${responseData['msg'] ?? 'Unknown error'}',
+          errorData: responseData,
+        );
+      }
+    } catch (e) {
+      _logger.e(' [銀聯] 創建失敗: $e');
+      rethrow;
+    } finally {
+      // 移除正在處理的訂單號
+      _processingOrders.remove(orderNo);
+    }
+  }
+
+  /// 25, 查詢支付狀態
+  @override
+  Future<Map<String, dynamic>> queryPaymentStatus({
+    required String orderNo,
+    String? paymentMethod, // 添加支付方式參數
+  }) async {
+    try {
+      const String endpoint = '/api/pay/query';
+      final Uri url = _buildUri('${PaymentApiConfig.baseUrl}$endpoint', null);
+
+      final reqTime = DateTime.now().millisecondsSinceEpoch;
+
+      // 44, 根據支付方式選擇對應的商戶號和appId
+      String mchNo;
+      String appId;
+      String appSecret;
+
+      if (paymentMethod == 'unionpay') {
+        mchNo = PaymentApiConfig.unionPayMchNo;
+        appId = PaymentApiConfig.unionPayQrAppId;
+        appSecret = PaymentApiConfig.unionPayQrAppSecret;
+      } else {
+        mchNo = PaymentApiConfig.mchNo;
+        appId = PaymentApiConfig.wechatAlipayAppId;
+        appSecret = PaymentApiConfig.wechatAlipayAppSecret;
+      }
+
+      final params = <String, dynamic>{
+        'mchNo': mchNo,
+        'appId': appId,
+        'mchOrderNo': orderNo,
+        'reqTime': reqTime,
+        'version': '1.0',
+        'signType': 'MD5',
+      };
+
+      // 生成簽名
+      final signature = _generatePaymentSign(params, appSecret);
+      params['sign'] = signature;
+
+      _logger.i(' [支付查詢] 訂單號: $orderNo');
+
+      final http.Response response = await _sendRequest(
+          () => http.post(url,
+              headers: _getPaymentHeaders(), body: json.encode(params)),
+          apiNameForLog: 'queryPaymentStatus');
+
+      final Map<String, dynamic> responseData =
+          await _handleResponse(response, 'queryPaymentStatus');
+
+      if (responseData.containsKey('data') && responseData['data'] != null) {
+        _logger.i(' [支付查詢] 查詢成功: ${responseData['data']}');
+        return responseData['data'];
+      } else {
+        throw ApiException(
+          message: '支付狀態查詢失敗: ${responseData['msg'] ?? 'Unknown error'}',
+          errorData: responseData,
+        );
+      }
+    } catch (e) {
+      _logger.e(' [支付查詢] 查詢失敗: $e');
+      rethrow;
+    }
   }
 }

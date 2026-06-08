@@ -3,11 +3,16 @@ import 'package:iboard_app/models/file_model.dart';
 
 ///實時監控虛擬廣告Model - 用於集成到頂部廣告輪播系統
 class LiveMonitorAdModel extends AdModel {
+  static final DateTime _createdAt = DateTime.utc(2000);
+  static final DateTime _updatedAt = DateTime.utc(2000);
+  static final DateTime _startTime = DateTime.utc(2000);
+  static final DateTime _endTime = DateTime.utc(2099);
+
   LiveMonitorAdModel()
       : super(
           id: -1,
-          createdAt: DateTime.now(),
-          updatedAt: DateTime.now(),
+          createdAt: _createdAt,
+          updatedAt: _updatedAt,
           deletedAt: null,
           title: '實時監控',
           description: '四路監控畫面',
@@ -15,8 +20,8 @@ class LiveMonitorAdModel extends AdModel {
           status: 'active',
           duration: 60,
           priority: 999,
-          startTime: DateTime(2000),
-          endTime: DateTime(2099),
+          startTime: _startTime,
+          endTime: _endTime,
           display: AdDisplayType.top,
           fileId: -1,
           file: FileModel(
@@ -25,8 +30,8 @@ class LiveMonitorAdModel extends AdModel {
             md5: 'live_monitor_internal',
             url: 'live_monitor://internal',
             fileSize: 0,
-            createdAt: DateTime.now(),
-            updatedAt: DateTime.now(),
+            createdAt: _createdAt,
+            updatedAt: _updatedAt,
             deletedAt: null,
             localFilePath: null,
           ),

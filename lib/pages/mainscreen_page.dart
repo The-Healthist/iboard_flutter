@@ -14,9 +14,10 @@ import 'package:iboard_app/providers/ad_top_carousel_provider.dart';
 import 'package:iboard_app/providers/ad_full_carousel_provider.dart';
 import 'package:iboard_app/providers/weather_provider.dart';
 import 'package:iboard_app/providers/rthk_news_provider.dart';
-import 'package:iboard_app/widgets/carousel_widget.dart' as custom_carousel;
+import 'package:iboard_app/widgets/carousel/carousel_widget.dart'
+    as custom_carousel;
 import 'package:iboard_app/widgets/mainscreen/bottom_display/bottom_display_widget.dart';
-import 'package:iboard_app/widgets/rthk_news_ticker_widget.dart';
+import 'package:iboard_app/widgets/news/rthk_news_ticker_widget.dart';
 import 'package:iboard_app/pages/settings_page.dart';
 import 'package:provider/provider.dart';
 import 'package:iboard_app/providers/arrear_provider.dart';

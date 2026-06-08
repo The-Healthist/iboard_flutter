@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:io';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:iboard_app/models/announcement_model.dart'; // Changed import
 import 'package:iboard_app/managers/managers.dart';
@@ -7,14 +8,16 @@ import 'package:iboard_app/providers/state_provider.dart';
 import 'package:flutter_pdfview/flutter_pdfview.dart';
 import 'package:video_player/video_player.dart';
 import 'package:provider/provider.dart';
-import 'package:iboard_app/widgets/carousel_widget.dart'; // 添加輪播組件導入
-import 'package:iboard_app/widgets/simple_print_dialog_enhanced.dart'; // 添加增強版打印對話框導入
+import 'package:iboard_app/widgets/carousel/carousel_widget.dart'; // 添加輪播組件導入
+import 'package:iboard_app/widgets/print/simple_print_dialog_enhanced.dart'; // 添加增強版打印對話框導入
 
 class AnnouncementReaderWidget extends StatefulWidget {
   final AnnouncementModel announcement;
   final FileManager fileManager;
   final VoidCallback? onHomeButtonPressed;
   final bool isInCarouselMode; // 是否在轮播模式中
+  final int? carouselIndex;
+  final ValueListenable<int>? visibleCarouselIndexListenable;
 
   // 新增：視頻播放進度回調
   final Function(Duration)? onVideoProgressChanged;
@@ -32,6 +35,8 @@ class AnnouncementReaderWidget extends StatefulWidget {
     required this.fileManager,
     this.onHomeButtonPressed,
     this.isInCarouselMode = false, // 默认不在轮播模式
+    this.carouselIndex,
+    this.visibleCarouselIndexListenable,
     this.onVideoProgressChanged,
     this.initialPlaybackPosition,
     this.onPdfCompleted,

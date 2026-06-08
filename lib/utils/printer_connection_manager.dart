@@ -27,19 +27,21 @@ class PrinterConnectionManager {
       // 載入已保存的打印機列表
       final printersJson = prefs.getString(_printerListKey);
       if (printersJson != null) {
-        final printersList = jsonDecode(printersJson) as List;
+        final printersList = _listFromJson(jsonDecode(printersJson));
         _savedPrinters = printersList
-            .map((json) => PrinterDeviceJson.fromJson(json))
+            .map(PrinterDeviceJson.fromJson)
+            .whereType<PrinterDevice>()
             .toList();
-        _logger.i('🖨️ 載入了 ${_savedPrinters.length} 個已保存的打印機');
+        _logger.i(' 載入了 ${_savedPrinters.length} 個已保存的打印機');
       }
 
       // 載入默認打印機
       final defaultPrinterJson = prefs.getString(_defaultPrinterKey);
       if (defaultPrinterJson != null) {
-        final defaultPrinterMap = jsonDecode(defaultPrinterJson);
-        _defaultPrinter = PrinterDeviceJson.fromJson(defaultPrinterMap);
-        _logger.i('🖨️ 載入默認打印機: ${_defaultPrinter?.name}');
+        _defaultPrinter = PrinterDeviceJson.fromJson(
+          jsonDecode(defaultPrinterJson),
+        );
+        _logger.i(' 載入默認打印機: ${_defaultPrinter?.name}');
       }
     } catch (e) {
       _logger.e('初始化打印機管理器失敗: $e');
@@ -67,7 +69,7 @@ class PrinterConnectionManager {
       }
 
       await _persistToStorage();
-      _logger.i('🖨️ 保存打印機: ${printer.name}');
+      _logger.i(' 保存打印機: ${printer.name}');
     } catch (e) {
       _logger.e('保存打印機失敗: $e');
     }
@@ -81,7 +83,7 @@ class PrinterConnectionManager {
       final prefs = await SharedPreferences.getInstance();
       await prefs.setString(_defaultPrinterKey, jsonEncode(printer.toJson()));
 
-      _logger.i('🖨️ 設置默認打印機: ${printer.name}');
+      _logger.i(' 設置默認打印機: ${printer.name}');
     } catch (e) {
       _logger.e('設置默認打印機失敗: $e');
     }
@@ -100,7 +102,7 @@ class PrinterConnectionManager {
       }
 
       await _persistToStorage();
-      _logger.i('🖨️ 移除打印機: $printerId');
+      _logger.i(' 移除打印機: $printerId');
     } catch (e) {
       _logger.e('移除打印機失敗: $e');
     }
@@ -148,7 +150,7 @@ class PrinterConnectionManager {
     _savedPrinters = updatedPrinters;
     await _persistToStorage();
 
-    _logger.i('🖨️ 刷新了 ${updatedPrinters.length} 個打印機狀態');
+    _logger.i(' 刷新了 ${updatedPrinters.length} 個打印機狀態');
     return updatedPrinters;
   }
 
@@ -174,10 +176,17 @@ class PrinterConnectionManager {
       await prefs.remove(_printerListKey);
       await prefs.remove(_defaultPrinterKey);
 
-      _logger.i('🖨️ 清除所有打印機數據');
+      _logger.i(' 清除所有打印機數據');
     } catch (e) {
       _logger.e('清除打印機數據失敗: $e');
     }
+  }
+
+  List<Object?> _listFromJson(Object? value) {
+    if (value is List) {
+      return value;
+    }
+    return const [];
   }
 }
 
@@ -193,13 +202,33 @@ extension PrinterDeviceJson on PrinterDevice {
     };
   }
 
-  static PrinterDevice fromJson(Map<String, dynamic> json) {
+  static PrinterDevice? fromJson(Object? value) {
+    final json = _nullableMap(value);
+    if (json == null) return null;
+
+    final id = _stringOrNull(json['id']);
+    final name = _stringOrNull(json['name']);
+    if (id == null || name == null) return null;
+
     return PrinterDevice(
-      id: json['id'] as String,
-      name: json['name'] as String,
-      ipAddress: json['ipAddress'] as String?,
-      isConnected: json['isConnected'] as bool,
-      model: json['model'] as String?,
+      id: id,
+      name: name,
+      ipAddress: _stringOrNull(json['ipAddress']),
+      isConnected: json['isConnected'] == true,
+      model: _stringOrNull(json['model']),
     );
+  }
+
+  static Map<String, dynamic>? _nullableMap(Object? value) {
+    if (value is Map<String, dynamic>) return value;
+    if (value is Map) {
+      return value.map((key, value) => MapEntry(key.toString(), value));
+    }
+    return null;
+  }
+
+  static String? _stringOrNull(Object? value) {
+    if (value is String && value.isNotEmpty) return value;
+    return null;
   }
 }

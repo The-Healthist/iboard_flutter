@@ -51,6 +51,52 @@ class AnnouncementProvider extends ChangeNotifier {
     });
   }
 
+  List<AnnouncementModel> _parseAnnouncementList(Object? value) {
+    if (value is! List) {
+      return [];
+    }
+
+    final announcements = <AnnouncementModel>[];
+    for (final item in value) {
+      try {
+        AnnouncementModel? announcement;
+        if (item is Map<String, dynamic>) {
+          announcement = AnnouncementModel.fromJson(item);
+        } else if (item is Map) {
+          announcement = AnnouncementModel.fromJson(
+            item.map((key, value) => MapEntry(key.toString(), value)),
+          );
+        }
+
+        if (announcement == null) {
+          continue;
+        }
+        if (_isDisplayableAnnouncement(announcement)) {
+          announcements.add(announcement);
+        } else {
+          _logger.w('跳過缺少文件資料的通告: id=${announcement.id}');
+        }
+      } catch (e) {
+        _logger.w('跳過無效通告項', error: e);
+      }
+    }
+    return announcements;
+  }
+
+  bool _isDisplayableAnnouncement(AnnouncementModel announcement) {
+    return announcement.file.url.isNotEmpty &&
+        announcement.file.mimeType.isNotEmpty;
+  }
+
+  List<AnnouncementModel> _decodeCachedAnnouncements(String jsonString) {
+    try {
+      return _parseAnnouncementList(json.decode(jsonString));
+    } catch (e) {
+      _logger.w('通告緩存JSON格式無效', error: e);
+      return [];
+    }
+  }
+
   ///1，保存通告数据到SharedPreferences缓存
   Future<void> _saveAnnouncementsToCache(
       List<AnnouncementModel> announcements) async {
@@ -70,11 +116,11 @@ class AnnouncementProvider extends ChangeNotifier {
     if (_announcements.isNotEmpty) {
       // 已有緩存數據，確保輪播數據是最新的
       _updateCarouselAnnouncements();
-      _logger.i('📢 使用現有的通告緩存數據: ${_announcements.length} 個');
+      _logger.i(' 使用現有的通告緩存數據: ${_announcements.length} 個');
     } else {
       // 嘗試從持久化緩存重新加載
       await _loadAnnouncementsFromCache();
-      _logger.i('📢 從持久化緩存重新載入通告數據: ${_announcements.length} 個');
+      _logger.i(' 從持久化緩存重新載入通告數據: ${_announcements.length} 個');
     }
   }
 
@@ -84,12 +130,7 @@ class AnnouncementProvider extends ChangeNotifier {
       final prefs = await SharedPreferences.getInstance();
       final jsonString = prefs.getString(_announcementsDataKey);
       if (jsonString != null && jsonString.isNotEmpty) {
-        final List<dynamic> announcementsJson =
-            json.decode(jsonString) as List<dynamic>;
-        final List<AnnouncementModel> cachedAnnouncements = announcementsJson
-            .map((announcementJson) => AnnouncementModel.fromJson(
-                announcementJson as Map<String, dynamic>))
-            .toList();
+        final cachedAnnouncements = _decodeCachedAnnouncements(jsonString);
 
         _announcements = cachedAnnouncements;
         _updateCarouselAnnouncements(); // 更新轮播通告数组
@@ -98,8 +139,8 @@ class AnnouncementProvider extends ChangeNotifier {
         if (_announcementCarouselProvider != null) {
           _announcementCarouselProvider!
               .updateCarouselList(_carouselAnnouncements);
-          _logger.i(
-              '📢 緩存加載完成，已更新輪播Provider: ${_carouselAnnouncements.length} 個通告');
+          _logger
+              .i(' 緩存加載完成，已更新輪播Provider: ${_carouselAnnouncements.length} 個通告');
         }
 
         notifyListeners();
@@ -111,7 +152,7 @@ class AnnouncementProvider extends ChangeNotifier {
         if (_announcementCarouselProvider != null) {
           _announcementCarouselProvider!
               .updateCarouselList(_carouselAnnouncements);
-          _logger.i('📢 緩存中無數據，已更新輪播Provider（空列表）');
+          _logger.i(' 緩存中無數據，已更新輪播Provider（空列表）');
         }
 
         notifyListeners();
@@ -126,7 +167,7 @@ class AnnouncementProvider extends ChangeNotifier {
       if (_announcementCarouselProvider != null) {
         _announcementCarouselProvider!
             .updateCarouselList(_carouselAnnouncements);
-        _logger.i('📢 緩存加載失敗，已更新輪播Provider（空列表）');
+        _logger.i(' 緩存加載失敗，已更新輪播Provider（空列表）');
       }
 
       notifyListeners();
@@ -168,8 +209,6 @@ class AnnouncementProvider extends ChangeNotifier {
         _appDataProvider.deviceSettings?.noticeUpdateDuration ?? 5;
     final updateIntervalSeconds = updateIntervalMinutes * 60;
     _isPeriodicUpdateActive = true;
-    debugPrint(
-        '[AnnouncementProvider] ⏰ 启动通告数据定时更新，间隔: ${updateIntervalSeconds}秒');
 
     fetchNotices();
 
@@ -177,7 +216,6 @@ class AnnouncementProvider extends ChangeNotifier {
     _updateTimer =
         Timer.periodic(Duration(seconds: updateIntervalSeconds), (timer) {
       if (_isPeriodicUpdateActive) {
-        debugPrint('[AnnouncementProvider] 🔄 执行定时通告数据更新');
         fetchNotices();
       } else {
         timer.cancel();
@@ -192,7 +230,6 @@ class AnnouncementProvider extends ChangeNotifier {
       _updateTimer = null;
     }
     _isPeriodicUpdateActive = false;
-    debugPrint('[AnnouncementProvider] ⏹️ 停止通告数据定时更新');
   }
 
   /// 重新初始化Provider（当依赖变化时调用）
@@ -388,9 +425,8 @@ class AnnouncementProvider extends ChangeNotifier {
     try {
       final List<Map<String, dynamic>> carouselNoticesData =
           await _apiClient.getCarouselNotices();
-      final List<AnnouncementModel> fetchedAnnouncements = carouselNoticesData
-          .map((jsonItem) => AnnouncementModel.fromJson(jsonItem))
-          .toList();
+      final List<AnnouncementModel> fetchedAnnouncements =
+          _parseAnnouncementList(carouselNoticesData);
 
       // 判断是否有数据变化(只比对id顺序和数量即可)；首啟強制更新
       final bool hasChanges =
@@ -436,16 +472,16 @@ class AnnouncementProvider extends ChangeNotifier {
           _error = 'Token expired and refresh failed: $refreshError';
         }
       } else {
-        // 🔧 優化：API失敗時優先使用緩存數據，降低錯誤影響
+        //  優化：API失敗時優先使用緩存數據，降低錯誤影響
         await _handleAnnouncementFallback();
         _error = null; // 清除錯誤，因為有緩存數據可用
-        _logger.i('📢 API失敗但已使用緩存數據: ${e.message}');
+        _logger.i(' API失敗但已使用緩存數據: ${e.message}');
       }
     } catch (e, stackTrace) {
       _logger.e('An unexpected error occurred while fetching notices',
           error: e, stackTrace: stackTrace);
 
-      // 🔧 优化：所有异常都优先使用缓存数据，不显示错误状态
+      //  优化：所有异常都优先使用缓存数据，不显示错误状态
       await _handleAnnouncementFallback();
       _error = null; // 清除錯誤狀態，因為緩存數據可用
 
@@ -453,14 +489,14 @@ class AnnouncementProvider extends ChangeNotifier {
       if (e.toString().contains('SocketException') ||
           e.toString().contains('Connection timed out') ||
           e.toString().contains('ClientException')) {
-        _logger.i('📢 網絡連線失敗，已使用緩存通告數據');
+        _logger.i(' 網絡連線失敗，已使用緩存通告數據');
       } else if (e.toString().contains('TimeoutException') ||
           e.toString().contains('請求超時')) {
-        _logger.i('📢 請求超時，已使用緩存通告數據');
+        _logger.i(' 請求超時，已使用緩存通告數據');
       } else if (e.toString().contains('FormatException')) {
-        _logger.i('📢 伺服器數據格式錯誤，已使用緩存通告數據');
+        _logger.i(' 伺服器數據格式錯誤，已使用緩存通告數據');
       } else {
-        _logger.i('📢 發生異常，已使用緩存通告數據: $e');
+        _logger.i(' 發生異常，已使用緩存通告數據: $e');
       }
     } finally {
       _isLoading = false;
@@ -470,7 +506,7 @@ class AnnouncementProvider extends ChangeNotifier {
         _announcementCarouselProvider!
             .updateCarouselList(_carouselAnnouncements);
         _logger
-            .i('📢 通告获取完成，已通知輪播Provider: ${_carouselAnnouncements.length} 個通告');
+            .i(' 通告获取完成，已通知輪播Provider: ${_carouselAnnouncements.length} 個通告');
       }
 
       notifyListeners();
@@ -488,7 +524,7 @@ class AnnouncementProvider extends ChangeNotifier {
     // 若過濾後為空但原始非空，臨時使用全部通告參與輪播，避免通告區被清空
     if (filtered.isEmpty && _announcements.isNotEmpty) {
       _carouselAnnouncements = List<AnnouncementModel>.from(_announcements);
-      _logger.i('📢 警示：過濾後輪播通告為空，臨時使用全部通告進入輪播');
+      _logger.i(' 警示：過濾後輪播通告為空，臨時使用全部通告進入輪播');
     } else {
       _carouselAnnouncements = filtered;
     }

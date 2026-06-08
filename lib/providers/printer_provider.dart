@@ -21,6 +21,7 @@ class PrinterProvider extends ChangeNotifier {
   static const String _printerListKey = 'api_saved_printers';
   static const String _defaultPrinterIdKey = 'api_default_printer_id';
   static const String _orangePiIpKey = 'orange_pi_ip';
+  static const Duration _startupProbeTimeout = Duration(seconds: 2);
 
   List<PrinterInfo> _printers = [];
   PrinterInfo? _defaultPrinter;
@@ -40,25 +41,33 @@ class PrinterProvider extends ChangeNotifier {
 
   void setApiClient(ApiClient? apiClient) => _apiClient = apiClient;
 
+  void _setPrintApiClient(PrintApiClient? client) {
+    _printApiClient?.close();
+    _printApiClient = client;
+  }
+
   /// 1, 初始化
-  Future<void> initialize({String? orangePiIp}) async {
+  Future<void> initialize({
+    String? orangePiIp,
+    bool probeService = true,
+  }) async {
     try {
-      _logger.i('🖨️ 初始化打印機提供者...');
+      _logger.i(' 初始化打印機提供者...');
 
       // 優先使用傳入的IP,否則從緩存載入
       if (orangePiIp != null && orangePiIp.isNotEmpty) {
         _orangePiIp = orangePiIp;
         await _saveOrangePiIp(orangePiIp);
-        _printApiClient = PrintApiClient(orangePiIp: orangePiIp);
+        _setPrintApiClient(PrintApiClient(orangePiIp: orangePiIp));
       } else {
         // 從緩存載入IP
         final cachedIp = await _loadOrangePiIp();
         if (cachedIp != null && cachedIp.isNotEmpty) {
           _orangePiIp = cachedIp;
-          _printApiClient = PrintApiClient(orangePiIp: cachedIp);
-          _logger.i('📦 從緩存載入香橙派IP: $cachedIp');
+          _setPrintApiClient(PrintApiClient(orangePiIp: cachedIp));
+          _logger.i(' 從緩存載入香橙派IP: $cachedIp');
         } else {
-          _logger.w('⚠️ 香橙派IP地址未配置');
+          _logger.w(' 香橙派IP地址未配置');
           _isInitialized = true;
           notifyListeners();
           return;
@@ -67,16 +76,18 @@ class PrinterProvider extends ChangeNotifier {
 
       await _loadCachedPrinters();
 
-      if (_printApiClient != null) {
-        _isServiceAvailable = await _printApiClient!.isServiceAvailable();
+      if (probeService && _printApiClient != null) {
+        _isServiceAvailable = await _probeServiceAvailability(
+          timeout: _startupProbeTimeout,
+        );
         if (_isServiceAvailable) await refreshPrinters();
       }
 
       _isInitialized = true;
       notifyListeners();
-      _logger.i('🖨️ 初始化完成,載入 ${_printers.length} 個打印機');
+      _logger.i(' 初始化完成,載入 ${_printers.length} 個打印機');
     } catch (e) {
-      _logger.e('❌ 初始化失敗: $e');
+      _logger.e(' 初始化失敗: $e');
       _isInitialized = true;
       notifyListeners();
     }
@@ -89,14 +100,16 @@ class PrinterProvider extends ChangeNotifier {
 
       _orangePiIp = orangePiIp;
       await _saveOrangePiIp(orangePiIp);
-      _printApiClient = PrintApiClient(orangePiIp: orangePiIp);
-      _isServiceAvailable = await _printApiClient!.isServiceAvailable();
+      _setPrintApiClient(PrintApiClient(orangePiIp: orangePiIp));
+      _isServiceAvailable = await _probeServiceAvailability(
+        timeout: _startupProbeTimeout,
+      );
 
       if (_isServiceAvailable) await refreshPrinters();
       notifyListeners();
-      _logger.i('✅ 香橙派IP更新: $orangePiIp');
+      _logger.i(' 香橙派IP更新: $orangePiIp');
     } catch (e) {
-      _logger.e('❌ 更新IP失敗: $e');
+      _logger.e(' 更新IP失敗: $e');
     }
   }
 
@@ -123,9 +136,9 @@ class PrinterProvider extends ChangeNotifier {
       }
 
       notifyListeners();
-      _logger.i('✅ 刷新完成,共 ${_printers.length} 個打印機');
+      _logger.i(' 刷新完成,共 ${_printers.length} 個打印機');
     } catch (e) {
-      _logger.e('❌ 刷新失敗: $e');
+      _logger.e(' 刷新失敗: $e');
     }
   }
 
@@ -142,7 +155,7 @@ class PrinterProvider extends ChangeNotifier {
       final testResult =
           await _printApiClient!.testPrinterConnection(printerIp);
       if (!testResult.connected) {
-        _logger.w('⚠️ 無法連接: ${testResult.message}');
+        _logger.w(' 無法連接: ${testResult.message}');
         return false;
       }
 
@@ -160,14 +173,14 @@ class PrinterProvider extends ChangeNotifier {
       final result = await _printApiClient!.connectPrinter(request);
       if (result['success'] == true) {
         await refreshPrinters();
-        _logger.i('✅ 添加成功');
+        _logger.i(' 添加成功');
         return true;
       }
 
-      _logger.w('⚠️ 添加失敗: ${result['message']}');
+      _logger.w(' 添加失敗: ${result['message']}');
       return false;
     } catch (e) {
-      _logger.e('❌ 添加失敗: $e');
+      _logger.e(' 添加失敗: $e');
       return false;
     }
   }
@@ -179,7 +192,7 @@ class PrinterProvider extends ChangeNotifier {
     try {
       final result = await _printApiClient!.deletePrinter(printerId);
       if (result['success'] != true) {
-        _logger.w('⚠️ 刪除失敗: ${result['message']}');
+        _logger.w(' 刪除失敗: ${result['message']}');
         return false;
       }
 
@@ -196,10 +209,10 @@ class PrinterProvider extends ChangeNotifier {
 
       await _savePrintersToCache();
       notifyListeners();
-      _logger.i('✅ 刪除成功');
+      _logger.i(' 刪除成功');
       return true;
     } catch (e) {
-      _logger.e('❌ 刪除失敗: $e');
+      _logger.e(' 刪除失敗: $e');
       return false;
     }
   }
@@ -217,7 +230,7 @@ class PrinterProvider extends ChangeNotifier {
     try {
       return await _printApiClient!.getPrinterDetails(printerId);
     } catch (e) {
-      _logger.e('❌ 獲取詳情失敗: $e');
+      _logger.e(' 獲取詳情失敗: $e');
       return null;
     }
   }
@@ -228,7 +241,7 @@ class PrinterProvider extends ChangeNotifier {
     try {
       return await _printApiClient!.getPrinterOptions(printerIp);
     } catch (e) {
-      _logger.e('❌ 獲取配置失敗: $e');
+      _logger.e(' 獲取配置失敗: $e');
       return null;
     }
   }
@@ -256,11 +269,11 @@ class PrinterProvider extends ChangeNotifier {
       );
 
       _logger.i(response.success
-          ? '✅ 打印成功: Job ${response.jobId}'
-          : '⚠️ 打印失敗: ${response.message}');
+          ? ' 打印成功: Job ${response.jobId}'
+          : ' 打印失敗: ${response.message}');
       return response;
     } catch (e) {
-      _logger.e('❌ 打印失敗: $e');
+      _logger.e(' 打印失敗: $e');
       return null;
     }
   }
@@ -285,11 +298,11 @@ class PrinterProvider extends ChangeNotifier {
       );
 
       _logger.i(response.success
-          ? '✅ 打印成功: Job ${response.jobId}'
-          : '⚠️ 打印失敗: ${response.message}');
+          ? ' 打印成功: Job ${response.jobId}'
+          : ' 打印失敗: ${response.message}');
       return response;
     } catch (e) {
-      _logger.e('❌ 打印失敗: $e');
+      _logger.e(' 打印失敗: $e');
       return null;
     }
   }
@@ -301,7 +314,7 @@ class PrinterProvider extends ChangeNotifier {
       final result = await _printApiClient!.testPrinterConnection(printerIp);
       return result.connected;
     } catch (e) {
-      _logger.e('❌ 測試失敗: $e');
+      _logger.e(' 測試失敗: $e');
       return false;
     }
   }
@@ -315,7 +328,7 @@ class PrinterProvider extends ChangeNotifier {
     try {
       return await _printApiClient!.getPrinterJobs(printerIp, jobType: jobType);
     } catch (e) {
-      _logger.e('❌ 獲取作業失敗: $e');
+      _logger.e(' 獲取作業失敗: $e');
       return null;
     }
   }
@@ -327,7 +340,7 @@ class PrinterProvider extends ChangeNotifier {
       final result = await _printApiClient!.cancelAllPrinterJobs(printerIp);
       return result['success'] == true;
     } catch (e) {
-      _logger.e('❌ 取消失敗: $e');
+      _logger.e(' 取消失敗: $e');
       return false;
     }
   }
@@ -370,9 +383,9 @@ class PrinterProvider extends ChangeNotifier {
       await _savePrintersToCache();
       await _clearDefaultPrinter();
       notifyListeners();
-      _logger.i('✅ 清除完成');
+      _logger.i(' 清除完成');
     } catch (e) {
-      _logger.e('❌ 清除失敗: $e');
+      _logger.e(' 清除失敗: $e');
     }
   }
 
@@ -399,16 +412,33 @@ class PrinterProvider extends ChangeNotifier {
 
   // ==================== 私有方法 ====================
 
+  Future<bool> _probeServiceAvailability({
+    Duration timeout = _startupProbeTimeout,
+  }) async {
+    final client = _printApiClient;
+    if (client == null) return false;
+
+    try {
+      return await client.isServiceAvailable().timeout(timeout);
+    } catch (e) {
+      _logger.w(' 打印服務不可用，跳過打印機網絡初始化: $e');
+      return false;
+    }
+  }
+
   Future<void> _loadCachedPrinters() async {
     try {
       final prefs = await SharedPreferences.getInstance();
       final printersJson = prefs.getString(_printerListKey);
 
       if (printersJson != null) {
-        final printersList = jsonDecode(printersJson) as List;
-        _printers = printersList
-            .map((json) => PrinterInfo.fromJson(json as Map<String, dynamic>))
-            .toList();
+        final decoded = jsonDecode(printersJson);
+        if (decoded is List) {
+          _printers = decoded
+              .whereType<Map>()
+              .map((json) => PrinterInfo.fromJson(_parseMap(json)))
+              .toList();
+        }
       }
 
       final defaultPrinterId = prefs.getInt(_defaultPrinterIdKey);
@@ -416,7 +446,7 @@ class PrinterProvider extends ChangeNotifier {
         _defaultPrinter = findPrinterById(defaultPrinterId);
       }
     } catch (e) {
-      _logger.e('❌ 載入緩存失敗: $e');
+      _logger.e(' 載入緩存失敗: $e');
     }
   }
 
@@ -427,7 +457,7 @@ class PrinterProvider extends ChangeNotifier {
           jsonEncode(_printers.map((p) => p.toJson()).toList());
       await prefs.setString(_printerListKey, printersJson);
     } catch (e) {
-      _logger.e('❌ 保存緩存失敗: $e');
+      _logger.e(' 保存緩存失敗: $e');
     }
   }
 
@@ -436,7 +466,7 @@ class PrinterProvider extends ChangeNotifier {
       final prefs = await SharedPreferences.getInstance();
       await prefs.setInt(_defaultPrinterIdKey, printerId);
     } catch (e) {
-      _logger.e('❌ 保存ID失敗: $e');
+      _logger.e(' 保存ID失敗: $e');
     }
   }
 
@@ -445,7 +475,7 @@ class PrinterProvider extends ChangeNotifier {
       final prefs = await SharedPreferences.getInstance();
       await prefs.remove(_defaultPrinterIdKey);
     } catch (e) {
-      _logger.e('❌ 清除失敗: $e');
+      _logger.e(' 清除失敗: $e');
     }
   }
 
@@ -454,7 +484,7 @@ class PrinterProvider extends ChangeNotifier {
       final prefs = await SharedPreferences.getInstance();
       return prefs.getString(_orangePiIpKey);
     } catch (e) {
-      _logger.e('❌ 載入IP失敗: $e');
+      _logger.e(' 載入IP失敗: $e');
       return null;
     }
   }
@@ -464,7 +494,7 @@ class PrinterProvider extends ChangeNotifier {
       final prefs = await SharedPreferences.getInstance();
       await prefs.setString(_orangePiIpKey, ip);
     } catch (e) {
-      _logger.e('❌ 保存IP失敗: $e');
+      _logger.e(' 保存IP失敗: $e');
     }
   }
 
@@ -485,23 +515,23 @@ class PrinterProvider extends ChangeNotifier {
   /// 21, 批量健康檢查 - 30分鐘定時任務核心邏輯
   Future<void> batchHealthCheck() async {
     if (_apiClient == null) {
-      _logger.w('⚠️ [健康檢查] ApiClient未設置');
+      _logger.w(' [健康檢查] ApiClient未設置');
       return;
     }
 
     try {
-      _logger.i('🏥 [健康檢查] 開始執行...');
+      _logger.i(' [健康檢查] 開始執行...');
       Map<String, dynamic> orangePiStatus;
       List<Map<String, dynamic>> printersData = [];
 
       if (_orangePiIp.isEmpty) {
-        _logger.w('⚠️ [健康檢查] 香橙派未配置');
+        _logger.w(' [健康檢查] 香橙派未配置');
         orangePiStatus = {
           'status': 'not_configured',
           'reason': 'Orange Pi IP not set',
         };
       } else if (_printApiClient == null) {
-        _logger.w('⚠️ [健康檢查] 打印服務未初始化');
+        _logger.w(' [健康檢查] 打印服務未初始化');
         orangePiStatus = {
           'ip': _orangePiIp,
           'port': 8080,
@@ -519,7 +549,7 @@ class PrinterProvider extends ChangeNotifier {
               DateTime.now().difference(startTime).inMilliseconds;
 
           if (health.isHealthy) {
-            _logger.i('✅ [健康檢查] 香橙派在線 (響應: ${responseTime}ms)');
+            _logger.i(' [健康檢查] 香橙派在線 (響應: ${responseTime}ms)');
             orangePiStatus = {
               'ip': _orangePiIp,
               'port': 8080,
@@ -530,7 +560,7 @@ class PrinterProvider extends ChangeNotifier {
             try {
               final printersList = await _printApiClient!.getPrintersList();
               if (printersList.success && printersList.printers.isNotEmpty) {
-                _logger.i('📋 [健康檢查] 獲取到 ${printersList.printers.length} 個打印機');
+                _logger.i(' [健康檢查] 獲取到 ${printersList.printers.length} 個打印機');
 
                 final printerIps =
                     printersList.printers.map((p) => p.ipAddress).toList();
@@ -538,10 +568,12 @@ class PrinterProvider extends ChangeNotifier {
                     await _printApiClient!.batchTestPrinters(printerIps);
 
                 for (final result in testResults) {
+                  final ipAddress = result['ip_address']?.toString() ?? '';
+                  if (ipAddress.isEmpty) continue;
                   updatePrinterStatus(
-                    result['ip_address'] as String,
-                    result['status'] as String,
-                    result['reason'] as String?,
+                    ipAddress,
+                    result['status']?.toString() ?? 'unknown',
+                    result['reason']?.toString(),
                   );
                 }
 
@@ -558,15 +590,15 @@ class PrinterProvider extends ChangeNotifier {
                   };
                 }).toList();
 
-                _logger.i('✅ [健康檢查] 完成 ${printersData.length} 個打印機測試');
+                _logger.i(' [健康檢查] 完成 ${printersData.length} 個打印機測試');
               } else {
-                _logger.w('⚠️ [健康檢查] 未獲取到打印機列表');
+                _logger.w(' [健康檢查] 未獲取到打印機列表');
               }
             } catch (e) {
-              _logger.e('❌ [健康檢查] 獲取打印機列表失敗: $e');
+              _logger.e(' [健康檢查] 獲取打印機列表失敗: $e');
             }
           } else {
-            _logger.w('⚠️ [健康檢查] 香橙派服務異常');
+            _logger.w(' [健康檢查] 香橙派服務異常');
             orangePiStatus = {
               'ip': _orangePiIp,
               'port': 8080,
@@ -577,7 +609,7 @@ class PrinterProvider extends ChangeNotifier {
           }
         } catch (e) {
           final isTimeout = e.toString().contains('timeout');
-          _logger.e('❌ [健康檢查] 香橙派連接失敗: ${isTimeout ? "超時" : e.toString()}');
+          _logger.e(' [健康檢查] 香橙派連接失敗: ${isTimeout ? "超時" : e.toString()}');
           orangePiStatus = {
             'ip': _orangePiIp,
             'port': 8080,
@@ -591,14 +623,14 @@ class PrinterProvider extends ChangeNotifier {
         }
       }
 
-      _logger.i('📤 [健康檢查] 上報健康狀態到後台...');
+      _logger.i(' [健康檢查] 上報健康狀態到後台...');
       await _apiClient!.printersHealthCheck(
         orangePi: orangePiStatus,
         printers: printersData,
       );
-      _logger.i('✅ [健康檢查] 完成並上報成功');
+      _logger.i(' [健康檢查] 完成並上報成功');
     } catch (e) {
-      _logger.e('❌ [健康檢查] 失敗: $e');
+      _logger.e(' [健康檢查] 失敗: $e');
     }
   }
 
@@ -616,7 +648,7 @@ class PrinterProvider extends ChangeNotifier {
     String? markerLevels,
   ) async {
     if (_apiClient == null) {
-      _logger.w('⚠️ [打印回調] ApiClient未設置');
+      _logger.w(' [打印回調] ApiClient未設置');
       return;
     }
 
@@ -631,7 +663,7 @@ class PrinterProvider extends ChangeNotifier {
           'status': 'not_configured',
           'reason': 'Orange Pi IP not set',
         };
-        _logger.i('📍 [打印回調] 香橙派狀態: not_configured');
+        _logger.i(' [打印回調] 香橙派狀態: not_configured');
       } else if (_printApiClient == null) {
         orangePiStatus = {
           'ip': _orangePiIp,
@@ -639,7 +671,7 @@ class PrinterProvider extends ChangeNotifier {
           'status': 'offline',
           'reason': 'Service not initialized',
         };
-        _logger.i('📍 [打印回調] 香橙派狀態: offline (未初始化)');
+        _logger.i(' [打印回調] 香橙派狀態: offline (未初始化)');
       } else {
         try {
           final startTime = DateTime.now();
@@ -656,7 +688,7 @@ class PrinterProvider extends ChangeNotifier {
             'response_time': responseTime,
           };
           _logger.i(
-              '📍 [打印回調] 香橙派狀態: ${health.isHealthy ? "online" : "offline"} (響應: ${responseTime}ms)');
+              ' [打印回調] 香橙派狀態: ${health.isHealthy ? "online" : "offline"} (響應: ${responseTime}ms)');
         } catch (e) {
           orangePiStatus = {
             'ip': _orangePiIp,
@@ -666,7 +698,7 @@ class PrinterProvider extends ChangeNotifier {
                 ? 'Connection timeout after 5s'
                 : 'Connection failed',
           };
-          _logger.i('📍 [打印回調] 香橙派狀態: offline (連接失敗)');
+          _logger.i(' [打印回調] 香橙派狀態: offline (連接失敗)');
         }
       }
 
@@ -688,7 +720,7 @@ class PrinterProvider extends ChangeNotifier {
 
         printersData = [printerData];
 
-        _logger.i('📋 [打印回調] 打印機數據:');
+        _logger.i(' [打印回調] 打印機數據:');
         _logger.i('   名稱: ${printer.displayName}');
         _logger.i('   IP: ${printer.ipAddress}');
         _logger.i('   狀態: ${success ? "online" : "offline"}');
@@ -709,20 +741,20 @@ class PrinterProvider extends ChangeNotifier {
 
         printersData = [printerData];
 
-        _logger.i('📋 [打印回調] 打印機數據 (簡化):');
+        _logger.i(' [打印回調] 打印機數據 (簡化):');
         _logger.i('   IP: $printerIp');
         _logger.i('   狀態: ${success ? "online" : "offline"}');
         _logger.i('   原因: ${reason ?? "無"}');
       }
 
-      _logger.i('📤 [打印回調] 發送回調請求到後台...');
+      _logger.i(' [打印回調] 發送回調請求到後台...');
       await _apiClient!.printersCallback(
         orangePi: orangePiStatus,
         printers: printersData,
       );
-      _logger.i('✅ [打印回調] 後台接收成功');
+      _logger.i(' [打印回調] 後台接收成功');
     } catch (e) {
-      _logger.e('❌ [打印回調] 失敗: $e');
+      _logger.e(' [打印回調] 失敗: $e');
     }
   }
 
@@ -736,15 +768,15 @@ class PrinterProvider extends ChangeNotifier {
       await Future.delayed(Duration(seconds: waitTime));
 
       final activeJobs = await _printApiClient!.getPrinterActiveJobs(printerIp);
-      final activeCount = activeJobs['count'] as int? ?? 0;
+      final activeCount = _parseInt(activeJobs['count']);
 
       if (activeCount == 0) {
         final allJobs = await _printApiClient!.getPrinterJobs(printerIp);
         final jobs = allJobs['jobs'] as List? ?? [];
 
         if (jobs.isNotEmpty) {
-          final latestJob = jobs.first as Map<String, dynamic>;
-          final jobState = latestJob['state'] as String?;
+          final latestJob = _nullableMap(jobs.first);
+          final jobState = latestJob?['state']?.toString();
 
           if (jobState == 'completed') {
             await printCallback(printerIp, true, null);
@@ -759,16 +791,26 @@ class PrinterProvider extends ChangeNotifier {
       }
       return true;
     } catch (e) {
-      _logger.e('❌ 監控失敗: $e');
+      _logger.e(' 監控失敗: $e');
       return false;
     }
   }
 
   /// 24, 啟動定時健康檢查
-  void startPeriodicHealthCheck(
-      {Duration interval = const Duration(minutes: 30)}) {
+  Future<void> startPeriodicHealthCheck(
+      {Duration interval = const Duration(minutes: 30)}) async {
     stopPeriodicHealthCheck();
-    batchHealthCheck();
+    final shouldStart = await _probeServiceAvailability(
+      timeout: _startupProbeTimeout,
+    );
+    if (!shouldStart) {
+      _isServiceAvailable = false;
+      _logger.w(' 香橙派不可用，不啟動打印機定時健康檢查');
+      notifyListeners();
+      return;
+    }
+
+    unawaited(batchHealthCheck());
     _healthCheckTimer = Timer.periodic(interval, (_) => batchHealthCheck());
   }
 
@@ -781,6 +823,34 @@ class PrinterProvider extends ChangeNotifier {
   @override
   void dispose() {
     stopPeriodicHealthCheck();
+    _setPrintApiClient(null);
     super.dispose();
   }
+}
+
+Map<String, dynamic> _parseMap(Object? value) {
+  return _nullableMap(value) ?? const {};
+}
+
+Map<String, dynamic>? _nullableMap(Object? value) {
+  if (value is Map<String, dynamic>) {
+    return value;
+  }
+  if (value is Map) {
+    return value.map((key, value) => MapEntry(key.toString(), value));
+  }
+  return null;
+}
+
+int _parseInt(Object? value, {int defaultValue = 0}) {
+  if (value is int) {
+    return value;
+  }
+  if (value is num) {
+    return value.toInt();
+  }
+  if (value is String) {
+    return int.tryParse(value) ?? defaultValue;
+  }
+  return defaultValue;
 }

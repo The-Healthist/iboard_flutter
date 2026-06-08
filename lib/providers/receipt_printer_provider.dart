@@ -1,6 +1,5 @@
 import 'dart:async';
 import 'dart:io';
-import 'dart:typed_data';
 import 'package:flutter/foundation.dart';
 import 'package:logger/logger.dart';
 import 'package:path_provider/path_provider.dart';
@@ -20,7 +19,7 @@ class ReceiptPrinterNotifier extends ChangeNotifier {
   Future<void> initializePrinter() async {
     try {
       _updateState(_state.copyWith(isInitializing: true));
-      _logger.i('🖨️ [ReceiptPrinter] 初始化小票打印機');
+      _logger.i(' [ReceiptPrinter] 初始化小票打印機');
 
       // 檢查權限
       await _checkPermissions();
@@ -33,9 +32,9 @@ class ReceiptPrinterNotifier extends ChangeNotifier {
         isInitialized: true,
       ));
 
-      _logger.i('✅ [ReceiptPrinter] 打印機初始化完成');
+      _logger.i(' [ReceiptPrinter] 打印機初始化完成');
     } catch (e) {
-      _logger.e('❌ [ReceiptPrinter] 打印機初始化失敗: $e');
+      _logger.e(' [ReceiptPrinter] 打印機初始化失敗: $e');
       _updateState(_state.copyWith(
         isInitializing: false,
         error: '打印機初始化失敗: $e',
@@ -56,7 +55,7 @@ class ReceiptPrinterNotifier extends ChangeNotifier {
   /// 3, 查找可用打印機
   Future<void> _findAvailablePrinters() async {
     try {
-      _logger.i('🔍 [ReceiptPrinter] 查找可用打印機');
+      _logger.i(' [ReceiptPrinter] 查找可用打印機');
 
       // 使用 printing 包查找打印機
       // 這裡主要是為了檢測是否有打印機可用
@@ -67,10 +66,9 @@ class ReceiptPrinterNotifier extends ChangeNotifier {
         selectedPrinter: 'USB熱敏打印機',
       ));
 
-      _logger
-          .i('✅ [ReceiptPrinter] 找到 ${_state.availablePrinters.length} 台打印機');
+      _logger.i(' [ReceiptPrinter] 找到 ${_state.availablePrinters.length} 台打印機');
     } catch (e) {
-      _logger.e('❌ [ReceiptPrinter] 查找打印機失敗: $e');
+      _logger.e(' [ReceiptPrinter] 查找打印機失敗: $e');
       throw Exception('查找打印機失敗: $e');
     }
   }
@@ -78,14 +76,14 @@ class ReceiptPrinterNotifier extends ChangeNotifier {
   /// 4, 選擇打印機
   void selectPrinter(String printerName) {
     _updateState(_state.copyWith(selectedPrinter: printerName));
-    _logger.i('🖨️ [ReceiptPrinter] 選擇打印機: $printerName');
+    _logger.i(' [ReceiptPrinter] 選擇打印機: $printerName');
   }
 
   /// 5, 打印支付小票
   Future<void> printPaymentReceipt(Map<String, dynamic> receiptData) async {
     try {
       _updateState(_state.copyWith(isPrinting: true, error: null));
-      _logger.i('🖨️ [ReceiptPrinter] 開始打印支付小票');
+      _logger.i(' [ReceiptPrinter] 開始打印支付小票');
 
       // 生成小票 PDF
       final pdfBytes = await _generateReceiptPDF(receiptData);
@@ -106,9 +104,9 @@ class ReceiptPrinterNotifier extends ChangeNotifier {
         lastPrintTime: DateTime.now(),
       ));
 
-      _logger.i('✅ [ReceiptPrinter] 支付小票打印完成');
+      _logger.i(' [ReceiptPrinter] 支付小票打印完成');
     } catch (e) {
-      _logger.e('❌ [ReceiptPrinter] 打印支付小票失敗: $e');
+      _logger.e(' [ReceiptPrinter] 打印支付小票失敗: $e');
       _updateState(_state.copyWith(
         isPrinting: false,
         error: '打印失敗: $e',
@@ -146,15 +144,19 @@ class ReceiptPrinterNotifier extends ChangeNotifier {
               pw.SizedBox(height: 8),
 
               // 基本信息
-              _buildReceiptInfoRow('大廈名稱:', receiptData['building_name'] ?? ''),
-              _buildReceiptInfoRow('單位名稱:', receiptData['unit_name'] ?? ''),
               _buildReceiptInfoRow(
-                  '支付方式:', receiptData['payment_method'] ?? ''),
+                  '大廈名稱:', receiptTextFromValue(receiptData['building_name'])),
               _buildReceiptInfoRow(
-                  '支付時間:', _formatDateTime(receiptData['payment_time'])),
-              _buildReceiptInfoRow('支付編號:', receiptData['payment_id'] ?? ''),
+                  '單位名稱:', receiptTextFromValue(receiptData['unit_name'])),
+              _buildReceiptInfoRow(
+                  '支付方式:', receiptTextFromValue(receiptData['payment_method'])),
+              _buildReceiptInfoRow(
+                  '支付時間:', formatReceiptDateTime(receiptData['payment_time'])),
+              _buildReceiptInfoRow(
+                  '支付編號:', receiptTextFromValue(receiptData['payment_id'])),
               if (receiptData['transaction_id'] != null)
-                _buildReceiptInfoRow('交易編號:', receiptData['transaction_id']),
+                _buildReceiptInfoRow('交易編號:',
+                    receiptTextFromValue(receiptData['transaction_id'])),
 
               pw.SizedBox(height: 8),
               pw.Divider(),
@@ -188,7 +190,7 @@ class ReceiptPrinterNotifier extends ChangeNotifier {
                     ),
                   ),
                   pw.Text(
-                    '\$${(receiptData['total_amount'] as double).toStringAsFixed(2)}',
+                    '\$${receiptAmountFromValue(receiptData['total_amount']).toStringAsFixed(2)}',
                     style: pw.TextStyle(
                       fontSize: 16,
                       fontWeight: pw.FontWeight.bold,
@@ -256,9 +258,7 @@ class ReceiptPrinterNotifier extends ChangeNotifier {
 
   /// 8, 獲取帳單明細
   List<pw.Widget> _getBillDetails(dynamic bills) {
-    if (bills == null || bills is! List) return [];
-
-    return (bills as List).map((bill) {
+    return parseReceiptBillLines(bills).map((bill) {
       return pw.Container(
         margin: const pw.EdgeInsets.only(bottom: 4),
         child: pw.Column(
@@ -269,46 +269,30 @@ class ReceiptPrinterNotifier extends ChangeNotifier {
               children: [
                 pw.Expanded(
                   child: pw.Text(
-                    bill['item_id'] ?? '',
+                    bill.itemId,
                     style: const pw.TextStyle(fontSize: 11),
                   ),
                 ),
                 pw.Text(
-                  '\$${(bill['net_amount'] as double).toStringAsFixed(2)}',
+                  '\$${bill.netAmount.toStringAsFixed(2)}',
                   style: const pw.TextStyle(fontSize: 11),
                 ),
               ],
             ),
-            if (bill['trs_to'] != null)
+            if (bill.trsTo.isNotEmpty)
               pw.Text(
-                '期間: ${bill['trs_to']}',
+                '期間: ${bill.trsTo}',
                 style: const pw.TextStyle(fontSize: 9),
               ),
-            if (bill['invoice_no'] != null)
+            if (bill.invoiceNo.isNotEmpty)
               pw.Text(
-                '發票: ${bill['invoice_no']}',
+                '發票: ${bill.invoiceNo}',
                 style: const pw.TextStyle(fontSize: 9),
               ),
           ],
         ),
       );
     }).toList();
-  }
-
-  /// 9, 格式化日期時間
-  String _formatDateTime(dynamic dateTime) {
-    if (dateTime == null) return '';
-
-    DateTime dt;
-    if (dateTime is String) {
-      dt = DateTime.tryParse(dateTime) ?? DateTime.now();
-    } else if (dateTime is DateTime) {
-      dt = dateTime;
-    } else {
-      return '';
-    }
-
-    return '${dt.year}-${dt.month.toString().padLeft(2, '0')}-${dt.day.toString().padLeft(2, '0')} ${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')}';
   }
 
   /// 10, 使用系統PDF打印機打印
@@ -332,12 +316,12 @@ class ReceiptPrinterNotifier extends ChangeNotifier {
 
       await file.writeAsBytes(pdfBytes);
 
-      _logger.i('💾 [ReceiptPrinter] 小票已保存到: ${file.path}');
+      _logger.i(' [ReceiptPrinter] 小票已保存到: ${file.path}');
 
       // 可以在這裡添加分享功能
       // Share.shareFiles([file.path], text: '繳費小票');
     } catch (e) {
-      _logger.e('❌ [ReceiptPrinter] 保存小票失敗: $e');
+      _logger.e(' [ReceiptPrinter] 保存小票失敗: $e');
       throw Exception('保存小票失敗: $e');
     }
   }
@@ -387,6 +371,78 @@ class ReceiptPrinterNotifier extends ChangeNotifier {
     _state = newState;
     notifyListeners();
   }
+}
+
+class ReceiptBillLine {
+  final String itemId;
+  final double netAmount;
+  final String trsTo;
+  final String invoiceNo;
+
+  const ReceiptBillLine({
+    required this.itemId,
+    required this.netAmount,
+    required this.trsTo,
+    required this.invoiceNo,
+  });
+}
+
+List<ReceiptBillLine> parseReceiptBillLines(Object? bills) {
+  if (bills is! List) return const [];
+
+  final lines = <ReceiptBillLine>[];
+  for (final bill in bills) {
+    final billMap = receiptMapFromValue(bill);
+    if (billMap == null) continue;
+
+    lines.add(ReceiptBillLine(
+      itemId: receiptTextFromValue(billMap['item_id']),
+      netAmount: receiptAmountFromValue(billMap['net_amount']),
+      trsTo: receiptTextFromValue(billMap['trs_to']),
+      invoiceNo: receiptTextFromValue(billMap['invoice_no']),
+    ));
+  }
+  return lines;
+}
+
+Map<String, dynamic>? receiptMapFromValue(Object? value) {
+  if (value is Map<String, dynamic>) {
+    return value;
+  }
+  if (value is Map) {
+    return value.map((key, value) => MapEntry(key.toString(), value));
+  }
+  return null;
+}
+
+String receiptTextFromValue(Object? value) {
+  return value?.toString() ?? '';
+}
+
+double receiptAmountFromValue(Object? value) {
+  if (value is num) {
+    return value.toDouble();
+  }
+  if (value is String) {
+    final normalized = value.trim().replaceAll(',', '');
+    if (normalized.isEmpty) return 0;
+    return double.tryParse(normalized) ?? 0;
+  }
+  return 0;
+}
+
+String formatReceiptDateTime(Object? dateTime) {
+  final DateTime? dt = switch (dateTime) {
+    DateTime value => value,
+    String value => DateTime.tryParse(value),
+    _ => null,
+  };
+  if (dt == null) return '';
+
+  return '${dt.year}-${dt.month.toString().padLeft(2, '0')}-'
+      '${dt.day.toString().padLeft(2, '0')} '
+      '${dt.hour.toString().padLeft(2, '0')}:'
+      '${dt.minute.toString().padLeft(2, '0')}';
 }
 
 /// 小票打印機狀態

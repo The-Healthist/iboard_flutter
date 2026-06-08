@@ -7,8 +7,9 @@ class WeatherWarningModel {
     Map<String, WeatherWarningInfo> warnings = {};
 
     json.forEach((key, value) {
-      if (value is Map<String, dynamic>) {
-        warnings[key] = WeatherWarningInfo.fromJson(value);
+      final warning = _nullableMap(value);
+      if (warning != null) {
+        warnings[key] = WeatherWarningInfo.fromJson(warning);
       }
     });
 
@@ -82,13 +83,13 @@ class WeatherWarningInfo {
 
   factory WeatherWarningInfo.fromJson(Map<String, dynamic> json) {
     return WeatherWarningInfo(
-      name: json['name'] ?? '',
-      code: json['code'] ?? '',
-      actionCode: json['actionCode'] ?? '',
-      issueTime: json['issueTime'] ?? '',
-      updateTime: json['updateTime'] ?? '',
-      type: json['type'], // 可选字段
-      expireTime: json['expireTime'], // 可选字段
+      name: _parseString(json['name']),
+      code: _parseString(json['code']),
+      actionCode: _parseString(json['actionCode']),
+      issueTime: _parseString(json['issueTime']),
+      updateTime: _parseString(json['updateTime']),
+      type: _parseNullableString(json['type']), // 可选字段
+      expireTime: _parseNullableString(json['expireTime']), // 可选字段
     );
   }
 
@@ -104,4 +105,25 @@ class WeatherWarningInfo {
     if (expireTime != null) result['expireTime'] = expireTime;
     return result;
   }
+}
+
+Map<String, dynamic>? _nullableMap(Object? value) {
+  if (value is Map<String, dynamic>) {
+    return value;
+  }
+  if (value is Map) {
+    return value.map((key, value) => MapEntry(key.toString(), value));
+  }
+  return null;
+}
+
+String _parseString(Object? value) {
+  return value?.toString() ?? '';
+}
+
+String? _parseNullableString(Object? value) {
+  if (value == null || value == '') {
+    return null;
+  }
+  return value.toString();
 }

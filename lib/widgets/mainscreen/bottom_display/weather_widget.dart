@@ -1,7 +1,7 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:iboard_app/providers/app_data_provider.dart';
-import 'package:iboard_app/widgets/weather_icon_widget.dart';
+import 'package:iboard_app/widgets/weather/weather_icon_widget.dart';
 import 'package:iboard_app/providers/weather_provider.dart';
 import 'package:iboard_app/models/weather_warning_model.dart';
 import 'package:iboard_app/models/current_weather_model.dart';

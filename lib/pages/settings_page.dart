@@ -7,7 +7,7 @@ import 'package:iboard_app/providers/ad_full_carousel_provider.dart';
 import 'package:iboard_app/providers/state_provider.dart';
 import 'package:iboard_app/providers/ad_top_carousel_provider.dart';
 import 'package:iboard_app/providers/app_update_provider.dart'; // 导入更新Provider
-import 'package:iboard_app/widgets/carousel_widget.dart'; // 导入通知类
+import 'package:iboard_app/widgets/carousel/carousel_widget.dart'; // 导入通知类
 
 import 'package:provider/provider.dart';
 

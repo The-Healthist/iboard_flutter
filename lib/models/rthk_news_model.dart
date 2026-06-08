@@ -20,16 +20,16 @@ class RthkNewsModel {
   ///1, 從RSS XML資料建立新聞模型
   factory RthkNewsModel.fromRssXml(Map<String, dynamic> item) {
     // 解析發佈時間
-    DateTime pubDate = _parseRssDate(item['pubDate'] ?? '');
+    DateTime pubDate = _parseRssDate(item['pubDate']?.toString() ?? '');
 
     // 格式化時間為 HH:mm 格式
     String formattedTime =
         '${pubDate.hour.toString().padLeft(2, '0')}:${pubDate.minute.toString().padLeft(2, '0')}';
 
     return RthkNewsModel(
-      title: _extractCDataContent(item['title'] ?? ''),
-      guid: item['guid'] ?? '',
-      link: item['link'] ?? '',
+      title: _extractCDataContent(item['title']?.toString() ?? ''),
+      guid: item['guid']?.toString() ?? '',
+      link: item['link']?.toString() ?? '',
       pubDate: pubDate,
       formattedTime: formattedTime,
     );
@@ -90,12 +90,15 @@ class RthkNewsModel {
 
   ///6, 從JSON格式建立模型
   factory RthkNewsModel.fromJson(Map<String, dynamic> json) {
+    final parsedPubDate = DateTime.tryParse(json['pubDate']?.toString() ?? '');
+    final pubDate = parsedPubDate ?? DateTime.now();
     return RthkNewsModel(
-      title: json['title'] ?? '',
-      guid: json['guid'] ?? '',
-      link: json['link'] ?? '',
-      pubDate: DateTime.tryParse(json['pubDate'] ?? '') ?? DateTime.now(),
-      formattedTime: json['formattedTime'] ?? '',
+      title: json['title']?.toString() ?? '',
+      guid: json['guid']?.toString() ?? '',
+      link: json['link']?.toString() ?? '',
+      pubDate: pubDate,
+      formattedTime: json['formattedTime']?.toString() ??
+          '${pubDate.hour.toString().padLeft(2, '0')}:${pubDate.minute.toString().padLeft(2, '0')}',
     );
   }
 

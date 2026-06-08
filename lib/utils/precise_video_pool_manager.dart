@@ -8,13 +8,13 @@ class PreciseVideoPoolManager {
   static PreciseVideoPoolManager? _instance;
 
   final Map<String, _PreciseVideoWrapper> _controllerPool = {};
-  static const int _maxControllerPool = 20; // 控制器缓存上限
+  static const int _maxControllerPool = 4; // 控制器缓存上限，低内存设备避免长期堆积
 
   /// 已初始化的控制器（占用解码器）
   final Set<String> _initializedControllers = {};
   final Set<String> _playingControllers = {}; // 正在播放
-  static const int _maxInitializedDecoders = 6; // 🎯 修复：增加到6个解码器，提供缓冲空间
-  static const int _maxConcurrentPlaying = 4; // 🎯 修复：支持顶部+全屏+预热，最多4个同时播放
+  static const int _maxInitializedDecoders = 2; // 只保留当前/过渡中的解码器
+  static const int _maxConcurrentPlaying = 1; // RK3568 上同时播放多个视频容易触发 LMK
 
   /// 预初始化策略：当前播放
   String? _currentTopAdKey; // 当前顶部广告
@@ -35,11 +35,9 @@ class PreciseVideoPoolManager {
 
   PreciseVideoPoolManager._internal();
 
-  // 用於減少重複日誌輸出的狀態記錄
-  String? _lastStatusOutput;
   final Map<String, DateTime> _lastDisposeLogTime = {}; // 用于防止重复输出dispose日志
   final Set<String> _recentlyCheckedNonExistentKeys =
-      {}; // 🎯 新增：記錄最近檢查過的不存在控制器，避免重複檢查
+      {}; //  新增：記錄最近檢查過的不存在控制器，避免重複檢查
 
   /// 0.获取未初始化的视频控制器（不占用解码器资源）
   Future<VideoPlayerController?> getUninitializedController({
@@ -103,7 +101,7 @@ class PreciseVideoPoolManager {
     //1.1 获取key并且释放上一个控制器(确保)
     final key = _generateControllerKey(filePath, videoType);
 
-    // 🎯 優化：根據視頻類型自動dispose上一個控制器，但避免與顯式清理衝突
+    //  優化：根據視頻類型自動dispose上一個控制器，但避免與顯式清理衝突
     if (videoType == VideoType.topAd) {
       if (key != _lastTopAdKey &&
           _lastTopAdKey != null &&
@@ -113,12 +111,12 @@ class PreciseVideoPoolManager {
       }
       _lastTopAdKey = key; // 更新當前頂部廣告key
     } else if (videoType == VideoType.fullAd) {
-      // 🎯 關鍵優化：全屏廣告通常由Provider顯式管理，減少自動清理干擾
+      //  關鍵優化：全屏廣告通常由Provider顯式管理，減少自動清理干擾
       if (key != _lastFullAdKey &&
           _lastFullAdKey != null &&
           !_recentlyCheckedNonExistentKeys.contains(_lastFullAdKey!) &&
           !_releasingKeys.contains(_lastFullAdKey!)) {
-        // 🎯 對全屏廣告採用更保守的清理策略，避免干擾Provider的顯式管理
+        //  對全屏廣告採用更保守的清理策略，避免干擾Provider的顯式管理
         final wrapper = _controllerPool[_lastFullAdKey];
         if (wrapper != null && !_playingControllers.contains(_lastFullAdKey!)) {
           await _autoDisposeController(_lastFullAdKey!, '全屏廣告');
@@ -127,8 +125,13 @@ class PreciseVideoPoolManager {
       _lastFullAdKey = key; // 更新當前全屏廣告key
     }
 
-    // 🎯 新增：檢查是否有相同文件路徑但不同類型的控制器正在播放
+    //  新增：檢查是否有相同文件路徑但不同類型的控制器正在播放
     await _checkAndHandleFilePathConflict(filePath, videoType, key);
+
+    // 全屏广告切换最容易发生旧/新 ExoPlayer 重叠，先清理同类型旧控制器。
+    if (videoType == VideoType.fullAd) {
+      await cleanupControllersByType(videoType, exceptKey: key);
+    }
 
     try {
       // 1. 检查是否已有初始化的控制器
@@ -160,11 +163,11 @@ class PreciseVideoPoolManager {
         );
       }
 
-      // 3. 🎯 改进的资源检查：检查当前广告key是否在初始化池中
+      // 3.  改进的资源检查：检查当前广告key是否在初始化池中
       final totalPendingInit =
           _initializedControllers.length + _initializingKeys.length;
       if (totalPendingInit >= _maxInitializedDecoders) {
-        // 🎯 关键检查：当前广告key是否在初始化池中
+        //  关键检查：当前广告key是否在初始化池中
         bool currentKeyInPool = _initializedControllers.contains(key);
 
         if (!currentKeyInPool) {
@@ -225,7 +228,7 @@ class PreciseVideoPoolManager {
 
       // 5.  关键步骤：初始化控制器，占用解码器资源
       if (!wrapper.controller.value.isInitialized) {
-        // 🔒 再次检查初始化限制（防止竞态条件）
+        //  再次检查初始化限制（防止竞态条件）
         final currentTotalInit =
             _initializedControllers.length + _initializingKeys.length;
         if (currentTotalInit >= _maxInitializedDecoders) {
@@ -238,14 +241,14 @@ class PreciseVideoPoolManager {
         try {
           await wrapper.controller.initialize();
 
-          // ✅ 初始化成功，添加到已初始化列表
+          //  初始化成功，添加到已初始化列表
           _initializedControllers.add(key);
           _lastUsed[key] = DateTime.now();
         } catch (e) {
           onError?.call();
           return null;
         } finally {
-          // 🔒 无论成功失败都要移除初始化标记
+          //  无论成功失败都要移除初始化标记
           _initializingKeys.remove(key);
         }
       }
@@ -281,7 +284,7 @@ class PreciseVideoPoolManager {
     if (_releasingKeys.contains(key)) return;
     _releasingKeys.add(key);
 
-    // 🎯 優化：立即標記為已檢查過的不存在控制器，避免其他地方重複嘗試清理
+    //  優化：立即標記為已檢查過的不存在控制器，避免其他地方重複嘗試清理
     _recentlyCheckedNonExistentKeys.add(key);
 
     try {
@@ -325,26 +328,41 @@ class PreciseVideoPoolManager {
         _updateCurrentPlayingState(null, videoType);
       }
     } catch (e) {
+      _controllerPool.remove(key);
+      _initializedControllers.remove(key);
+      _playingControllers.remove(key);
+      _lastUsed.remove(key);
+      _updateCurrentPlayingState(null, videoType);
     } finally {
       _releasingKeys.remove(key);
 
-      // 🎯 優化：設置定時器清除快取標記，避免永久阻止重新初始化
+      //  優化：設置定時器清除快取標記，避免永久阻止重新初始化
       Timer(const Duration(seconds: 30), () {
         _recentlyCheckedNonExistentKeys.remove(key);
       });
     }
   }
 
-  /// 3. ▶️ 开始播放（严格控制并发播放）
+  /// 3. ▶ 开始播放（严格控制并发播放）
   Future<void> _startPlay(VideoPlayerController controller, String key) async {
     try {
-      // 🧹 首先清理不一致的播放状态
+      if (!_isControllerUsable(controller, key)) {
+        return;
+      }
+
+      //  首先清理不一致的播放状态
       await _cleanupInconsistentPlayingState();
+      if (!_isControllerUsable(controller, key)) {
+        return;
+      }
 
-      // 🎯 优化播放状态管理
+      //  优化播放状态管理
       optimizePlayingStates();
+      if (!_isControllerUsable(controller, key)) {
+        return;
+      }
 
-      // 🔒 严格限制并发播放数量（带重试机制）
+      //  严格限制并发播放数量（带重试机制）
       int retryCount = 0;
       const maxRetries = 3;
 
@@ -352,19 +370,28 @@ class PreciseVideoPoolManager {
           retryCount < maxRetries) {
         final beforeCount = _playingControllers.length;
         await _pauseOldestPlaying();
+        if (!_isControllerUsable(controller, key)) {
+          return;
+        }
         final afterCount = _playingControllers.length;
 
         // 检查暂停是否有效
         if (beforeCount == afterCount) {
           await Future.delayed(const Duration(milliseconds: 100));
+          if (!_isControllerUsable(controller, key)) {
+            return;
+          }
           // 再次尝试清理不一致状态
           await _cleanupInconsistentPlayingState();
+          if (!_isControllerUsable(controller, key)) {
+            return;
+          }
         }
 
         retryCount++;
       }
 
-      // 📊 最终检查：确保绝对不会超过限制
+      //  最终检查：确保绝对不会超过限制
       if (_playingControllers.length >= _maxConcurrentPlaying) {
         // 强制清理一个播放状态
         if (_playingControllers.isNotEmpty) {
@@ -378,7 +405,7 @@ class PreciseVideoPoolManager {
         return;
       }
 
-      // 🎯 优化：最终检查并发播放限制，如果达到限制则尝试释放最旧的非关键控制器
+      //  优化：最终检查并发播放限制，如果达到限制则尝试释放最旧的非关键控制器
       if (_playingControllers.length >= _maxConcurrentPlaying) {
         // 尝试释放最旧的非关键播放控制器
         bool releasedOldest = false;
@@ -393,12 +420,15 @@ class PreciseVideoPoolManager {
               if (wrapper != null && wrapper.controller.value.isPlaying) {
                 await wrapper.controller.pause();
                 _playingControllers.remove(oldKey);
+                if (!_isControllerUsable(controller, key)) {
+                  return;
+                }
 
                 releasedOldest = true;
                 break;
               }
             } catch (e) {
-              debugPrint('[PreciseVideoPoolManager] ❌ 释放最旧的非关键播放控制器失败: $e');
+              debugPrint('[PreciseVideoPoolManager]  释放最旧的非关键播放控制器失败: $e');
             }
           }
         }
@@ -409,18 +439,25 @@ class PreciseVideoPoolManager {
       }
 
       // 设置播放参数
+      if (!_isControllerUsable(controller, key)) return;
       await controller.setLooping(true);
+      if (!_isControllerUsable(controller, key)) return;
       await controller.setVolume(1.0);
+      if (!_isControllerUsable(controller, key)) return;
       await controller.setPlaybackSpeed(1.0);
+      if (!_isControllerUsable(controller, key)) return;
       await controller.seekTo(Duration.zero);
+      if (!_isControllerUsable(controller, key)) return;
 
       // 等待准备完成
       await Future.delayed(const Duration(milliseconds: 350));
+      if (!_isControllerUsable(controller, key)) return;
 
       await controller.play();
+      if (!_isControllerUsable(controller, key)) return;
       _playingControllers.add(key);
 
-      // 📊 播放后状态检查
+      //  播放后状态检查
       if (_playingControllers.length > _maxConcurrentPlaying) {}
     } catch (e) {
       // 播放失败时确保从播放列表中移除
@@ -428,7 +465,22 @@ class PreciseVideoPoolManager {
     }
   }
 
-  /// 4. 📊 更新当前播放状态
+  bool _isControllerUsable(VideoPlayerController controller, String key) {
+    if (_releasingKeys.contains(key)) return false;
+
+    final wrapper = _controllerPool[key];
+    if (wrapper == null || !identical(wrapper.controller, controller)) {
+      return false;
+    }
+
+    try {
+      return controller.value.isInitialized && !controller.value.hasError;
+    } catch (e) {
+      return false;
+    }
+  }
+
+  /// 4.  更新当前播放状态
   void _updateCurrentPlayingState(String? key, VideoType videoType) {
     if (videoType == VideoType.topAd) {
       _currentTopAdKey = key;
@@ -437,82 +489,56 @@ class PreciseVideoPoolManager {
     }
   }
 
-  /// 5. 🔄 释放最旧的解码器
+  /// 5.  释放最旧的解码器
   Future<void> _releaseOldestDecoder() async {
     if (_initializedControllers.isEmpty) {
       return;
     }
 
-    // 找到最少使用且非当前播放的初始化控制器
-    String? targetKey;
-    DateTime? oldestTime;
-    int leastUsageCount = -1;
-
-    for (final key in _initializedControllers) {
-      // 不释放当前正在播放的
-      if (_playingControllers.contains(key)) {
-        continue;
-      }
-
-      // 不释放当前显示的主要视频
-      if (key == _currentTopAdKey || key == _currentFullAdKey) {
-        continue;
-      }
-
-      final wrapper = _controllerPool[key];
-      if (wrapper == null) continue;
-
-      final lastUsedTime = _lastUsed[key] ?? DateTime.now();
-      final usageCount = wrapper.useCount;
-
-      // 优先选择使用次数少且最旧的控制器
-      bool shouldSelect = false;
-      if (targetKey == null) {
-        shouldSelect = true;
-      } else if (usageCount < leastUsageCount) {
-        shouldSelect = true;
-      } else if (usageCount == leastUsageCount &&
-          lastUsedTime.isBefore(oldestTime!)) {
-        shouldSelect = true;
-      }
-
-      if (shouldSelect) {
-        oldestTime = lastUsedTime;
-        targetKey = key;
-        leastUsageCount = usageCount;
-      }
-    }
+    final targetKey = VideoPoolResourcePolicy.selectDecoderToRelease(
+      initializedKeys: _initializedControllers,
+      playingKeys: _playingControllers,
+      protectedKeys: {
+        if (_currentTopAdKey != null) _currentTopAdKey!,
+        if (_currentFullAdKey != null) _currentFullAdKey!,
+      },
+      usageCounts: _controllerPool.map(
+        (key, wrapper) => MapEntry(key, wrapper.useCount),
+      ),
+      lastUsed: _lastUsed,
+      now: DateTime.now(),
+    );
 
     if (targetKey != null && _controllerPool.containsKey(targetKey)) {
       final wrapper = _controllerPool[targetKey]!;
 
-      // 🔑 关键：dispose控制器以释放解码器资源
+      //  关键：dispose控制器以释放解码器资源
       _controllerPool.remove(targetKey);
       _initializedControllers.remove(targetKey);
-      _playingControllers.remove(targetKey); // 🔧 确保同时清理播放状态
+      _playingControllers.remove(targetKey); //  确保同时清理播放状态
       _lastUsed.remove(targetKey);
 
       try {
         await _safeDisposeController(wrapper.controller, targetKey);
       } catch (e) {
-        debugPrint('[PreciseVideoPoolManager] ❌ 释放最少使用的解码器失败: $e');
+        debugPrint('[PreciseVideoPoolManager]  释放最少使用的解码器失败: $e');
       }
     } else {}
   }
 
-  /// 5a. 🧹 清理不一致的播放状态
+  /// 5a.  清理不一致的播放状态
   Future<void> _cleanupInconsistentPlayingState() async {
     final toRemove = <String>[];
 
     for (final key in _playingControllers) {
       final wrapper = _controllerPool[key];
 
-      // 🎯 修复：只清理明确无效的状态，不清理瞬时的播放状态变化
+      //  修复：只清理明确无效的状态，不清理瞬时的播放状态变化
       if (wrapper == null || !_initializedControllers.contains(key)) {
         // 只有当控制器已被移除或未初始化时才清理
         toRemove.add(key);
       }
-      // 🎯 移除：不再检查 isPlaying 状态，因为这会导致正常播放的视频被误判
+      //  移除：不再检查 isPlaying 状态，因为这会导致正常播放的视频被误判
     }
 
     for (final key in toRemove) {
@@ -522,17 +548,17 @@ class PreciseVideoPoolManager {
     if (toRemove.isNotEmpty) {}
   }
 
-  /// 6. ⏸️ 暂停最旧的播放（增强版 - 确保严格限制）
+  /// 6.  暂停最旧的播放（增强版 - 确保严格限制）
   Future<void> _pauseOldestPlaying() async {
     if (_playingControllers.isEmpty) {
       return;
     }
 
-    // 🔧 修复：先清理状态不一致的控制器（减少误判）
+    //  修复：先清理状态不一致的控制器（减少误判）
     final toRemove = <String>[];
     for (final key in _playingControllers) {
       final wrapper = _controllerPool[key];
-      // 🎯 修复：只清理已被移除的控制器，不检查isPlaying状态
+      //  修复：只清理已被移除的控制器，不检查isPlaying状态
       if (wrapper == null) {
         toRemove.add(key);
       }
@@ -547,35 +573,15 @@ class PreciseVideoPoolManager {
       return;
     }
 
-    // 找到最旧的播放控制器（优先暂停使用次数多的）
-    String? targetKey;
-    DateTime? oldestTime;
-    int mostUsageCount = -1;
-
-    for (final key in _playingControllers) {
-      final wrapper = _controllerPool[key];
-      if (wrapper == null) continue;
-
-      final lastUsedTime = _lastUsed[key] ?? DateTime.now();
-      final usageCount = wrapper.useCount;
-
-      bool shouldSelect = false;
-      if (targetKey == null) {
-        shouldSelect = true;
-      } else if (usageCount > mostUsageCount) {
-        // 优先暂停使用次数多的（说明不太重要）
-        shouldSelect = true;
-      } else if (usageCount == mostUsageCount &&
-          lastUsedTime.isBefore(oldestTime!)) {
-        shouldSelect = true;
-      }
-
-      if (shouldSelect) {
-        oldestTime = lastUsedTime;
-        targetKey = key;
-        mostUsageCount = usageCount;
-      }
-    }
+    final targetKey = VideoPoolResourcePolicy.selectPlayingKeyToPause(
+      playingKeys: _playingControllers,
+      availableKeys: _controllerPool.keys.toSet(),
+      usageCounts: _controllerPool.map(
+        (key, wrapper) => MapEntry(key, wrapper.useCount),
+      ),
+      lastUsed: _lastUsed,
+      now: DateTime.now(),
+    );
 
     if (targetKey != null && _controllerPool.containsKey(targetKey)) {
       final wrapper = _controllerPool[targetKey]!;
@@ -593,7 +599,7 @@ class PreciseVideoPoolManager {
     } else {}
   }
 
-  /// 7. 🗑️ 移除最少使用的未初始化控制器
+  /// 7.  移除最少使用的未初始化控制器
   Future<void> _removeOldestUnusedController() async {
     if (_controllerPool.isEmpty) return;
 
@@ -618,41 +624,13 @@ class PreciseVideoPoolManager {
     }
   }
 
-  /// 8. 📊 打印解码器状态（增强版 - 包含完整性验证）
-  void _printDecoderStatus({bool forceOutput = false}) {
-    _validateStateConsistency();
-  }
-
-  /// 8a. 🔍 验证状态一致性
-  void _validateStateConsistency() {
-    try {
-      // 验证初始化控制器数量不超过限制
-      if (_initializedControllers.length > _maxInitializedDecoders) {}
-
-      // 验证播放控制器数量不超过限制
-      if (_playingControllers.length > _maxConcurrentPlaying) {}
-
-      // 验证所有播放中的控制器都已初始化
-      for (final playingKey in _playingControllers) {
-        if (!_initializedControllers.contains(playingKey)) {}
-      }
-
-      // 验证所有已初始化的控制器都在控制器池中
-      for (final initializedKey in _initializedControllers) {
-        if (!_controllerPool.containsKey(initializedKey)) {}
-      }
-    } catch (e) {
-      debugPrint('[PreciseVideoPoolManager] ❌ 验证状态一致性失败: $e');
-    }
-  }
-
-  /// 9. 🔑 检查控制器是否已初始化
+  /// 9.  检查控制器是否已初始化
   bool isControllerInitialized(String filePath, VideoType videoType) {
     final key = _generateControllerKey(filePath, videoType);
     return _initializedControllers.contains(key);
   }
 
-  /// 9a. 🎯 优化播放状态管理
+  /// 9a.  优化播放状态管理
   void optimizePlayingStates() {
     // 清理不一致的播放状态
     final toRemove = <String>[];
@@ -668,7 +646,7 @@ class PreciseVideoPoolManager {
         // 控制器未初始化但在播放列表中
         toRemove.add(key);
       }
-      // 🎯 修复：移除对 isPlaying 的检查，避免误判正常播放的视频
+      //  修复：移除对 isPlaying 的检查，避免误判正常播放的视频
       // 因为 isPlaying 状态可能因为帧同步、状态更新延迟等原因瞬间为false
     }
 
@@ -676,14 +654,17 @@ class PreciseVideoPoolManager {
       _playingControllers.remove(key);
     }
 
-    // 🎯 额外检查：确保播放中的控制器都在初始化列表中
+    //  额外检查：确保播放中的控制器都在初始化列表中
     for (final key in _playingControllers) {
       if (!_initializedControllers.contains(key)) {}
     }
   }
 
-  /// 9b. 🎯 清理指定类型的所有控制器（新增方法）
-  Future<void> cleanupControllersByType(VideoType videoType) async {
+  /// 9b.  清理指定类型的所有控制器（新增方法）
+  Future<void> cleanupControllersByType(
+    VideoType videoType, {
+    String? exceptKey,
+  }) async {
     final keysToRemove = <String>[];
 
     // 1. 找到所有该类型的控制器
@@ -691,7 +672,7 @@ class PreciseVideoPoolManager {
       final key = entry.key;
       final wrapper = entry.value;
 
-      if (wrapper.videoType == videoType) {
+      if (wrapper.videoType == videoType && key != exceptKey) {
         keysToRemove.add(key);
       }
     }
@@ -731,10 +712,10 @@ class PreciseVideoPoolManager {
     }
   }
 
-  /// 9b. 🎯 自動dispose控制器（優雅版本）
+  /// 9b.  自動dispose控制器（優雅版本）
   Future<void> _autoDisposeController(
       String keyToDispose, String videoTypeName) async {
-    // 🎯 優化：防止重複檢查已知不存在的控制器
+    //  優化：防止重複檢查已知不存在的控制器
     if (_recentlyCheckedNonExistentKeys.contains(keyToDispose)) {
       return;
     }
@@ -745,7 +726,7 @@ class PreciseVideoPoolManager {
     }
 
     if (!_controllerPool.containsKey(keyToDispose)) {
-      // 🎯 優化：將不存在的控制器加入快取，避免重複檢查（60秒後自動清除）
+      //  優化：將不存在的控制器加入快取，避免重複檢查（60秒後自動清除）
       _recentlyCheckedNonExistentKeys.add(keyToDispose);
 
       // 設置定時器清除快取
@@ -753,7 +734,7 @@ class PreciseVideoPoolManager {
         _recentlyCheckedNonExistentKeys.remove(keyToDispose);
       });
 
-      // 🎯 優化：防止重複輸出相同的日誌（30秒內只輸出一次，減少日誌噪音）
+      //  優化：防止重複輸出相同的日誌（30秒內只輸出一次，減少日誌噪音）
       final now = DateTime.now();
       final lastLogTime = _lastDisposeLogTime[keyToDispose];
       if (lastLogTime == null || now.difference(lastLogTime).inSeconds > 30) {
@@ -765,7 +746,7 @@ class PreciseVideoPoolManager {
     // 标记正在释放，防止重复调用
     _releasingKeys.add(keyToDispose);
 
-    // 🎯 關鍵保護：檢查是否為正在播放的重要控制器
+    //  關鍵保護：檢查是否為正在播放的重要控制器
     if (_playingControllers.contains(keyToDispose)) {
       _releasingKeys.remove(keyToDispose); // 移除释放标记
 
@@ -775,7 +756,7 @@ class PreciseVideoPoolManager {
       }
     }
 
-    // 🎯 修復：允許全屏廣告在切換時清理上一個控制器，但要確保不是當前正在播放的
+    //  修復：允許全屏廣告在切換時清理上一個控制器，但要確保不是當前正在播放的
     if (keyToDispose.startsWith('fullAd_')) {
       // 只有當前正在播放的全屏廣告才需要保護，上一個全屏廣告應該被清理
       if (_playingControllers.contains(keyToDispose)) {
@@ -811,7 +792,7 @@ class PreciseVideoPoolManager {
     }
   }
 
-  /// 9bb. 🎯 檢查並處理相同文件路徑的衝突
+  /// 9bb.  檢查並處理相同文件路徑的衝突
   Future<void> _checkAndHandleFilePathConflict(
       String filePath, VideoType videoType, String currentKey) async {
     // 查找所有使用相同文件路徑但不同VideoType的控制器
@@ -831,7 +812,7 @@ class PreciseVideoPoolManager {
     if (conflictingKeys.isNotEmpty) {
       // 根據優先級決定處理策略
       for (final conflictingKey in conflictingKeys) {
-        // 🚨 重要：不要清理刚刚设置的当前控制器
+        //  重要：不要清理刚刚设置的当前控制器
         if (conflictingKey == _lastTopAdKey ||
             conflictingKey == _lastFullAdKey) {
           continue;
@@ -850,14 +831,14 @@ class PreciseVideoPoolManager {
               currentKey.startsWith('fullAd_')) {
             await _autoDisposeController(conflictingKey, '頂部廣告（被全屏廣告接管）');
           }
-          // 🚨 重要：不要自动清理全屏广告，即使有冲突
+          //  重要：不要自动清理全屏广告，即使有冲突
           else if (conflictingKey.startsWith('fullAd_')) {}
         }
       }
     }
   }
 
-  /// 9cc. 🔧 從控制器key中提取文件ID用於比較
+  /// 9cc.  從控制器key中提取文件ID用於比較
   String _extractFileIdFromKey(String key) {
     // key格式: "videoType_fileId" (例如: "fullAd_20745029", "topAd_20745029")
     // 提取文件ID部分用於比較
@@ -868,7 +849,7 @@ class PreciseVideoPoolManager {
     return key;
   }
 
-  /// 9c. 🛡️ 安全dispose控制器（新增方法）
+  /// 9c.  安全dispose控制器（新增方法）
   Future<void> _safeDisposeController(
       VideoPlayerController controller, String key) async {
     try {
@@ -880,7 +861,7 @@ class PreciseVideoPoolManager {
       // 检查控制器是否已初始化
       if (!controller.value.isInitialized) {}
 
-      // 🎯 关键：使用try-catch包围dispose，参考video_player.dart的dispose实现
+      //  关键：使用try-catch包围dispose，参考video_player.dart的dispose实现
       // video_player.dart中的dispose方法会检查_isDisposed标志
       await controller.dispose();
     } catch (e) {
@@ -892,7 +873,7 @@ class PreciseVideoPoolManager {
     }
   }
 
-  /// 9d. 🛠️ 强制检查和修复资源限制（紧急修复方法）
+  /// 9d.  强制检查和修复资源限制（紧急修复方法）
   Future<void> enforceResourceLimits() async {
     // 1. 强制修复初始化控制器数量超限
     while (_initializedControllers.length > _maxInitializedDecoders) {
@@ -988,9 +969,80 @@ extension VideoTypeExtension on VideoType {
   String get name => toString().split('.').last;
 }
 
-/// 🎯 解码器占用详细说明类
+@visibleForTesting
+class VideoPoolResourcePolicy {
+  static String? selectDecoderToRelease({
+    required Iterable<String> initializedKeys,
+    required Set<String> playingKeys,
+    required Set<String> protectedKeys,
+    required Map<String, int> usageCounts,
+    required Map<String, DateTime> lastUsed,
+    required DateTime now,
+  }) {
+    String? targetKey;
+    DateTime? oldestTime;
+    int leastUsageCount = 0;
+
+    for (final key in initializedKeys) {
+      if (playingKeys.contains(key) || protectedKeys.contains(key)) {
+        continue;
+      }
+      if (!usageCounts.containsKey(key)) {
+        continue;
+      }
+
+      final keyLastUsed = lastUsed[key] ?? now;
+      final keyUsageCount = usageCounts[key] ?? 0;
+
+      if (targetKey == null ||
+          keyUsageCount < leastUsageCount ||
+          (keyUsageCount == leastUsageCount &&
+              keyLastUsed.isBefore(oldestTime!))) {
+        targetKey = key;
+        oldestTime = keyLastUsed;
+        leastUsageCount = keyUsageCount;
+      }
+    }
+
+    return targetKey;
+  }
+
+  static String? selectPlayingKeyToPause({
+    required Iterable<String> playingKeys,
+    required Set<String> availableKeys,
+    required Map<String, int> usageCounts,
+    required Map<String, DateTime> lastUsed,
+    required DateTime now,
+  }) {
+    String? targetKey;
+    DateTime? oldestTime;
+    int mostUsageCount = 0;
+
+    for (final key in playingKeys) {
+      if (!availableKeys.contains(key)) {
+        continue;
+      }
+
+      final keyLastUsed = lastUsed[key] ?? now;
+      final keyUsageCount = usageCounts[key] ?? 0;
+
+      if (targetKey == null ||
+          keyUsageCount > mostUsageCount ||
+          (keyUsageCount == mostUsageCount &&
+              keyLastUsed.isBefore(oldestTime!))) {
+        targetKey = key;
+        oldestTime = keyLastUsed;
+        mostUsageCount = keyUsageCount;
+      }
+    }
+
+    return targetKey;
+  }
+}
+
+///  解码器占用详细说明类
 class DecoderResourceExplanation {
-  /// 📋 不占用解码器资源的函数方法
+  ///  不占用解码器资源的函数方法
   static const List<String> nonDecoderMethods = [
     'VideoPlayerController.file()', // 仅创建对象
     'VideoPlayerController.network()', // 仅创建对象
@@ -1002,55 +1054,55 @@ class DecoderResourceExplanation {
     'controller.pause()', // 暂停（不释放解码器）
   ];
 
-  /// 🔥 占用解码器资源的函数方法
+  ///  占用解码器资源的函数方法
   static const List<String> decoderMethods = [
-    'controller.initialize()', // 🔑 关键：创建textureId，占用解码器
+    'controller.initialize()', //  关键：创建textureId，占用解码器
     'controller.play()', // 开始解码工作（需要已初始化）
   ];
 
-  /// 💥 释放解码器资源的函数方法
+  ///  释放解码器资源的函数方法
   static const List<String> releaseDecoderMethods = [
-    'controller.dispose()', // 🔑 关键：释放textureId，释放解码器
+    'controller.dispose()', //  关键：释放textureId，释放解码器
   ];
 
-  /// 📖 详细解释
+  ///  详细解释
   static String getExplanation() {
     return '''
-🔍 解码器资源管理详解：
+ 解码器资源管理详解：
 
-1. 📱 创建阶段（不占解码器）：
+1.  创建阶段（不占解码器）：
    - VideoPlayerController.file(File file) 
    ↓ 仅创建Dart对象，内存中只有文件路径等元数据
    ↓ textureId = kUninitializedTextureId (-1)
-   ↓ 📊 解码器占用：0
+   ↓  解码器占用：0
 
-2. 🎮 初始化阶段（占用解码器）：
+2.  初始化阶段（占用解码器）：
    - controller.initialize()
    ↓ 调用 _videoPlayerPlatform.create(dataSourceDescription)
    ↓ 平台层创建解码器实例和texture
    ↓ textureId = 分配的真实ID (非-1)
-   ↓ 📊 解码器占用：+1 ⚠️
+   ↓  解码器占用：+1
 
-3. ▶️ 播放阶段（解码工作）：
+3. ▶ 播放阶段（解码工作）：
    - controller.play()
    ↓ 解码器开始工作，解码视频帧到texture
    ↓ CPU/GPU资源消耗开始
-   ↓ 📊 解码器占用：维持+1，但工作负载增加
+   ↓  解码器占用：维持+1，但工作负载增加
 
-4. ⏸️ 暂停阶段（保持解码器）：
+4.  暂停阶段（保持解码器）：
    - controller.pause()
    ↓ 停止解码工作，但保持textureId
    ↓ 解码器资源仍被占用
-   ↓ 📊 解码器占用：维持+1
+   ↓  解码器占用：维持+1
 
-5. 🗑️ 释放阶段（释放解码器）：
+5.  释放阶段（释放解码器）：
    - controller.dispose()
    ↓ 调用 _videoPlayerPlatform.dispose(textureId)
    ↓ 平台层销毁解码器实例和texture
    ↓ textureId = kUninitializedTextureId (-1)
-   ↓ 📊 解码器占用：-1 ✅
+   ↓  解码器占用：-1
 
-💡 关键理解：
+ 关键理解：
 - 解码器 = textureId ≠ VideoPlayerController对象
 - 可以有20个Controller对象，但只有4个textureId
 - 只有initialize()和dispose()会改变解码器占用数量

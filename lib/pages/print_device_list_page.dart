@@ -61,7 +61,7 @@ class PrintDeviceListPageState extends State<PrintDeviceListPage> {
         }
       }
 
-      _logger.i('📱 當前香橙派IP: $_currentOrangePiIp');
+      _logger.i(' 當前香橙派IP: $_currentOrangePiIp');
     } catch (e) {
       _logger.e('載入IP地址失敗: $e');
       setState(() {
@@ -97,7 +97,7 @@ class PrintDeviceListPageState extends State<PrintDeviceListPage> {
         _isLoading = false;
       });
 
-      _logger.i('📱 打印機初始化完成');
+      _logger.i(' 打印機初始化完成');
     } catch (e) {
       if (!mounted) return;
 
@@ -295,7 +295,7 @@ class PrintDeviceListPageState extends State<PrintDeviceListPage> {
 
   /// 4a, 手動健康檢測
   Future<void> _manualHealthCheck() async {
-    _logger.i('🏥 [手動健康檢測] 用戶觸發');
+    _logger.i(' [手動健康檢測] 用戶觸發');
 
     // 顯示載入對話框
     _showLoadingDialog('正在執行健康檢測...\n請稍候');
@@ -319,12 +319,12 @@ class PrintDeviceListPageState extends State<PrintDeviceListPage> {
         isSuccess: true,
       );
 
-      _logger.i('✅ [手動健康檢測] 完成');
+      _logger.i(' [手動健康檢測] 完成');
     } catch (e) {
       if (!mounted) return;
       Navigator.of(context).pop(); // 關閉載入對話框
 
-      _logger.e('❌ [手動健康檢測] 失敗: $e');
+      _logger.e(' [手動健康檢測] 失敗: $e');
 
       _showMessageDialog(
         title: '健康檢測失敗',
@@ -336,7 +336,7 @@ class PrintDeviceListPageState extends State<PrintDeviceListPage> {
 
   /// 7, 測試打印機連接
   Future<void> _testPrinter(PrinterInfo printer) async {
-    _logger.i('🖨️ 測試打印機: ${printer.name}');
+    _logger.i(' 測試打印機: ${printer.name}');
 
     _showLoadingDialog('測試連接中...');
 
@@ -717,19 +717,6 @@ class PrintDeviceListPageState extends State<PrintDeviceListPage> {
         return Colors.red;
       default:
         return Colors.grey;
-    }
-  }
-
-  /// 獲取顏色模式文本
-  String _getColorModeText(String? colorMode) {
-    switch (colorMode) {
-      case 'color':
-        return '彩色';
-      case 'monochrome':
-      case 'bw':
-        return '黑白';
-      default:
-        return colorMode ?? '未知';
     }
   }
 
@@ -1414,28 +1401,6 @@ class PrintDeviceListPageState extends State<PrintDeviceListPage> {
           ],
         ),
       ],
-    );
-  }
-
-  /// 14, 構建詳情行
-  Widget _buildDetailRow(String label, String value) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 4),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          SizedBox(
-            width: 80,
-            child: Text(
-              '$label:',
-              style: const TextStyle(fontWeight: FontWeight.w600),
-            ),
-          ),
-          Expanded(
-            child: Text(value),
-          ),
-        ],
-      ),
     );
   }
 

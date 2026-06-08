@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:iboard_app/providers/app_data_provider.dart';
 import 'package:iboard_app/providers/app_update_provider.dart'; // 导入更新Provider
-import 'package:iboard_app/widgets/debug_timer_widget.dart';
-import 'package:iboard_app/widgets/debug_update_time_widget.dart'; // 导入調試窗口
+import 'package:iboard_app/widgets/debug/debug_timer_widget.dart';
+import 'package:iboard_app/widgets/debug/debug_update_time_widget.dart'; // 导入調試窗口
 
 import 'package:provider/provider.dart';
 import 'package:flutter/foundation.dart'; // 导入kDebugMode
@@ -21,7 +21,7 @@ class TimeSettingsPageState extends State<TimeSettingsPage> {
   @override
   void initState() {
     super.initState();
-    // 🔧 優化：頁面初始化時嘗試加載緩存數據
+    //  優化：頁面初始化時嘗試加載緩存數據
     _loadCacheDataIfNeeded();
   }
 
@@ -57,7 +57,7 @@ class TimeSettingsPageState extends State<TimeSettingsPage> {
       final prefs = await SharedPreferences.getInstance();
       final deviceId = prefs.getString('deviceId');
 
-      // 🔧 優化：使用優化後的初始化方法，失敗時保持緩存數據
+      //  優化：使用優化後的初始化方法，失敗時保持緩存數據
       await appDataProvider.initialize(deviceId: deviceId);
 
       if (!mounted) return;
@@ -70,7 +70,7 @@ class TimeSettingsPageState extends State<TimeSettingsPage> {
         ),
       );
     } catch (e) {
-      // 🔧 優化：刷新失敗時檢查是否有緩存數據可用
+      //  優化：刷新失敗時檢查是否有緩存數據可用
       if (!mounted) return;
       final appDataProvider =
           Provider.of<AppDataProvider>(context, listen: false);
@@ -112,7 +112,7 @@ class TimeSettingsPageState extends State<TimeSettingsPage> {
           final deviceSettings = appDataProvider.deviceSettings;
           final error = appDataProvider.error;
 
-          // 🔧 優化：檢查是否有緩存數據可用，即使登錄失敗
+          //  優化：檢查是否有緩存數據可用，即使登錄失敗
           final hasCachedData = settingsModel != null || deviceSettings != null;
           final shouldShowContent = isLoggedIn || hasCachedData;
 
@@ -256,7 +256,7 @@ class TimeSettingsPageState extends State<TimeSettingsPage> {
                                         ),
                                       ),
                                       const Spacer(),
-                                      // 🔧 新增：數據來源指示器
+                                      //  新增：數據來源指示器
                                       _buildDataSourceIndicator(
                                           isLoggedIn, hasCachedData),
                                     ],
@@ -298,7 +298,7 @@ class TimeSettingsPageState extends State<TimeSettingsPage> {
                             const SizedBox(height: 24),
                             _buildVersionInfoCard(context),
 
-                            // 时间設置卡片 - 🔧 優化：基於緩存數據而非登錄狀態
+                            // 时间設置卡片 -  優化：基於緩存數據而非登錄狀態
                             if (deviceSettings != null) ...[
                               const SizedBox(height: 24),
                               Container(

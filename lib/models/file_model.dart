@@ -31,26 +31,19 @@ class FileModel {
 
   factory FileModel.fromJson(Map<String, dynamic> json) {
     return FileModel(
-      id: json['id'] as int,
-      mimeType: json['mimeType'] as String,
-      md5: json['md5'] as String,
-      url: json['path'] as String, // API uses 'path' for URL
-      fileSize: json['size'] as int, // API uses 'size' for fileSize
-      oss: json['oss'] as String?,
-      uploader: json['uploader'] as String?,
-      uploaderId: json['uploaderId'] as int?,
-      uploaderType: json['uploaderType'] as String?,
-      createdAt: json['createdAt'] != null
-          ? DateTime.parse(json['createdAt'] as String)
-          : null,
-      updatedAt: json['updatedAt'] != null
-          ? DateTime.parse(json['updatedAt'] as String)
-          : null,
-      deletedAt: json['deletedAt'] != null
-          ? DateTime.parse(json['deletedAt'] as String)
-          : null,
-      localFilePath: json['localFilePath']
-          as String?, // Assuming this might still be used locally
+      id: _parseInt(json['id']),
+      mimeType: json['mimeType']?.toString() ?? '',
+      md5: json['md5']?.toString() ?? '',
+      url: (json['path'] ?? json['url'])?.toString() ?? '',
+      fileSize: _parseInt(json['size'] ?? json['fileSize']),
+      oss: json['oss']?.toString(),
+      uploader: json['uploader']?.toString(),
+      uploaderId: _parseNullableInt(json['uploaderId']),
+      uploaderType: json['uploaderType']?.toString(),
+      createdAt: _parseDate(json['createdAt']),
+      updatedAt: _parseDate(json['updatedAt']),
+      deletedAt: _parseDate(json['deletedAt']),
+      localFilePath: json['localFilePath']?.toString(),
     );
   }
 
@@ -71,4 +64,31 @@ class FileModel {
       'localFilePath': localFilePath,
     };
   }
+}
+
+int _parseInt(Object? value) {
+  if (value is int) {
+    return value;
+  }
+  if (value is num) {
+    return value.toInt();
+  }
+  if (value is String) {
+    return int.tryParse(value) ?? 0;
+  }
+  return 0;
+}
+
+int? _parseNullableInt(Object? value) {
+  if (value == null) {
+    return null;
+  }
+  return _parseInt(value);
+}
+
+DateTime? _parseDate(Object? value) {
+  if (value == null) {
+    return null;
+  }
+  return DateTime.tryParse(value.toString());
 }
