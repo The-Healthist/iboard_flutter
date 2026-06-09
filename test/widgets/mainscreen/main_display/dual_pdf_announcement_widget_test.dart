@@ -1,8 +1,13 @@
+import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:iboard_app/widgets/mainscreen/main_display/dual_pdf_announcement_widget.dart';
 
 void main() {
   group('debugBuildDualAnnouncementFrames', () {
+    test('fits page images without cropping or distortion', () {
+      expect(debugDualAnnouncementPageFit, BoxFit.contain);
+    });
+
     test('pairs flattened PDF pages two at a time', () {
       final frames = debugBuildDualAnnouncementFrames(
         <String>['1.1', '2.1', '2.2', '3.1', '3.2'],

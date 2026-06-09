@@ -10,6 +10,9 @@ import 'package:iboard_app/providers/state_provider.dart';
 import 'package:iboard_app/widgets/carousel/carousel_widget.dart';
 import 'package:provider/provider.dart';
 
+@visibleForTesting
+const BoxFit debugDualAnnouncementPageFit = BoxFit.contain;
+
 class DualPdfAnnouncementWidget extends StatefulWidget {
   final List<AnnouncementModel> announcements;
   final FileManager? fileManager;
@@ -369,7 +372,7 @@ class _DualPdfAnnouncementWidgetState extends State<DualPdfAnnouncementWidget> {
           Positioned.fill(
             child: Image.file(
               File(entry.pagePath),
-              fit: BoxFit.contain,
+              fit: debugDualAnnouncementPageFit,
               gaplessPlayback: true,
               errorBuilder: (context, error, stackTrace) {
                 return const Center(child: Text('通告頁面暫不可用'));
