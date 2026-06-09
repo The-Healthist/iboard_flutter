@@ -3,7 +3,6 @@ import 'package:iboard_app/models/announcement_model.dart';
 import 'package:iboard_app/providers/announcement_provider.dart';
 import 'package:iboard_app/providers/arrear_provider.dart';
 import 'package:iboard_app/providers/state_provider.dart';
-import 'package:iboard_app/widgets/mainscreen/main_display/payment_widget.dart';
 import 'package:provider/provider.dart';
 import 'package:logger/logger.dart';
 
@@ -115,14 +114,12 @@ class MainScreenWidgetState extends State<MainScreenWidget> {
                     _selectedFunction = chineseTitle;
                   });
 
-                  // 29, 處理功能按鈕點擊，電子繳費需要暫停輪播
+                  // 29, 處理功能按鈕點擊
                   if (chineseTitle == '電子繳費') {
-                    _logger
-                        .i(' [MainScreenWidget] 用戶點擊電子繳費按鈕 - 進入手動操作狀態（禁用超時）');
+                    _logger.i(' [MainScreenWidget] 用戶點擊電子繳費按鈕 - 顯示未開通提示圖');
                     final carouselStateProvider =
                         context.read<CarouselStateProvider>();
-                    carouselStateProvider.enterManualOperation(
-                        disableTimeout: true);
+                    carouselStateProvider.enterManualOperation();
                   } else if (chineseTitle == '通告列表') {
                     // 30, 返回通告列表時恢復輪播
                     _logger.i(' [MainScreenWidget] 用戶點擊通告列表 - 恢復默認狀態');
@@ -252,28 +249,18 @@ class MainScreenWidgetState extends State<MainScreenWidget> {
 
   ///3, 構建電子繳費頁面
   Widget _buildElectronicPaymentPage() {
-    return PaymentWidget(
-      onIdleTimeout: () {
-        // 28, 無操作超時，恢復輪播（自動切換到通告和繳費列表）
-        debugPrint(' [MainScreenWidget] 電子繳費頁面無操作超時，恢復通告輪播');
-        if (mounted) {
-          final carouselStateProvider = context.read<CarouselStateProvider>();
-
-          // 40, 使用專門的方法從手動操作狀態恢復到默認狀態
-          // 這個方法會正確處理輪播恢復、全屏廣告計時器啟動等邏輯
-          try {
-            carouselStateProvider.exitManualOperationToDefault();
-            debugPrint(' [MainScreenWidget] 已調用 exitManualOperationToDefault');
-          } catch (e) {
-            debugPrint(' [MainScreenWidget] 恢復通告輪播失敗: $e');
-          }
-
-          // 32, 重置本地選擇狀態
-          setState(() {
-            _selectedFunction = '通告列表';
-          });
-        }
-      },
+    return Container(
+      color: Colors.white,
+      padding: const EdgeInsets.all(16),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(8),
+        child: Image.asset(
+          'assets/images/payment.png',
+          width: double.infinity,
+          height: double.infinity,
+          fit: BoxFit.contain,
+        ),
+      ),
     );
   }
 
