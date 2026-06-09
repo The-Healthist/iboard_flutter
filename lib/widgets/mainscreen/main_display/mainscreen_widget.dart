@@ -3,7 +3,6 @@ import 'package:iboard_app/models/announcement_model.dart';
 import 'package:iboard_app/providers/announcement_provider.dart';
 import 'package:iboard_app/providers/arrear_provider.dart';
 import 'package:iboard_app/providers/state_provider.dart';
-import 'package:iboard_app/widgets/mainscreen/main_display/payment_widget.dart';
 import 'package:provider/provider.dart';
 import 'package:logger/logger.dart';
 
@@ -115,14 +114,12 @@ class MainScreenWidgetState extends State<MainScreenWidget> {
                     _selectedFunction = chineseTitle;
                   });
 
-                  // 29, 處理功能按鈕點擊，電子繳費需要暫停輪播
+                  // 29, 處理功能按鈕點擊
                   if (chineseTitle == '電子繳費') {
-                    _logger
-                        .i(' [MainScreenWidget] 用戶點擊電子繳費按鈕 - 進入手動操作狀態（禁用超時）');
+                    _logger.i(' [MainScreenWidget] 用戶點擊電子繳費展示圖 - 進入手動操作狀態');
                     final carouselStateProvider =
                         context.read<CarouselStateProvider>();
-                    carouselStateProvider.enterManualOperation(
-                        disableTimeout: true);
+                    carouselStateProvider.enterManualOperation();
                   } else if (chineseTitle == '通告列表') {
                     // 30, 返回通告列表時恢復輪播
                     _logger.i(' [MainScreenWidget] 用戶點擊通告列表 - 恢復默認狀態');
@@ -252,28 +249,12 @@ class MainScreenWidgetState extends State<MainScreenWidget> {
 
   ///3, 構建電子繳費頁面
   Widget _buildElectronicPaymentPage() {
-    return PaymentWidget(
-      onIdleTimeout: () {
-        // 28, 無操作超時，恢復輪播（自動切換到通告和繳費列表）
-        debugPrint(' [MainScreenWidget] 電子繳費頁面無操作超時，恢復通告輪播');
-        if (mounted) {
-          final carouselStateProvider = context.read<CarouselStateProvider>();
-
-          // 40, 使用專門的方法從手動操作狀態恢復到默認狀態
-          // 這個方法會正確處理輪播恢復、全屏廣告計時器啟動等邏輯
-          try {
-            carouselStateProvider.exitManualOperationToDefault();
-            debugPrint(' [MainScreenWidget] 已調用 exitManualOperationToDefault');
-          } catch (e) {
-            debugPrint(' [MainScreenWidget] 恢復通告輪播失敗: $e');
-          }
-
-          // 32, 重置本地選擇狀態
-          setState(() {
-            _selectedFunction = '通告列表';
-          });
-        }
-      },
+    return _buildStaticImagePage(
+      imagePath: 'assets/images/payment.png',
+      icon: Icons.payment,
+      chineseTitle: '電子繳費',
+      englishTitle: 'Electronic Payment',
+      fallbackMessage: '開通電子支付詳情請聯絡貴大廈管理公司',
     );
   }
 
@@ -1002,6 +983,22 @@ class MainScreenWidgetState extends State<MainScreenWidget> {
 
   ///16, 構建便利服務頁面
   Widget _buildConvenientServicesPage() {
+    return _buildStaticImagePage(
+      imagePath: 'assets/images/convenient_services.png',
+      icon: Icons.store,
+      chineseTitle: '便利服務',
+      englishTitle: 'Convenient Services',
+      fallbackMessage: '該大廈尚未開通此功能',
+    );
+  }
+
+  Widget _buildStaticImagePage({
+    required String imagePath,
+    required IconData icon,
+    required String chineseTitle,
+    required String englishTitle,
+    required String fallbackMessage,
+  }) {
     return Container(
       padding: const EdgeInsets.fromLTRB(16.0, 20.0, 16.0, 20.0), // 移除上下內邊距
       child: Column(
@@ -1018,43 +1015,43 @@ class MainScreenWidgetState extends State<MainScreenWidget> {
               child: ClipRRect(
                 borderRadius: BorderRadius.circular(8), // 保持圆角
                 child: Image.asset(
-                  'assets/images/convenient_services.png',
+                  imagePath,
                   width: double.infinity, // 宽度填满容器
                   height: double.infinity, // 高度填满容器
                   fit: BoxFit.cover, // 填满容器，不保持比例
                   errorBuilder: (context, error, stackTrace) {
                     // 如果图片加载失败，显示备用内容
-                    return const Center(
+                    return Center(
                       child: Column(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
                           Icon(
-                            Icons.store,
+                            icon,
                             size: 64,
                             color: Colors.grey,
                           ),
-                          SizedBox(height: 16),
+                          const SizedBox(height: 16),
                           Text(
-                            '便利服務',
-                            style: TextStyle(
+                            chineseTitle,
+                            style: const TextStyle(
                               fontSize: 18,
                               color: Colors.black87,
                               fontWeight: FontWeight.w500,
                             ),
                           ),
-                          SizedBox(height: 4),
+                          const SizedBox(height: 4),
                           Text(
-                            'Convenient Services',
-                            style: TextStyle(
+                            englishTitle,
+                            style: const TextStyle(
                               fontSize: 12,
                               color: Color(0xFF757575),
                               fontWeight: FontWeight.normal,
                             ),
                           ),
-                          SizedBox(height: 8),
+                          const SizedBox(height: 8),
                           Text(
-                            '該大廈尚未開通此功能',
-                            style: TextStyle(
+                            fallbackMessage,
+                            style: const TextStyle(
                               fontSize: 14,
                               color: Colors.grey,
                             ),

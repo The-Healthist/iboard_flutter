@@ -10,7 +10,6 @@ import 'package:iboard_app/providers/ad_full_carousel_provider.dart';
 import 'package:iboard_app/providers/rthk_news_provider.dart';
 import 'package:iboard_app/providers/app_update_provider.dart'; // 添加应用更新Provider导入
 import 'package:iboard_app/providers/printer_provider.dart'; // 添加打印機提供者導入
-import 'package:iboard_app/providers/payment_provider.dart'; // 添加支付提供者導入
 import 'package:iboard_app/providers/receipt_printer_provider.dart'; // 添加小票打印機提供者導入
 import 'package:iboard_app/managers/file_manager.dart';
 import 'package:iboard_app/utils/device_id_util.dart';
@@ -129,15 +128,6 @@ void main() {
           ChangeNotifierProvider<PrinterProvider>(
             create: (context) {
               return PrinterProvider();
-            },
-          ),
-          ChangeNotifierProvider<PaymentNotifier>(
-            create: (context) {
-              final appDataProvider =
-                  Provider.of<AppDataProvider>(context, listen: false);
-              final paymentNotifier = PaymentNotifier();
-              paymentNotifier.setApiClient(appDataProvider.apiClient);
-              return paymentNotifier;
             },
           ),
           ChangeNotifierProvider<ReceiptPrinterNotifier>(
