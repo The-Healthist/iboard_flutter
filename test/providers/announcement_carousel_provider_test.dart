@@ -142,6 +142,45 @@ void main() {
       );
     });
   });
+
+  group('AnnouncementCarouselExitPolicy', () {
+    test('honors main screen target when exiting independent announcement', () {
+      expect(
+        AnnouncementCarouselExitPolicy.resolveTargetIndex(
+          requestedTargetIndex: 0,
+          savedCarouselIndex: 2,
+          widgetCount: 4,
+          initialCarouselIndex: 2,
+        ),
+        0,
+      );
+    });
+
+    test('restores saved carousel index when no explicit target is requested',
+        () {
+      expect(
+        AnnouncementCarouselExitPolicy.resolveTargetIndex(
+          requestedTargetIndex: null,
+          savedCarouselIndex: 3,
+          widgetCount: 5,
+          initialCarouselIndex: 2,
+        ),
+        3,
+      );
+    });
+
+    test('falls back to first content index when saved target is invalid', () {
+      expect(
+        AnnouncementCarouselExitPolicy.resolveTargetIndex(
+          requestedTargetIndex: null,
+          savedCarouselIndex: 9,
+          widgetCount: 4,
+          initialCarouselIndex: 0,
+        ),
+        2,
+      );
+    });
+  });
 }
 
 AnnouncementModel _announcement({

@@ -1126,19 +1126,7 @@ class AnnouncementCarouselProvider extends ChangeNotifier {
       //  修复：如果在独立通告模式，任何跳转都应该先退出独立模式
       if (_isInIndependentAnnouncementMode) {
         // debugPrint('[AnnouncementCarousel]  在独立模式中跳转，先退出独立模式');
-        exitIndependentAnnouncementMode();
-
-        // 如果跳转到主屏幕，exitIndependentAnnouncementMode 已经处理完毕
-        if (index == 0) {
-          return;
-        }
-
-        // 如果跳转到其他索引，需要等待退出完成后再跳转
-        Future.delayed(const Duration(milliseconds: 100), () {
-          if (index < _midCarouselController.widgetCount) {
-            jumpToAnnouncementIndex(index);
-          }
-        });
+        exitIndependentAnnouncementMode(targetIndex: index);
         return;
       }
 
@@ -1228,7 +1216,7 @@ class AnnouncementCarouselProvider extends ChangeNotifier {
   }
 
   ///14a，退出独立通告模式，恢复正常轮播内容
-  void exitIndependentAnnouncementMode() {
+  void exitIndependentAnnouncementMode({int? targetIndex}) {
     if (!_isInIndependentAnnouncementMode) {
       // debugPrint('[AnnouncementCarousel]  当前不在独立通告模式，无需退出');
       return;
@@ -1259,30 +1247,22 @@ class AnnouncementCarouselProvider extends ChangeNotifier {
 
     //  修复：延迟一小段时间确保Widget完全重新创建后再跳转
     Future.delayed(const Duration(milliseconds: 100), () {
-      //  关键修复：优先恢复到保存的索引（进入独立模式前的位置）
-      int targetIndex;
-      if (_savedCarouselIndex != null &&
-          _savedCarouselIndex! >= 2 &&
-          _savedCarouselIndex! < _midCarouselController.widgetCount) {
-        targetIndex = _savedCarouselIndex!;
-        // debugPrint('[AnnouncementCarousel]  恢复到进入独立模式前的索引: $targetIndex');
-      } else {
-        // 如果没有保存的索引，使用默认逻辑
-        targetIndex = _determineInitialCarouselIndex();
-        if (targetIndex < 2) {
-          targetIndex = 2; //  修复：确保不会停留在主屏幕，从第一个正常通告开始
-        }
-        // debugPrint('[AnnouncementCarousel]  使用默认初始索引: $targetIndex');
-      }
+      final resolvedTargetIndex =
+          AnnouncementCarouselExitPolicy.resolveTargetIndex(
+        requestedTargetIndex: targetIndex,
+        savedCarouselIndex: _savedCarouselIndex,
+        widgetCount: _midCarouselController.widgetCount,
+        initialCarouselIndex: _determineInitialCarouselIndex(),
+      );
 
-      _currentNoticeIndex = targetIndex;
+      _currentNoticeIndex = resolvedTargetIndex;
       _recordValidCarouselIndex(_currentNoticeIndex);
 
       // debugPrint(
-      //     '[AnnouncementCarousel]  准备跳转到目标索引: $targetIndex，当前Widget数量: ${_midCarouselController.widgetCount}');
+      //     '[AnnouncementCarousel]  准备跳转到目标索引: $resolvedTargetIndex，当前Widget数量: ${_midCarouselController.widgetCount}');
 
       // 跳转到目标索引
-      if (_midCarouselController.widgetCount > targetIndex) {
+      if (_midCarouselController.widgetCount > resolvedTargetIndex) {
         _jumpToVisibleIndex(_currentNoticeIndex);
         // debugPrint(
         //     '[AnnouncementCarousel]  已恢复到正常轮播，当前索引: $_currentNoticeIndex');
@@ -2132,5 +2112,39 @@ class AnnouncementCarouselIndexPolicy {
       arrearEndIndex++;
     }
     return currentIndex >= arrearStartIndex && currentIndex <= arrearEndIndex;
+  }
+}
+
+@visibleForTesting
+class AnnouncementCarouselExitPolicy {
+  static int resolveTargetIndex({
+    required int? requestedTargetIndex,
+    required int? savedCarouselIndex,
+    required int widgetCount,
+    required int initialCarouselIndex,
+  }) {
+    if (_isValidIndex(requestedTargetIndex, widgetCount)) {
+      return requestedTargetIndex!;
+    }
+
+    if (_isValidContentIndex(savedCarouselIndex, widgetCount)) {
+      return savedCarouselIndex!;
+    }
+
+    if (_isValidIndex(initialCarouselIndex, widgetCount)) {
+      return initialCarouselIndex < 2 && widgetCount > 2
+          ? 2
+          : initialCarouselIndex;
+    }
+
+    return widgetCount > 2 ? 2 : 0;
+  }
+
+  static bool _isValidIndex(int? index, int widgetCount) {
+    return index != null && index >= 0 && index < widgetCount;
+  }
+
+  static bool _isValidContentIndex(int? index, int widgetCount) {
+    return index != null && index >= 2 && index < widgetCount;
   }
 }
