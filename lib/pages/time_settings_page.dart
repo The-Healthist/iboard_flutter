@@ -6,7 +6,7 @@ import 'package:iboard_app/widgets/debug/debug_update_time_widget.dart'; // 导�
 
 import 'package:provider/provider.dart';
 import 'package:flutter/foundation.dart'; // 导入kDebugMode
-import 'package:shared_preferences/shared_preferences.dart';
+import 'package:iboard_app/utils/device_id_util.dart';
 
 class TimeSettingsPage extends StatefulWidget {
   const TimeSettingsPage({super.key});
@@ -54,8 +54,7 @@ class TimeSettingsPageState extends State<TimeSettingsPage> {
       if (!mounted) return;
       final appDataProvider =
           Provider.of<AppDataProvider>(context, listen: false);
-      final prefs = await SharedPreferences.getInstance();
-      final deviceId = prefs.getString('deviceId');
+      final deviceId = await DeviceIdUtil().generateUniqueDeviceId();
 
       //  優化：使用優化後的初始化方法，失敗時保持緩存數據
       await appDataProvider.initialize(deviceId: deviceId);

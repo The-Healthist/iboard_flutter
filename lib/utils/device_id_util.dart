@@ -6,6 +6,8 @@ import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class DeviceIdUtil {
+  static const String _deviceIdKey = 'device_id';
+  static const String _legacyCachedDeviceIdKey = 'cached_device_id';
   static final DeviceIdUtil _instance = DeviceIdUtil._internal();
 
   factory DeviceIdUtil() {
@@ -32,7 +34,19 @@ class DeviceIdUtil {
   Future<String?> _getCachedDeviceId() async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      return prefs.getString('device_id');
+      final deviceId = prefs.getString(_deviceIdKey);
+      if (deviceId != null && deviceId.isNotEmpty) {
+        return deviceId;
+      }
+
+      // Backward compatibility for older builds that wrote a different key.
+      final legacyDeviceId = prefs.getString(_legacyCachedDeviceIdKey);
+      if (legacyDeviceId != null && legacyDeviceId.isNotEmpty) {
+        await prefs.setString(_deviceIdKey, legacyDeviceId);
+        return legacyDeviceId;
+      }
+
+      return null;
     } catch (e) {
       return null;
     }
@@ -42,7 +56,8 @@ class DeviceIdUtil {
   Future<void> _cacheDeviceId(String deviceId) async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      await prefs.setString('cached_device_id', deviceId);
+      await prefs.setString(_deviceIdKey, deviceId);
+      await prefs.setString(_legacyCachedDeviceIdKey, deviceId);
     } catch (e) {
       // 如果保存失败，继续使用，但不会缓存
     }
@@ -234,7 +249,8 @@ class DeviceIdUtil {
   Future<void> clearStoredDeviceId() async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      await prefs.remove('cached_device_id');
+      await prefs.remove(_deviceIdKey);
+      await prefs.remove(_legacyCachedDeviceIdKey);
       await prefs.remove('fallback_device_id');
     } catch (e) {
       // 忽略清除失败的错误
